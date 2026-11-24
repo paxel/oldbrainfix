@@ -30,6 +30,28 @@ void main() {
       '# Shop\n\n| Item | Qty |\n| --- | --: |\n| ☐ **milk** #dairy | 2 |\n'
       '| oat | 1 |';
 
+  /// A table whose rows sort apart by either column (obf-1052): by price
+  /// 3, 1, 2 (the empty price last), descending 1, 3, 2.
+  const fruit =
+      '| Fruit | Price |\n| --- | --: |\n| pear | 10 |\n| fig |  |\n'
+      '| apple | 2,50 € |';
+
+  /// The rows found by [rowKey] of each of [rows] from top to bottom.
+  List<int> order(
+    WidgetTester tester,
+    Iterable<int> rows,
+    String Function(int r) rowKey,
+  ) =>
+      [
+        for (final r in rows)
+          if (find.byKey(ValueKey(rowKey(r))).evaluate().isNotEmpty) r,
+      ]..sort(
+        (a, b) => tester
+            .getTopLeft(find.byKey(ValueKey(rowKey(a))))
+            .dy
+            .compareTo(tester.getTopLeft(find.byKey(ValueKey(rowKey(b)))).dy),
+      );
+
   /// A table wider than any phone, with [rows] rows under its header.
   String wide({int rows = 3, bool headings = false}) {
     String row(String name) =>
@@ -272,6 +294,82 @@ void main() {
         find.textContaining('Show all', skipOffstage: false),
         findsNothing,
       );
+    });
+
+    testWidgets('a tap on a column\'s heading sorts the rows shown by it, '
+        'ascending, descending, then as written, an arrow saying which; a '
+        'tap under it still opens the table (obf-1052)', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await pump(tester, fruit);
+      List<int> rows() => order(tester, [1, 2, 3], (r) => 'table-0-row-$r');
+      expect(rows(), [1, 2, 3]);
+
+      await tester.tap(key('table-0-sort-1'));
+      await tester.pumpAndSettle();
+      expect(find.byType(TableScreen), findsNothing);
+      expect(rows(), [3, 1, 2]);
+      expect(find.byIcon(Icons.arrow_upward), findsOneWidget);
+      expect(
+        tester.getSemantics(key('table-0-sort-1')).value,
+        'Sorted ascending',
+      );
+
+      await tester.tap(key('table-0-sort-1'));
+      await tester.pumpAndSettle();
+      expect(rows(), [1, 3, 2]);
+      expect(find.byIcon(Icons.arrow_downward), findsOneWidget);
+      expect(find.byIcon(Icons.arrow_upward), findsNothing);
+
+      await tester.tap(key('table-0-sort-1'));
+      await tester.pumpAndSettle();
+      expect(rows(), [1, 2, 3]);
+      expect(find.byKey(const ValueKey('table-sort-arrow')), findsNothing);
+
+      // By the words.
+      await tester.tap(key('table-0-sort-0'));
+      await tester.pumpAndSettle();
+      expect(rows(), [3, 2, 1]);
+
+      await tester.tap(key('table-0-row-1'));
+      await tester.pumpAndSettle();
+      expect(find.byType(TableScreen), findsOneWidget);
+      semantics.dispose();
+    });
+
+    testWidgets('folded, the first rows in the sorted order show', (
+      tester,
+    ) async {
+      final text = [
+        '| Name | Count |',
+        '| --- | --- |',
+        for (var r = 1; r <= 12; r++) '| r$r | $r |',
+      ].join('\n');
+      await tester.pumpWidget(
+        app(
+          Scaffold(
+            body: ListView(
+              children: [
+                MarkedText(
+                  text,
+                  format: TextFormats.markdown,
+                  rows: MarkedText.cardRows,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      expect(key('table-0-row-1'), findsOneWidget);
+      expect(key('table-0-row-12'), findsNothing);
+      await tester.tap(key('table-0-sort-1'));
+      await tester.pumpAndSettle();
+      await tester.tap(key('table-0-sort-1'));
+      await tester.pumpAndSettle();
+      expect(key('table-0-row-12'), findsOneWidget);
+      expect(key('table-0-row-3'), findsOneWidget);
+      expect(key('table-0-row-2'), findsNothing);
+      expect(key('table-0-row-1'), findsNothing);
+      expect(find.text('Show all 12'), findsOneWidget);
     });
 
     testWidgets('a cell\'s box is a button that ticks it beside the text', (
@@ -683,6 +781,75 @@ void main() {
       expect(written.single.text, '# Shop\n\n$table');
       expect(photos.copiedHtml.single.text, table);
       expect(plain, [table]);
+    });
+
+    testWidgets('where it is only read a tap on a column\'s heading sorts '
+        'the rows by it, in the view only (obf-1052)', (tester) async {
+      await open(tester, fruit);
+      List<int> rows() => order(tester, [1, 2, 3], (r) => 'table-row-$r');
+      await tester.tap(key('cell-0-1'));
+      await tester.pumpAndSettle();
+      expect(rows(), [3, 1, 2]);
+      expect(find.byIcon(Icons.arrow_upward), findsOneWidget);
+      await tester.tap(key('cell-0-1'));
+      await tester.pumpAndSettle();
+      expect(rows(), [1, 3, 2]);
+      expect(find.byIcon(Icons.arrow_downward), findsOneWidget);
+      await tester.tap(key('cell-0-1'));
+      await tester.pumpAndSettle();
+      expect(rows(), [1, 2, 3]);
+      expect(find.byKey(const ValueKey('table-sort-arrow')), findsNothing);
+    });
+
+    testWidgets('where it is edited a column\'s letter sorts the rows shown '
+        'by it, the text as written, and its heading is still edited', (
+      tester,
+    ) async {
+      final written = await open(tester, fruit, edits: true);
+      List<int> rows() => order(tester, [1, 2, 3], (r) => 'table-row-$r');
+      await tester.tap(key('column-1'));
+      await tester.pumpAndSettle();
+      expect(key('table-asWritten'), findsNothing);
+      await tester.tap(key('table-sortDown'));
+      await tester.pumpAndSettle();
+      expect(rows(), [1, 3, 2]);
+      expect(find.byIcon(Icons.arrow_downward), findsOneWidget);
+      expect(written, isEmpty);
+
+      // A cell keeps its place in the table: the one edited is written.
+      await tester.tap(key('cell-3-0'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'apples');
+      await tester.tap(key('cell-0-1'));
+      await tester.pumpAndSettle();
+      expect(written.single.text, contains('| apples | 2,50 € |'));
+      expect(find.byType(TextField), findsOneWidget);
+
+      await tester.tap(key('column-1'));
+      await tester.pumpAndSettle();
+      expect(key('table-sortDown'), findsNothing);
+      await tester.tap(key('table-asWritten'));
+      await tester.pumpAndSettle();
+      expect(rows(), [1, 2, 3]);
+    });
+
+    testWidgets('a column moved there shows the rows as written again', (
+      tester,
+    ) async {
+      final written = await open(tester, fruit, edits: true);
+      List<int> rows() => order(tester, [1, 2, 3], (r) => 'table-row-$r');
+      await tester.tap(key('column-1'));
+      await tester.pumpAndSettle();
+      await tester.tap(key('table-sortUp'));
+      await tester.pumpAndSettle();
+      expect(rows(), [3, 1, 2]);
+      await tester.tap(key('column-1'));
+      await tester.pumpAndSettle();
+      await tester.tap(key('table-back'));
+      await tester.pumpAndSettle();
+      expect(written, hasLength(1));
+      expect(rows(), [1, 2, 3]);
+      expect(find.byKey(const ValueKey('table-sort-arrow')), findsNothing);
     });
 
     testWidgets('its ⋮ at the top right corner copies the table too, the '
@@ -1128,7 +1295,8 @@ void main() {
       await tester.tap(find.byTooltip('All Notes'));
       await tester.pumpAndSettle();
       // On a cell of the header row: a tag in a cell searches.
-      await tester.tap(find.text('Item', findRichText: true));
+      // Under the header row: a heading's tap sorts (obf-1052).
+      await tester.tap(find.text('oat', findRichText: true));
       await tester.pumpAndSettle();
       expect(find.byType(TableScreen), findsOneWidget);
       await tester.tap(key('cell-2-0'));
@@ -1362,6 +1530,30 @@ void main() {
       expect(find.byType(TableScreen), findsNothing);
     });
 
+    testWidgets('a tap on a column\'s heading on a search\'s card sorts its '
+        'rows, opening neither the Note nor the table (obf-1052)', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final id = notes.capture(fruit, format: TextFormats.markdown).id;
+      await tester.pumpWidget(OldBrainFixApp(store: store));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Search and browse'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'pear');
+      await tester.pump(BrowserSearchField.pause);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('table-0-sort-1')).first);
+      await tester.pumpAndSettle();
+      expect(find.byType(NoteEditorScreen), findsNothing);
+      expect(find.byType(TableScreen), findsNothing);
+      expect(find.byIcon(Icons.arrow_upward), findsOneWidget);
+      expect(notes.byId(id)?.text, fruit);
+    });
+
     testWidgets('a box ticked on the card keeps its tick when a cell is '
         'written; one typed into a cell becomes a box', (tester) async {
       tester.view.physicalSize = const Size(800, 2400);
@@ -1380,7 +1572,8 @@ void main() {
       await tester.tap(key('box-done'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Item', findRichText: true));
+      // Under the header row: a heading's tap sorts (obf-1052).
+      await tester.tap(find.text('oat', findRichText: true));
       await tester.pumpAndSettle();
       expect(find.text('✅'), findsOneWidget);
       await tester.tap(key('cell-2-0'));

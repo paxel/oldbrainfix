@@ -5212,6 +5212,30 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get tableSort => 'Sort by this column';
+
+  @override
+  String get tableSortedUp => 'Sorted ascending';
+
+  @override
+  String get tableSortedDown => 'Sorted descending';
+
+  @override
+  String get tableShowSortedUp => 'Show sorted ascending';
+
+  @override
+  String get tableShowSortedDown => 'Show sorted descending';
+
+  @override
+  String get tableShowAsWritten => 'Show as written';
+
+  @override
+  String get tableSortRows => 'Sort rows by this column';
+
+  @override
+  String get tableSortRowsDown => 'Sort rows by this column, descending';
+
+  @override
   String get pairCodeNeedsUpdate =>
       'This code comes from a newer Old Brain Fix. Update Old Brain Fix on this Device, then try again.';
 

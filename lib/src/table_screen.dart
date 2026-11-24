@@ -121,6 +121,106 @@ Future<void> copyTable(
   await Clipboard.setData(ClipboardData(text: copy.markdown));
 }
 
+/// How a table being read shows its rows (obf-1052): sorted by its
+/// column [column], ascending or [descending], in the view only.
+typedef TableSort = ({int column, bool descending});
+
+/// The sort a tap on the heading of [column] gives after [sort]:
+/// ascending, then descending, then as written.
+TableSort? nextTableSort(TableSort? sort, int column) => switch (sort) {
+  (column: final c, descending: false) when c == column => (
+    column: column,
+    descending: true,
+  ),
+  (column: final c, descending: true) when c == column => null,
+  _ => (column: column, descending: false),
+};
+
+/// The rows of [table] in the order [sort] shows them, each by its index
+/// in [MarkdownTable.rows], the header row first; as written without a
+/// sort or with one by a column the table no longer has.
+List<int> tableRowOrder(MarkdownTable table, TableSort? sort) =>
+    sort == null || sort.column >= table.columns
+    ? [for (var r = 0; r < table.rows.length; r++) r]
+    : [
+        0,
+        ...MarkdownTables.sortedRows(
+          table,
+          sort.column,
+          descending: sort.descending,
+        ),
+      ];
+
+/// How much wider the heading of the column a table is sorted by gets
+/// for its arrow, at the text size [size] scaled by [scaler].
+double tableSortRoom(TextScaler scaler, double size) => scaler.scale(size) + 4;
+
+/// The words of a column's heading, [words], with the arrow of the
+/// direction the rows are sorted by it, up for ascending, down for
+/// [descending], at the text size [size].
+class TableSortedHeading extends StatelessWidget {
+  final Widget words;
+  final bool descending;
+  final double size;
+
+  const TableSortedHeading({
+    super.key,
+    required this.words,
+    required this.descending,
+    required this.size,
+  });
+
+  @override
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Expanded(child: words),
+      const SizedBox(width: 4),
+      Icon(
+        descending ? Icons.arrow_downward : Icons.arrow_upward,
+        key: const ValueKey('table-sort-arrow'),
+        size: MediaQuery.textScalerOf(context).scale(size),
+      ),
+    ],
+  );
+}
+
+/// A column's heading where a tap sorts the rows shown by it
+/// ([onSort], obf-1052), taking the tap before the table's or the card's
+/// under it; a screen reader hears which way the rows are sorted by it:
+/// [descending] true or false, null while they are not.
+class TableSortTap extends StatelessWidget {
+  final VoidCallback onSort;
+  final bool? descending;
+  final Widget child;
+
+  const TableSortTap({
+    super.key,
+    required this.onSort,
+    required this.descending,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    return Semantics(
+      button: true,
+      onTapHint: t.tableSort,
+      value: switch (descending) {
+        true => t.tableSortedDown,
+        false => t.tableSortedUp,
+        null => null,
+      },
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onSort,
+        child: child,
+      ),
+    );
+  }
+}
+
 /// What a table's ⋮ does (obf-1050).
 enum TableAction { copy, up, down, delete }
 
@@ -228,6 +328,12 @@ Future<TableAction?> showTableMenu(
 /// A tap on a box of a cell opens its menu at the finger while there is
 /// [ticking], also where the table is only read (ADR 0035).
 ///
+/// The rows show sorted by a column in the view only (obf-1052), the
+/// Note's text as written: where the table is only read a tap on a
+/// column's heading sorts them ascending, then descending, then shows
+/// them as written; with [edit], whose heading's tap edits it, its
+/// letter's menu does. The screen forgets it when it closes.
+///
 /// Copy in the bar, and in the ⋮ at the table's top right corner
 /// (obf-1050), puts the table on the clipboard as an HTML table and, as
 /// the plain text, as Markdown (#324).
@@ -275,12 +381,27 @@ class TableScreen extends StatefulWidget {
 }
 
 /// What a heading's menu does.
-enum _Op { before, after, back, forward, delete, headings }
+enum _Op {
+  before,
+  after,
+  back,
+  forward,
+  delete,
+  headings,
+  sortUp,
+  sortDown,
+  asWritten,
+}
 
 class _TableScreenState extends State<TableScreen> {
   late String _text = widget.text;
   late int _at = widget.at;
   MarkdownTable? _table;
+
+  /// How the rows show sorted, in the view only (obf-1052), and the rows
+  /// in that order by their index in the table, the header row first.
+  TableSort? _sort;
+  List<int> _order = const [];
 
   /// Read as each frame draws, so a tap shows while its save waits
   /// (#338).
@@ -337,7 +458,8 @@ class _TableScreenState extends State<TableScreen> {
   }
 
   void _read() {
-    _table = MarkdownTables.at(_text, _at);
+    final table = _table = MarkdownTables.at(_text, _at);
+    _order = table == null ? const [] : tableRowOrder(table, _sort);
     _tags = Markdown.tags(_text);
     _links = Markdown.autolinks(_text);
   }
@@ -384,9 +506,19 @@ class _TableScreenState extends State<TableScreen> {
                 ]
                 .fold(0.0, math.max)
                 .clamp(TableScreen.narrowest - 24, TableScreen.widest - 24) +
-            24,
+            24 +
+            (_sort?.column == c
+                ? tableSortRoom(scaler, style.fontSize ?? 14)
+                : 0),
     ];
   }
+
+  /// Shows the rows sorted as [sort] says, in the view only.
+  void _sortBy(TableSort? sort) => setState(() {
+    _sort = sort;
+    _read();
+    _measure();
+  });
 
   /// Writes [change] when it changed the text, and shows the table it
   /// gives; [gone] when the table went with it, which closes the screen.
@@ -547,6 +679,16 @@ class _TableScreenState extends State<TableScreen> {
               item(_Op.back, Icons.arrow_back, t.tableColumnLeft),
               item(_Op.forward, Icons.arrow_forward, t.tableColumnRight),
               item(_Op.delete, Icons.delete_outline, t.tableColumnDelete),
+              if (_sort != (column: index, descending: false))
+                item(_Op.sortUp, Icons.arrow_upward, t.tableShowSortedUp),
+              if (_sort != (column: index, descending: true))
+                item(_Op.sortDown, Icons.arrow_downward, t.tableShowSortedDown),
+              if (_sort != null)
+                item(
+                  _Op.asWritten,
+                  Icons.format_list_numbered,
+                  t.tableShowAsWritten,
+                ),
               if (index == 0)
                 PopupMenuItem(
                   key: const ValueKey('table-headings'),
@@ -579,23 +721,29 @@ class _TableScreenState extends State<TableScreen> {
     final (text, where) = (_text, _at);
     switch ((picked, column)) {
       case (_Op.before, false):
-        _apply(MarkdownTables.insertRow(text, where, index));
+        _reshape(MarkdownTables.insertRow(text, where, index));
       case (_Op.after, false):
-        _apply(MarkdownTables.insertRow(text, where, index + 1));
+        _reshape(MarkdownTables.insertRow(text, where, index + 1));
       case (_Op.back, false):
-        _apply(MarkdownTables.moveRow(text, where, index, index - 1));
+        _reshape(MarkdownTables.moveRow(text, where, index, index - 1));
       case (_Op.forward, false):
-        _apply(MarkdownTables.moveRow(text, where, index, index + 1));
+        _reshape(MarkdownTables.moveRow(text, where, index, index + 1));
       case (_Op.before, true):
-        _apply(MarkdownTables.insertColumn(text, where, index));
+        _reshape(MarkdownTables.insertColumn(text, where, index));
       case (_Op.after, true):
-        _apply(MarkdownTables.insertColumn(text, where, index + 1));
+        _reshape(MarkdownTables.insertColumn(text, where, index + 1));
       case (_Op.back, true):
-        _apply(MarkdownTables.moveColumn(text, where, index, index - 1));
+        _reshape(MarkdownTables.moveColumn(text, where, index, index - 1));
       case (_Op.forward, true):
-        _apply(MarkdownTables.moveColumn(text, where, index, index + 1));
+        _reshape(MarkdownTables.moveColumn(text, where, index, index + 1));
       case (_Op.headings, _):
         _apply(MarkdownTables.toggleHeadingColumn(text, where));
+      case (_Op.sortUp, _):
+        _sortBy((column: index, descending: false));
+      case (_Op.sortDown, _):
+        _sortBy((column: index, descending: true));
+      case (_Op.asWritten, _):
+        _sortBy(null);
       case (_Op.delete, _):
         await _delete(table, index, column: column);
     }
@@ -618,12 +766,19 @@ class _TableScreenState extends State<TableScreen> {
       return;
     }
     if (!mounted) return;
-    _apply(
+    _reshape(
       column
           ? MarkdownTables.deleteColumn(_text, _at, index)
           : MarkdownTables.deleteRow(_text, _at, index),
       gone: gone,
     );
+  }
+
+  /// Makes [change], which puts in, moves or deletes a row or column:
+  /// the rows show as written again, the sort no longer fitting them.
+  void _reshape(MarkdownChange change, {bool gone = false}) {
+    if (change.text != _text) _sort = null;
+    _apply(change, gone: gone);
   }
 
   /// Puts the table on the clipboard as an HTML table and, as the plain
@@ -733,8 +888,8 @@ class _TableScreenState extends State<TableScreen> {
                   key: const ValueKey('table-rows'),
                   padding: EdgeInsets.only(bottom: padding.bottom + 16),
                   children: [
-                    for (var r = 1; r < table.rows.length; r++)
-                      _row(context, table, r),
+                    // In the order shown, each by its index in the table.
+                    for (final r in _order.skip(1)) _row(context, table, r),
                     if (_edits) _row(context, table, table.rows.length),
                   ],
                 ),
@@ -871,7 +1026,7 @@ class _TableScreenState extends State<TableScreen> {
     } else if (adds) {
       content = const SizedBox.shrink();
     } else {
-      content = MarkedCell(
+      final words = MarkedCell(
         _text,
         table.rows[r].cells[c],
         boxes: _boxes,
@@ -881,6 +1036,15 @@ class _TableScreenState extends State<TableScreen> {
         textAlign: cellAlign(table.aligns[c]),
         ticking: _ticking,
       );
+      content = switch (_sort) {
+        (column: final by, :final descending) when r == 0 && by == c =>
+          TableSortedHeading(
+            words: words,
+            descending: descending,
+            size: style.fontSize ?? 14,
+          ),
+        _ => words,
+      };
     }
     final box = DecoratedBox(
       decoration: BoxDecoration(
@@ -897,6 +1061,16 @@ class _TableScreenState extends State<TableScreen> {
         child: content,
       ),
     );
+    // Where it is only read, a heading's tap sorts the rows by its
+    // column (obf-1052).
+    if (edit == null && r == 0 && !adds) {
+      return TableSortTap(
+        key: ValueKey('cell-$r-$c'),
+        onSort: () => _sortBy(nextTableSort(_sort, c)),
+        descending: _sort?.column == c ? _sort?.descending : null,
+        child: box,
+      );
+    }
     return GestureDetector(
       key: ValueKey('cell-$r-$c'),
       behavior: HitTestBehavior.opaque,

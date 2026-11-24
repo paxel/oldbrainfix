@@ -8396,6 +8396,54 @@ abstract class AppLocalizations {
   /// **'Row {number}, column {letter}'**
   String tableCell(int number, String letter);
 
+  /// What a screen reader says a tap on a column's heading in a table being read does (obf-1052): it sorts the rows shown by that column, ascending, then descending, then as written. The Note's text stays as it is.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort by this column'**
+  String get tableSort;
+
+  /// What a screen reader says of the column a table being read is sorted by, ascending (obf-1052); its heading shows an arrow up.
+  ///
+  /// In en, this message translates to:
+  /// **'Sorted ascending'**
+  String get tableSortedUp;
+
+  /// What a screen reader says of the column a table being read is sorted by, descending (obf-1052); its heading shows an arrow down.
+  ///
+  /// In en, this message translates to:
+  /// **'Sorted descending'**
+  String get tableSortedDown;
+
+  /// Menu item of a column's letter in a table's full screen where it is edited (obf-1052): shows the rows sorted by that column, ascending, without changing the Note's text.
+  ///
+  /// In en, this message translates to:
+  /// **'Show sorted ascending'**
+  String get tableShowSortedUp;
+
+  /// Menu item of a column's letter in a table's full screen where it is edited (obf-1052): shows the rows sorted by that column, descending, without changing the Note's text.
+  ///
+  /// In en, this message translates to:
+  /// **'Show sorted descending'**
+  String get tableShowSortedDown;
+
+  /// Menu item of a column's letter in a table's full screen, while the rows show sorted (obf-1052): shows them in the order of the Note's text again.
+  ///
+  /// In en, this message translates to:
+  /// **'Show as written'**
+  String get tableShowAsWritten;
+
+  /// Menu item of a column's letter on a table edited as a grid in the Note editor (obf-1052): puts the rows under the header in ascending order of that column in the Note's text. Undo takes it back.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort rows by this column'**
+  String get tableSortRows;
+
+  /// Menu item of a column's letter on a table edited as a grid in the Note editor (obf-1052): puts the rows under the header in descending order of that column in the Note's text. Undo takes it back.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort rows by this column, descending'**
+  String get tableSortRowsDown;
+
   /// Under the pair code field, on the phone and the desktop, when the code typed or scanned is of a layout a later version of the app writes (ADR 0034): this version cannot join with it.
   ///
   /// In en, this message translates to:

@@ -1583,6 +1583,21 @@ replace a law of Both apps where they say so. A desktop law marked
   a paragraph's; blank lines part them and stay where they are. A table
   that would stand right above a paragraph or another table, which would
   read as its rows, gets a blank line between. Each is a step of Undo.
+- **A tap on a cell of the header row sorts a table being read** by its
+  column (obf-1052), on a card, the search card's included, in a text
+  being read and full screen where it is only read: ascending,
+  descending, then as written, an arrow in that cell saying which, in the
+  view only; the Note's text stays as written and the order is forgotten
+  on leaving, a card's first 10 rows being the first in it. The tap is
+  the header row's alone, never the card's, the search card's or the
+  table's, which the rows under it keep. Full screen where the table is
+  edited, a tap on a cell of the header row edits it, the column's letter
+  offers Show sorted ascending, Show sorted descending and Show as
+  written, and putting in, moving or deleting a row or column shows the
+  rows as written again. On the editor's grid the column's letter offers
+  Sort rows by this column and Sort rows by this column, descending,
+  which rewrite the rows in the text, each a step of Undo, none when the
+  rows already stand so.
 
 ### Checklist and Shopping List Lines
 

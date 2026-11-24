@@ -37,7 +37,8 @@ typedef GridWritten = ({String text, int at});
 /// column adds one. A row's number and a column's letter open its menu
 /// at the finger: put one in before or after it, move it, delete it
 /// (asking once while it holds words; the last one takes the table), for
-/// a column how it lines up its cells, and on the first column whether it
+/// a column how it lines up its cells and sorting the rows by it,
+/// ascending or descending (obf-1052), and on the first column whether it
 /// holds headings. "Show as lines" in its corner shows the table's lines
 /// as text instead ([onShowLines]). Its ⋮ at the top right corner, at the
 /// finger, copies the whole table, moves it past the block of the text
@@ -108,6 +109,8 @@ enum _Op {
   alignLeft,
   alignCenter,
   alignRight,
+  sortUp,
+  sortDown,
 }
 
 class TableGridState extends State<TableGrid> {
@@ -549,6 +552,8 @@ class TableGridState extends State<TableGrid> {
                 t.tableAlignRight,
                 checked: align == MarkdownAlign.right,
               ),
+              item(_Op.sortUp, Icons.arrow_upward, t.tableSortRows),
+              item(_Op.sortDown, Icons.arrow_downward, t.tableSortRowsDown),
               item(_Op.delete, Icons.delete_outline, t.tableColumnDelete),
               if (index == 0)
                 PopupMenuItem(
@@ -614,6 +619,11 @@ class TableGridState extends State<TableGrid> {
         _apply(
           MarkdownTables.setAlign(text, where, index, MarkdownAlign.right),
         );
+      // Rows already in that order are no step of Undo (obf-1052).
+      case (_Op.sortUp, _):
+        _apply(MarkdownTables.sortRows(text, where, index));
+      case (_Op.sortDown, _):
+        _apply(MarkdownTables.sortRows(text, where, index, descending: true));
       case (_Op.delete, _):
         await _delete(table, index, column: column);
     }

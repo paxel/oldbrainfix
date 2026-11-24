@@ -5278,6 +5278,31 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get tableSort => 'Nach dieser Spalte sortieren';
+
+  @override
+  String get tableSortedUp => 'Aufsteigend sortiert';
+
+  @override
+  String get tableSortedDown => 'Absteigend sortiert';
+
+  @override
+  String get tableShowSortedUp => 'Aufsteigend sortiert zeigen';
+
+  @override
+  String get tableShowSortedDown => 'Absteigend sortiert zeigen';
+
+  @override
+  String get tableShowAsWritten => 'Wie geschrieben zeigen';
+
+  @override
+  String get tableSortRows => 'Zeilen nach dieser Spalte sortieren';
+
+  @override
+  String get tableSortRowsDown =>
+      'Zeilen nach dieser Spalte absteigend sortieren';
+
+  @override
   String get pairCodeNeedsUpdate =>
       'Dieser Code stammt von einem neueren Old Brain Fix. Aktualisiere Old Brain Fix auf diesem Gerät und versuch es dann noch einmal.';
 

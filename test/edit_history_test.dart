@@ -269,6 +269,31 @@ void main() {
       expect(notes.byId(id)?.text, '$table\n\nShop');
     });
 
+    testWidgets('rows sorted by a column\'s menu go back, rows already in '
+        'that order are no step (obf-1052)', (tester) async {
+      const table = '| Item | Count |\n| --- | --- |\n| tea | 1 |\n| oat | 2 |';
+      final sorted = notes.capture('Shop\n\n$table').id;
+      notes.setFormat(sorted, TextFormats.markdown);
+      await edit(tester, sorted);
+      await tap(tester, key('grid-column-1'));
+      await tap(tester, key('table-sortUp'));
+      expect(typed(tester), 'Shop\n\n$table');
+      expect(enabled(tester, 'editor-undo'), isFalse);
+
+      await tap(tester, key('grid-column-1'));
+      await tap(tester, key('table-sortDown'));
+      expect(
+        typed(tester),
+        'Shop\n\n| Item | Count |\n| --- | --- |\n| oat | 2 |\n| tea | 1 |',
+      );
+      expect(enabled(tester, 'editor-undo'), isTrue);
+      await undo(tester);
+      expect(typed(tester), 'Shop\n\n$table');
+      expect(enabled(tester, 'editor-undo'), isFalse);
+      await leave(tester);
+      expect(notes.byId(sorted)?.text, 'Shop\n\n$table');
+    });
+
     testWidgets('a box ticked after it was typed keeps its tick when the '
         'typing after it goes back', (tester) async {
       final plain = notes.capture('list').id;

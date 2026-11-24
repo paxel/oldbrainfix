@@ -525,6 +525,21 @@ void main() {
     expect(cell.textAlign, TextAlign.center);
   });
 
+  testWidgets('a column\'s menu sorts the rows by it in the text, ascending '
+      'or descending (obf-1052)', (tester) async {
+    final controller = await pumpField(tester, shop);
+    String lines() => controller.text.split('\n\n')[1];
+
+    await pick(tester, 'grid-column-1', 'table-sortUp');
+    expect(lines(), '| Item | Qty |\n| --- | --: |\n| oat | 1 |\n| milk | 2 |');
+    await pick(tester, 'grid-column-0', 'table-sortDown');
+    expect(lines(), '| Item | Qty |\n| --- | --: |\n| oat | 1 |\n| milk | 2 |');
+    await pick(tester, 'grid-column-0', 'table-sortUp');
+    expect(lines(), '| Item | Qty |\n| --- | --: |\n| milk | 2 |\n| oat | 1 |');
+    expect(controller.text, startsWith('Shop\n\n'));
+    expect(controller.text, endsWith('\n\nBread'));
+  });
+
   testWidgets('a column lining up on the left without saying so has Align '
       'left checked, and picking it keeps its line', (tester) async {
     final controller = await pumpField(tester, shop);
