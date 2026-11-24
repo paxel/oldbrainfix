@@ -113,7 +113,7 @@ pub mod vault_view;
 pub mod whole_tables;
 pub mod window_sizes;
 
-pub use app::{App, Page, Selection, Wall, local_wall};
+pub use app::{App, Page, Selection, TAGS_THREAD, Wall, local_wall};
 
 use std::path::PathBuf;
 

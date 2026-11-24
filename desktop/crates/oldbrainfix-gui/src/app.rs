@@ -190,7 +190,7 @@ use crate::sync_view::{
 };
 use crate::table_grid::{self, GridLook, Grids};
 use crate::table_view::{self, Opening, TableView};
-use crate::tag_tree_view::{self, TagAsked};
+use crate::tag_tree_view::{self, RowAsked, TagAsked};
 use crate::tally_page::{PageIntent, TallyPage};
 use crate::tally_view::{
     self, EntryForm, FieldForm, FormIntent, TallyAction, TallyBadge, TallyForm, TallyShown, Whose,
@@ -504,6 +504,26 @@ struct AgendaReads {
 
 /// What the Agenda's thread read, at its mark, and whether it wrote.
 type AgendaRead = (oldbrainfix_core::Result<(AgendaView, i64)>, bool);
+
+/// The name of the thread that reads the most used tags (obf-1074).
+pub const TAGS_THREAD: &str = "most used tags";
+
+/// The most used tags read, at the log's mark the read began at.
+type TagsRead = (i64, oldbrainfix_core::Result<Vec<String>>);
+
+/// The most used tags under All Notes' search (obf-1074), read apart from
+/// the View, as reading them reads every Note: on a thread of their own
+/// where the window has the Agenda's opener, once for each mark of the
+/// log, and on the window's thread without one.
+#[derive(Default)]
+struct TagRow {
+    /// The tags read last, shown until the next read is in.
+    tags: Vec<String>,
+    /// The log's mark they were read at.
+    seq: Option<i64>,
+    /// The read running.
+    running: Option<std::sync::mpsc::Receiver<TagsRead>>,
+}
 
 /// A Pack's work running off the window's thread (#165): its answer to
 /// come, what it does, since when, and whether Abort on the page Running
@@ -2415,6 +2435,8 @@ pub struct App {
     /// Where the Agenda is read off the window's thread (#207); without
     /// it, the window reads it itself.
     agenda_reads: Option<AgendaReads>,
+    /// The most used tags under All Notes' search (obf-1074).
+    tag_row: TagRow,
     /// The Pack work running on threads of their own, on connections
     /// the Agenda's opener hands them, with what each does.
     pack_work: Vec<PackRunning>,
@@ -3037,6 +3059,7 @@ impl App {
             folder_wanted: None,
             syncing: None,
             agenda_reads: None,
+            tag_row: TagRow::default(),
             pack_work: Vec::new(),
             unsorted_wanted: None,
             changes_wanted: None,
@@ -6020,6 +6043,79 @@ impl App {
         reads.running = Some(arrives);
     }
 
+    /// Reads All Notes' most used tags (obf-1074) while it shows, where
+    /// the log changed since they were read: on a thread with the
+    /// Agenda's opener, else here. The desktop has no Area Locks, so
+    /// nothing is closed.
+    fn read_tags(&mut self) {
+        if self.selection != Selection::All || self.alone.is_some() {
+            return;
+        }
+        // Its end looks at the log again. An Import or an Area being
+        // deleted writes a Note after another: read again at its end.
+        if self.tag_row.running.is_some() || self.import.running() || self.deletions.running() {
+            return;
+        }
+        let Ok(seq) = self.store.current_seq() else {
+            return;
+        };
+        if self.tag_row.seq == Some(seq) {
+            return;
+        }
+        fn read(store: &Store) -> TagsRead {
+            let seq = store.current_seq().unwrap_or_default();
+            let tags = TagTree::new(store)
+                .tree(&HashSet::new())
+                .map(|tree| tag_tree_view::most_used(&tree, tag_tree_view::MOST_USED));
+            (seq, tags)
+        }
+        match self.agenda_reads.as_ref().map(|reads| reads.open.clone()) {
+            Some(open) => {
+                let (sent, arrives) = std::sync::mpsc::channel();
+                let spawned = std::thread::Builder::new()
+                    .name(TAGS_THREAD.to_string())
+                    .spawn(move || drop(sent.send(read(&open()))));
+                match spawned {
+                    Ok(_) => self.tag_row.running = Some(arrives),
+                    // No thread to be had: read here.
+                    Err(_) => self.tags_read(read(&self.store)),
+                }
+            }
+            None => self.tags_read(read(&self.store)),
+        }
+    }
+
+    /// Keeps the most used tags `read`; one that failed says so and is
+    /// read again at the log's next mark.
+    fn tags_read(&mut self, (seq, tags): TagsRead) {
+        self.tag_row.seq = Some(seq);
+        match tags {
+            Ok(tags) => self.tag_row.tags = tags,
+            Err(e) => self.error = Some(e.to_string()),
+        }
+    }
+
+    /// Shows the most used tags from their thread once they are in, and
+    /// reads them again where the log changed meanwhile. The window looks
+    /// again shortly while the read runs.
+    fn tags_arrived(&mut self, ctx: &egui::Context) {
+        let Some(running) = &self.tag_row.running else {
+            return;
+        };
+        match running.try_recv() {
+            Ok(read) => {
+                self.tag_row.running = None;
+                self.tags_read(read);
+                self.read_tags();
+                ctx.request_repaint();
+            }
+            Err(std::sync::mpsc::TryRecvError::Empty) => {
+                ctx.request_repaint_after(std::time::Duration::from_millis(30));
+            }
+            Err(std::sync::mpsc::TryRecvError::Disconnected) => self.tag_row.running = None,
+        }
+    }
+
     /// Shows the Agenda's read from its thread once it is in, unless the
     /// log changed since it was read: then it reads again (#207). The
     /// window looks again shortly while it runs.
@@ -7120,6 +7216,8 @@ impl App {
             }
         }
         self.keep_cards = false;
+        // All Notes' most used tags, where the log changed (obf-1074).
+        self.read_tags();
         if let Some(e) = left {
             self.error = Some(e.to_string());
         }
@@ -12571,6 +12669,7 @@ impl App {
         self.save_ticks(ui.ctx());
         self.agenda_arrived(ui.ctx());
         self.search_arrived(ui.ctx());
+        self.tags_arrived(ui.ctx());
         self.pack_arrived(ui.ctx());
         self.ask_arrived(ui.ctx());
         // However its page went, what a Backup opened held goes with it.
@@ -14057,12 +14156,8 @@ impl App {
                     });
                 }
                 area_drop(ui, tones, &blocks, actions);
-                // Every tag by its levels (#267, Q623).
-                let on = self.selection == Selection::Tags;
-                let tags = Some((icons::TAG, text));
-                if row(ui, tones, on, 0.0, tags, t.tags_title(), false).clicked() {
-                    actions.push(Action::Select(Selection::Tags));
-                }
+                // The tag tree opens from All Notes' row of tags
+                // (obf-1074).
                 ui.add_space(12.0);
                 let on = self.selection == Selection::Trash;
                 let trash = Some((icons::OPEN_TRASH, text));
@@ -16566,7 +16661,9 @@ impl App {
     /// holds back, forward and the path, the place shown as the title;
     /// its second the search field, the view switch, the person filter's
     /// menu and its chips, and "+", all one height; under them the tags
-    /// the "#…" typed starts. All of it grows with Text size.
+    /// the "#…" typed starts, or in All Notes while nothing is typed the
+    /// most used tags ending in "All tags…" (obf-1074). All of it grows
+    /// with Text size.
     fn list_band(&mut self, ui: &mut Ui, tones: Tones, hint: &str, actions: &mut Vec<Action>) {
         let sizes = BandSizes::of(ui);
         theme::search_band(ui, |ui| {
@@ -16595,6 +16692,15 @@ impl App {
                 state.store(ui.ctx(), id);
                 self.search_focus = true;
                 actions.push(Action::Search);
+            }
+            // All Notes' most used tags while nothing is typed (obf-1074),
+            // gone at the first letter.
+            if self.selection == Selection::All && self.query.trim().is_empty() {
+                match tag_tree_view::most_used_row(ui, &self.t, &self.tag_row.tags) {
+                    Some(RowAsked::Search(tag)) => actions.push(Action::SearchFor(tag)),
+                    Some(RowAsked::All) => actions.push(Action::Select(Selection::Tags)),
+                    None => {}
+                }
             }
         });
     }

@@ -18,7 +18,7 @@ use egui::{Key, Modifiers};
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::{Notes, Places, SigningKey, Store};
-use oldbrainfix_gui::{App, Selection};
+use oldbrainfix_gui::{App, Selection, TAGS_THREAD};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -146,7 +146,9 @@ fn a_letter_shows_at_once_and_the_results_follow_once_typing_stops() -> TestResu
 }
 
 /// The search's connection, handed over once per search the test lets
-/// go, and how many searches asked for it.
+/// go, and how many searches asked for it. The thread reading All Notes'
+/// most used tags after a write (obf-1074) is no search: it gets it at
+/// once, uncounted.
 struct Gate {
     go: Sender<()>,
     asked: Arc<AtomicUsize>,
@@ -159,6 +161,9 @@ impl Gate {
         let asked = Arc::new(AtomicUsize::new(0));
         let counted = asked.clone();
         let open = move || {
+            if std::thread::current().name() == Some(TAGS_THREAD) {
+                return own.clone();
+            }
             counted.fetch_add(1, Ordering::SeqCst);
             if let Ok(gate) = gate.lock() {
                 let _ = gate.recv();

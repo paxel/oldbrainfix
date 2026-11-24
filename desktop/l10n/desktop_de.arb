@@ -362,6 +362,7 @@
   "fileNoProgramFix": "Installiere ein Programm für Dateien dieser Art; der Anhang bleibt an der Notiz.",
   "hiddenFromAiAreaFirstDesktop": "{names}: vor KI verborgen. Eine Notiz in einem Bereich, der vor KI verborgen ist, geht an niemanden sonst. Nimm die Markierung zuerst im Menü des Bereichs ab.",
   "tagSuggestionsLabel": "#Wörter, die mit dem Getippten beginnen",
+  "mostUsedTagsLabel": "Die meistgenutzten #Wörter",
   "menuExportVault": "Als Markdown-Ordner exportieren …",
   "vaultExportPickTitle": "Wähle, wohin der Markdown-Ordner kommt",
   "vaultExportTitle": "Als Markdown-Ordner exportieren",

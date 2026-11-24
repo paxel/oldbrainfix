@@ -42,6 +42,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Handy und dem Desktop bringt eine Sicherung die Einstellungen des Geräts zurück und bietet das vorher gewählte Sprachmodell an. ([obf-1098](https://github.com/paxel/oldbrainfix/issues/411))
 - Auf dem Handy und dem Desktop stehen die Knöpfe einer Notiz in vier benannten Gruppen: Diese Notiz, Hinzufügen, Teilen und Aufräumen. ([obf-1073](https://github.com/paxel/oldbrainfix/issues/386))
 - Auf dem Handy und dem Desktop kommen die Worte einer entfernten Aufnahme oder eines Fotos in den Text der Notiz, zum Bearbeiten oder Löschen. ([obf-1084](https://github.com/paxel/oldbrainfix/issues/397))
+- Auf dem Handy und dem Desktop stehen die meistgenutzten #Wörter unter der Suche, am Ende „Alle #Wörter …“ für den ganzen Baum. ([obf-1074](https://github.com/paxel/oldbrainfix/issues/387))
 
 ### Behoben
 

@@ -677,6 +677,8 @@
   "@hiddenFromAiAreaFirstDesktop": {"description": "The desktop's question when a Note to be given to other people is hidden from AI by its Area's mark (#267): only Close; the mark comes off in the ⋮ of the Area's list band (obf-1065) or the Area's right-click in the sidebar, so one click never shows the Area's other Notes to the AI.", "placeholders": {"names": {"type": "String"}}},
   "tagSuggestionsLabel": "Tags starting with what is typed",
   "@tagSuggestionsLabel": {"description": "What a screen reader hears for the row of tag buttons under a desktop search field while a # is typed into it (#267)."},
+  "mostUsedTagsLabel": "The most used tags",
+  "@mostUsedTagsLabel": {"description": "What a screen reader hears for the row of the most used tags under All Notes' search field on the desktop while nothing is typed, ending in All tags… (obf-1074)."},
   "menuExportVault": "Export as vault…",
   "@menuExportVault": {"description": "File menu entry (#267, ADR 0050): writes every Note as a folder of Markdown files, a vault, into a new folder in the folder picked."},
   "vaultExportPickTitle": "Choose where the vault goes",

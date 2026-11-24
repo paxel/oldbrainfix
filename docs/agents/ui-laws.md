@@ -1972,7 +1972,8 @@ There are three kinds, and an action takes the first that fits.
 - The desktop window is a classic desktop window (#145): **the menu
   bar** on top (File, Edit, View, Area, Note, AI, Sync, Help); **the
   sidebar** on the left with the Agenda, Unsorted, All Notes, Frogs, the
-  Areas with their Topics, Tags (#267) and the Trash, marking the place shown; **the list** in
+  Areas with their Topics and the Trash, marking the place shown (the
+  tag tree opens from All Notes, obf-1074); **the list** in
   the middle. **A Note opens as a dialog over the window** (#146), one at
   a time, over the list and the sidebar but not the menu bar, which
   stays at hand for it; closing it keeps what was typed: its cross, Esc,
@@ -2053,7 +2054,18 @@ There are three kinds, and an action takes the first that fits.
   (#279), a click on it selecting nothing; this Device keeps each fold
   (ADR 0008), as lists keep theirs, Areas starting unfolded. A folded
   Area still shows the Topic shown under it, marked.
-- **Tags below the Areas opens the tag tree in the list** (#267): every
+- **Tags under All Notes' search** (obf-1074): the desktop's Areas
+  list is its sidebar, which has no search; All Notes' search, over
+  every Note as the Areas list's on the phone, has the row of tags. While
+  its field is empty, one row right under it in the band shows the most
+  used tags as on the phone (see Phone ▸ Navigation, "Tags under the
+  Areas list's search"), at most twelve, and ends in "All tags…", there
+  also without a tag; a click on a tag searches All Notes for it, and
+  each reads "Search for" its tag to a screen reader. A row wider than
+  the band leaves out the least used tags, never "All tags…". Its tags
+  are read on a thread of their own while All Notes shows, once for each
+  change, never per frame. The sidebar lists no tags.
+- **"All tags…" opens the tag tree in the list** (#267): every
   tag by its levels as on the phone (see Phone ▸ Navigation, "The tag
   tree"), each level's arrow unfolding the levels below, kept while the
   app runs; a click on a tag shows All Notes searching for it. Typing
