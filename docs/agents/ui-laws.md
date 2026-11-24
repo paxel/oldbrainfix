@@ -2183,7 +2183,8 @@ There are three kinds, and an action takes the first that fits.
   made their default, and from File ▸ Open ▸ Markdown file…. A second
   start hands its files, like a capture and `oldbrainfix open`, to the
   running app over a local socket on Linux and macOS and over a named
-  pipe of the user's on Windows; the Finder hands them over as the open
+  pipe on Windows that only the user may open, a pipe run by another
+  user being handed nothing; the Finder hands them over as the open
   documents Apple Event (Q12). It is a window beside the main one, one per file, drawn as the reading view
   draws a Note: all of CommonMark with GitHub's tables (as obf-1048 draws
   them), task lists, strike-through and footnotes, six heading levels,

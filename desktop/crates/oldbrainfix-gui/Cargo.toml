@@ -88,9 +88,10 @@ libc = "0.2"
 
 # The login's display name for the own Profile (`GetUserNameExW`), a
 # file opened with its program without a shell (`ShellExecuteW`), and
-# the named pipe a second start hands its wish over (Q12).
+# the named pipe a second start hands its wish over, open to this user
+# alone (Q12).
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Security_Authentication_Identity", "Win32_Storage_FileSystem", "Win32_System_IO", "Win32_System_Pipes", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { version = "0.61", features = ["Win32_Security_Authentication_Identity", "Win32_Security_Authorization", "Win32_Storage_FileSystem", "Win32_System_IO", "Win32_System_Pipes", "Win32_System_Threading", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
 
 # Closing a notification once its Occurrence is Done.
 [target.'cfg(all(unix, not(target_os = "macos")))'.dependencies]

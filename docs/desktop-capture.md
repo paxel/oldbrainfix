@@ -101,5 +101,6 @@ Examples for launchers and macro pads:
 - A script: `echo "Call the dentist" | oldbrainfix capture -`
 
 On Windows the app has no console, so it prints nothing there; a second
-start hands its wish to the running app over a named pipe, as it does
-over a local socket on Linux and macOS.
+start hands its wish to the running app over a named pipe that only
+your user may open, as it does over a local socket on Linux and macOS;
+a pipe run by another user is handed nothing.

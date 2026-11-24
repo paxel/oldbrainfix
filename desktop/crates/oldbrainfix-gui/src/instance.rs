@@ -5,7 +5,8 @@
 //! <file>` the bundle's path, so only the running app writes to the log,
 //! and `oldbrainfix open <file>` the path of a Sent Item for the window
 //! to show. On Unix the way is a local socket, on Windows a named pipe
-//! of this user's (Q12); elsewhere every start runs on its own.
+//! only this user may open, whose server a start checks runs as this
+//! user (Q12); elsewhere every start runs on its own.
 //!
 //! Before it hands anything over, a start asks the running app for its
 //! version (#290): one older than this start, or one that does not
@@ -507,7 +508,10 @@ fn pipe_name(socket: &Path) -> String {
 mod pipe;
 
 /// Connects to the named pipe of the app running at `socket`, waiting a
-/// little while it serves another start; `None` when none runs.
+/// little while it serves another start; `None` when none runs, and when
+/// the pipe's server runs as another user, who made it first: this
+/// start hands it nothing and runs as the first, as a start does where
+/// no socket answers.
 #[cfg(windows)]
 fn connect(socket: &Path) -> Option<std::fs::File> {
     /// `ERROR_PIPE_BUSY`: every instance of the pipe is serving.
@@ -520,7 +524,7 @@ fn connect(socket: &Path) -> Option<std::fs::File> {
             .write(true)
             .open(&name)
         {
-            Ok(pipe) => return Some(pipe),
+            Ok(pipe) => return pipe::same_user(&pipe).then_some(pipe),
             Err(e) if e.raw_os_error() == Some(BUSY) && std::time::Instant::now() < until => {
                 std::thread::sleep(Duration::from_millis(20));
             }
