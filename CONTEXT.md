@@ -112,7 +112,7 @@ The row of buttons that formats the selection or the word at the cursor, or the 
 _Avoid_: toolbar, formatting toolbar
 
 **Table**:
-Rows and columns in a Formatted text, written as a GitHub Markdown table: a header row, the first column as headings when it is marked so, and cells of one line of formatting each. It is edited in place in the editor, cell by cell, with rows and columns put in, moved and deleted and columns aligned there; where it is only read it keeps the text size, wraps long cells and scrolls sideways when wider than its room, a card showing its first 10 rows; from there it opens full screen. German: Tabelle.
+Rows and columns in a Formatted text, written as a GitHub Markdown table: a header row, the first column as headings when it is marked so, and cells of one line of formatting each. It is edited in place in the editor, cell by cell, with rows and columns put in, moved and deleted and columns aligned there; where it is only read it keeps the text size, wraps long cells and scrolls sideways when wider than its room, a card showing its first 10 rows; from there it opens full screen, and a tap or click on a cell of its header row sorts the rows shown by that column, in the view only. German: Tabelle.
 _Avoid_: spreadsheet, grid
 
 **Box**:

@@ -729,7 +729,9 @@ replace a law of Both apps where they say so. A desktop law marked
   size, long cells wrapping and a table wider than its room moving
   sideways inside it, the header row and a heading first column in view;
   a card shows the first 10 rows and "Show all N" (obf-1048). A click
-  opens the table full screen. A small ⋮ at a table's top right corner
+  opens the table full screen; a click on a cell of its header row sorts
+  the rows shown by that column instead, in the view only (obf-1052,
+  see Phone ▸ Text editor and Desktop ▸ Text editor and Lines). A small ⋮ at a table's top right corner
   (obf-1050) offers Copy wherever the table shows, and Move up, Move
   down (past the block above or below) and Delete table where the Note
   is edited; Undo takes them back. **Copy in the bar of the table full screen**
@@ -2264,6 +2266,24 @@ replace a law of Both apps where they say so. A desktop law marked
   holds words. Move and Delete are each a step of the bar's Undo; done
   on the text as it reads, the text is then edited, its cursor outside
   the table.
+- **A click on a cell of the header row sorts a table being read** by
+  its column (obf-1052), as on the phone: on a card, the search's
+  included, in a Section, in the reading view, in the Markdown viewer
+  and full screen where it is only read: ascending, descending, then as
+  written, an arrow in that cell saying which and a screen reader
+  hearing "Sorted ascending" or "Sorted descending", in the view only;
+  the Note's text stays as written, a card's first 10 rows are the first
+  in that order, and the order is forgotten once the table is not drawn.
+  The click is the header row's alone, never the card's or the table's,
+  which the rows under it keep. In the Note dialog's text as it reads, a
+  click on the header row edits the cell, as on any row. Full screen
+  where the table is edited, the column's letter offers Show sorted
+  ascending, Show sorted descending and Show as written, and putting in,
+  moving or deleting a row or column shows the rows as written again. On
+  the Note dialog's grid the column's letter offers Sort rows by this
+  column and Sort rows by this column, descending, which rewrite the
+  rows in the text, each a step of the bar's Undo, none when the rows
+  already stand so.
 - **A right-click in a text field opens its menu at the pointer**
   (#253): every field one types into has Cut, Copy, Paste and Select
   all, Cut and Copy greyed without a selection or in a password field,

@@ -20,6 +20,14 @@
 //! Copy in the bar, and in the ⋮ at its top right corner (obf-1050),
 //! puts the table on the clipboard as an HTML table and, as plain text,
 //! as Markdown (#324), each box in the state it shows.
+//!
+//! The rows show sorted by a column in the view only (obf-1052), the
+//! Note's text as written: where the table is only read a click on a
+//! cell of the header row sorts them by its column ascending, then
+//! descending, then shows them as written; where it may change, the
+//! column's letter offers that, and putting in, moving or deleting a row
+//! or column shows them as written again. The view forgets it as it
+//! closes.
 
 use egui::{Color32, Frame, Id, Key, Margin, Modifiers, Rect, RichText, Sense, TextEdit, Ui};
 use std::collections::BTreeSet;
@@ -33,7 +41,7 @@ use crate::format_bar;
 use crate::icons;
 use crate::l10n::L10n;
 use crate::text_marks_view::{
-    self, BoxAsk, BoxLook, Found, LaidCell, Look, Spots, TABLE_MENU, TableAct,
+    self, BoxAsk, BoxLook, Found, LaidCell, Look, Spots, TABLE_MENU, TableAct, TableSort,
 };
 use crate::theme::{self, Tones};
 
@@ -82,6 +90,7 @@ pub struct TableView {
     ticking: Ticking,
     editing: Option<Editing>,
     deleting: Option<Deleting>,
+    sort: Option<TableSort>,
 }
 
 /// How the boxes of the table show and what a click on one offers: as
@@ -123,6 +132,25 @@ pub(crate) enum Op {
     Headings,
     /// Lines the column's cells up so (#257).
     Align(Align),
+    /// Shows the rows sorted by the column, ascending or descending, in
+    /// the view only, and as written again (obf-1052).
+    ShowSorted(bool),
+    AsWritten,
+    /// Sorts the rows in the text by the column, ascending or descending
+    /// (obf-1052).
+    SortRows(bool),
+}
+
+/// Which sorting a column's menu offers (obf-1052).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) enum Sorts {
+    /// None, as a row's menu.
+    Nothing,
+    /// Showing the rows sorted, full screen where the table may change:
+    /// how they show sorted now.
+    View(Option<TableSort>),
+    /// Sorting the rows in the text, on the editor's grid.
+    Rows,
 }
 
 /// The room around a cell's words.
@@ -150,6 +178,7 @@ impl TableView {
             ticking: Ticking::default(),
             editing: None,
             deleting: None,
+            sort: None,
         };
         if let Some((row, column)) = opening.cell {
             view.start_editing(row, column);
@@ -279,6 +308,21 @@ impl TableView {
         if let Some(text) = self.commit() {
             asked.push(Asked::Write(text));
         }
+        match op {
+            Op::ShowSorted(descending) => {
+                self.sort = Some(TableSort {
+                    column: index,
+                    descending,
+                });
+                return;
+            }
+            Op::AsWritten => {
+                self.sort = None;
+                return;
+            }
+            Op::SortRows(_) => return,
+            _ => {}
+        }
         let Some(table) = self.table() else {
             return;
         };
@@ -312,9 +356,14 @@ impl TableView {
                 }
                 return;
             }
-            (Op::Back, _) => return,
+            (Op::Back, _) | (Op::ShowSorted(_) | Op::AsWritten | Op::SortRows(_), _) => return,
         };
+        // A row or column put in or moved shows the rows as written.
+        let reshapes = matches!(op, Op::Before | Op::After | Op::Back | Op::Forward);
         if let Some(text) = self.take(change) {
+            if reshapes {
+                self.sort = None;
+            }
             asked.push(Asked::Write(text));
         }
     }
@@ -329,6 +378,7 @@ impl TableView {
             table::delete_row(text, at, deleting.index)
         };
         if let Some(text) = self.take(change) {
+            self.sort = None;
             asked.push(Asked::Write(text));
         }
         if deleting.gone {
@@ -468,6 +518,13 @@ impl TableView {
             *height = height.max(lowest);
         }
         let (rows, columns) = (table.rows.len(), table.columns());
+        // The heading of the column the rows show sorted by holds its
+        // arrow after its words (obf-1052).
+        let sort = self.sort.filter(|s| s.column < columns);
+        let arrow = text_marks_view::sort_room(look.font().size);
+        if let Some(width) = sort.and_then(|s| widths.get_mut(s.column)) {
+            *width += arrow;
+        }
         if edits {
             widths.push(ADDING);
             heights.push(lowest);
@@ -478,7 +535,26 @@ impl TableView {
             (0.0, 0.0)
         };
         let xs = starts(lead, &widths);
-        let ys = starts(top, &heights);
+        // Each row where the order shown puts it, by its index in the
+        // table, the empty row adding one last.
+        let mut order = text_marks_view::row_order(ui.ctx(), (&self.text, &table), sort).to_vec();
+        if edits {
+            order.push(rows);
+        }
+        let placed: Vec<f32> = order
+            .iter()
+            .map(|&r| heights.get(r).copied().unwrap_or_default())
+            .collect();
+        let placed = starts(top, &placed);
+        let mut ys = vec![top; heights.len() + 1];
+        for (&r, &y) in order.iter().zip(&placed) {
+            if let Some(slot) = ys.get_mut(r) {
+                *slot = y;
+            }
+        }
+        if let (Some(end), Some(&y)) = (ys.last_mut(), placed.last()) {
+            *end = y;
+        }
         let size = egui::vec2(
             xs.last().copied().unwrap_or(lead),
             ys.last().copied().unwrap_or(top),
@@ -540,15 +616,28 @@ impl TableView {
                 }
             }
             let mut spots = Spots::default();
+            let sorted = sort.filter(|s| r == 0 && s.column == c);
             if let Some(laid) = laid {
                 let align = table.aligns.get(c).copied().unwrap_or(Align::None);
-                spots = paint_cell(ui, laid, rect, align, &look);
+                let mut words = rect;
+                if sorted.is_some() {
+                    words.max.x -= arrow;
+                }
+                spots = paint_cell(ui, laid, words, align, &look);
+            }
+            if let Some(sort) = sorted {
+                let size = look.font().size;
+                let shown = (sort.descending, size, PAD);
+                text_marks_view::paint_sort_arrow(ui, rect, shown, colour);
             }
             if ui.is_rect_visible(rect) {
                 ui.painter()
                     .rect_stroke(rect, 0.0, stroke, egui::StrokeKind::Inside);
             }
-            let sense = if edits {
+            // Where it is only read, a cell of the header row sorts the
+            // rows shown by its column.
+            let sorts = !edits && r == 0 && c < columns;
+            let sense = if edits || sorts {
                 Sense::click()
             } else {
                 Sense::hover()
@@ -572,9 +661,21 @@ impl TableView {
             } else {
                 WidgetType::Label
             };
-            resp.widget_info(|| WidgetInfo::labeled(typ, true, &label));
-            if edits && resp.on_hover_cursor(egui::CursorIcon::Text).clicked() {
-                self.edit((r, c), asked);
+            if sorts {
+                let now = sort.filter(|s| s.column == c).map(|s| s.descending);
+                resp.widget_info(|| text_marks_view::sort_info(t, &label, now));
+                if resp
+                    .on_hover_cursor(egui::CursorIcon::PointingHand)
+                    .on_hover_text(t.table_sort())
+                    .clicked()
+                {
+                    self.sort = text_marks_view::next_sort(self.sort, c);
+                }
+            } else {
+                resp.widget_info(|| WidgetInfo::labeled(typ, true, &label));
+                if edits && resp.on_hover_cursor(egui::CursorIcon::Text).clicked() {
+                    self.edit((r, c), asked);
+                }
             }
             // The cell's boxes, tags and links over it, under the cells
             // drawn after it.
@@ -650,7 +751,8 @@ impl TableView {
                 if resp.clicked() {
                     adding = Some((rows, 0));
                 }
-            } else if let Some(op) = menu(t, &resp, (false, r, rows), (false, None)) {
+            } else if let Some(op) = menu(t, &resp, (false, r, rows), (false, None, Sorts::Nothing))
+            {
                 picked = Some((op, false, r));
             }
         }
@@ -689,9 +791,12 @@ impl TableView {
                 if resp.clicked() {
                     adding = Some((0, columns));
                 }
-            } else if let Some(op) =
-                menu(t, &resp, (true, c, columns), (table.heading_column, None))
-            {
+            } else if let Some(op) = menu(
+                t,
+                &resp,
+                (true, c, columns),
+                (table.heading_column, None, Sorts::View(self.sort)),
+            ) {
                 picked = Some((op, true, c));
             }
         }
@@ -881,13 +986,14 @@ pub(crate) fn heading(
 /// The menu of a row's number or a column's letter, `(column, index,
 /// count)` saying which of how many, opened by a click or a right-click
 /// where the pointer is; the first column's says whether it holds
-/// headings, `headings`, and a column's how it lines up its cells while
-/// `align` is that (#257). Gives what was picked.
+/// headings, `headings`, a column's how it lines up its cells while
+/// `align` is that (#257), and a column's the sorting `sorts` says
+/// (obf-1052). Gives what was picked.
 pub(crate) fn menu(
     t: &L10n,
     resp: &egui::Response,
     (column, index, count): (bool, usize, usize),
-    (headings, align): (bool, Option<Align>),
+    (headings, align, sorts): (bool, Option<Align>, Sorts),
 ) -> Option<Op> {
     let mut picked = None;
     let mut entries = |ui: &mut Ui| {
@@ -946,6 +1052,39 @@ pub(crate) fn menu(
                     picked = Some(Op::Align(to));
                     ui.close();
                 }
+            }
+        }
+        // Shown sorted, the entry of how it shows now is left out, and
+        // As written while the rows show so.
+        let sorting = match sorts {
+            _ if !column => Vec::new(),
+            Sorts::Nothing => Vec::new(),
+            Sorts::View(now) => {
+                let this = now.filter(|s| s.column == index).map(|s| s.descending);
+                let mut entries = Vec::new();
+                if this != Some(false) {
+                    entries.push((Op::ShowSorted(false), t.table_show_sorted_up()));
+                }
+                if this != Some(true) {
+                    entries.push((Op::ShowSorted(true), t.table_show_sorted_down()));
+                }
+                if now.is_some() {
+                    entries.push((Op::AsWritten, t.table_show_as_written()));
+                }
+                entries
+            }
+            Sorts::Rows => vec![
+                (Op::SortRows(false), t.table_sort_rows()),
+                (Op::SortRows(true), t.table_sort_rows_down()),
+            ],
+        };
+        if !sorting.is_empty() {
+            ui.separator();
+        }
+        for (op, words) in sorting {
+            if ui.button(RichText::new(words).color(text)).clicked() {
+                picked = Some(op);
+                ui.close();
             }
         }
         if column && index == 0 {

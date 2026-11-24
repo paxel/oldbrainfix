@@ -209,8 +209,10 @@ pub struct LinkSpot {
 /// card, and where the bar under it lies while it moves sideways, with
 /// how far its cells move per point the bar is dragged and how far they
 /// move at most (obf-1048); where its ⋮ lies, and whether there is a
-/// block of the text above it and below it to move past (obf-1050).
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// block of the text above it and below it to move past (obf-1050);
+/// what of each cell of its header row shows, with its column and its
+/// words, and how its rows show sorted (obf-1052).
+#[derive(Debug, Clone, PartialEq)]
 pub struct TableSpot {
     pub at: usize,
     pub rect: Rect,
@@ -219,6 +221,8 @@ pub struct TableSpot {
     pub bar: Option<(Rect, f32, f32)>,
     pub menu: Rect,
     pub moves: (bool, bool),
+    pub heads: Vec<(usize, Rect, String)>,
+    pub sort: Option<TableSort>,
 }
 
 /// What was done to a table drawn (obf-1050): a click on it, or a pick
@@ -255,12 +259,140 @@ pub struct TableRoom {
 
 /// What is kept of a table drawn between frames, under its
 /// [`TableSpot::key`]: whether "Show all" unfolded it, how far its cells
-/// moved sideways, and the row to bring into view once it is drawn.
+/// moved sideways, the row to bring into view once it is drawn, how its
+/// rows show sorted (obf-1052) and the frame it was drawn in last, which
+/// forgets the sort once a frame goes by without it.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 struct TableState {
     unfolded: bool,
     offset: f32,
     reveal: Option<usize>,
+    sort: Option<TableSort>,
+    drawn: u64,
+}
+
+/// How a table being read shows its rows (obf-1052): sorted by its
+/// column `column`, ascending or `descending`, in the view only, the
+/// Note's text as written.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TableSort {
+    pub column: usize,
+    pub descending: bool,
+}
+
+/// The sort a click on the heading of `column` gives after `sort`:
+/// ascending, then descending, then as written.
+pub fn next_sort(sort: Option<TableSort>, column: usize) -> Option<TableSort> {
+    match sort {
+        Some(s) if s.column == column && !s.descending => Some(TableSort {
+            column,
+            descending: true,
+        }),
+        Some(s) if s.column == column => None,
+        _ => Some(TableSort {
+            column,
+            descending: false,
+        }),
+    }
+}
+
+/// A table to sort, for [`SortCache`]: told apart by its lines as
+/// written, the column and the direction.
+#[derive(Clone, Copy)]
+struct Sorting<'a> {
+    table: &'a Table,
+    lines: &'a str,
+    sort: TableSort,
+}
+
+impl std::hash::Hash for Sorting<'_> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.lines.hash(state);
+        self.sort.column.hash(state);
+        self.sort.descending.hash(state);
+    }
+}
+
+/// Sorts the rows of a table by the core, for [`SortCache`].
+#[derive(Default)]
+struct Sorter;
+
+impl ComputerMut<Sorting<'_>, Arc<Vec<usize>>> for Sorter {
+    fn compute(&mut self, key: Sorting<'_>) -> Arc<Vec<usize>> {
+        let sorted = markdown::table::sorted_rows(key.table, key.sort.column, key.sort.descending);
+        Arc::new(std::iter::once(0).chain(sorted).collect())
+    }
+}
+
+/// The orders of the tables shown sorted, kept while they are drawn
+/// frame after frame, so a long table is not sorted again each frame.
+type SortCache = FrameCache<Arc<Vec<usize>>, Sorter>;
+
+/// The rows of `table` of `text` in the order `sort` shows them, each by
+/// its index in [`Table::rows`], the header row first; as written
+/// without a sort or with one by a column the table does not have.
+pub(crate) fn row_order(
+    ctx: &egui::Context,
+    (text, table): (&str, &Table),
+    sort: Option<TableSort>,
+) -> Arc<Vec<usize>> {
+    match sort {
+        Some(sort) if sort.column < table.columns() => {
+            let lines = text.get(table.start..table.end).unwrap_or_default();
+            let key = Sorting { table, lines, sort };
+            ctx.memory_mut(|m| m.caches.cache::<SortCache>().get(key).clone())
+        }
+        _ => Arc::new((0..table.rows.len()).collect()),
+    }
+}
+
+/// How much wider the heading of the column a table is sorted by is for
+/// its arrow, at the text size `size`.
+pub(crate) fn sort_room(size: f32) -> f32 {
+    size + 4.0
+}
+
+/// Paints the arrow of the direction a table's rows are sorted by the
+/// column whose heading lies in `cell`, up for ascending, down for
+/// `descending`, `size` high at its top right, `pad` in from its edges.
+pub(crate) fn paint_sort_arrow(
+    ui: &Ui,
+    cell: Rect,
+    (descending, size, pad): (bool, f32, Vec2),
+    colour: Color32,
+) {
+    let at = Rect::from_min_size(
+        egui::pos2(cell.right() - pad.x - size, cell.top() + pad.y),
+        egui::vec2(size, size),
+    );
+    if ui.is_rect_visible(at) {
+        let icon = if descending {
+            icons::ARROW_DOWN
+        } else {
+            icons::ARROW_UP
+        };
+        icons::paint(ui.painter(), at, icon, colour);
+    }
+}
+
+/// What a screen reader says of the heading of a column a click sorts
+/// the rows by, `words` reading as it does: the click's "Sort by this
+/// column", and which way the rows are sorted by it while they are.
+pub(crate) fn sort_info(t: &L10n, words: &str, descending: Option<bool>) -> WidgetInfo {
+    let label = if words.trim().is_empty() {
+        t.table_sort().to_string()
+    } else {
+        format!("{}: {}", words.trim(), t.table_sort())
+    };
+    let mut info = WidgetInfo::labeled(WidgetType::Button, true, label);
+    info.current_text_value = descending.map(|down| {
+        if down {
+            t.table_sorted_down().to_string()
+        } else {
+            t.table_sorted_up().to_string()
+        }
+    });
+    info
 }
 
 /// Where what is kept of the table beginning at the byte `at` of the text
@@ -1950,7 +2082,9 @@ fn spots_in(spots: Spots, clip: Rect) -> Spots {
 /// rows under its header until "Show all" ([`table_clicks`]) unfolds the
 /// rest; only the rows shown are laid out. Its ⋮ beside its top right
 /// corner (obf-1050) takes the room it needs, `moves` saying whether
-/// there is a block above and below it to move past.
+/// there is a block above and below it to move past. Its rows show in
+/// the order its sort gives (obf-1052), the column sorted by with an
+/// arrow in its heading; a card's first rows are the first of it.
 fn table_label(
     ui: &mut Ui,
     (text, table, moves): (&str, &Table, (bool, bool)),
@@ -1959,13 +2093,27 @@ fn table_label(
 ) -> Spots {
     let key = table_key(room.card.unwrap_or_else(|| ui.id()), table.start);
     let mut state: TableState = ui.data(|d| d.get_temp(key)).unwrap_or_default();
+    // A sort goes with the view it was made in, which drew the table in
+    // the frame before, and with the column it was by (obf-1052).
+    let frame = ui.ctx().cumulative_frame_nr();
+    if state.drawn + 1 < frame || state.sort.is_some_and(|s| s.column >= table.columns()) {
+        state.sort = None;
+    }
+    state.drawn = frame;
+    let order = row_order(ui.ctx(), (text, table), state.sort);
     let under = table.rows.len().saturating_sub(1);
     let folded = room.card.is_some() && !state.unfolded && under > CARD_ROWS;
-    let rows = if folded {
-        table.rows.get(..=CARD_ROWS).unwrap_or(&table.rows)
+    // The rows shown, each by its index in the table: on a card folded
+    // the first of the order.
+    let shown_rows: &[usize] = if folded {
+        order.get(..=CARD_ROWS).unwrap_or(&order)
     } else {
-        &table.rows
+        &order
     };
+    let rows: Vec<_> = shown_rows
+        .iter()
+        .filter_map(|&r| table.rows.get(r))
+        .collect();
     let column = ui.available_width().max(1.0);
     let menu = TABLE_MENU + TABLE_MENU_GAP;
     let space = (room.wide.map_or(column, |r| r.span().max(column)) - menu).max(1.0);
@@ -1990,6 +2138,20 @@ fn table_label(
             *width = width.max(cell.size(ui, look).x + pad.x * 2.0);
         }
     }
+    // The heading of the column the rows are sorted by holds its arrow
+    // after its words.
+    let arrow = sort_room(look.font.size);
+    let sorted = state.sort.map(|s| s.column);
+    let beside = |r: usize, c: usize| {
+        if r == 0 && sorted == Some(c) {
+            arrow
+        } else {
+            0.0
+        }
+    };
+    if let Some(width) = sorted.and_then(|c| natural.get_mut(c)) {
+        *width += arrow;
+    }
     let mut widths = column_widths(&natural, space, look.font.size * COLUMN_EMS);
     // A first column of headings that stays while the rest moves takes at
     // most half the room, its words wrapped.
@@ -2002,8 +2164,8 @@ fn table_label(
     // The cells wider than their column laid out again, wrapped.
     for (r, (row, cells)) in rows.iter().zip(&mut laid).enumerate() {
         for (c, ((cell, slot), width)) in row.cells.iter().zip(cells).zip(&widths).enumerate() {
-            if slot.size(ui, look).x + pad.x * 2.0 > *width + 0.5 {
-                let wrap = (*width - pad.x * 2.0 - 1.0).max(1.0);
+            if slot.size(ui, look).x + pad.x * 2.0 + beside(r, c) > *width + 0.5 {
+                let wrap = (*width - pad.x * 2.0 - beside(r, c) - 1.0).max(1.0);
                 *slot = lay_wrapped(ui, (text, cell), (found, look), bold(r, c), wrap);
             }
         }
@@ -2123,6 +2285,7 @@ fn table_label(
         .collect();
     let (stroke, fill) = table_tones(look.colour);
     let mut spots = Spots::default();
+    let mut heads = Vec::new();
     for (r, row) in laid.iter().enumerate() {
         let height = heights.get(r).copied().unwrap_or_default();
         let y = if r == 0 {
@@ -2151,9 +2314,14 @@ fn table_label(
             }
             let align = table.aligns.get(c).copied().unwrap_or(Align::None);
             let words = cell.size(ui, look);
-            let inset = aligned(align, width, words.x, pad.x);
+            let inset = aligned(align, width - beside(r, c), words.x, pad.x);
             let pos = egui::pos2(x + inset, y + pad.y);
             spots.extend(spots_in(cell.paint(cells, pos, look.colour, true), part));
+            if let Some(sort) = state.sort.filter(|s| r == 0 && s.column == c) {
+                let arrow = (sort.descending, look.font.size, pad);
+                paint_sort_arrow(cells, at, arrow, look.colour);
+            }
+            let index = shown_rows.get(r).copied().unwrap_or(r);
             if current == Some((r, c))
                 && let Some(found) = &look.found
             {
@@ -2162,9 +2330,15 @@ fn table_label(
             if seen.is_positive() {
                 spots.cells.push(CellSpot {
                     at: table.start,
-                    cell: (r, c),
+                    cell: (index, c),
                     rect: seen,
                 });
+                if let Some(head) = table.rows.first().and_then(|h| h.cells.get(c))
+                    && r == 0
+                {
+                    let words = text_boxes::strip(&head.visible());
+                    heads.push((c, seen, words));
+                }
                 painter.rect_stroke(at, 0.0, stroke, egui::StrokeKind::Inside);
             }
         }
@@ -2187,6 +2361,7 @@ fn table_label(
     }
     // A row asked for, as by a search hit in it, comes into view once.
     if let Some(row) = state.reveal.take()
+        && let Some(row) = shown_rows.iter().position(|&r| r == row)
         && let (Some(y), Some(height)) = (ys.get(row), heights.get(row))
     {
         let target = Rect::from_min_size(
@@ -2216,6 +2391,8 @@ fn table_label(
         bar: bar.map(|(bar, _, per_point)| (bar, per_point, most)),
         menu,
         moves,
+        heads,
+        sort: state.sort,
     });
     spots
 }
@@ -2228,7 +2405,9 @@ fn table_label(
 /// does, the bar under a table moves it sideways, "Show all" unfolds a
 /// table folded on a card (obf-1048), and its ⋮ (obf-1050) offers Copy
 /// and, where the text is edited (`edits`), Move up, Move down and
-/// Delete table.
+/// Delete table. Where the text is only read, a click on a cell of a
+/// table's header row sorts its rows shown by that column (obf-1052):
+/// ascending, then descending, then as written.
 pub fn table_clicks(
     ui: &mut Ui,
     t: &L10n,
@@ -2246,6 +2425,26 @@ pub fn table_clicks(
             .clicked()
         {
             picked = Some((spot.at, TableAct::Open));
+        }
+        // Where it is only read, a click on a cell of its header row
+        // sorts the rows shown by its column (obf-1052), over the
+        // table's click; in the editor it edits the cell.
+        for (c, rect, words) in spot.heads.iter().filter(|_| !edits) {
+            let id = of.with(("table sort", spot.at, *c));
+            let resp = ui.interact(*rect, id, Sense::click());
+            let now = spot.sort.filter(|s| s.column == *c).map(|s| s.descending);
+            resp.widget_info(|| sort_info(t, words, now));
+            if resp
+                .on_hover_cursor(egui::CursorIcon::PointingHand)
+                .on_hover_text(t.table_sort())
+                .clicked()
+            {
+                ui.data_mut(|d| {
+                    let state: &mut TableState = d.get_temp_mut_or_default(spot.key);
+                    state.sort = next_sort(state.sort, *c);
+                });
+                ui.ctx().request_repaint();
+            }
         }
         let (up, down) = spot.moves;
         let menu = (of.with(("table menu", spot.at)), spot.menu);

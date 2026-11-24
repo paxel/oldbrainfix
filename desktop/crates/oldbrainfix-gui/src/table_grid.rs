@@ -15,7 +15,8 @@
 //! table, Esc back into the field. The "+" under the rows' numbers and
 //! after the columns' letters adds one; a row's number and a column's
 //! letter open their menus, as in the table full screen, a column's also
-//! with its alignment. A column's border drags it wider or narrower for
+//! with its alignment and sorting the rows by it, ascending or
+//! descending, in the text (obf-1052). A column's border drags it wider or narrower for
 //! as long as the editor shows the table: Markdown has no widths. Every
 //! change writes the whole table through the core at once, the cell's own
 //! words the truth while it is edited. "Show as lines" shows a table's
@@ -40,7 +41,7 @@ use oldbrainfix_core::text_format;
 
 use crate::format_bar::{self, Format};
 use crate::l10n::L10n;
-use crate::table_view::{self, Deleting, Op};
+use crate::table_view::{self, Deleting, Op, Sorts};
 use crate::text_marks_view::{
     self, BoxAsk, BoxLook, BoxSpot, Found, LaidCell, Look, TABLE_MENU, TableAct,
 };
@@ -895,7 +896,8 @@ impl Grids {
             let shown = (r + 1).to_string();
             let id = of.with(("row", r));
             let resp = table_view::heading(ui, at, (&shown, &label), id, (tones, weak));
-            if let Some(picked) = table_view::menu(t, &resp, (false, r, rows), (false, None)) {
+            let menu = (false, None, Sorts::Nothing);
+            if let Some(picked) = table_view::menu(t, &resp, (false, r, rows), menu) {
                 op = Some((picked, false, r));
             }
             drawn.menu |= menu_open(ui, &resp);
@@ -916,7 +918,8 @@ impl Grids {
             let id = of.with(("column", c));
             let resp = table_view::heading(ui, at, (&letter, &label), id, (tones, weak));
             let align = table.aligns.get(c).copied().unwrap_or(Align::None);
-            let menu = (table.heading_column, Some(align));
+            // Sorting the rows by it rewrites them (obf-1052).
+            let menu = (table.heading_column, Some(align), Sorts::Rows);
             if let Some(picked) = table_view::menu(t, &resp, (true, c, columns), menu) {
                 op = Some((picked, true, c));
             }
@@ -1161,6 +1164,8 @@ impl Grids {
             (Op::Forward, true) => table::move_column(text, at, index, index + 1),
             (Op::Align(align), _) => table::set_align(text, at, index, align),
             (Op::Headings, _) => table::toggle_heading_column(text, at),
+            // Rows already in that order are no step of Undo.
+            (Op::SortRows(descending), _) => table::sort_rows(text, at, index, descending),
             (Op::Delete, _) => {
                 let gone = if column {
                     shown.columns() == 1
@@ -1179,7 +1184,7 @@ impl Grids {
                 }
                 return;
             }
-            (Op::Back, _) => return,
+            (Op::Back, _) | (Op::ShowSorted(_) | Op::AsWritten, _) => return,
         };
         self.take(ui, text, change);
         // The widths dragged go with their columns.
