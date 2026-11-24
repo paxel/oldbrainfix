@@ -25,6 +25,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the phone and the desktop, the quick note's More is a full-width "Open in the editor" button under the Nudge buttons. ([obf-1080](https://github.com/paxel/oldbrainfix/issues/393))
 - On the desktop, every Note list starts with one header band of two rows that grows with Text size. ([obf-1064](https://github.com/paxel/oldbrainfix/issues/377))
 - On the desktop, the list's search field is as tall as a button, its text a card's size, with the magnifier and ✕ inside. ([obf-1063](https://github.com/paxel/oldbrainfix/issues/376))
+- On the desktop, View and New Note are framed buttons with icon and word, like Show Notes by…. ([obf-1067](https://github.com/paxel/oldbrainfix/issues/380))
 
 ### Fixed
 

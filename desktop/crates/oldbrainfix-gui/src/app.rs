@@ -16080,7 +16080,7 @@ impl App {
         // What stands beside the field, so it takes the rest.
         let mut beside = 0.0;
         if switch {
-            beside += sizes.row + gap;
+            beside += band_button_width(ui, t.menu_view(), sizes) + gap;
         }
         if !trash {
             let font = FontId::proportional(sizes.words);
@@ -16098,7 +16098,7 @@ impl App {
             beside += chip_width(ui, name, sizes) + gap;
         }
         if kinds.is_some() {
-            beside += sizes.row + gap;
+            beside += band_button_width(ui, t.menu_new_note(), sizes) + gap;
         }
         // The typed text at a card's text size (obf-1063); the margin
         // makes the field as tall as the row (egui's single line takes no
@@ -16189,7 +16189,7 @@ impl App {
             // Topics too (UI laws, "Navigation"); last, so the buttons
             // before it keep their place while it goes.
             if let Some(kinds) = kinds
-                && let Some(kind) = add_button(ui, &t, &kinds, (sizes.row, sizes.glyph))
+                && let Some(kind) = add_button(ui, &t, &kinds, Some(sizes))
             {
                 actions.push(Action::Add(kind));
             }
@@ -17801,7 +17801,7 @@ impl App {
             // As the phone's bar, without its Calendar (UI laws, "The
             // Agenda's bar").
             // "+" captures, as the phone's Agenda's does (#146).
-            if add_button(ui, &t, &[NewKind::Note], (24.0, 20.0)).is_some() {
+            if add_button(ui, &t, &[NewKind::Note], None).is_some() {
                 actions.push(Action::NewNote);
             }
             // Room for the buttons at the end: 24 wide and 8 apart, and
@@ -23850,15 +23850,33 @@ fn filter_chip(ui: &mut Ui, tones: Tones, name: &str, sizes: BandSizes) -> egui:
 
 /// "+" at the top of a list (#146, #161): with one kind it makes that at
 /// once, with more its menu offers them, Note first, each with its icon
-/// and words; the kind picked.
-fn add_button(ui: &mut Ui, t: &L10n, kinds: &[NewKind], size: (f32, f32)) -> Option<NewKind> {
+/// and words; the kind picked. In a list's band, of `band`'s sizes, it
+/// reads "+ New Note" in a button's frame (obf-1067); the Agenda's is
+/// the icon alone.
+fn add_button(
+    ui: &mut Ui,
+    t: &L10n,
+    kinds: &[NewKind],
+    band: Option<BandSizes>,
+) -> Option<NewKind> {
     let text = ui.visuals().text_color();
+    let button = |ui: &mut Ui, label: &str| match band {
+        Some(sizes) => {
+            let resp = band_button(ui, (icons::ADD, t.menu_new_note(), label), sizes, None);
+            if label == t.menu_new_note() {
+                resp
+            } else {
+                resp.on_hover_text(label)
+            }
+        }
+        None => sized_icon_button(ui, (icons::ADD, label, text), (24.0, 20.0)),
+    };
     if let [kind] = kinds {
-        let add = sized_icon_button(ui, (icons::ADD, t.menu_new_note(), text), size);
+        let add = button(ui, t.menu_new_note());
         spotlight::anchor(ui, "add", add.rect);
         return add.clicked().then_some(*kind);
     }
-    let add = sized_icon_button(ui, (icons::ADD, t.add_here(), text), size);
+    let add = button(ui, t.add_here());
     spotlight::anchor(ui, "add", add.rect);
     let mut picked = None;
     egui::Popup::menu(&add).show(|ui| {
@@ -23882,28 +23900,82 @@ fn add_button(ui: &mut Ui, t: &L10n, kinds: &[NewKind], size: (f32, f32)) -> Opt
 }
 
 /// The bar button of a Note list's compact/detailed switch (#114, #189):
-/// it says what clicking it does and shows as selected while the list is
-/// `compact`, one height with the band's row (obf-1064); whether it was
-/// clicked.
+/// its icon and "View" in a button's frame (obf-1067), one height with
+/// the band's row (obf-1064); it says what clicking it does to a screen
+/// reader and in its tooltip and shows as selected while the list is
+/// `compact`; whether it was clicked.
 fn compact_button(ui: &mut Ui, tones: Tones, t: &L10n, compact: bool, sizes: BandSizes) -> bool {
     let (icon, label) = if compact {
         (icons::NOTES_COMPACT, t.show_notes_full())
     } else {
         (icons::NOTES_FULL, t.show_notes_compact())
     };
-    let (rect, resp) = ui.allocate_exact_size(egui::vec2(sizes.row, sizes.row), Sense::click());
-    spotlight::anchor(ui, "compact", rect);
-    resp.widget_info(|| WidgetInfo::selected(WidgetType::Button, true, compact, label));
-    // The hover under the tint, so the selected look stays.
-    theme::icon_button_back(ui, &resp, rect);
-    if compact {
-        let fill = tones.accent.gamma_multiply(0.3);
-        ui.painter().rect_filled(rect, theme::BUTTON_RADIUS, fill);
-    }
-    let text = ui.visuals().text_color();
-    let at = egui::Rect::from_center_size(rect.center(), egui::vec2(sizes.glyph, sizes.glyph));
-    icons::paint(ui.painter(), at, icon, text);
+    let selected = Some((compact, tones.accent));
+    let resp = band_button(ui, (icon, t.menu_view(), label), sizes, selected);
+    spotlight::anchor(ui, "compact", resp.rect);
     resp.on_hover_text(label).clicked()
+}
+
+/// How wide [`band_button`] draws `word` with its icon.
+fn band_button_width(ui: &Ui, word: &str, sizes: BandSizes) -> f32 {
+    let font = FontId::proportional(sizes.words);
+    let colour = ui.visuals().text_color();
+    let words = ui.painter().layout_no_wrap(word.to_string(), font, colour);
+    let pad = ui.spacing().button_padding.x;
+    pad + sizes.glyph + ui.spacing().icon_spacing + words.size().x + pad
+}
+
+/// A button of the band's second row (obf-1067): `icon` and `word` in
+/// the frame "Show Notes by…" has, as tall as the row, `label` to a
+/// screen reader; with `selected`, a switch, tinted with its accent
+/// while on.
+fn band_button(
+    ui: &mut Ui,
+    (icon, word, label): (char, &str, &str),
+    sizes: BandSizes,
+    selected: Option<(bool, Color32)>,
+) -> egui::Response {
+    let width = band_button_width(ui, word, sizes);
+    let (rect, resp) = ui.allocate_exact_size(egui::vec2(width, sizes.row), Sense::click());
+    resp.widget_info(|| match selected {
+        Some((on, _)) => WidgetInfo::selected(WidgetType::Button, true, on, label),
+        None => WidgetInfo::labeled(WidgetType::Button, true, label),
+    });
+    if ui.is_rect_visible(rect) {
+        // The frame egui's button paints, for this state.
+        let look = *ui.style().visuals.widgets.state(resp.widget_state());
+        let frame = rect.expand(look.expansion);
+        ui.painter().rect(
+            frame,
+            look.corner_radius,
+            look.weak_bg_fill,
+            look.bg_stroke,
+            egui::StrokeKind::Inside,
+        );
+        if let Some((true, accent)) = selected {
+            let fill = accent.gamma_multiply(0.3);
+            ui.painter().rect_filled(frame, look.corner_radius, fill);
+        }
+        let text = ui.visuals().text_color();
+        let pad = ui.spacing().button_padding.x;
+        let glyph = egui::vec2(sizes.glyph, sizes.glyph);
+        let at = egui::Rect::from_min_size(
+            egui::pos2(rect.left() + pad, rect.center().y - sizes.glyph / 2.0),
+            glyph,
+        );
+        icons::paint(ui.painter(), at, icon, text);
+        let font = FontId::proportional(sizes.words);
+        let words = ui.painter().layout_no_wrap(word.to_string(), font, text);
+        let left = at.right() + ui.spacing().icon_spacing;
+        let top = rect.center().y - words.size().y / 2.0;
+        ui.painter().galley(egui::pos2(left, top), words, text);
+    }
+    if let Some(cursor) = ui.visuals().interact_cursor
+        && resp.hovered()
+    {
+        ui.ctx().set_cursor_icon(cursor);
+    }
+    resp
 }
 
 /// A text edited in the Note dialog: the Note's, or a Section's (#183)

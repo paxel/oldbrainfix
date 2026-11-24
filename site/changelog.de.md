@@ -24,6 +24,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Handy und dem Desktop ist „Mehr“ der Schnellnotiz ein breiter Knopf „Im Editor öffnen“ unter den Stupser-Knöpfen. ([obf-1080](https://github.com/paxel/oldbrainfix/issues/393))
 - Auf dem Desktop beginnt jede Liste von Notizen mit einem zweizeiligen Kopfstreifen, der mit der Textgröße wächst. ([obf-1064](https://github.com/paxel/oldbrainfix/issues/377))
 - Auf dem Desktop ist das Suchfeld einer Liste so hoch wie ein Knopf, seine Schrift so groß wie auf Karten, Lupe und ✕ darin. ([obf-1063](https://github.com/paxel/oldbrainfix/issues/376))
+- Auf dem Desktop sind Ansicht und Neue Notiz gerahmte Knöpfe mit Symbol und Wort, wie „Notizen zeigen von …“. ([obf-1067](https://github.com/paxel/oldbrainfix/issues/380))
 
 ### Behoben
 

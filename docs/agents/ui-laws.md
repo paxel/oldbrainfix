@@ -1806,7 +1806,7 @@ replace a law of Both apps where they say so. A desktop law marked
   with the same room after its last card, so that card scrolls fully
   into view.
 - **On the desktop "+" sits at the end of the list's heading** (#146, #161),
-  in a list of Notes last in its band's second row (obf-1064), and opens a menu of the same kinds, Note first, each with its icon and
+  in a list of Notes last in its band's second row (obf-1064) as "+ New Note" in a button's frame (obf-1067), and opens a menu of the same kinds, Note first, each with its icon and
   words; the Agenda's and Unsorted's "+" open the quick note at once. The
   pages open as dialogs over the window; the desktop's Session page is
   the Routine editor's, its name first, the count, rule and schedule as
@@ -1830,7 +1830,10 @@ replace a law of Both apps where they say so. A desktop law marked
   row holds back, forward and the path, the place shown last and large
   as the list's title; its second the search field, then the view
   switch, "Show Notes by…" and "+", all at one height, the Trash's the
-  field alone. The search field is as tall as those buttons, its text
+  field alone. The view switch and "+" are icon and word in the frame
+  "Show Notes by…" has, "View" and "New Note" (obf-1067); to a screen
+  reader and in its tooltip the switch says what a click does, and
+  "+" with a menu says "Add here". The search field is as tall as those buttons, its text
   a card's text's size, the magnifier inside it at its left and ✕ to
   clear it inside at its right while something is typed (obf-1063).
   A person the filter keeps is a chip with ✕ in the second row, after

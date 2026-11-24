@@ -419,3 +419,53 @@ fn the_magnifier_and_clear_lie_inside_the_search_field() -> TestResult {
     assert!(gone, "✕ stays after clearing");
     Ok(())
 }
+
+/// Whether a frame is drawn around `button`: a filled or stroked
+/// rectangle within a point or two of it.
+fn framed(harness: &Harness<'_, App>, button: Rect) -> bool {
+    drawn(harness).iter().any(|shape| match shape {
+        Shape::Rect(r) => {
+            let near = (r.rect.min - button.min).length() <= 2.0
+                && (r.rect.max - button.max).length() <= 2.0;
+            near && (r.fill.a() > 0 || r.stroke.width > 0.0)
+        }
+        _ => false,
+    })
+}
+
+#[test]
+fn view_and_new_note_are_icon_and_word_in_a_button_frame() -> TestResult {
+    let t = t();
+    for size in [TextSize::Normal, TextSize::Largest] {
+        let (store, kitchen) = store(size)?;
+        for (selection, add) in [
+            (Selection::Place(kitchen.clone()), t.add_here()),
+            (Selection::Unsorted, t.menu_new_note()),
+        ] {
+            let harness = window(&store, selection.clone(), egui::vec2(1280.0, 800.0));
+            let menu = button(&harness, t.person_filter());
+            assert!(framed(&harness, menu), "{size:?}: no frame to compare with");
+            let view = button(&harness, t.show_notes_compact());
+            let new = button(&harness, add);
+            for (r, word) in [(view, t.menu_view()), (new, t.menu_new_note())] {
+                let at = format!("{size:?} {selection:?} {word}");
+                let (words, shown) =
+                    text_in(&harness, word, r).unwrap_or_else(|| panic!("{at}: no words in {r:?}"));
+                assert!(shown > 0.0);
+                assert!(r.width() > r.height() + words.width(), "{at}: {r:?}");
+                assert!((r.height() - menu.height()).abs() <= 1.0, "{at}: {r:?}");
+                assert!(framed(&harness, r), "{at}: no frame around {r:?}");
+                // The icon before the word, inside the button.
+                let icon = drawn(&harness).iter().any(|shape| match shape {
+                    Shape::Text(text) => {
+                        let b = text.visual_bounding_rect();
+                        r.expand(1.0).contains_rect(b) && b.right() <= words.left()
+                    }
+                    _ => false,
+                });
+                assert!(icon, "{at}: no icon before the word");
+            }
+        }
+    }
+    Ok(())
+}
