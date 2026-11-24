@@ -236,5 +236,20 @@ void main() {
       expect(shown.last, isNot(isA<BarAction>()));
       expect(shown, isNot(contains(b)));
     });
+
+    test('one that stands in ⋮ goes there with room to spare (obf-1078)', () {
+      final a = action('a');
+      final running = BarAction(
+        icon: Icons.timelapse,
+        label: 'Running',
+        onPressed: () {},
+        inMenu: true,
+      );
+      final shown = barActions([a, running, calendar], 10);
+      expect(shown, hasLength(3));
+      expect(shown.take(2), [a, calendar]);
+      expect(shown.last, isNot(isA<BarAction>()));
+      expect(barActions([a, calendar], 10), [a, calendar]);
+    });
   });
 }

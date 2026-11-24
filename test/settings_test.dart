@@ -100,8 +100,12 @@ void main() {
         matching: find.byType(Scaffold),
       );
       expect(tester.widget<Scaffold>(agenda.first).drawer, isNull);
-      expect(find.byIcon(Icons.more_vert), findsNothing);
-      expect(find.byWidgetPredicate((w) => w is PopupMenuButton), findsNothing);
+      // ⋮ holds Running alone (obf-1078), never Settings.
+      await tap(tester, find.byKey(const ValueKey('bar-more')));
+      expect(find.byType(PopupMenuItem<VoidCallback>), findsOneWidget);
+      expect(find.text('Running'), findsOneWidget);
+      await tester.tapAt(Offset.zero);
+      await tester.pumpAndSettle();
 
       await openDeviceSettings(tester);
       expect(find.byType(SettingsScreen), findsOneWidget);

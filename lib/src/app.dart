@@ -58,6 +58,7 @@ import 'profile_platform.dart';
 import 'question_mark_background.dart';
 import 'restore_screen.dart';
 import 'ring_screen.dart';
+import 'running.dart';
 import 'session_view.dart';
 import 'routine_editor_screen.dart';
 import 'run_over.dart';
@@ -325,6 +326,18 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
   late final _imports = ImportJobs(store: widget.store, runner: _jobs);
   late final _deletions = AreaDeletions(store: widget.store, runner: _jobs);
 
+  /// What the page Running lists (obf-1078), once the readers are made.
+  late final _running = Running(
+    places: _places,
+    sync: _autoSync,
+    imports: _imports,
+    deletions: _deletions,
+    transcriber: _transcriber,
+    photos: _photoReader,
+    files: _attachmentReader,
+    model: _speechModel,
+  );
+
   @override
   void initState() {
     super.initState();
@@ -390,6 +403,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     _stopped = true;
     (Object, StackTrace)? failed;
     for (final stop in <VoidCallback>[
+      _running.dispose,
       _alarms.dispose,
       _autoSync.dispose,
       _mirror.dispose,
@@ -553,9 +567,13 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
                                                                   child: AreaDeletionsScope(
                                                                     deletions:
                                                                         _deletions,
-                                                                    child: _spotlit(
-                                                                      child ??
-                                                                          const SizedBox.shrink(),
+                                                                    child: RunningScope(
+                                                                      running:
+                                                                          _running,
+                                                                      child: _spotlit(
+                                                                        child ??
+                                                                            const SizedBox.shrink(),
+                                                                      ),
                                                                     ),
                                                                   ),
                                                                 ),

@@ -26,6 +26,7 @@ import 'package:oldbrainfix/src/nudge_screen.dart';
 import 'package:oldbrainfix/src/photo_platform.dart';
 import 'package:oldbrainfix/src/ring_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
+import 'package:oldbrainfix/src/running.dart';
 import 'package:oldbrainfix/src/trash_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -349,6 +350,37 @@ void main() {
       await back(tester);
       expect(lockScreen, findsOneWidget);
       expect(notes.all().single.text, 'long thought');
+    });
+
+    testWidgets('the page Running goes when it locks again, also over '
+        'Capture, and opens nothing while locked (obf-1078)', (tester) async {
+      await start(tester);
+      await tester.enterText(find.byKey(const ValueKey('lockPin')), pin);
+      await tap(tester, find.byKey(const ValueKey('unlockPin')));
+      await tap(tester, find.byKey(const ValueKey('bar-more')));
+      await tap(tester, find.byKey(const ValueKey('running')));
+      expect(find.byType(RunningScreen), findsOneWidget);
+
+      await away(tester, const Duration(minutes: 5));
+      expect(tester.takeException(), isNull);
+      expect(lockScreen, findsOneWidget);
+      expect(find.byType(RunningScreen, skipOffstage: false), findsNothing);
+
+      await tester.enterText(find.byKey(const ValueKey('lockPin')), pin);
+      await tap(tester, find.byKey(const ValueKey('unlockPin')));
+      await openTextCapture(tester);
+      // As a tap on the line under Capture's bar does.
+      openRunning(tester.element(find.byType(CaptureScreen)));
+      await tester.pumpAndSettle();
+      expect(find.byType(RunningScreen), findsOneWidget);
+      await away(tester, const Duration(minutes: 5));
+      expect(tester.takeException(), isNull);
+      expect(find.byType(RunningScreen, skipOffstage: false), findsNothing);
+      expect(find.byType(CaptureScreen), findsOneWidget);
+
+      openRunning(tester.element(find.byType(CaptureScreen)));
+      await tester.pumpAndSettle();
+      expect(find.byType(RunningScreen, skipOffstage: false), findsNothing);
     });
 
     testWidgets('keeps a share open in Capture over the browser when it '

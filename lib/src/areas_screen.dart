@@ -30,6 +30,7 @@ import 'place_names.dart';
 import 'profile.dart';
 import 'routine_editor_screen.dart';
 import 'run_over.dart';
+import 'running.dart';
 import 'share_area_screen.dart';
 import 'spotlight.dart';
 import 'system_bars.dart';
@@ -651,8 +652,9 @@ class _AreasScreenState extends State<AreasScreen>
     );
   }
 
-  /// ⋮ of the Areas list: Rearrange shows the Areas' handles
-  /// (obf-1089).
+  /// ⋮ of the Areas list, with two Areas or more: Rearrange shows the
+  /// Areas' handles (obf-1089), Running opens the page of what runs in
+  /// the background (obf-1078).
   Widget _areasMenu(AppLocalizations t) => PopupMenuButton<VoidCallback>(
     key: const ValueKey('areas-more'),
     tooltip: t.more,
@@ -664,6 +666,12 @@ class _AreasScreenState extends State<AreasScreen>
         value: () => setState(() => _rearranging = true),
         child: Text(t.rearrangeAreas),
       ),
+      if (RunningScope.of(context) != null)
+        PopupMenuItem(
+          key: const ValueKey('areas-running'),
+          value: () => openRunning(context),
+          child: Text(t.jobsTitle),
+        ),
     ],
   );
 

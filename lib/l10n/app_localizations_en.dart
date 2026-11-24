@@ -7058,4 +7058,106 @@ class AppLocalizationsEn extends AppLocalizations {
   String recordingPauseSeconds(int seconds) {
     return '$seconds s';
   }
+
+  @override
+  String get jobsTitle => 'Running';
+
+  @override
+  String get jobsNone => 'Nothing runs in the background.';
+
+  @override
+  String jobsSince(String time) {
+    return 'Since $time';
+  }
+
+  @override
+  String get jobsAbort => 'Abort';
+
+  @override
+  String get jobsStopping => 'Stopping…';
+
+  @override
+  String get jobsStopped => 'Stopped';
+
+  @override
+  String get jobsGoOn => 'Go on';
+
+  @override
+  String get jobsSync => 'Sync with a Device';
+
+  @override
+  String get jobsSyncAbort =>
+      'The sync under way ends first. Then this Device does not sync on its own until Sync now, Go on or the next start.';
+
+  @override
+  String get jobsSyncPaused =>
+      'Paused: this Device does not sync on its own until Sync now, Go on or the next start.';
+
+  @override
+  String jobsImport(String name) {
+    return 'Import of $name';
+  }
+
+  @override
+  String get jobsImportAbort => 'The Notes imported so far stay.';
+
+  @override
+  String jobsImportStopped(int done, int count) {
+    return 'Stopped: $done of $count imported';
+  }
+
+  @override
+  String get jobsImportEnded => 'Import stopped.';
+
+  @override
+  String get jobsTranscripts => 'Transcribing recordings';
+
+  @override
+  String get jobsPhotoTexts => 'Reading the text in photos';
+
+  @override
+  String get jobsAttachmentTexts => 'Reading attached files';
+
+  @override
+  String jobsRead(int done, int count) {
+    return '$done of $count';
+  }
+
+  @override
+  String get jobsReadAbort =>
+      'The one being read ends first. The others wait until Go on or the next start.';
+
+  @override
+  String get jobsReadStopped =>
+      'Stopped: the others wait until Go on or the next start.';
+
+  @override
+  String get jobsModelDownload => 'Downloading the speech model';
+
+  @override
+  String get jobsModelCopy => 'Copying the speech model';
+
+  @override
+  String get jobsModelStopped =>
+      'Stopped. The Settings offer the speech model again.';
+
+  @override
+  String jobsAreaDeletion(String name) {
+    return 'Deleting the Area $name';
+  }
+
+  @override
+  String get jobsAreaAbort =>
+      'The Notes moved so far stay where they went. The Area stays with the others.';
+
+  @override
+  String jobsAreaStopped(int moved, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Stopped: $moved of $count Notes moved',
+      one: 'Stopped: $moved of 1 Note moved',
+    );
+    return '$_temp0';
+  }
 }

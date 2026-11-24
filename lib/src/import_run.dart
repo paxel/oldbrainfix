@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:isolate';
 
 import 'package:flutter/services.dart';
@@ -11,16 +12,73 @@ import 'sync_runner.dart';
 /// How far a long job is: [done] of [of] (obf-1061, obf-1093).
 typedef JobProgress = void Function(int done, int of);
 
+/// How far one who reads beside the app is, as the page Running shows it
+/// (obf-1078): since when it reads without a rest, and how many of how
+/// many it took meanwhile, the one being read the next.
+typedef ReaderBusy = ({DateTime since, int done, int of});
+
 /// A long job, such as an Import (obf-1061) or deleting an Area
 /// (obf-1093): it reads what it needs through [folders] and writes into
-/// [store], telling [progress] how far it is. It crosses into an
-/// isolate: a closure made by a top-level function, holding only the
-/// strings it was handed.
+/// [store], telling [progress] how far it is, and asks [stop] before
+/// each of its steps whether Abort on the page Running was pressed
+/// (obf-1078). It crosses into an isolate: a closure made by a top-level
+/// function, holding only the strings it was handed.
 typedef LongWork<T> = Future<T> Function(
   Store store,
   FolderPlatform folders,
   JobProgress progress,
+  Stopping stop,
 );
+
+/// The Abort of one long job (obf-1078): a file in the app's temporary
+/// folder, named for this job alone, whose being there tells the job to
+/// stop before its next step. The job asks it in its own isolate,
+/// without waiting, as the core asks before each Note; a port's message
+/// would wait behind the work. A file that cannot be written leaves the
+/// job running to its end, so nothing is lost either way.
+class JobStop {
+  /// The file; only its being there counts.
+  final String path;
+
+  var _raised = false;
+
+  JobStop._(this.path);
+
+  static var _made = 0;
+
+  /// A stop of its own under the system's temporary folder, the app's
+  /// cache on the phone, not raised.
+  factory JobStop() => JobStop._(
+    '${Directory.systemTemp.path}/obf-stop-$pid-'
+    '${DateTime.now().microsecondsSinceEpoch}-${_made++}',
+  )..clear();
+
+  /// Whether Abort was pressed for this job.
+  bool get raised => _raised;
+
+  /// Tells the job to stop before its next step; where the file cannot
+  /// be written, it runs to its end and Abort stays offered.
+  void raise() {
+    try {
+      File(path).writeAsBytesSync(const [], flush: true);
+      _raised = true;
+    } on FileSystemException {
+      // The job runs to its end.
+    }
+  }
+
+  /// Takes the file away once the job ended, so none is left behind.
+  void clear() {
+    try {
+      File(path).deleteSync();
+    } on FileSystemException {
+      // Not there.
+    }
+  }
+}
+
+/// Whether the [JobStop] at [path] was raised, asked where the job runs.
+bool _stopRaised(String path) => File(path).existsSync();
 
 /// One Import as a job (obf-1061), telling how far the writing is.
 typedef ImportWork = LongWork<ImportSummary>;
@@ -31,8 +89,14 @@ typedef ImportWork = LongWork<ImportSummary>;
 /// ([InlineJobRunner]).
 abstract interface class JobRunner {
   /// [work] on [store], or on a connection of its own to its database,
-  /// [progress] told here as it goes.
-  Future<T> run<T>(Store store, LongWork<T> work, JobProgress progress);
+  /// [progress] told here as it goes, stopping before its next step once
+  /// [stop] is raised.
+  Future<T> run<T>(
+    Store store,
+    LongWork<T> work,
+    JobProgress progress,
+    JobStop stop,
+  );
 }
 
 /// Runs a long job on the store the app reads, in its isolate, reading
@@ -43,8 +107,15 @@ class InlineJobRunner implements JobRunner {
   const InlineJobRunner(this.folders);
 
   @override
-  Future<T> run<T>(Store store, LongWork<T> work, JobProgress progress) =>
-      work(store, folders, progress);
+  Future<T> run<T>(
+    Store store,
+    LongWork<T> work,
+    JobProgress progress,
+    JobStop stop,
+  ) {
+    final path = stop.path;
+    return work(store, folders, progress, () => _stopRaised(path));
+  }
 }
 
 /// Runs a long job in an isolate of its own on a connection of its own
@@ -65,7 +136,12 @@ class IsolateJobRunner implements JobRunner {
   });
 
   @override
-  Future<T> run<T>(Store store, LongWork<T> work, JobProgress progress) async {
+  Future<T> run<T>(
+    Store store,
+    LongWork<T> work,
+    JobProgress progress,
+    JobStop stop,
+  ) async {
     final told = ReceivePort();
     told.listen((message) {
       if (message case (final int done, final int of)) {
@@ -73,7 +149,15 @@ class IsolateJobRunner implements JobRunner {
       }
     });
     try {
-      return await _isolated(store, path, folders, token, work, told.sendPort);
+      return await _isolated(
+        store,
+        path,
+        folders,
+        token,
+        work,
+        told.sendPort,
+        stop.path,
+      );
     } finally {
       told.close();
     }
@@ -89,10 +173,16 @@ Future<T> _isolated<T>(
   RootIsolateToken? token,
   LongWork<T> work,
   SendPort told,
+  String stop,
 ) => runIsolated(
   store,
   path,
-  (s) => work(s, folders, (done, of) => told.send((done, of))),
+  (s) => work(
+    s,
+    folders,
+    (done, of) => told.send((done, of)),
+    () => _stopRaised(stop),
+  ),
   token: token,
 );
 
@@ -109,19 +199,39 @@ class ImportEnd {
 }
 
 /// One Import of [kind] as its page shows it (obf-1061): reading while
-/// [of] is null, then [written] of [of] Notes in, then its [end].
+/// [of] is null, then [written] of [of] Notes in, then its [end]. [name]
+/// is the folder's or the file's, as the page Running names it
+/// (obf-1078).
 class ImportJob extends ChangeNotifier {
   final ImportKind kind;
+  final String? name;
 
-  ImportJob(this.kind);
+  ImportJob(this.kind, {this.name});
 
   var _written = 0;
   int? _of;
   ImportEnd? _end;
+  JobStop? _stop;
+  ({int done, int of})? _stopped;
 
   int get written => _written;
   int? get of => _of;
   ImportEnd? get end => _end;
+
+  /// Whether Abort was pressed for it on the page Running (obf-1078).
+  bool get aborting => _stop?.raised ?? false;
+
+  /// How many of how many Notes it made, once Abort stopped it before
+  /// all of them were in; null otherwise.
+  ({int done, int of})? get stopped => _stopped;
+
+  /// Stops it before its next Note; the Notes in stay (obf-1078).
+  void abort() {
+    final stop = _stop;
+    if (stop == null || stop.raised) return;
+    stop.raise();
+    notifyListeners();
+  }
 
   void _progress(int written, int of) {
     _written = written;
@@ -149,12 +259,20 @@ class ImportJobs {
 
   ImportJobs({required this.store, required this.runner});
 
-  /// Runs [work] as [job], its count told to it as it goes.
+  /// Runs [work] as [job], its count told to it as it goes, until it ends
+  /// or [ImportJob.abort] stops it.
   Future<ImportSummary> run(ImportJob job, ImportWork work) async {
+    final stop = JobStop();
+    job._stop = stop;
     running.value = job;
     try {
-      return await runner.run(store, work, job._progress);
+      final summary = await runner.run(store, work, job._progress, stop);
+      if (summary.stopped case final of?) {
+        job._stopped = (done: summary.notes, of: of);
+      }
+      return summary;
     } finally {
+      stop.clear();
       if (!_disposed && identical(running.value, job)) running.value = null;
     }
   }

@@ -238,6 +238,9 @@ class _SyncScreenState extends State<SyncScreen> {
       return;
     }
     final pairing = PairingScope.of(context);
+    // Syncing by hand ends a pause Abort began on the page Running
+    // (obf-1078), as on the desktop.
+    AutoSyncScope.of(context)?.goOn();
     setState(() {
       _codeInvalid = false;
       _busy = true;

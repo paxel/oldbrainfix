@@ -464,6 +464,72 @@ void main() {
     });
   });
 
+  group('paused on the page Running (obf-1078)', () {
+    testWidgets('the round under way ends; then nothing syncs on its own '
+        'until Go on', (tester) async {
+      pairDesk();
+      parked = Completer<void>();
+      final auto = autoSync()..shown();
+      await tester.pump();
+      expect(joined, hasLength(1));
+      expect(auto.syncing.value, isTrue);
+      auto.pause();
+      expect(auto.paused, isTrue);
+      parked!.complete();
+      parked = null;
+      await tester.pump();
+      expect(auto.syncing.value, isFalse);
+
+      await wait(tester, const Duration(minutes: 3));
+      Notes(phone).capture('Meanwhile');
+      await wait(tester, const Duration(seconds: 10));
+      auto.shown();
+      await tester.pump();
+      expect(joined, hasLength(1));
+
+      auto.goOn();
+      await tester.pump();
+      expect(auto.paused, isFalse);
+      expect(joined, hasLength(2));
+      auto.dispose();
+    });
+
+    testWidgets('a paired Device asking is told to come back later', (
+      tester,
+    ) async {
+      pairDesk();
+      final hosts = FakeHosts();
+      final runner = RecordingRunner();
+      final auto = AutoSync(
+        store: phone,
+        platform: sync,
+        deviceName: () async => 'Pixel',
+        join: join,
+        clock: () => now,
+        host: hosts.start,
+        runner: runner,
+      );
+      auto.shown();
+      await tester.pump();
+      auto.pause();
+      final request = HostRequest(
+        method: 'POST',
+        path: '/sync',
+        body: Uint8List(0),
+      );
+      final (response, session) = await hosts.running!.merging!(request);
+      expect(response.status, 503);
+      expect(session, isNull);
+      expect(runner.hosted, isEmpty);
+
+      auto.goOn();
+      final (again, _) = await hosts.running!.merging!(request);
+      expect(again.status, 204);
+      expect(runner.hosted, hasLength(1));
+      auto.dispose();
+    });
+  });
+
   group('hosting while the app is open', () {
     testWidgets('hosts for paired Devices while it shows, says so on the '
         'network, and stops on leaving', (tester) async {

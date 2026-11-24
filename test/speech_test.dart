@@ -15,6 +15,7 @@ import 'package:oldbrainfix/src/starter_set_screen.dart';
 import 'package:oldbrainfix/src/sync_line.dart';
 import 'package:oldbrainfix/src/speech_model_screen.dart';
 import 'package:oldbrainfix/src/speech_offer_screen.dart';
+import 'package:oldbrainfix/src/running.dart';
 import 'package:oldbrainfix/src/speech_platform.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -695,6 +696,75 @@ void main() {
         expect(announcements.visible, isNull);
         expect(store.speechModelOffer, isNull);
       });
+    });
+  });
+
+  group('Abort on the page Running (obf-1078)', () {
+    Future<void> openRunningPage(WidgetTester tester) async {
+      await tester.tap(find.byKey(const ValueKey('bar-more')));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.tap(find.byKey(const ValueKey('running')));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+    }
+
+    testWidgets('lets the recording under way end; the others wait, one '
+        'waited for is still transcribed', (tester) async {
+      final one = notes.capture('', recordings: [first]);
+      final two = notes.capture('', recordings: [second]);
+      speech
+        ..installed = WhisperModel.base.sha256
+        ..transcripts[1] = 'buy more sauce'
+        ..transcripts[2] = 'call the vet'
+        ..transcribeGate = Completer<void>();
+      await start(tester);
+      await openRunningPage(tester);
+      expect(find.text('Transcribing recordings'), findsOneWidget);
+      expect(find.text('0 of 2'), findsOneWidget);
+      await tap(tester, find.byKey(const ValueKey('running-abort')));
+      expect(find.text('Stopping…'), findsOneWidget);
+
+      speech.transcribeGate?.complete();
+      await tester.pumpAndSettle();
+      expect(speech.transcribed, [first]);
+      expect(notes.byId(one.id)?.transcripts.values, ['buy more sauce']);
+      expect(
+        find.text('Stopped: the others wait until Go on or the next start.'),
+        findsOneWidget,
+      );
+
+      // A capture waiting for its Transcript still gets it.
+      final transcriber = SpeechScope.of(
+        tester.element(find.byType(RunningScreen)),
+      )?.transcriber;
+      final hash = notes.byId(two.id)?.recordings.single ?? '';
+      final waited = transcriber?.transcribed(two.id, hash);
+      await tester.pumpAndSettle();
+      expect(await waited, isTrue);
+      expect(speech.transcribed, [first, second]);
+    });
+
+    testWidgets('cancels the speech model\'s download', (tester) async {
+      await start(tester);
+      await openModel(tester);
+      await choose(tester, base);
+      for (var i = 0; i < 3; i++) {
+        await tester.binding.handlePopRoute();
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 1));
+      }
+      await openRunningPage(tester);
+      expect(find.text('Downloading the speech model'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('running-abort')));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      expect(speech.cancels, 1);
+      expect(
+        find.text('Stopped. The Settings offer the speech model again.'),
+        findsOneWidget,
+      );
+      expect(find.text('Nothing runs in the background.'), findsOneWidget);
     });
   });
 

@@ -294,6 +294,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       announcements,
       navigator,
       jobs,
+      name: name,
       work: folderImport(folder, t.importAreaName(name)),
       finished: (summary, area) => [
         t.importFinishedNotes(summary.notes, area),
@@ -424,14 +425,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
   /// await, once done, even after this page closed, without values (UI
   /// laws): its tap shows what went where, [finished] says it of the new
   /// Area, with a way into the Area; or, with nothing to import, why
-  /// ([nothing]); or that it [failed]. The page says the same. Then gives
-  /// up what was picked for it ([release]).
+  /// ([nothing]); or that it [failed]. Stopped by Abort on the page
+  /// Running (obf-1078), it announces "Import stopped.", its tap showing
+  /// how many of how many Notes came in and, with any, what went where.
+  /// The page says the same. Then gives up what was picked for it
+  /// ([release]). [name] is the folder's, for the page Running.
   Future<void> _runImport(
     ImportKind kind,
     AppLocalizations t,
     Announcements? announcements,
     NavigatorState navigator,
     ImportJobs jobs, {
+    String? name,
     required ImportWork work,
     required String Function(ImportSummary summary, String area) finished,
     required ({String announced, String cause, String fix, String details})
@@ -442,8 +447,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }) async {
     final store = widget.store;
     final trail = widget.trail ?? BrowserTrail();
-    final job = ImportJob(kind);
+    final job = ImportJob(kind, name: name);
     _showImport(navigator, store, trail, job);
+    // Says at the top that it ended as [title], its tap showing
+    // [details], with a way into the new [area] when there is one.
+    void announceEnd(String title, String details, Area? area) =>
+        announcements?.announce(
+          title,
+          onTap: () => unawaited(
+            showDialog<void>(
+              context: navigator.context,
+              builder: (context) => AlertDialog(
+                title: Text(title),
+                content: SingleChildScrollView(child: Text(details)),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text(context.t.close),
+                  ),
+                  if (area != null)
+                    TextButton(
+                      key: const ValueKey('importOpenArea'),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        _openImported(navigator, store, trail, area);
+                      },
+                      child: Text(context.t.importOpenArea),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
     try {
       final summary = await jobs.run(job, work);
       // A Restart ended this run of the app meanwhile: its store is
@@ -453,6 +488,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
         final id? => Places(store).areaById(id),
         null => null,
       };
+      // Stopped by Abort, before its first Note or later (obf-1078).
+      if (summary.stopped case final of?) {
+        final said = t.jobsImportStopped(summary.notes, of);
+        final details = area == null
+            ? said
+            : '$said\n\n${finished(summary, areaName(t, area))}';
+        job.ended(ImportEnd(details, area: area));
+        announceEnd(t.jobsImportEnded, details, area);
+        return;
+      }
       if (area == null) {
         final why = nothing(summary);
         job.ended(ImportEnd('${why.announced}\n\n${why.cause} ${why.fix}'));
@@ -469,32 +514,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
       final details = finished(summary, areaName(t, area));
       job.ended(ImportEnd(details, area: area));
-      announcements?.announce(
-        t.importFinished,
-        onTap: () => unawaited(
-          showDialog<void>(
-            context: navigator.context,
-            builder: (context) => AlertDialog(
-              title: Text(context.t.importFinished),
-              content: SingleChildScrollView(child: Text(details)),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text(context.t.close),
-                ),
-                TextButton(
-                  key: const ValueKey('importOpenArea'),
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    _openImported(navigator, store, trail, area);
-                  },
-                  child: Text(context.t.importOpenArea),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
+      announceEnd(t.importFinished, details, area);
     } on Exception catch (e) {
       if (runOver(store)) return;
       job.ended(

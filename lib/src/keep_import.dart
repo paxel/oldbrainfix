@@ -10,21 +10,28 @@ import 'import_run.dart';
 /// Area named [areaName] (ADR 0036, Google Keep). Only the files
 /// [Imports.keepReads] takes are handed over, none read beyond its
 /// limit. A file that cannot be read throws, and then nothing is
-/// written. [progress] hears how far the writing is.
+/// written. [progress] hears how far the writing is; [stop] is asked
+/// before each Note (obf-1078).
 Future<ImportSummary> importKeepFolder(
   Store store,
   FolderPlatform folders,
   String folder,
   String areaName, {
   ImportProgress? progress,
+  Stopping? stop,
 }) async {
   final files = await folders.files(folder);
   final kept = _ofKeep([for (final f in files) f.path]).toSet();
   final over = <int, Uint8List>{};
-  return Imports(store).keep(areaName, [
-    for (final file in files)
-      if (kept.contains(file.path)) ?await _read(folders, file, over),
-  ], progress: progress);
+  return Imports(store).keep(
+    areaName,
+    [
+      for (final file in files)
+        if (kept.contains(file.path)) ?await _read(folders, file, over),
+    ],
+    progress: progress,
+    stop: stop,
+  );
 }
 
 /// As [importKeepFolder] for the Takeout export as the [zip] picked
@@ -37,6 +44,7 @@ Future<ImportSummary> importKeepZip(
   String zip,
   String areaName, {
   ImportProgress? progress,
+  Stopping? stop,
 }) async {
   try {
     final wanted = {
@@ -50,7 +58,8 @@ Future<ImportSummary> importKeepZip(
         entries.add(entry);
       }
     }
-    return Imports(store).keep(areaName, entries, progress: progress);
+    return Imports(store)
+        .keep(areaName, entries, progress: progress, stop: stop);
   } finally {
     await folders.dropUnzipped();
   }
@@ -60,9 +69,23 @@ Future<ImportSummary> importKeepZip(
 /// is no [zip], into [areaName], as a job for a [JobRunner]
 /// (obf-1061).
 ImportWork keepImport(String source, String areaName, {required bool zip}) =>
-    (store, folders, progress) => zip
-    ? importKeepZip(store, folders, source, areaName, progress: progress)
-    : importKeepFolder(store, folders, source, areaName, progress: progress);
+    (store, folders, progress, stop) => zip
+    ? importKeepZip(
+        store,
+        folders,
+        source,
+        areaName,
+        progress: progress,
+        stop: stop,
+      )
+    : importKeepFolder(
+        store,
+        folders,
+        source,
+        areaName,
+        progress: progress,
+        stop: stop,
+      );
 
 /// The paths of [paths] the core reads of a Keep export: those
 /// [Imports.keepReads] takes, and when any of them lies in a folder named

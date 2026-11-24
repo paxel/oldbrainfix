@@ -7,6 +7,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
 import 'found_marks.dart';
+import 'import_run.dart' show ReaderBusy;
 import 'l10n.dart';
 import 'ocr_platform.dart' show GeneratedTextLabel;
 import 'place_names.dart';
@@ -488,6 +489,33 @@ class Transcriber extends ChangeNotifier {
   /// The recording being transcribed, by its hash; null while none is.
   String? get current => _current;
 
+  /// Since when it transcribes without a rest, and how many of how many
+  /// recordings it took meanwhile; null while it rests (obf-1078).
+  ReaderBusy? get busy => _busy;
+  ReaderBusy? _busy;
+
+  /// Whether Abort on the page Running stopped it (obf-1078): the
+  /// recording under way ends and is kept; of the others, only those
+  /// asked for again or waited for are transcribed, until [goOn] or the
+  /// next start.
+  bool get stopped => _stopped;
+  var _stopped = false;
+
+  /// Stops it as [stopped] says.
+  void stop() {
+    if (_stopped || _disposed) return;
+    _stopped = true;
+    notifyListeners();
+  }
+
+  /// Transcribes the recordings waiting again, after [stop].
+  void goOn() {
+    if (!_stopped || _disposed) return;
+    _stopped = false;
+    notifyListeners();
+    _kick();
+  }
+
   /// Names the Starter Set's places and the app's words in the language
   /// of [t] in the prompts from now on.
   void setTexts(AppLocalizations t) => _texts = t;
@@ -553,20 +581,35 @@ class Transcriber extends ChangeNotifier {
     _running = true;
     _again = false;
     Completer<bool>? waiting;
+    var took = 0;
     try {
       while (!_disposed && model.current != null) {
         final asked = _asked.isEmpty ? null : _asked.removeAt(0);
         waiting = asked?.done;
+        final left = notes
+            .untranscribed()
+            .where((r) => !_skipped.contains(r.hash))
+            .toList();
+        // Stopped, only what someone waits for is taken (obf-1078).
         final next = asked == null
-            ? notes
-                  .untranscribed()
-                  .where((r) => !_skipped.contains(r.hash))
-                  .firstOrNull
+            ? _stopped
+                  ? left.where((r) => _waiting.containsKey(r.hash)).firstOrNull
+                  : left.firstOrNull
             : (noteId: asked.noteId, hash: asked.hash);
         if (next == null) break;
         final bytes = notes.recordingBytes(next.hash);
         String? text;
         if (bytes != null) {
+          _busy = (
+            since: _busy?.since ?? DateTime.now(),
+            done: took,
+            of:
+                took +
+                1 +
+                _asked.length +
+                (_stopped ? 0 : left.length - (asked == null ? 1 : 0)),
+          );
+          took++;
           _current = next.hash;
           notifyListeners();
           final lead = prompts();
@@ -606,6 +649,10 @@ class Transcriber extends ChangeNotifier {
       waiting?.complete(false);
       // Without a model, or gone: nothing asked for is transcribed.
       if (_disposed || model.current == null) _dropAsked();
+      if (_busy != null) {
+        _busy = null;
+        if (!_disposed) notifyListeners();
+      }
     }
     if (_again) _kick();
   }

@@ -11370,6 +11370,162 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{seconds} s'**
   String recordingPauseSeconds(int seconds);
+
+  /// Title of the phone's page listing every job running in the background, and its entry in the top bar's ⋮ of the Agenda and the Areas list (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Running'**
+  String get jobsTitle;
+
+  /// On the page Running while no job runs (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing runs in the background.'**
+  String get jobsNone;
+
+  /// On the page Running: when a job started, as the clock shows it (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Since {time}'**
+  String jobsSince(String time);
+
+  /// Button of a job on the page Running: stops it at its next safe point (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Abort'**
+  String get jobsAbort;
+
+  /// On the page Running in place of Abort once it was pressed, until the job stops (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Stopping…'**
+  String get jobsStopping;
+
+  /// Heading over the jobs Abort stopped or paused, on the page Running (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped'**
+  String get jobsStopped;
+
+  /// Button of a paused job on the page Running: starts it again (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Go on'**
+  String get jobsGoOn;
+
+  /// A job on the page Running: this Device syncs with the shared folder or a paired Device (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Sync with a Device'**
+  String get jobsSync;
+
+  /// Under the sync's Abort on the page Running: what Abort does (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'The sync under way ends first. Then this Device does not sync on its own until Sync now, Go on or the next start.'**
+  String get jobsSyncAbort;
+
+  /// On the page Running for the sync Abort paused (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Paused: this Device does not sync on its own until Sync now, Go on or the next start.'**
+  String get jobsSyncPaused;
+
+  /// A job on the page Running: the Import of a folder (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Import of {name}'**
+  String jobsImport(String name);
+
+  /// Under an Import's Abort on the page Running (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'The Notes imported so far stay.'**
+  String get jobsImportAbort;
+
+  /// On the page Running and the Import's page for an Import Abort stopped: how many of its Notes it made (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped: {done} of {count} imported'**
+  String jobsImportStopped(int done, int count);
+
+  /// Announced at the top once an Import Abort stopped on the page Running has ended (obf-1078); its tap shows what it made.
+  ///
+  /// In en, this message translates to:
+  /// **'Import stopped.'**
+  String get jobsImportEnded;
+
+  /// A job on the page Running: Transcripts being made (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Transcribing recordings'**
+  String get jobsTranscripts;
+
+  /// A job on the page Running: Photo Texts being read (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Reading the text in photos'**
+  String get jobsPhotoTexts;
+
+  /// A job on the page Running: Attachment Texts being read (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Reading attached files'**
+  String get jobsAttachmentTexts;
+
+  /// On the page Running: how many of the recordings, photos or files waiting were read (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'{done} of {count}'**
+  String jobsRead(int done, int count);
+
+  /// Under the Abort of reading recordings, photos or files on the page Running (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'The one being read ends first. The others wait until Go on or the next start.'**
+  String get jobsReadAbort;
+
+  /// On the page Running for reading Abort stopped (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped: the others wait until Go on or the next start.'**
+  String get jobsReadStopped;
+
+  /// A job on the page Running (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading the speech model'**
+  String get jobsModelDownload;
+
+  /// A job on the page Running: a speech model file of the user's own being copied in (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Copying the speech model'**
+  String get jobsModelCopy;
+
+  /// On the page Running for the speech model's download Abort stopped (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped. The Settings offer the speech model again.'**
+  String get jobsModelStopped;
+
+  /// A job on the page Running (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Deleting the Area {name}'**
+  String jobsAreaDeletion(String name);
+
+  /// Under the Abort of deleting an Area on the page Running (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'The Notes moved so far stay where they went. The Area stays with the others.'**
+  String get jobsAreaAbort;
+
+  /// On the page Running for deleting an Area Abort stopped (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Stopped: {moved} of 1 Note moved} other{Stopped: {moved} of {count} Notes moved}}'**
+  String jobsAreaStopped(int moved, int count);
 }
 
 class _AppLocalizationsDelegate

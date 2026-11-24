@@ -43,6 +43,7 @@ import 'profile_screen.dart';
 import 'routine_editor_screen.dart';
 import 'routine_history_screen.dart';
 import 'run_over.dart';
+import 'running.dart';
 import 'schedule_text.dart';
 import 'session_view.dart';
 import 'setup_screen.dart';
@@ -1486,6 +1487,15 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
                 icon: OwnProfileAvatar(model: widget.profile),
               ),
             ),
+            // What runs in the background, always in ⋮ (obf-1078).
+            if (RunningScope.of(context) != null)
+              BarAction(
+                key: const ValueKey('running'),
+                label: t.jobsTitle,
+                onPressed: () => openRunning(context),
+                icon: Icons.timelapse,
+                inMenu: true,
+              ),
           ],
         ),
         body: ListView(

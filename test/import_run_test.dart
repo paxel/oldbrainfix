@@ -25,6 +25,7 @@ Future<ImportSummary> _namesItsIsolate(
   Store store,
   FolderPlatform folders,
   ImportProgress progress,
+  Stopping stop,
 ) async {
   Notes(store).capture(Isolate.current.debugName ?? '');
   return const ImportSummary(areaId: null, notes: 0, notText: 0, tooLarge: 0);
@@ -40,10 +41,15 @@ class _GatedRunner implements JobRunner {
   _GatedRunner(this.folders);
 
   @override
-  Future<T> run<T>(Store store, LongWork<T> work, JobProgress progress) async {
+  Future<T> run<T>(
+    Store store,
+    LongWork<T> work,
+    JobProgress progress,
+    JobStop stop,
+  ) async {
     told = progress;
     await gate.future;
-    return work(store, folders, progress);
+    return work(store, folders, progress, () => File(stop.path).existsSync());
   }
 }
 
@@ -70,7 +76,7 @@ void main() {
 
     test('runs off the app\'s isolate', () async {
       final runner = IsolateJobRunner(path: path, folders: FakeImportFolders());
-      await runner.run(app, _namesItsIsolate, (_, _) {});
+      await runner.run(app, _namesItsIsolate, (_, _) {}, JobStop());
       final where = Notes(app).all().single.text;
       expect(where, isNot(Isolate.current.debugName));
     });
@@ -85,6 +91,7 @@ void main() {
         app,
         folderImport('content://tree/Notes', 'From Notes'),
         (written, of) => told.add((written, of)),
+        JobStop(),
       );
       expect(summary.notes, 2);
       expect(told, [(0, 2), (1, 2), (2, 2)]);

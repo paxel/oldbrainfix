@@ -10,26 +10,34 @@ import 'import_run.dart';
 /// may become a Note is read, and none larger than
 /// [Imports.maxFileBytes]; every other file is handed over unread, so
 /// the core counts it as skipped. A file that cannot be read throws, and
-/// then nothing is written. [progress] hears how far the writing is.
+/// then nothing is written. [progress] hears how far the writing is;
+/// [stop] is asked before each Note (obf-1078).
 Future<ImportSummary> importFolder(
   Store store,
   FolderPlatform folders,
   String folder,
   String areaName, {
   ImportProgress? progress,
+  Stopping? stop,
 }) async {
   final files = <ImportFile>[];
   for (final file in await folders.files(folder)) {
     files.add(await _read(folders, file));
   }
-  return Imports(store).folder(areaName, files, progress: progress);
+  return Imports(store).folder(areaName, files, progress: progress, stop: stop);
 }
 
 /// [importFolder] of [folder] into [areaName] as a job for a
 /// [JobRunner] (obf-1061).
 ImportWork folderImport(String folder, String areaName) =>
-    (store, folders, progress) =>
-        importFolder(store, folders, folder, areaName, progress: progress);
+    (store, folders, progress, stop) => importFolder(
+      store,
+      folders,
+      folder,
+      areaName,
+      progress: progress,
+      stop: stop,
+    );
 
 Future<ImportFile> _read(FolderPlatform folders, FolderFile file) async {
   if (!mayBecomeNote(file.path)) {

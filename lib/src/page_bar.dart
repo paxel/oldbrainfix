@@ -23,11 +23,14 @@ const _iconRoom = 44.0;
 /// ⋮ its icon and [label], greyed in both while [onPressed] is null. Any
 /// other widget among a bar's actions stays on the bar. With a
 /// [spotlight], its tip (obf-1043) points at it on the bar, else at ⋮.
+/// One [inMenu] always stands in ⋮, last, whether the bar is full or not:
+/// Running on the main pages (obf-1078).
 class BarAction extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback? onPressed;
   final String? spotlight;
+  final bool inMenu;
 
   const BarAction({
     super.key,
@@ -35,6 +38,7 @@ class BarAction extends StatelessWidget {
     required this.label,
     required this.onPressed,
     this.spotlight,
+    this.inMenu = false,
   });
 
   @override
@@ -54,14 +58,25 @@ class BarAction extends StatelessWidget {
 /// [actions] as a bar with room for [slots] buttons shows them (UI laws,
 /// "The bar"): all of them while they fit, else the [BarAction]s that
 /// fit, in their order, and ⋮ last with the rest. What is not a
-/// [BarAction] never goes into ⋮.
+/// [BarAction] never goes into ⋮; one [BarAction.inMenu] always does,
+/// after the rest.
 List<Widget> barActions(List<Widget> actions, int slots) {
-  if (actions.length <= slots) return actions;
-  final fixed = actions.where((a) => a is! BarAction).length;
+  final menu = [
+    for (final action in actions)
+      if (action is BarAction && action.inMenu) action,
+  ];
+  final bar = [
+    for (final action in actions)
+      if (action is! BarAction || !action.inMenu) action,
+  ];
+  if (bar.length + (menu.isEmpty ? 0 : 1) <= slots) {
+    return menu.isEmpty ? bar : [...bar, _BarMore(actions: menu)];
+  }
+  final fixed = bar.where((a) => a is! BarAction).length;
   var free = slots - 1 - fixed;
   final shown = <Widget>[];
   final more = <BarAction>[];
-  for (final action in actions) {
+  for (final action in bar) {
     if (action is! BarAction) {
       shown.add(action);
     } else if (free > 0) {
@@ -71,6 +86,7 @@ List<Widget> barActions(List<Widget> actions, int slots) {
       more.add(action);
     }
   }
+  more.addAll(menu);
   if (more.isEmpty) return shown;
   return [...shown, _BarMore(actions: more)];
 }
@@ -155,7 +171,8 @@ AppBar pageBar(
                 Flexible(child: Text(title, overflow: TextOverflow.ellipsis)),
               ],
             ),
-      actions: actions,
+      // Room for all of them; only what stands in ⋮ always goes there.
+      actions: barActions(actions, actions.length + 1),
       backgroundColor: background,
       flexibleSpace: const SyncLine(),
     );

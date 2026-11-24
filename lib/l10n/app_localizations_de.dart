@@ -7143,4 +7143,106 @@ class AppLocalizationsDe extends AppLocalizations {
   String recordingPauseSeconds(int seconds) {
     return '$seconds Sek.';
   }
+
+  @override
+  String get jobsTitle => 'Im Hintergrund';
+
+  @override
+  String get jobsNone => 'Im Hintergrund läuft nichts.';
+
+  @override
+  String jobsSince(String time) {
+    return 'Seit $time';
+  }
+
+  @override
+  String get jobsAbort => 'Abbrechen';
+
+  @override
+  String get jobsStopping => 'Wird angehalten …';
+
+  @override
+  String get jobsStopped => 'Angehalten';
+
+  @override
+  String get jobsGoOn => 'Weiter';
+
+  @override
+  String get jobsSync => 'Synchronisierung mit einem Gerät';
+
+  @override
+  String get jobsSyncAbort =>
+      'Die laufende Synchronisierung endet zuerst. Danach synchronisiert dieses Gerät nicht mehr von selbst, bis du „Jetzt synchronisieren“ oder „Weiter“ tippst oder die App neu startet.';
+
+  @override
+  String get jobsSyncPaused =>
+      'Pausiert: Dieses Gerät synchronisiert nicht mehr von selbst, bis du „Jetzt synchronisieren“ oder „Weiter“ tippst oder die App neu startet.';
+
+  @override
+  String jobsImport(String name) {
+    return 'Import von $name';
+  }
+
+  @override
+  String get jobsImportAbort => 'Die bisher importierten Notizen bleiben.';
+
+  @override
+  String jobsImportStopped(int done, int count) {
+    return 'Angehalten: $done von $count importiert';
+  }
+
+  @override
+  String get jobsImportEnded => 'Import angehalten.';
+
+  @override
+  String get jobsTranscripts => 'Aufnahmen werden transkribiert';
+
+  @override
+  String get jobsPhotoTexts => 'Text in Fotos wird gelesen';
+
+  @override
+  String get jobsAttachmentTexts => 'Angehängte Dateien werden gelesen';
+
+  @override
+  String jobsRead(int done, int count) {
+    return '$done von $count';
+  }
+
+  @override
+  String get jobsReadAbort =>
+      'Was gerade gelesen wird, endet zuerst. Die übrigen warten bis „Weiter“ oder zum nächsten Start.';
+
+  @override
+  String get jobsReadStopped =>
+      'Angehalten: Die übrigen warten bis „Weiter“ oder zum nächsten Start.';
+
+  @override
+  String get jobsModelDownload => 'Das Sprachmodell wird heruntergeladen';
+
+  @override
+  String get jobsModelCopy => 'Das Sprachmodell wird kopiert';
+
+  @override
+  String get jobsModelStopped =>
+      'Angehalten. Die Einstellungen bieten das Sprachmodell wieder an.';
+
+  @override
+  String jobsAreaDeletion(String name) {
+    return 'Der Bereich $name wird gelöscht';
+  }
+
+  @override
+  String get jobsAreaAbort =>
+      'Die bisher verschobenen Notizen bleiben, wo sie hingingen. Der Bereich bleibt mit den übrigen.';
+
+  @override
+  String jobsAreaStopped(int moved, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Angehalten: $moved von $count Notizen verschoben',
+      one: 'Angehalten: $moved von 1 Notiz verschoben',
+    );
+    return '$_temp0';
+  }
 }
