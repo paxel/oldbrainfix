@@ -15,6 +15,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'add_a_part.dart';
 import 'announced.dart';
+import 'editor_actions.dart';
 import 'fake_photos.dart';
 import 'reveal.dart';
 
@@ -164,12 +165,23 @@ void main() {
     expect(find.byTooltip('File into…'), findsNothing);
     await tester.longPress(find.text('Buy milk'));
     await tester.pumpAndSettle();
-    expect(find.byTooltip('Move to trash'), findsNothing);
-    expect(find.byTooltip('Merge into…'), findsNothing);
     expect(find.byTooltip('File into…'), findsNothing);
-    // Only a Manager sets up Routines: no "+" among the badges, and the
-    // settings of the Note are shown, not changed.
+    // No Tidy at the end of the editor (obf-1073), and only a Manager
+    // sets up Routines: no "+" under Add, and the settings of the Note
+    // are shown, not changed.
+    await revealInEditor(
+      tester,
+      find.byKey(const ValueKey('editor-group-share')),
+    );
+    expect(find.byKey(const ValueKey('editor-group-tidy')), findsNothing);
+    expect(find.byKey(const ValueKey('editor-trash')), findsNothing);
+    expect(find.byKey(const ValueKey('editor-merge')), findsNothing);
     expect(find.byKey(const ValueKey('badge-add')), findsNothing);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('badge-importance')),
+      -100,
+      scrollable: find.byType(Scrollable).first,
+    );
     for (final badge in ['badge-importance', 'badge-place']) {
       expect(
         tester.widget<SettingBadge>(find.byKey(ValueKey(badge))).onTap,
@@ -179,11 +191,8 @@ void main() {
     }
     final field = tester.widget<TextField>(find.byType(TextField).first);
     expect(field.readOnly, isTrue);
-    // Amend stays: "Add a part" on the bar or in ⋮ (obf-1072).
-    if (addAPartAction.evaluate().isEmpty) {
-      await tester.tap(find.byKey(const ValueKey('bar-more')));
-      await tester.pumpAndSettle();
-    }
+    // Amend stays: "Add a part" under Add (obf-1072, obf-1073).
+    await revealInEditor(tester, addAPartAction);
     expect(addAPartAction, findsOneWidget);
   });
 

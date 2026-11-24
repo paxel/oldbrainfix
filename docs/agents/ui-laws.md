@@ -433,8 +433,8 @@ replace a law of Both apps where they say so. A desktop law marked
   Managers); others read it. Under its meta line it says, small and
   grey, when it was last edited and by whom, once it was.
 - **A Note's History** (#193) is History on the Note editor's bar on
-  the phone (the clock with an arrow, before Merge and Move to trash)
-  and Note ▸ History on the desktop, over the Note dialog. It lists
+  the phone (the clock with an arrow, after Undo, Redo and Find) and
+  History in the ⋮ of the Note dialog on the desktop (obf-1065). It lists
   every change of the Note, **the newest first** (unlike a box's
   History, which goes oldest first): its text before and after, its
   Amends added and changed, its Lines added, renamed, checked,
@@ -541,7 +541,8 @@ replace a law of Both apps where they say so. A desktop law marked
 - **"Export as Pack…"** (#164) is in the menu of every Area and Topic,
   for anyone who may read them, in a Note card's ⋮ after Copy text
   (under Share… on the phone, #281) and
-  on the Note editor's bar after Share to an app (`inventory_2`). It
+  in the Note editor's Share group after Share to an app
+  (`inventory_2`, obf-1073). It
   opens the Pack's tree: Areas and Topics as headings, each Note with
   its kind's icon and its first line, under it its files with their
   sizes, their texts, its Routines, Reminders and Frog, under a Session
@@ -1338,11 +1339,22 @@ replace a law of Both apps where they say so. A desktop law marked
   with the text as it was and the recording gets its Transcript later,
   not the text. A recording shared in is not taken into the text.
 - **The Note editor holds what the quick note no longer shows** (#352):
-  in its bar Photo, Voice, Gallery, Paste and Add to a Shopping List
-  beside Attach file (on a phone-wide bar mostly in ⋮); its badges the
-  Kind, the place (File into…), the Importance and "+" with Remind me…,
-  in Advanced Frog and Session; Merge into… adds it to another Note; the
-  format bar rides on the keyboard. Voice records on a page of its own
+  under This Note its badges the Kind, the place (File into…) and the
+  Importance; under Add "+" with Remind me…, in Advanced Frog and
+  Session, Voice, Photo, Gallery, Paste and Attach a file; under Tidy
+  Merge into…, which adds it to another Note, and Add to a Shopping
+  List; the format bar rides on the keyboard.
+- **The Note editor's actions stand in four named groups** (obf-1073),
+  as in the desktop's Note dialog: **This Note**, the row of badges
+  under the text; at the page's end, after all the Note holds, **Add**
+  ("+", Voice, Photo, Gallery, Paste, Attach a file, Add a part),
+  **Share** (Send to a person, Share to an app, Export as Pack…) and
+  **Tidy** (Merge into…, Add to a Shopping List, Move to trash, the
+  last in the error colour). Each group is a small heading, read as a
+  heading, over its compact buttons side by side, wrapping; a group
+  with nothing this Device may do shows nothing. The top bar keeps
+  Undo, Redo and Find first, then the calendar, History and Revert all
+  changes; none of the groups' actions goes into its ⋮. Voice records on a page of its own
   with the big stop button; Stop, Back and Stop on the notification keep
   the recording on the Note.
 - **A pause ends a recording only where the Device says so**
@@ -1479,8 +1491,8 @@ replace a law of Both apps where they say so. A desktop law marked
   Append for its text, Remove for the text (with the undo at the top,
   #268), Read the text again (not for a file left to a computer), and
   "Remove Attachment, keep text", asked once, where this Device may;
-  the card's ⋮ offers the last too. "Attach a file" on the editor's bar
-  picks more files.
+  the card's ⋮ offers the last too. "Attach a file" under the editor's
+  Add (obf-1073) picks more files.
 - **Hidden from AI** (#267, ADR 0049): a card's ⋮ and an Area's menu in
   the Areas list have the switch "Hidden from AI", the Note editor its
   badge, offered on a Note or Area in no Shared Area and, once marked,
@@ -1605,7 +1617,8 @@ replace a law of Both apps where they say so. A desktop law marked
   first when Undo is tapped while they are typed. A step goes back through the same
   calls that made it, the earlier value written as a new edit; what can
   no longer go back, such as a Line a sync took away, stays as it is.
-  **"Revert all changes"** in ⋮ asks once, "Revert all changes?" with
+  **"Revert all changes"**, on the bar after History, in ⋮ where the
+  bar is full, asks once, "Revert all changes?" with
   Cancel and Revert, then takes every step back to the Note as it was
   opened; Redo brings them back one by one. A formatted text does not go
   back to plain, and a Tally or a Session not back to a Plain Note, so
@@ -1616,8 +1629,8 @@ replace a law of Both apps where they say so. A desktop law marked
   its find bar.
 - **The Amend box shows only when asked** (obf-1072, C15c): the Note
   editor has no "Add to Note" field or button of its own. An existing
-  Note has **Add a part** (`post_add`) on its bar, after Revert all
-  changes and before Photo, for everyone who may Amend it; it opens the
+  Note has **Add a part** (`post_add`) last under Add at the page's end
+  (obf-1073), for everyone who may Amend it; it opens the
   box "Add to Note" with its format bar, "What's new?" and Add. A Note
   being made, in the editor opened by the quick note's Open in the
   editor or a list's "+", has none; opened again later, it has. Its

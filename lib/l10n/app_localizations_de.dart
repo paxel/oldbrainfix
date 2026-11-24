@@ -355,6 +355,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get add => 'Hinzufügen';
 
   @override
+  String get editorGroupThisNote => 'Diese Notiz';
+
+  @override
+  String get editorGroupTidy => 'Aufräumen';
+
+  @override
   String get moveToTrash => 'In den Papierkorb';
 
   @override

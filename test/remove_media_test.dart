@@ -269,7 +269,12 @@ void main() {
       expect(section.photos, isEmpty);
       expect(section.removedPhotos, [hash]);
       expect(inEditor(find.byType(NotePhoto)), findsNothing);
-      await reveal(tester, inEditor(find.text('Tomatoes 400 g')));
+      // Above, where the page ends in the editor's groups (obf-1073).
+      await tester.scrollUntilVisible(
+        inEditor(find.text('Tomatoes 400 g')),
+        -100,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(inEditor(find.text('Tomatoes 400 g')), findsOneWidget);
     });
 

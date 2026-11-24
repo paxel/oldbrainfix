@@ -15,6 +15,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'announced.dart';
 import 'bundle_test.dart' show FakeBundles;
+import 'editor_actions.dart';
 import 'fake_alarms.dart';
 import 'fake_profile.dart' show halvesPng;
 import 'fake_voice.dart';
@@ -154,12 +155,14 @@ void main() {
     return (note, got);
   }
 
+  /// Send to a person, under Share at the end of the editor (obf-1073).
+  final sendToPerson = find.byKey(const ValueKey('send-note-file'));
+
   group('sending', () {
     testWidgets('to nobody known: signed only, with a hint', (tester) async {
       final note = Notes(phone).capture('Dentist on Friday');
       await edit(tester, note);
-      await tester.tap(find.byTooltip('Send to a person'));
-      await tester.pumpAndSettle();
+      await tapEditorAction(tester, sendToPerson);
       expect(find.text('Anyone, not encrypted'), findsOneWidget);
       expect(find.textContaining('Not encrypted: whoever'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('send-note')));
@@ -178,8 +181,7 @@ void main() {
       meet(phone, ann, 'Ann');
       final note = Notes(phone).capture('Surprise party');
       await edit(tester, note);
-      await tester.tap(find.byTooltip('Send to a person'));
-      await tester.pumpAndSettle();
+      await tapEditorAction(tester, sendToPerson);
       expect(find.text('Ann, encrypted'), findsOneWidget);
       expect(find.textContaining('Not encrypted: whoever'), findsNothing);
       await tester.tap(find.text('Ann, encrypted'));
@@ -197,8 +199,7 @@ void main() {
       meet(phone, ann, '');
       final note = Notes(phone).capture('Surprise party');
       await edit(tester, note);
-      await tester.tap(find.byTooltip('Send to a person'));
-      await tester.pumpAndSettle();
+      await tapEditorAction(tester, sendToPerson);
       expect(find.text('No name, encrypted'), findsOneWidget);
     });
 
@@ -208,8 +209,7 @@ void main() {
       final note = Notes(phone).capture('Dentist on Friday');
       sendNote(phone, note.id);
       await edit(tester, note);
-      await tester.tap(find.byTooltip('Send to a person'));
-      await tester.pumpAndSettle();
+      await tapEditorAction(tester, sendToPerson);
       expect(find.text('Send an update'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('send-note')));
       await tester.pumpAndSettle();
@@ -220,8 +220,7 @@ void main() {
       expect(update.item.version, 2);
       expect(update.item.cancel, isFalse);
 
-      await tester.tap(find.byTooltip('Send to a person'));
-      await tester.pumpAndSettle();
+      await tapEditorAction(tester, sendToPerson);
       await tester.tap(find.byKey(const ValueKey('send-cancel')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('send-note')));
@@ -243,8 +242,7 @@ void main() {
       meet(phone, bea, 'Bea');
       final note = Notes(phone).capture('Surprise party');
       await edit(tester, note);
-      await tester.tap(find.byTooltip('Send to a person'));
-      await tester.pumpAndSettle();
+      await tapEditorAction(tester, sendToPerson);
       bool sendable() => tester
           .widget<TextButton>(find.byKey(const ValueKey('send-note')))
           .enabled;
@@ -269,8 +267,7 @@ void main() {
 
       // An update starts at Bea, whom it went to, not at the first one
       // listed.
-      await tester.tap(find.byTooltip('Send to a person'));
-      await tester.pumpAndSettle();
+      await tapEditorAction(tester, sendToPerson);
       expect(find.text('Send an update'), findsOneWidget);
       expect(picked(), 1);
       expect(sendable(), isTrue);
@@ -281,8 +278,7 @@ void main() {
       expect(files.shared, hasLength(2));
 
       // Sent to anyone last: nobody again.
-      await tester.tap(find.byTooltip('Send to a person'));
-      await tester.pumpAndSettle();
+      await tapEditorAction(tester, sendToPerson);
       expect(picked(), isNull);
       expect(sendable(), isFalse);
     });
@@ -328,8 +324,7 @@ void main() {
     testWidgets('a Note never sent offers no cancellation', (tester) async {
       final note = Notes(phone).capture('Milk');
       await edit(tester, note);
-      await tester.tap(find.byTooltip('Send to a person'));
-      await tester.pumpAndSettle();
+      await tapEditorAction(tester, sendToPerson);
       expect(find.byKey(const ValueKey('send-cancel')), findsNothing);
     });
 
@@ -337,8 +332,7 @@ void main() {
       files.shares = false;
       final note = Notes(phone).capture('Milk');
       await edit(tester, note);
-      await tester.tap(find.byTooltip('Send to a person'));
-      await tester.pumpAndSettle();
+      await tapEditorAction(tester, sendToPerson);
       await tester.tap(find.byKey(const ValueKey('send-note')));
       await tester.pumpAndSettle();
       await expectFailureAnnounced(

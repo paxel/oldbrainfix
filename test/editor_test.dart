@@ -9,6 +9,7 @@ import 'package:oldbrainfix/src/trash_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'add_a_part.dart';
+import 'editor_actions.dart';
 import 'reveal.dart';
 
 void main() {
@@ -159,7 +160,13 @@ void main() {
         ),
         'Update: sauce bought',
       );
-      await tap(tester, find.text('Add'));
+      await tap(
+        tester,
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Add'),
+        ),
+      );
 
       expect(find.text('Update: sauce bought'), findsOneWidget);
       // Under it, the same day as the Note, its time only (#170).
@@ -249,7 +256,7 @@ void main() {
       notes.capture('milk');
       await startAtNotes(tester);
       await edit(tester, find.text('nees mor sauce'));
-      await tap(tester, find.byTooltip('Move to trash'));
+      await tapEditorAction(tester, find.byKey(const ValueKey('editor-trash')));
 
       expect(find.byType(NoteEditorScreen), findsNothing);
       expect(find.text('nees mor sauce'), findsNothing);
@@ -359,11 +366,9 @@ void main() {
     await tap(tester, find.byKey(const ValueKey('badge-importance')));
     await tap(tester, find.text('Unwichtig'));
     await reveal(tester, find.text('Gekauft'));
-    // "Add a part" in ⋮ on a phone this wide (obf-1072).
-    await tap(tester, find.byKey(const ValueKey('bar-more')));
-    expect(find.text('Teil hinzufügen'), findsOneWidget);
-    await tester.tapAt(Offset.zero);
-    await tester.pumpAndSettle();
+    // "Add a part" in the Add group at the page's end (obf-1073).
+    await reveal(tester, find.text('Teil hinzufügen'));
+    expect(find.text('Aufräumen'), findsOneWidget);
     await tap(tester, find.byType(BackButton));
     await tap(tester, find.byType(BackButton));
     await tap(tester, find.text('Ein ziemlich langer Bereichsname'));

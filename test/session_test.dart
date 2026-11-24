@@ -397,6 +397,18 @@ void main() {
       expect(NoteKinds(store).of(id), NoteKind.session);
       expect(sessions.setupOf(id)?.pool, [pushUps]);
       expect(sessions.ofNote(id), isEmpty, reason: 'no Routine yet');
+      // Back to the top of the page, longer with the groups at its end
+      // (obf-1073).
+      await tester.scrollUntilVisible(
+        key('note-name'),
+        -100,
+        scrollable: find
+            .descendant(
+              of: find.byType(NoteEditorScreen),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
       // Its page: the name, the pool and the count, then its badges.
       expect(key('note-name'), findsOneWidget);
       expect(key('session-pool'), findsOneWidget);

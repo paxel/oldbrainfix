@@ -203,7 +203,7 @@ void main() {
         ),
         'sauce bought',
       );
-      await tap(tester, find.text('Add'));
+      await tap(tester, amendAdd);
       expect(find.text('sauce bought'), findsOneWidget);
       await arrive(tester, faraway);
       // In the Section's one line under its text (#170).

@@ -352,6 +352,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get add => 'Add';
 
   @override
+  String get editorGroupThisNote => 'This Note';
+
+  @override
+  String get editorGroupTidy => 'Tidy';
+
+  @override
   String get moveToTrash => 'Move to trash';
 
   @override

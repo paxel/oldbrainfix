@@ -1106,7 +1106,12 @@ void main() {
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField).last, 'and *oat*');
       await tester.pump();
-      await tester.tap(find.text('Add'));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Add'),
+        ),
+      );
       await tester.pumpAndSettle();
       final section = notes.sections(id).single;
       expect(section.text, 'and *oat*');

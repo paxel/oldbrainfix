@@ -6,7 +6,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/agenda_screen.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
-import 'package:oldbrainfix/src/page_bar.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart'
     show deviceWallClock;
 import 'package:oldbrainfix/src/shopping_pick_screen.dart';
@@ -61,8 +60,8 @@ void main() {
   ];
 
   Future<void> start(WidgetTester tester) async {
-    // Wide, so every action of the editor's bar shows on it, none in ⋮
-    // (obf-1051).
+    // Tall, so the editor's groups at the page's end show without
+    // scrolling (obf-1073).
     tester.view
       ..physicalSize = const Size(1280, 1600)
       ..devicePixelRatio = 1;
@@ -96,7 +95,9 @@ void main() {
   final action = find.byKey(const ValueKey('add-to-shopping'));
 
   /// The words of the editor's "Add to a Shopping List".
-  String label(WidgetTester tester) => tester.widget<BarAction>(action).label;
+  String label(WidgetTester tester) => tester
+      .widget<Text>(find.descendant(of: action, matching: find.byType(Text)))
+      .data!;
 
   testWidgets('each line becomes a Line of the list picked, a name the list '
       'has comes back instead, and the Note goes with the editor', (

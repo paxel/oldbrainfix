@@ -16,6 +16,8 @@ import 'package:oldbrainfix/src/setting_badges.dart';
 import 'package:oldbrainfix/src/text_marks_view.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'editor_actions.dart';
+
 /// The Note editor's row of badges (#160): each setting as its icon and
 /// value, a tap opening its small editor, "+" spawning from the Note.
 void main() {
@@ -120,6 +122,8 @@ void main() {
       expect(find.bySemanticsLabel('Area and Topic: Unsorted'), findsOneWidget);
       expect(find.bySemanticsLabel(RegExp(r'^Captured: ')), findsOneWidget);
       expect(find.bySemanticsLabel('Kind: Plain Note'), findsOneWidget);
+      // "+" leads the Add group at the page's end (obf-1073).
+      await revealInEditor(tester, key('badge-add'));
       expect(
         find.bySemanticsLabel('Routine, Reminder, Frog or Session'),
         findsOneWidget,

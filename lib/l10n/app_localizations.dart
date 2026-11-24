@@ -716,6 +716,18 @@ abstract class AppLocalizations {
   /// **'Add'**
   String get add;
 
+  /// Heading of the first of the Note editor's four groups under the text (obf-1073), over the badges of the Note's settings: Kind, Importance, Area and Topic, Captured, Show on the Agenda, Hidden from AI.
+  ///
+  /// In en, this message translates to:
+  /// **'This Note'**
+  String get editorGroupThisNote;
+
+  /// Heading of the last of the Note editor's four groups (obf-1073), over Merge into…, Add to a Shopping List and Move to trash.
+  ///
+  /// In en, this message translates to:
+  /// **'Tidy'**
+  String get editorGroupTidy;
+
   /// No description provided for @moveToTrash.
   ///
   /// In en, this message translates to:
@@ -11155,7 +11167,7 @@ abstract class AppLocalizations {
   /// **'Here you file the Note into an Area or a Topic.'**
   String get spotEditorPlace;
 
-  /// A Spotlight (obf-1043) on the Note editor's + badge, which holds Remind me… (new in 0.7.0): one sentence of what it does.
+  /// A Spotlight (obf-1043) on the Note editor's + badge, first in its Add group (obf-1073), which holds Remind me… (new in 0.7.0): one sentence of what it does.
   ///
   /// In en, this message translates to:
   /// **'In +, Remind me… sets up a Reminder or a Routine for this Note.'**
@@ -11173,7 +11185,7 @@ abstract class AppLocalizations {
   /// **'Linked from lists the Notes whose links lead to this one.'**
   String get spotEditorLinkedFrom;
 
-  /// A Spotlight (obf-1043) on Add a part in the Note editor's bar or its ⋮ menu (new in 0.8.0, obf-1072): one sentence of what it does.
+  /// A Spotlight (obf-1043) on Add a part in the Note editor's Add group (new in 0.8.0, obf-1072, obf-1073): one sentence of what it does.
   ///
   /// In en, this message translates to:
   /// **'Add a part puts something new under the Note, with its own time.'**

@@ -141,10 +141,15 @@ void main() {
           findsNothing,
         );
       }
+      // Measured on the page, as This Note's heading may push the
+      // badges out of sight of the content (obf-1073).
+      final page = tester.state<ScrollableState>(find.byType(Scrollable).first);
+      final contentEnd =
+          tester.getBottomLeft(key(content)).dy + page.position.pixels;
       await reveal(tester, key('note-badges'));
       expect(
-        tester.getTopLeft(key('note-badges')).dy,
-        greaterThanOrEqualTo(tester.getBottomLeft(key(content)).dy),
+        tester.getTopLeft(key('note-badges')).dy + page.position.pixels,
+        greaterThanOrEqualTo(contentEnd),
       );
       final section = notes.sections(id).single.id;
       await reveal(tester, key('section-text:$section'));

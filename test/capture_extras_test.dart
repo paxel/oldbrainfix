@@ -200,7 +200,7 @@ void main() {
         ),
         'sauce bought',
       );
-      await tap(tester, find.text('Add'));
+      await tap(tester, amendAdd);
       // In the Section's one line under its text (#170).
       expect(find.textContaining(' · Headphones'), findsOneWidget);
       expect(notes.sections(note.id).single.context.bluetoothDevices, [

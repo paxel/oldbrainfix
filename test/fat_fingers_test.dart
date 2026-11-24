@@ -17,6 +17,7 @@ import 'fake_photos.dart';
 import 'fake_voice.dart';
 import 'open_capture.dart';
 import 'open_settings.dart';
+import 'reveal.dart';
 
 /// "Fat fingers" (#224): text 1.3 times on top of the system's font size,
 /// icons and tap targets 1.3 times, the Agenda's rows with them, and
@@ -271,12 +272,15 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(NoteEditorScreen), findsOneWidget);
       expectBarClear(tester);
+      // The groups at the page's end fit as well (obf-1073).
+      await reveal(tester, find.text('In den Papierkorb'));
+      expect(find.text('Aufräumen'), findsOneWidget);
+      expect(tester.takeException(), isNull);
       // What does not fit goes into ⋮, last, with its icon and words.
       expect(find.byKey(const ValueKey('note-history')), findsNothing);
       await tester.tap(find.byKey(const ValueKey('bar-more')));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('note-history')), findsOneWidget);
-      expect(find.text('In den Papierkorb'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('note-history')));
       await tester.pumpAndSettle();
       expect(find.byType(NoteHistoryScreen), findsOneWidget);

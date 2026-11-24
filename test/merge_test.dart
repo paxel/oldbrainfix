@@ -8,6 +8,7 @@ import 'package:oldbrainfix/src/note_card.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'editor_actions.dart';
 import 'reveal.dart';
 
 void main() {
@@ -68,7 +69,9 @@ void main() {
     await tester.longPress(find.text('nees mor sauce'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'need more sauce');
-    await tap(tester, find.byTooltip('Merge into…'));
+    // The field shows its caret first, before the page goes down to Tidy.
+    await tester.pump();
+    await tapEditorAction(tester, find.byKey(const ValueKey('editor-merge')));
 
     expect(find.byType(MergeIntoScreen), findsOneWidget);
     expect(cards(), ['sauce']);

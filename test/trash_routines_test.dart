@@ -8,6 +8,11 @@ import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix/src/trash_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'editor_actions.dart';
+
+/// Move to trash, under Tidy at the end of the Note editor (obf-1073).
+final editorTrash = find.byKey(const ValueKey('editor-trash'));
+
 void main() {
   late Store store;
   late Notes notes;
@@ -96,7 +101,7 @@ void main() {
       routines.spawn(pills.id, daily([at(20)]));
       await start(tester);
       await openNote(tester, 'pills');
-      await tap(tester, find.byTooltip('Move to trash'));
+      await tapEditorAction(tester, editorTrash);
       expect(find.byType(AlertDialog), findsNothing);
       expect(find.byType(NoteEditorScreen), findsNothing);
       expect(notes.byId(pills.id)?.isTrashed, isTrue);
@@ -118,7 +123,7 @@ void main() {
       routines.spawn(pills.id, daily([at(8)]));
       await start(tester);
       await openNote(tester, 'pills');
-      await tap(tester, find.byTooltip('Move to trash'));
+      await tapEditorAction(tester, editorTrash);
       await tester.pump(const Duration(seconds: 9));
       expect(find.text('Moved to the Trash'), findsOneWidget);
       await tester.pump(const Duration(seconds: 1));
@@ -137,7 +142,7 @@ void main() {
         await startWeek(tester);
         expect(find.byType(Checkbox), findsNWidgets(AgendaScreen.days));
         await openNote(tester, 'pills');
-        await tap(tester, find.byTooltip('Move to trash'));
+        await tapEditorAction(tester, editorTrash);
         expect(find.byType(NoteEditorScreen), findsNothing);
         expect(notes.byId(pills.id)?.isTrashed, isTrue);
         expect(routines.all(), isEmpty);
@@ -207,7 +212,7 @@ void main() {
       await editSchedule(tester, find.text('pills').first);
       await tap(tester, find.text('pills'));
       expect(find.byType(NoteEditorScreen), findsOneWidget);
-      await tap(tester, find.byTooltip('Move to trash'));
+      await tapEditorAction(tester, editorTrash);
       expect(find.byType(NoteEditorScreen), findsNothing);
       expect(find.byType(RoutineEditorScreen), findsNothing);
       expect(find.byType(Checkbox), findsNothing);
@@ -221,7 +226,7 @@ void main() {
       await start(tester);
       await editSchedule(tester, find.text('dentist Tuesday').first);
       await tap(tester, find.text('dentist Tuesday'));
-      await tap(tester, find.byTooltip('Merge into…'));
+      await tapEditorAction(tester, find.byKey(const ValueKey('editor-merge')));
       await tap(tester, find.text('dentist'));
       expect(find.byType(RoutineEditorScreen), findsOneWidget);
       expect(find.text('dentist'), findsOneWidget);
@@ -236,7 +241,7 @@ void main() {
       notes.merge(tuesday.id, dentist.id);
       await start(tester);
       await openNote(tester, 'dentist');
-      await tap(tester, find.byTooltip('Move to trash'));
+      await tapEditorAction(tester, editorTrash);
       expect(notes.byId(dentist.id)?.isTrashed, isTrue);
       expect(routines.all(), isEmpty);
     });
@@ -246,7 +251,7 @@ void main() {
       final milk = notes.capture('milk');
       await start(tester);
       await openNote(tester, 'milk');
-      await tap(tester, find.byTooltip('Move to trash'));
+      await tapEditorAction(tester, editorTrash);
       expect(find.byType(AlertDialog), findsNothing);
       expect(find.byType(NoteEditorScreen), findsNothing);
       expect(notes.byId(milk.id)?.isTrashed, isTrue);
@@ -330,7 +335,7 @@ void main() {
         ),
       );
       expect(find.byType(NoteEditorScreen), findsOneWidget);
-      await tap(tester, find.byTooltip('Move to trash'));
+      await tapEditorAction(tester, editorTrash);
       expect(find.byType(RoutineEditorScreen), findsNothing);
       expect(card, findsNothing);
       await tap(tester, find.text('Moved to the Trash'));
@@ -389,9 +394,8 @@ void main() {
     await tap(tester, find.byTooltip('Alle Notizen'));
     await tester.longPress(find.text('Tabletten'));
     await tester.pumpAndSettle();
-    // On a phone the bar's last actions overflow into its ⋮.
-    await tap(tester, find.byTooltip('Mehr').last);
-    await tap(tester, find.text('In den Papierkorb'));
+    // Under Aufräumen at the end of the editor (obf-1073).
+    await tapEditorAction(tester, find.text('In den Papierkorb'));
     expect(find.text('In den Papierkorb verschoben'), findsOneWidget);
     expect(find.text('Rückgängig'), findsOneWidget);
     await tap(tester, find.byType(BackButton).last);

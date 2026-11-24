@@ -7,6 +7,7 @@ import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'add_a_part.dart';
+import 'editor_actions.dart';
 import 'reveal.dart';
 
 /// A text in a format this version does not know, as a later version
@@ -61,12 +62,15 @@ void main() {
     // Amend adds a Section and leaves the text as it is.
     await addAPart(tester);
     await tester.enterText(find.byType(TextField).last, 'Oat milk');
-    await tap(tester, find.text('Add'));
+    await tap(
+      tester,
+      find.descendant(of: find.byType(AlertDialog), matching: find.text('Add')),
+    );
     expect(store.current(note.id, NoteKeys.text), _future);
     expect(notes.sections(note.id).single.text, 'Oat milk');
 
     // Merge points the Note at the one picked, its text as it is.
-    await tap(tester, find.byTooltip('Merge into…'));
+    await tapEditorAction(tester, find.byKey(const ValueKey('editor-merge')));
     await tap(tester, find.text('Target'));
     expect(notes.byId(note.id)?.mergedInto, target.id);
     expect(store.current(note.id, NoteKeys.text), _future);

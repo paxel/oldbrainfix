@@ -7,6 +7,7 @@ import 'package:oldbrainfix/src/capture_screen.dart';
 import 'package:oldbrainfix/src/note_card.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'editor_actions.dart';
 import 'fake_photos.dart';
 import 'fake_voice.dart';
 import 'open_capture.dart';
@@ -77,7 +78,7 @@ void main() {
     await tester.pump();
     await tap(tester, find.byKey(const ValueKey('captureToEditor')));
     final garlic = notes.all().singleWhere((n) => n.text == 'more garlic').id;
-    await tap(tester, find.byTooltip('Merge into…'));
+    await tapEditorAction(tester, find.byKey(const ValueKey('editor-merge')));
     await tap(tester, listed('Sauce'));
 
     expect(notes.byId(garlic)?.mergedInto, sauce.id);

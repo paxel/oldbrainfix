@@ -630,7 +630,11 @@ TableEditing? tableEdit(Notes notes, PlacedNote placed, VoidCallback changed) {
 /// Sections, each with its own Capture Context. A Section this Device may
 /// edit, while the Note is not in the trash, is edited in a field of its
 /// own as the Note's text is and saved with it; the others are only read,
-/// their text selected and copied with a long press (#183). "Add a
+/// their text selected and copied with a long press (#183). Under the
+/// text its badges stand under the heading This Note, and at the page's
+/// end its actions under Add, Share and Tidy, the groups of the desktop's
+/// Note dialog (obf-1073); the bar keeps Undo, Redo, Find, the calendar,
+/// History and Revert. "Add a
 /// part" among its actions opens the box that amends it, not on a Note
 /// being made (obf-1072); the "+" badge spawns a Routine, Reminder, Frog or
 /// Session from it, as the card's menu does; the calendar button adds it,
@@ -2526,7 +2530,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// as its icon and its value, an icon for a fixed set of values, short
   /// text otherwise (#192), a tap opening its small editor; a setting
   /// that does not apply has none. The kind comes first, in words (#310);
-  /// "+" ends it.
+  /// "+" leads the Add group at the page's end (obf-1073).
   Widget _badges(
     PlacedNote placed,
     DateFormat when,
@@ -2686,6 +2690,35 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               () => _toggleHiddenFromAi(toggle),
             ),
           ),
+      ],
+    );
+  }
+
+  /// The Note's actions at the end of the page in three of the four
+  /// groups the desktop's Note dialog has (obf-1073), This Note, its
+  /// badges, standing under the text: **Add**, "+" with Remind me…,
+  /// Voice, Photo, Gallery, Paste, Attach a file and Add a part;
+  /// **Share**, Send to a person, Share to an app and Export as Pack…;
+  /// **Tidy**, Merge into…, Add to a Shopping List and Move to trash. A
+  /// group with nothing this Device may do shows nothing.
+  List<Widget> _groups(
+    AppLocalizations t,
+    PlacedNote placed,
+    Note note,
+    bool editable,
+  ) {
+    final (
+      :changes,
+      :schedules,
+      amends: _,
+      note: _,
+      area: _,
+      topic: _,
+      author: _,
+    ) = placed;
+    final photos = PhotoScope.of(context);
+    return [
+      ?_group(const ValueKey('editor-group-add'), t.add, [
         // In a Shared Area only a Manager sets them up (ADR 0013).
         if (schedules)
           Spotlight(
@@ -2698,9 +2731,154 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               onTap: _addMenu,
             ),
           ),
-      ],
-    );
+        if (changes) ...[
+          // What the quick note offered before (#352).
+          if (VoiceScope.of(context).available)
+            _groupButton(
+              key: const ValueKey('editor-voice'),
+              label: t.voice,
+              onPressed: () => unawaited(_record()),
+              icon: Icons.mic_none,
+            ),
+          if (photos.available)
+            _groupButton(
+              key: const ValueKey('editor-photo'),
+              label: t.photo,
+              onPressed: () => unawaited(_takePhoto()),
+              icon: Icons.photo_camera_outlined,
+            ),
+          if (photos.pickable)
+            _groupButton(
+              key: const ValueKey('editor-gallery'),
+              label: t.gallery,
+              onPressed: () => unawaited(_pickPhotos()),
+              icon: Icons.photo_library_outlined,
+            ),
+          if (photos.pasteable && editable)
+            _groupButton(
+              key: const ValueKey('editor-paste'),
+              label: t.paste,
+              onPressed: () => unawaited(_paste()),
+              icon: Icons.content_paste,
+            ),
+          if (FileScope.of(context).pickable)
+            _groupButton(
+              key: const ValueKey('attach-file'),
+              label: t.attachFile,
+              onPressed: () => unawaited(_attachFile()),
+              icon: Icons.attach_file,
+            ),
+        ],
+        // Opens the Amend box, only when asked (obf-1072); in a Shared
+        // Area also for a Member, who changes only their own Notes
+        // (ADR 0013).
+        if (_amends && !widget.made)
+          Spotlight(
+            id: 'editor-add-part',
+            child: _groupButton(
+              key: const ValueKey('editor-add-part'),
+              label: t.addAPart,
+              onPressed: () => unawaited(_amend()),
+              icon: Icons.post_add,
+            ),
+          ),
+      ]),
+      ?_group(const ValueKey('editor-group-share'), t.share, [
+        _groupButton(
+          key: const ValueKey('send-note-file'),
+          label: t.sendToPerson,
+          onPressed: () {
+            _saveText();
+            unawaited(sendNoteFile(context, widget.notes.store, widget.noteId));
+          },
+          icon: Icons.send_outlined,
+        ),
+        _groupButton(
+          key: const ValueKey('share-note'),
+          label: t.shareToApp,
+          onPressed: () {
+            _saveText();
+            unawaited(shareNoteToApp(context, widget.notes, widget.noteId));
+          },
+          icon: Icons.share_outlined,
+        ),
+        _groupButton(
+          key: const ValueKey('pack-note'),
+          label: t.exportAsPack,
+          onPressed: () {
+            _saveText();
+            unawaited(exportPack(context, widget.notes.store, widget.noteId));
+          },
+          icon: Icons.inventory_2_outlined,
+        ),
+      ]),
+      ?_group(const ValueKey('editor-group-tidy'), t.editorGroupTidy, [
+        if (changes) ...[
+          _groupButton(
+            key: const ValueKey('editor-merge'),
+            label: t.mergeInto,
+            onPressed: _merge,
+            icon: Icons.call_merge,
+          ),
+          ?_shoppingAction(t, note, changes),
+          _groupButton(
+            key: const ValueKey('editor-trash'),
+            label: t.moveToTrash,
+            onPressed: _trash,
+            icon: Icons.delete_outline,
+            warns: true,
+          ),
+        ],
+      ]),
+    ];
   }
+
+  /// One group of [_groups] under its [heading], its [children] side by
+  /// side where they fit; none without children.
+  Widget? _group(Key key, String heading, List<Widget> children) =>
+      children.isEmpty
+      ? null
+      : Padding(
+          key: key,
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // A heading of its own for a screen reader, not read as a
+              // part of the first button.
+              Semantics(
+                container: true,
+                header: true,
+                child: Text(
+                  heading,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(spacing: 8, runSpacing: 8, children: children),
+            ],
+          ),
+        );
+
+  /// A compact button of a group (obf-1073), its icon and its words;
+  /// [warns] draws it in the error colour, as Delete.
+  Widget _groupButton({
+    required Key key,
+    required String label,
+    required VoidCallback onPressed,
+    required IconData icon,
+    bool warns = false,
+  }) => OutlinedButton.icon(
+    key: key,
+    style: warns
+        ? OutlinedButton.styleFrom(
+            foregroundColor: Theme.of(context).colorScheme.error,
+          )
+        : null,
+    onPressed: onPressed,
+    icon: Icon(icon, size: 18),
+    label: Text(label),
+  );
 
   /// The text format badge [badge], with the tip of the code language
   /// (obf-1043) while its format dialog offers one: a Code text this
@@ -3269,7 +3447,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// photo or file, which no Line holds, no Section and nothing spawned
   /// from it, while there is a list to add to. With one list it names it,
   /// "Add to Weekly", and adds at once (#276).
-  BarAction? _shoppingAction(AppLocalizations t, Note note, bool changes) {
+  Widget? _shoppingAction(AppLocalizations t, Note note, bool changes) {
     final lists = _toShopping;
     if (!changes ||
         lists.isEmpty ||
@@ -3284,7 +3462,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       return null;
     }
     final only = lists.length == 1 ? lists.single : null;
-    return BarAction(
+    return _groupButton(
       key: const ValueKey('add-to-shopping'),
       label: only == null
           ? t.addToShoppingList
@@ -3888,9 +4066,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     if (placed == null) return Scaffold(appBar: AppBar());
     final (:note, :area, :topic, :changes, schedules: _, amends: _, author: _) =
         placed;
-    // In a Shared Area a Member changes only their own Notes, and only a
-    // Manager their Routines (ADR 0013); Amend stays.
-    final amends = _amends;
     final editable = changes && note.textEditable;
     final when = DateFormat.yMd(Localizations.localeOf(context).toString())
         .add_Hm();
@@ -3936,39 +4111,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 onPressed: _openFind,
                 icon: Icons.search,
               ),
-              BarAction(
-                key: const ValueKey('send-note-file'),
-                label: t.sendToPerson,
-                onPressed: () {
-                  _saveText();
-                  unawaited(
-                    sendNoteFile(context, widget.notes.store, widget.noteId),
-                  );
-                },
-                icon: Icons.send_outlined,
-              ),
-              BarAction(
-                key: const ValueKey('share-note'),
-                label: t.shareToApp,
-                onPressed: () {
-                  _saveText();
-                  unawaited(
-                    shareNoteToApp(context, widget.notes, widget.noteId),
-                  );
-                },
-                icon: Icons.share_outlined,
-              ),
-              BarAction(
-                key: const ValueKey('pack-note'),
-                label: t.exportAsPack,
-                onPressed: () {
-                  _saveText();
-                  unawaited(
-                    exportPack(context, widget.notes.store, widget.noteId),
-                  );
-                },
-                icon: Icons.inventory_2_outlined,
-              ),
               CalendarButton(choices: _calendarChoices),
               BarAction(
                 key: const ValueKey('note-history'),
@@ -3984,64 +4126,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                     : null,
                 icon: Icons.settings_backup_restore,
               ),
-              // Opens the Amend box, only when asked (obf-1072).
-              if (amends && !widget.made)
-                BarAction(
-                  key: const ValueKey('editor-add-part'),
-                  spotlight: 'editor-add-part',
-                  label: t.addAPart,
-                  onPressed: () => unawaited(_amend()),
-                  icon: Icons.post_add,
-                ),
-              if (changes) ...[
-                // What the quick note offered before (#352).
-                if (PhotoScope.of(context).available)
-                  BarAction(
-                    key: const ValueKey('editor-photo'),
-                    label: t.photo,
-                    onPressed: () => unawaited(_takePhoto()),
-                    icon: Icons.photo_camera_outlined,
-                  ),
-                if (VoiceScope.of(context).available)
-                  BarAction(
-                    key: const ValueKey('editor-voice'),
-                    label: t.voice,
-                    onPressed: () => unawaited(_record()),
-                    icon: Icons.mic_none,
-                  ),
-                if (PhotoScope.of(context).pickable)
-                  BarAction(
-                    key: const ValueKey('editor-gallery'),
-                    label: t.gallery,
-                    onPressed: () => unawaited(_pickPhotos()),
-                    icon: Icons.photo_library_outlined,
-                  ),
-                if (PhotoScope.of(context).pasteable && editable)
-                  BarAction(
-                    key: const ValueKey('editor-paste'),
-                    label: t.paste,
-                    onPressed: () => unawaited(_paste()),
-                    icon: Icons.content_paste,
-                  ),
-                if (FileScope.of(context).pickable)
-                  BarAction(
-                    key: const ValueKey('attach-file'),
-                    label: t.attachFile,
-                    onPressed: () => unawaited(_attachFile()),
-                    icon: Icons.attach_file,
-                  ),
-                BarAction(
-                  label: t.mergeInto,
-                  onPressed: _merge,
-                  icon: Icons.call_merge,
-                ),
-                ?_shoppingAction(t, note, changes),
-                BarAction(
-                  label: t.moveToTrash,
-                  onPressed: _trash,
-                  icon: Icons.delete_outline,
-                ),
-              ],
             ],
           ),
           body: Column(
@@ -4215,7 +4299,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         ],
         // A Session's panels keep their own space under them.
         if (_sessionDraft == null) const SizedBox(height: 16),
-        _badges(placed, when, place, colour),
+        ?_group(
+          const ValueKey('editor-group-this-note'),
+          t.editorGroupThisNote,
+          [_badges(placed, when, place, colour)],
+        ),
         // Its past runs (#264), under its settings.
         if (_sessionDraft != null) ...[
           const SizedBox(height: 16),
@@ -4327,7 +4415,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             id: 'editor-linked-from',
             child: LinkedFrom(linking: _linkedFrom),
           ),
-        const SizedBox(height: 24),
+        // What may be done with it, after all it holds (obf-1073).
+        const SizedBox(height: 8),
+        ..._groups(t, placed, note, editable),
+        const SizedBox(height: 8),
       ],
     );
   }

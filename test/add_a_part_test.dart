@@ -8,6 +8,7 @@ import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'add_a_part.dart';
+import 'editor_actions.dart';
 import 'open_capture.dart';
 
 /// Amend only when asked (obf-1072): the Note editor never shows the
@@ -53,18 +54,14 @@ void main() {
     expect(find.byType(NoteEditorScreen), findsOneWidget);
   }
 
-  /// No Amend box on the page, and no "Add a part" on the bar or in ⋮.
+  /// No Amend box on the page, and no "Add a part" in its groups at the
+  /// page's end (obf-1073).
   Future<void> expectNoAmend(WidgetTester tester) async {
     expect(find.text("What's new?"), findsNothing);
     expect(find.text('Add to Note'), findsNothing);
+    await revealInEditor(tester, key('editor-group-share'));
     expect(addAPartAction, findsNothing);
-    if (key('bar-more').evaluate().isNotEmpty) {
-      await tap(tester, key('bar-more'));
-      expect(addAPartAction, findsNothing);
-      expect(find.text('Add a part'), findsNothing);
-      await tester.tapAt(Offset.zero);
-      await tester.pumpAndSettle();
-    }
+    expect(find.text('Add a part'), findsNothing);
   }
 
   Future<void> addPart(WidgetTester tester, String text) async {
@@ -76,7 +73,10 @@ void main() {
       ),
       text,
     );
-    await tap(tester, find.text('Add'));
+    await tap(
+      tester,
+      find.descendant(of: find.byType(AlertDialog), matching: find.text('Add')),
+    );
   }
 
   testWidgets('a Note being made from the quick note has no Add a part', (
@@ -153,6 +153,17 @@ void main() {
     expect(tester.widget<Text>(key('find-count')).data, '1 of 1');
 
     await tap(tester, key('editor-undo'));
+    // Back up from the groups at the page's end to the text (obf-1073).
+    await tester.scrollUntilVisible(
+      field,
+      -100,
+      scrollable: find
+          .descendant(
+            of: find.byType(ListView),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
     expect(tester.widget<TextField>(field).controller?.text, 'buy milk');
   });
 }

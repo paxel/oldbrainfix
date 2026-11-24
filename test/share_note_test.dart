@@ -10,6 +10,7 @@ import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'bundle_test.dart' show FakeBundles;
+import 'editor_actions.dart';
 import 'fake_photos.dart';
 
 void main() {
@@ -184,9 +185,9 @@ void main() {
     await tester.longPress(find.text('Bike lock code'));
     await tester.pumpAndSettle();
     expect(find.byType(NoteEditorScreen), findsOneWidget);
-    expect(find.byTooltip('Send to a person'), findsOneWidget);
-    await tester.tap(find.byTooltip('Share to an app'));
-    await tester.pumpAndSettle();
+    // In the Share group at the page's end (obf-1073).
+    await tapEditorAction(tester, find.byKey(const ValueKey('share-note')));
+    expect(find.text('Send to a person'), findsOneWidget);
 
     expect(files.texts.single.text, 'Bike lock code');
   });

@@ -1622,9 +1622,13 @@ void main() {
 
           boxFrame('capture-and-sort', 'history', (tester) async {
             await boilerEditor(tester);
-            // In ⋮, after Undo and Redo first on the bar (obf-1051).
-            await _tap(tester, find.byKey(const ValueKey('bar-more')));
-            await _tap(tester, find.byKey(const ValueKey('note-history')));
+            // On the bar after Undo, Redo and Find (obf-1051), in ⋮ where
+            // the bar is full.
+            final history = find.byKey(const ValueKey('note-history'));
+            if (history.evaluate().isEmpty) {
+              await _tap(tester, find.byKey(const ValueKey('bar-more')));
+            }
+            await _tap(tester, history);
             expect(find.byType(NoteHistoryScreen), findsOneWidget);
           });
 

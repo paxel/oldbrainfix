@@ -103,6 +103,8 @@
   "amendHint": "Was gibt es Neues?",
   "addAPart": "Teil hinzufügen",
   "add": "Hinzufügen",
+  "editorGroupThisNote": "Diese Notiz",
+  "editorGroupTidy": "Aufräumen",
   "moveToTrash": "In den Papierkorb",
   "trashTitle": "Papierkorb",
   "trashEmpty": "Der Papierkorb ist leer.",

@@ -10,6 +10,8 @@ import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'editor_actions.dart';
+
 /// Undo, Redo and "Revert all changes" of the Note editor (obf-1051):
 /// step by step back to the Note as it was opened, for its text, its
 /// Lines and its badges.
@@ -88,7 +90,7 @@ void main() {
       (TextSize.normal, true),
     ]) {
       testWidgets('Undo and Redo lead it at 360 wide, text size '
-          '${size.name}${fat ? ', Fat fingers' : ''}; Revert is in ⋮', (
+          '${size.name}${fat ? ', Fat fingers' : ''}; Revert follows', (
         tester,
       ) async {
         store
@@ -105,10 +107,21 @@ void main() {
           // Nothing changed yet: greyed.
           expect(enabled(tester, name), isFalse, reason: name);
         }
-        expect(key('editor-revert'), findsNothing);
-        await tap(tester, key('bar-more'));
+        // The bar holds no more than its editing actions (obf-1073):
+        // Revert on it, or in ⋮ where it is full.
+        if (key('editor-revert').evaluate().isEmpty) {
+          await tap(tester, key('bar-more'));
+        }
         expect(key('editor-revert'), findsOneWidget);
-        expect(find.text('Revert all changes'), findsOneWidget);
+        // Its words in ⋮, or as the icon's tooltip on the bar.
+        expect(
+          find.byWidgetPredicate(
+            (w) =>
+                (w is Text && w.data == 'Revert all changes') ||
+                (w is Tooltip && w.message == 'Revert all changes'),
+          ),
+          findsWidgets,
+        );
       });
     }
   });
@@ -486,8 +499,7 @@ void main() {
     final id = notes.capture('Dentist on Tuesday').id;
     notes.edit(id, 'Dentist on Wednesday');
     await edit(tester, id);
-    await tap(tester, key('bar-more'));
-    await tap(tester, key('note-history'));
+    await tapBarAction(tester, key('note-history'));
     // The capture, last: its text is the one before.
     final use = find.byKey(const ValueKey('use-version-1'));
     await tester.ensureVisible(use);
@@ -509,15 +521,13 @@ void main() {
     await tap(tester, key('badge-importance'));
     await tap(tester, key('importance-important'));
 
-    await tap(tester, key('bar-more'));
-    await tap(tester, key('editor-revert'));
+    await tapBarAction(tester, key('editor-revert'));
     expect(find.text('Revert all changes?'), findsOneWidget);
     // Cancel changes nothing.
     await tap(tester, find.text('Cancel'));
     expect(notes.byId(id)?.importance, Importance.important);
 
-    await tap(tester, key('bar-more'));
-    await tap(tester, key('editor-revert'));
+    await tapBarAction(tester, key('editor-revert'));
     await tap(tester, key('revert-all-confirm'));
     expect(typed(tester), 'fix the gate');
     expect(notes.byId(id)?.importance, Importance.normal);
