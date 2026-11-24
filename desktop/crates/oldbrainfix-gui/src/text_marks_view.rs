@@ -70,7 +70,7 @@ use oldbrainfix_core::text_boxes::{self, FoundBox};
 use oldbrainfix_core::{BoxState, BoxTick, FoundTag, ShownBox, text_format};
 
 use crate::l10n::L10n;
-use crate::{find_marks, schedule_text, theme};
+use crate::{find_marks, icons, schedule_text, theme, whole_tables};
 
 /// How far apart the lines of a formatted text lie (#327, obf-1020), as
 /// on the phone: a line's height in parts of its font's size.
@@ -208,7 +208,8 @@ pub struct LinkSpot {
 /// with how many rows it has under its header while it is folded on a
 /// card, and where the bar under it lies while it moves sideways, with
 /// how far its cells move per point the bar is dragged and how far they
-/// move at most (obf-1048).
+/// move at most (obf-1048); where its ⋮ lies, and whether there is a
+/// block of the text above it and below it to move past (obf-1050).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TableSpot {
     pub at: usize,
@@ -216,6 +217,24 @@ pub struct TableSpot {
     pub key: Id,
     pub more: Option<(Rect, usize)>,
     pub bar: Option<(Rect, f32, f32)>,
+    pub menu: Rect,
+    pub moves: (bool, bool),
+}
+
+/// What was done to a table drawn (obf-1050): a click on it, or a pick
+/// in its ⋮.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TableAct {
+    /// A click on the table: it opens full screen, or in the editor its
+    /// cell is edited.
+    Open,
+    /// Copy, as in the bar of the table full screen (#324).
+    Copy,
+    /// Move up and Move down, past the block above or below it.
+    Up,
+    Down,
+    /// Delete table.
+    Delete,
 }
 
 /// How many rows under its header a table shows on a card until "Show
@@ -572,7 +591,9 @@ pub fn room_label(
                 Some(table) if !truncate => {
                     if block.line == table.first_line.max(first) {
                         room(ui, BlockKind::Table, &mut blank);
-                        spots.extend(table_label(ui, (text, table), (&found, &look), tables));
+                        let moves = whole_tables::moves(text, table);
+                        let table = (text, table.as_ref(), moves);
+                        spots.extend(table_label(ui, table, (&found, &look), tables));
                     }
                 }
                 // A blank line reads as room, not as a line.
@@ -1836,6 +1857,11 @@ const BAR: f32 = 6.0;
 const BAR_GAP: f32 = 3.0;
 const MORE_GAP: f32 = 4.0;
 
+/// How large a table's ⋮ beside its top right corner is, and the room
+/// before it (obf-1050).
+pub(crate) const TABLE_MENU: f32 = 22.0;
+const TABLE_MENU_GAP: f32 = 2.0;
+
 /// How wide each column of a table is in `room` across, as wide as its
 /// widest words with their room, `natural`, while the whole table fits;
 /// else none wider than `cap`, the room left shared among the columns cut,
@@ -1922,10 +1948,12 @@ fn spots_in(spots: Spots, clip: Rect) -> Spots {
 /// staying while it holds headings. Its header row stays in view while
 /// its rows scroll under it. On a card it shows its first [`CARD_ROWS`]
 /// rows under its header until "Show all" ([`table_clicks`]) unfolds the
-/// rest; only the rows shown are laid out.
+/// rest; only the rows shown are laid out. Its ⋮ beside its top right
+/// corner (obf-1050) takes the room it needs, `moves` saying whether
+/// there is a block above and below it to move past.
 fn table_label(
     ui: &mut Ui,
-    (text, table): (&str, &Table),
+    (text, table, moves): (&str, &Table, (bool, bool)),
     (found, look): (&Found, &Look),
     room: TableRoom,
 ) -> Spots {
@@ -1939,7 +1967,8 @@ fn table_label(
         &table.rows
     };
     let column = ui.available_width().max(1.0);
-    let space = room.wide.map_or(column, |r| r.span().max(column));
+    let menu = TABLE_MENU + TABLE_MENU_GAP;
+    let space = (room.wide.map_or(column, |r| r.span().max(column)) - menu).max(1.0);
     let pad = CELL_PAD;
     // Each cell on one line first, for how wide its words are.
     let bold = |r: usize, c: usize| r == 0 || (table.heading_column && c == 0);
@@ -2001,12 +2030,17 @@ fn table_label(
     let size = egui::vec2(column, high + bar_room + more_room);
     let (taken, _) = ui.allocate_exact_size(size, Sense::hover());
     let left = match room.wide {
-        Some(range) if shown > column => {
-            (taken.center().x - shown / 2.0).clamp(range.min, (range.max - shown).max(range.min))
+        Some(range) if shown + menu > column => {
+            let most = (range.max - shown - menu).max(range.min);
+            (taken.center().x - (shown + menu) / 2.0).clamp(range.min, most)
         }
         _ => taken.left(),
     };
     let rect = Rect::from_min_size(egui::pos2(left, taken.top()), egui::vec2(shown, high));
+    let menu = Rect::from_min_size(
+        egui::pos2(rect.right() + TABLE_MENU_GAP, rect.top()),
+        egui::vec2(TABLE_MENU, TABLE_MENU),
+    );
     // The wheel sideways, or with Shift, moves it while it is pointed at.
     if sideways && ui.rect_contains_pointer(rect) {
         let dx = ui.input(|i| i.smooth_scroll_delta.x);
@@ -2180,18 +2214,28 @@ fn table_label(
         key,
         more,
         bar: bar.map(|(bar, _, per_point)| (bar, per_point, most)),
+        menu,
+        moves,
     });
     spots
 }
 
 /// Takes the tables `spots` of the text `of`, by id, as buttons over
 /// what was drawn of them, read as "Open the table". Gives where the
-/// table clicked begins in the text. Taken before the marks, tags and
-/// links in them, those keep their clicks. Over the table's own click and
-/// whatever else lies over it, as a card does, the bar under a table
-/// moves it sideways and "Show all" unfolds a table folded on a card
-/// (obf-1048).
-pub fn table_clicks(ui: &mut Ui, t: &L10n, of: Id, spots: &[TableSpot]) -> Option<usize> {
+/// table clicked begins in the text, and what was done to it. Taken
+/// before the marks, tags and links in them, those keep their clicks.
+/// Over the table's own click and whatever else lies over it, as a card
+/// does, the bar under a table moves it sideways, "Show all" unfolds a
+/// table folded on a card (obf-1048), and its ⋮ (obf-1050) offers Copy
+/// and, where the text is edited (`edits`), Move up, Move down and
+/// Delete table.
+pub fn table_clicks(
+    ui: &mut Ui,
+    t: &L10n,
+    of: Id,
+    spots: &[TableSpot],
+    edits: bool,
+) -> Option<(usize, TableAct)> {
     let mut picked = None;
     for spot in spots {
         let resp = ui.interact(spot.rect, of.with(("table", spot.at)), Sense::click());
@@ -2201,7 +2245,12 @@ pub fn table_clicks(ui: &mut Ui, t: &L10n, of: Id, spots: &[TableSpot]) -> Optio
             .on_hover_text(t.table_open())
             .clicked()
         {
-            picked = Some(spot.at);
+            picked = Some((spot.at, TableAct::Open));
+        }
+        let (up, down) = spot.moves;
+        let menu = (of.with(("table menu", spot.at)), spot.menu);
+        if let (_, Some(act)) = table_menu(ui, t, menu, (edits, up, down)) {
+            picked = Some((spot.at, act));
         }
         if let Some((bar, per_point, most)) = spot.bar {
             let drag = ui.interact(bar, of.with(("table bar", spot.at)), Sense::drag());
@@ -2230,6 +2279,57 @@ pub fn table_clicks(ui: &mut Ui, t: &L10n, of: Id, spots: &[TableSpot]) -> Optio
         }
     }
     picked
+}
+
+/// A table's ⋮ (obf-1050) as `id` at `rect`, weak until pointed at, and
+/// its menu, opened by a click: Copy, and with `edits` Move up while
+/// `up`, Move down while `down`, and Delete table. Gives the ⋮ and what
+/// was picked.
+pub(crate) fn table_menu(
+    ui: &mut Ui,
+    t: &L10n,
+    (id, rect): (Id, Rect),
+    (edits, up, down): (bool, bool, bool),
+) -> (egui::Response, Option<TableAct>) {
+    let resp = ui.interact(rect, id, Sense::click());
+    let label = t.desk_table_more();
+    resp.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, label));
+    if ui.is_rect_visible(rect) {
+        if resp.hovered() {
+            let fill = ui.visuals().widgets.hovered.weak_bg_fill;
+            ui.painter().rect_filled(rect, 6.0, fill);
+        }
+        let weak = ui.visuals().weak_text_color();
+        icons::paint(ui.painter(), rect.shrink(2.0), icons::MORE_VERT, weak);
+    }
+    let resp = resp
+        .on_hover_cursor(egui::CursorIcon::PointingHand)
+        .on_hover_text(label);
+    let mut picked = None;
+    Popup::menu(&resp).show(|ui| {
+        let text = ui.visuals().text_color();
+        let mut entries = vec![(TableAct::Copy, t.table_copy(), true)];
+        if edits {
+            entries.extend([
+                (TableAct::Up, t.table_up(), up),
+                (TableAct::Down, t.table_down(), down),
+                (TableAct::Delete, t.table_delete(), true),
+            ]);
+        }
+        for (act, words, enabled) in entries {
+            let colour = if act == TableAct::Delete {
+                ui.visuals().error_fg_color
+            } else {
+                text
+            };
+            let entry = egui::Button::new(RichText::new(words).color(colour));
+            if ui.add_enabled(enabled, entry).clicked() {
+                picked = Some(act);
+                ui.close();
+            }
+        }
+    });
+    (resp, picked)
 }
 
 /// Where the boxes, tags and links of `line`, laid out in `galley` at

@@ -194,7 +194,7 @@ use crate::tally_page::{PageIntent, TallyPage};
 use crate::tally_view::{
     self, EntryForm, FieldForm, FormIntent, TallyAction, TallyBadge, TallyForm, TallyShown, Whose,
 };
-use crate::text_marks_view::{self, BoxAsk, BoxLook, Spots, TableRoom};
+use crate::text_marks_view::{self, BoxAsk, BoxLook, Spots, TableAct, TableRoom};
 use crate::text_menu::{self, Clip, Pick as MenuPick};
 use crate::theme::{self, AREA_PALETTE, Tones};
 use crate::tick_saves;
@@ -666,7 +666,8 @@ impl Reads {
             | Action::ClearCards
             | Action::StepCards { .. }
             | Action::SelectAllCards
-            | Action::Clip(_) => Reads::Nothing,
+            | Action::Clip(_)
+            | Action::CopyTable(_) => Reads::Nothing,
             Action::SwitchView(_) | Action::Compact(_) => Reads::Look,
             Action::SelectNote(_)
             | Action::OpenFinding(..)
@@ -1601,6 +1602,9 @@ enum Action {
     PhotoOut(String, Out),
     /// Shows a table of a formatted text full screen (#128).
     OpenTable(Opening),
+    /// A table's ⋮ Copy (obf-1050): the table on the clipboard as its
+    /// HTML beside its Markdown, as the table full screen copies it.
+    CopyTable(markdown::table::TableCopy),
     /// Something asked of the table shown full screen.
     Table(table_view::Asked),
     /// Captures the capture field's text and the recording running,
@@ -7579,7 +7583,7 @@ impl App {
         // elsewhere since starts them again, and what was typed is a step
         // before what is asked now, unless it goes with the typing.
         let seen = match &action {
-            Action::WholeStep { .. } => None,
+            Action::WholeStep { .. } | Action::CopyTable(_) => None,
             Action::FormatText(_) | Action::OfferCode(..) | Action::AskLink { .. } => {
                 Some(See::Drawn(self.steps_time))
             }
@@ -8080,6 +8084,8 @@ impl App {
             Action::ClosePhoto => self.viewer = None,
             Action::PhotoOut(hash, out) => self.photo_out(&hash, out),
             Action::OpenTable(opening) => self.open_table(opening)?,
+            // Copied says nothing (UI laws).
+            Action::CopyTable(copy) => self.put_copy(copy.markdown, Some(&copy.html)),
             Action::Table(asked) => self.table_asked(asked)?,
             Action::Fold(setting, open) => {
                 // Nothing kept means folded, the default.
@@ -12649,6 +12655,7 @@ impl App {
             match ask {
                 md_view::Asked::TextStep(larger) => self.apply(Action::TextStep(larger)),
                 md_view::Asked::SearchAll(words) => self.apply(Action::SearchFor(words)),
+                md_view::Asked::Copy(copy) => self.apply(Action::CopyTable(copy)),
                 md_view::Asked::OpenElsewhere(file) => {
                     let opened = match &self.linked_file_opener {
                         Some(open) => open(&file),
@@ -16017,8 +16024,8 @@ impl App {
                     actions.push(Action::Toggle(routine, occurrence));
                 } else if let Some((entity, asked)) = clicks.tick {
                     actions.push(box_action(entity, asked));
-                } else if let Some(opening) = clicks.table {
-                    actions.push(Action::OpenTable(opening));
+                } else if let Some(asked) = clicks.table {
+                    actions.push(asked);
                 } else if let Some((line, checked)) = clicks.check {
                     if self.view.shopping_lists.contains_key(id) {
                         actions.push(Action::Shopping(ShoppingAction::Check(line, checked)));
@@ -16448,17 +16455,25 @@ impl App {
                                         )
                                     });
                                     let of = Id::new(("text", &section.id));
-                                    if let Some(at) =
-                                        text_marks_view::table_clicks(ui, &t, of, &spots.tables)
-                                    {
-                                        actions.push(Action::OpenTable(Opening {
-                                            note: None,
-                                            text: section.text.clone(),
-                                            at,
-                                            cell: None,
-                                            tags: true,
-                                            boxes: Some(section.id.clone()),
-                                        }));
+                                    if let Some((at, act)) = text_marks_view::table_clicks(
+                                        ui,
+                                        &t,
+                                        of,
+                                        &spots.tables,
+                                        false,
+                                    ) {
+                                        actions.extend(table_action(
+                                            act,
+                                            Opening {
+                                                note: None,
+                                                text: section.text.clone(),
+                                                at,
+                                                cell: None,
+                                                tags: true,
+                                                boxes: Some(section.id.clone()),
+                                            },
+                                            look,
+                                        ));
                                     }
                                     if let Some(asked) = text_marks_view::box_clicks(
                                         ui,
@@ -16579,17 +16594,21 @@ impl App {
                             });
                             let of = Id::new(("text", &note.id));
                             // Its tables open to read (#128).
-                            if let Some(at) =
-                                text_marks_view::table_clicks(ui, &t, of, &spots.tables)
+                            if let Some((at, act)) =
+                                text_marks_view::table_clicks(ui, &t, of, &spots.tables, false)
                             {
-                                actions.push(Action::OpenTable(Opening {
-                                    note: None,
-                                    text: note.text.clone(),
-                                    at,
-                                    cell: None,
-                                    tags: true,
-                                    boxes: Some(note.id.clone()),
-                                }));
+                                actions.extend(table_action(
+                                    act,
+                                    Opening {
+                                        note: None,
+                                        text: note.text.clone(),
+                                        at,
+                                        cell: None,
+                                        tags: true,
+                                        boxes: Some(note.id.clone()),
+                                    },
+                                    boxes,
+                                ));
                             }
                             // A Member ticks the boxes of a Note not theirs.
                             if let Some(asked) = text_marks_view::box_clicks(
@@ -16856,6 +16875,7 @@ impl App {
                         if grid.took {
                             picked = None;
                         }
+                        actions.extend(grid.copy.map(Action::CopyTable));
                         if let Some((start, end, url)) = grid.link {
                             actions.push(Action::AskLink {
                                 start,
@@ -20663,15 +20683,20 @@ fn sent_item_form(
                 false,
             );
             let of = Id::new("sent text");
-            if let Some(at) = text_marks_view::table_clicks(ui, t, of, &spots.tables) {
-                actions.push(Action::OpenTable(Opening {
-                    note: None,
-                    text: item.text.clone(),
-                    at,
-                    cell: None,
-                    tags: false,
-                    boxes: None,
-                }));
+            if let Some((at, act)) = text_marks_view::table_clicks(ui, t, of, &spots.tables, false)
+            {
+                actions.extend(table_action(
+                    act,
+                    Opening {
+                        note: None,
+                        text: item.text.clone(),
+                        at,
+                        cell: None,
+                        tags: false,
+                        boxes: None,
+                    },
+                    &unticked,
+                ));
             }
             text_marks_view::link_clicks(ui, of, &spots.links);
             if !full {
@@ -20699,15 +20724,21 @@ fn sent_item_form(
                     false,
                 );
                 let of = Id::new(("sent section", i));
-                if let Some(at) = text_marks_view::table_clicks(ui, t, of, &spots.tables) {
-                    actions.push(Action::OpenTable(Opening {
-                        note: None,
-                        text: section.text.clone(),
-                        at,
-                        cell: None,
-                        tags: false,
-                        boxes: None,
-                    }));
+                if let Some((at, act)) =
+                    text_marks_view::table_clicks(ui, t, of, &spots.tables, false)
+                {
+                    actions.extend(table_action(
+                        act,
+                        Opening {
+                            note: None,
+                            text: section.text.clone(),
+                            at,
+                            cell: None,
+                            tags: false,
+                            boxes: None,
+                        },
+                        &unticked,
+                    ));
                 }
                 text_marks_view::link_clicks(ui, of, &spots.links);
             }
@@ -23422,8 +23453,9 @@ struct CardClicks {
     /// What a click on a box of the Note's text or a Section's asked,
     /// with that text's id (ADR 0035).
     tick: Option<(String, BoxAsk)>,
-    /// The table clicked, to show full screen (#128).
-    table: Option<Opening>,
+    /// The table clicked, to show full screen (#128), or copied from its
+    /// ⋮ (obf-1050).
+    table: Option<Action>,
     /// The tag clicked, as written (#126).
     tag: Option<String>,
     menu_opened: bool,
@@ -23778,11 +23810,24 @@ fn edited_text(
         let marked = Id::new(("field", of));
         // A click on a table edits the cell clicked in its
         // grid (#257).
-        if let Some(at) = text_marks_view::table_clicks(ui, &t, marked, &spots.tables) {
-            let pointer = ui.input(|i| i.pointer.interact_pos());
-            let cell = spots.cell_at(at, pointer).unwrap_or((0, 0));
-            *editing = true;
-            table_grid::edit(ui, (id, of), edited, at, cell);
+        // Its ⋮ copies it, or deletes or moves it in the grids, a step
+        // of the Note's Undo there (obf-1050).
+        match text_marks_view::table_clicks(ui, &t, marked, &spots.tables, true) {
+            Some((at, TableAct::Open)) => {
+                let pointer = ui.input(|i| i.pointer.interact_pos());
+                let cell = spots.cell_at(at, pointer).unwrap_or((0, 0));
+                *editing = true;
+                table_grid::edit(ui, (id, of), edited, at, cell);
+            }
+            Some((at, TableAct::Copy)) => {
+                let copy = markdown::table::copy(edited, at, &boxes.states);
+                actions.extend(copy.map(Action::CopyTable));
+            }
+            Some((at, act)) => {
+                *editing = true;
+                table_grid::act(ui, (id, of), edited, at, act);
+            }
+            None => {}
         }
         // A tick is no edit: what is typed stays.
         if let Some(asked) = text_marks_view::box_clicks(ui, &t, marked, &spots.boxes, edit.ticks) {
@@ -24009,6 +24054,8 @@ fn edited_text(
                 before,
             });
         }
+        // A table's ⋮ Copy (obf-1050).
+        actions.extend(grid.copy.take().map(Action::CopyTable));
         // A click on the bar keeps the field being edited,
         // and so does the keyboard going into a cell of its
         // grids or back.
@@ -24232,15 +24279,19 @@ fn kinded_text(
         }
         let of = Id::new(("text", &note.id));
         // Its tables open to read (#128).
-        if let Some(at) = text_marks_view::table_clicks(ui, &t, of, &spots.tables) {
-            actions.push(Action::OpenTable(Opening {
-                note: None,
-                text: note.text.clone(),
-                at,
-                cell: None,
-                tags: true,
-                boxes: Some(note.id.clone()),
-            }));
+        if let Some((at, act)) = text_marks_view::table_clicks(ui, &t, of, &spots.tables, false) {
+            actions.extend(table_action(
+                act,
+                Opening {
+                    note: None,
+                    text: note.text.clone(),
+                    at,
+                    cell: None,
+                    tags: true,
+                    boxes: Some(note.id.clone()),
+                },
+                shown.boxes,
+            ));
         }
         // A Member ticks the boxes of a Note not theirs.
         if let Some(asked) = text_marks_view::box_clicks(ui, &t, of, &spots.boxes, shown.ticks) {
@@ -24445,6 +24496,19 @@ fn description_fold(ui: &mut Ui, t: &L10n, (rect, id): (egui::Rect, Id), open: b
         .clicked()
 }
 
+/// What was done to a table of a text only read (obf-1050), as an
+/// action: a click opens it as `opening` says, its ⋮ Copy puts it on the
+/// clipboard, each box as `look` shows it.
+fn table_action(act: TableAct, opening: Opening, look: &BoxLook) -> Option<Action> {
+    match act {
+        TableAct::Open => Some(Action::OpenTable(opening)),
+        TableAct::Copy => {
+            markdown::table::copy(&opening.text, opening.at, &look.states).map(Action::CopyTable)
+        }
+        TableAct::Up | TableAct::Down | TableAct::Delete => None,
+    }
+}
+
 /// What a click on a box of the text `entity` asked, as an action.
 fn box_action(entity: String, asked: BoxAsk) -> Action {
     match asked {
@@ -24588,15 +24652,19 @@ fn read_part(
             text_marks_view::room_label(ui, text, None, range, look, false, tables)
         });
         let id = Id::new(("reading", of));
-        if let Some(at) = text_marks_view::table_clicks(ui, t, id, &spots.tables) {
-            actions.push(Action::OpenTable(Opening {
-                note: None,
-                text: text.to_string(),
-                at,
-                cell: None,
-                tags: true,
-                boxes: Some(of.to_string()),
-            }));
+        if let Some((at, act)) = text_marks_view::table_clicks(ui, t, id, &spots.tables, false) {
+            actions.extend(table_action(
+                act,
+                Opening {
+                    note: None,
+                    text: text.to_string(),
+                    at,
+                    cell: None,
+                    tags: true,
+                    boxes: Some(of.to_string()),
+                },
+                boxes,
+            ));
         }
         if let Some(asked) = text_marks_view::box_clicks(ui, t, id, &spots.boxes, ticks) {
             actions.push(box_action(of.to_string(), asked));
@@ -25654,25 +25722,30 @@ fn note_card(
     // table opens full screen, to edit where its marks may change (#128);
     // taken first, its marks, tags and links keep their clicks.
     let of = Id::new(("card", &note.id));
-    let mut table = text_marks_view::table_clicks(ui, t, of, &marks.tables).map(|at| Opening {
-        note: look.changes.then(|| note.id.clone()),
-        text: note.text.clone(),
-        at,
-        cell: None,
-        tags: true,
-        boxes: Some(note.id.clone()),
-    });
+    let mut table =
+        text_marks_view::table_clicks(ui, t, of, &marks.tables, false).and_then(|(at, act)| {
+            let opening = Opening {
+                note: look.changes.then(|| note.id.clone()),
+                text: note.text.clone(),
+                at,
+                cell: None,
+                tags: true,
+                boxes: Some(note.id.clone()),
+            };
+            table_action(act, opening, look.boxes.look(&note.id))
+        });
     for (section, spots) in &section_marks {
         let of = Id::new(("card", &section.id));
-        if let Some(at) = text_marks_view::table_clicks(ui, t, of, &spots.tables) {
-            table = Some(Opening {
+        if let Some((at, act)) = text_marks_view::table_clicks(ui, t, of, &spots.tables, false) {
+            let opening = Opening {
                 note: None,
                 text: section.text.clone(),
                 at,
                 cell: None,
                 tags: true,
                 boxes: Some(section.id.clone()),
-            });
+            };
+            table = table_action(act, opening, look.boxes.look(&section.id)).or(table);
         }
     }
     // A box of its text, or of a Section's, ticks where this Device may

@@ -26,6 +26,7 @@ use egui::{
     WidgetInfo, WidgetText, WidgetType,
 };
 use oldbrainfix_core::findings::{self, Finding, FindingPart};
+use oldbrainfix_core::markdown::table::{self, TableCopy};
 use oldbrainfix_core::text_format;
 
 use crate::app::{READ_EDGE, READ_SIZE, icon_button};
@@ -35,7 +36,7 @@ use crate::l10n::L10n;
 use crate::md_doc::{Block, Doc, Inline, Picture, Run, Target};
 use crate::md_source::{Read, Watch};
 use crate::note_window::{self, Scrolled};
-use crate::text_marks_view::{self, BoxLook, CODE_SCALE, LINE_HEIGHT, TableRoom};
+use crate::text_marks_view::{self, BoxLook, CODE_SCALE, LINE_HEIGHT, TableAct, TableRoom};
 use crate::{icons, read_text, text_menu, theme};
 
 /// The sizes of the six levels of heading, in parts of the text's size.
@@ -62,6 +63,9 @@ pub enum Asked {
     OpenElsewhere(PathBuf),
     /// The find bar's Search all Notes, with its words.
     SearchAll(String),
+    /// A table's ⋮ Copy (obf-1050): the table on the clipboard as its
+    /// HTML beside its Markdown.
+    Copy(TableCopy),
 }
 
 /// Where the view is to scroll to once drawn: a heading, by its words or
@@ -224,6 +228,8 @@ pub struct Viewer {
     pub size: Vec2,
     /// Whether the system's cross was clicked.
     closed: bool,
+    /// A table copied from its ⋮ in this frame (obf-1050).
+    copied: Option<TableCopy>,
 }
 
 impl Viewer {
@@ -262,6 +268,7 @@ impl Viewer {
             forward: false,
             size,
             closed: false,
+            copied: None,
         }
     }
 
@@ -401,6 +408,7 @@ impl Viewer {
             self.ask_import(&ctx, t, &mut asked);
         }
         read_text::menu(&ctx, t);
+        asked.extend(self.copied.take().map(Asked::Copy));
         if let Some(words) = text_menu::take_searched(&ctx) {
             self.open_find(Some(&words));
         }
@@ -654,6 +662,7 @@ impl Viewer {
             dark: ui.visuals().dark_mode,
             wide: egui::Rangef::new(0.0, 0.0),
             clicked: None,
+            copied: None,
             goal,
         };
         let output = scroll.show_viewport(ui, |ui, viewport| {
@@ -676,6 +685,10 @@ impl Viewer {
             });
         });
         let clicked = draw.clicked.take();
+        let copied = draw.copied.take();
+        if copied.is_some() {
+            self.copied = copied;
+        }
         // One the file does not hold is dropped once it was drawn.
         if loaded {
             self.goal = None;
@@ -815,6 +828,8 @@ struct Draw<'a> {
     /// How wide a table may be, beyond the column.
     wide: egui::Rangef,
     clicked: Option<Target>,
+    /// A table copied from its ⋮ (obf-1050).
+    copied: Option<TableCopy>,
     goal: &'a mut Option<Goal>,
 }
 
@@ -1045,7 +1060,12 @@ impl Draw<'_> {
             text_marks_view::room_label(ui, text, None, (0, source.len()), look, false, room);
         let id = Id::new(("markdown source", find_marks::text_key(source)));
         // Its sideways bar is taken there; full screen it does not open.
-        let _ = text_marks_view::table_clicks(ui, self.t, id, &spots.tables);
+        // Its ⋮ copies it (obf-1050).
+        if let Some((at, TableAct::Copy)) =
+            text_marks_view::table_clicks(ui, self.t, id, &spots.tables, false)
+        {
+            self.copied = table::copy(source, at, &none.states);
+        }
         text_marks_view::link_clicks(ui, id, &spots.links);
     }
 

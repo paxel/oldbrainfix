@@ -510,5 +510,6 @@
   "deskNoteRevertAll": "Alle Änderungen zurücknehmen",
   "deskNoteRevertQuestion": "Alle Änderungen zurücknehmen?",
   "deskNoteRevertDetail": "Die Notiz wird wieder so, wie sie beim Öffnen war. „Wiederholen“ holt die Änderungen einzeln zurück.",
-  "deskNoteRevert": "Zurücknehmen"
+  "deskNoteRevert": "Zurücknehmen",
+  "deskTableMore": "Mehr zu dieser Tabelle"
 }

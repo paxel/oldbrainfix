@@ -974,5 +974,7 @@
   "deskNoteRevertDetail": "The Note goes back to how it was when it was opened. Redo brings the changes back one by one.",
   "@deskNoteRevertDetail": {"description": "Body of the question before Revert all changes in the desktop's Note dialog (obf-1051)."},
   "deskNoteRevert": "Revert",
-  "@deskNoteRevert": {"description": "Confirm button of the question Revert all changes? in the desktop's Note dialog (obf-1051)."}
+  "@deskNoteRevert": {"description": "Confirm button of the question Revert all changes? in the desktop's Note dialog (obf-1051)."},
+  "deskTableMore": "More for this table",
+  "@deskTableMore": {"description": "What a screen reader says for the ⋮ at the top right corner of a table in a text on the desktop (obf-1050): Copy, and where the Note is edited Move up, Move down and Delete table."}
 }

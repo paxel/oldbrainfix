@@ -108,6 +108,7 @@ pub mod tray;
 pub mod undo;
 pub mod unsorted_steps;
 pub mod vault_view;
+pub mod whole_tables;
 pub mod window_sizes;
 
 pub use app::{App, Page, Selection, Wall, local_wall};

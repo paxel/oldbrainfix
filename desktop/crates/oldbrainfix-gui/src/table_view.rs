@@ -17,8 +17,9 @@
 //! anew through the core. A box in a cell (ADR 0035) shows the state of
 //! its latest tick and, where this Device may tick it, opens Check, Fail,
 //! Open and its History as on a card; a tick is no edit of the table.
-//! Copy in the bar puts the table on the clipboard as an HTML table and,
-//! as plain text, as Markdown (#324), each box in the state it shows.
+//! Copy in the bar, and in the ⋮ at its top right corner (obf-1050),
+//! puts the table on the clipboard as an HTML table and, as plain text,
+//! as Markdown (#324), each box in the state it shows.
 
 use egui::{Color32, Frame, Id, Key, Margin, Modifiers, Rect, RichText, Sense, TextEdit, Ui};
 use std::collections::BTreeSet;
@@ -31,7 +32,9 @@ use oldbrainfix_core::{BoxState, text_boxes, text_format};
 use crate::format_bar;
 use crate::icons;
 use crate::l10n::L10n;
-use crate::text_marks_view::{self, BoxAsk, BoxLook, Found, LaidCell, Look, Spots};
+use crate::text_marks_view::{
+    self, BoxAsk, BoxLook, Found, LaidCell, Look, Spots, TABLE_MENU, TableAct,
+};
 use crate::theme::{self, Tones};
 
 /// A table to show full screen: the text it is in and where it begins
@@ -360,8 +363,15 @@ impl TableView {
                         ui.add_space(8.0);
                         ui.label(RichText::new(t.table_title()).size(18.0).color(text));
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            // Its ⋮ at the top right corner, as on every
+                            // table drawn (obf-1050): Copy.
+                            let side = egui::vec2(TABLE_MENU, TABLE_MENU);
+                            let (at, _) = ui.allocate_exact_size(side, Sense::hover());
+                            let menu = (Id::new("table view menu"), at);
+                            let (_, act) =
+                                text_marks_view::table_menu(ui, t, menu, (false, false, false));
                             let copy = ui.button(RichText::new(t.table_copy()).color(text));
-                            if copy.clicked() {
+                            if copy.clicked() || act == Some(TableAct::Copy) {
                                 if let Some(text) = self.commit() {
                                     asked.push(Asked::Write(text));
                                 }

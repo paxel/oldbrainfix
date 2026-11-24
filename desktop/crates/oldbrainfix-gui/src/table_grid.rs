@@ -21,6 +21,9 @@
 //! words the truth while it is edited. "Show as lines" shows a table's
 //! lines as text in the field until the cursor leaves them or the field
 //! the keyboard; "Show as grid" beside them brings the grid back.
+//! The ⋮ at a grid's top right corner (obf-1050) copies the table, moves
+//! it past the block above or below it ([`whole_tables`]) or deletes it,
+//! asked first while a cell holds words; each a step of the Note's Undo.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -32,14 +35,17 @@ use egui::{
     Ui, Vec2, WidgetInfo, WidgetType,
 };
 use oldbrainfix_core::markdown::Change;
-use oldbrainfix_core::markdown::table::{self, Align, Table};
+use oldbrainfix_core::markdown::table::{self, Align, Table, TableCopy};
 use oldbrainfix_core::text_format;
 
 use crate::format_bar::{self, Format};
 use crate::l10n::L10n;
 use crate::table_view::{self, Deleting, Op};
-use crate::text_marks_view::{self, BoxAsk, BoxLook, BoxSpot, Found, LaidCell, Look};
+use crate::text_marks_view::{
+    self, BoxAsk, BoxLook, BoxSpot, Found, LaidCell, Look, TABLE_MENU, TableAct,
+};
 use crate::theme::Tones;
+use crate::whole_tables;
 
 /// The room around a cell's words.
 const PAD: Vec2 = egui::vec2(8.0, 4.0);
@@ -55,6 +61,9 @@ const LETTERS: f32 = 22.0;
 const PLUS: f32 = 26.0;
 /// The room above and under a grid.
 const GAP: f32 = 4.0;
+/// How wide the room of a grid's ⋮ at its top right corner is
+/// (obf-1050).
+const MENU: f32 = TABLE_MENU + 4.0;
 /// How far from a column's border a drag takes it.
 const BORDER: f32 = 4.0;
 
@@ -82,6 +91,11 @@ struct State {
     widths: BTreeMap<usize, Vec<Option<f32>>>,
     /// The row or column of a table whose delete is asked about.
     deleting: Option<(usize, Deleting)>,
+    /// The table whose delete from its ⋮ is asked about, and what a ⋮ of
+    /// the text read asked of a table, to do once the grids show
+    /// (obf-1050).
+    dropping: Option<usize>,
+    pending: Option<(usize, TableAct)>,
     /// The text as the grids last saw it.
     seen: String,
     /// Where the field's cursor was, in characters.
@@ -127,6 +141,8 @@ pub struct Outcome {
     /// A menu of the grids changed the text whole: what it was before,
     /// for the step of the Note's Undo (obf-1051).
     pub whole: Option<String>,
+    /// A table's ⋮ Copy (obf-1050), to put on the clipboard.
+    pub copy: Option<TableCopy>,
 }
 
 /// One table of a field's text this frame: as lines, or laid out as a
@@ -147,7 +163,7 @@ struct Laid {
 
 impl Laid {
     fn width(&self) -> f32 {
-        NUMBERS + self.widths.iter().sum::<f32>() + PLUS
+        NUMBERS + self.widths.iter().sum::<f32>() + PLUS + MENU
     }
 }
 
@@ -182,6 +198,7 @@ impl Grids {
             && !keyboard
             && !state.menu
             && state.deleting.is_none()
+            && state.dropping.is_none()
         {
             state.editing = None;
         }
@@ -244,7 +261,7 @@ impl Grids {
                 let cells = text_marks_view::lay_table(ui, (text, &table), (&found, &look));
                 let (mut widths, mut heights) = text_marks_view::grid(ui, &cells, &look, PAD);
                 let dragged = self.state.widths.get(&index);
-                let room = (self.room - NUMBERS - PLUS).max(NARROWEST);
+                let room = (self.room - NUMBERS - PLUS - MENU).max(NARROWEST);
                 let natural: f32 = widths.iter().map(|w| w.clamp(NARROWEST, WIDEST)).sum();
                 // Narrower to fit the field, but never narrower than the
                 // narrowest; a width dragged stays as dragged.
@@ -402,6 +419,8 @@ impl Grids {
         }
         let rects = self.rects(output, text);
         let mut menu = false;
+        // What a ⋮ picked, or a ⋮ of the text read asked.
+        let mut acted = self.state.pending.take();
         for index in 0..self.shown.len() {
             let Some(&rect) = rects.get(index) else {
                 continue;
@@ -415,6 +434,12 @@ impl Grids {
             if drawn.boxes.is_some() {
                 outcome.boxes = drawn.boxes;
             }
+            if let Some(act) = drawn.act {
+                acted = Some((index, act));
+            }
+        }
+        if let Some((index, act)) = acted {
+            outcome.copy = self.whole_table(ui, text, index, (act, boxes));
         }
         let answered = std::mem::take(&mut self.state.answered);
         if answered {
@@ -434,12 +459,27 @@ impl Grids {
                 None => {}
             }
         }
+        if let Some(index) = self.state.dropping {
+            let whole = Deleting {
+                column: false,
+                index: 0,
+                gone: true,
+            };
+            if let Some(sure) = table_view::question(ui.ctx(), t, tones, whole) {
+                self.state.dropping = None;
+                self.state.answered = true;
+                if sure {
+                    self.drop_table(ui, text, index);
+                }
+            }
+        }
         // A menu closed with nothing picked gives the keyboard back.
         if self.state.menu && !menu && ui.memory(|m| m.focused().is_none()) {
             self.give_back(ui, text);
         }
         let focused = ui.memory(|m| m.focused());
         let held = self.state.deleting.is_some()
+            || self.state.dropping.is_some()
             || answered
             || self.state.answered
             || menu
@@ -886,6 +926,16 @@ impl Grids {
         let at = Rect::from_min_size(origin + egui::vec2(right, 0.0), egui::vec2(PLUS, LETTERS));
         let label = ("+", t.table_add_column());
         let add_column = table_view::heading(ui, at, label, of.with("add column"), (tones, weak));
+        // Its ⋮ at its top right corner (obf-1050).
+        let at = Rect::from_min_size(
+            egui::pos2(rect.right() - MENU, origin.y + (LETTERS - TABLE_MENU) / 2.0),
+            egui::vec2(TABLE_MENU, TABLE_MENU),
+        );
+        let (up, down) = whole_tables::moves(text, &table);
+        let menu = (of.with("menu"), at);
+        let (resp, act) = text_marks_view::table_menu(ui, t, menu, (true, up, down));
+        drawn.menu |= menu_open(ui, &resp);
+        drawn.act = act;
         // "Show as lines" in the row of the "+" under the rows' numbers.
         let words = t.table_show_lines();
         let size = small_size(ui, words);
@@ -1178,6 +1228,82 @@ impl Grids {
         }
     }
 
+    /// Does what the ⋮ of the table `index` picked, `act`, to the whole
+    /// table (obf-1050): gives its Copy, each box as `boxes` shows it;
+    /// moves it past the block above or below; deletes it, asked first
+    /// while a cell holds words.
+    fn whole_table(
+        &mut self,
+        ui: &Ui,
+        text: &mut String,
+        index: usize,
+        (act, boxes): (TableAct, &BoxLook),
+    ) -> Option<TableCopy> {
+        self.finish(ui, text);
+        let start = table::all(text).get(index)?.start;
+        match act {
+            TableAct::Open => {}
+            TableAct::Copy => return table::copy(text, start, &boxes.states),
+            TableAct::Up | TableAct::Down => {
+                let change = whole_tables::move_table(text, start, act == TableAct::Up)?;
+                let to = change.start;
+                self.take(ui, text, change);
+                // What is kept of a table goes with it past another.
+                let now = table::all(text).iter().position(|t| t.start == to);
+                if let Some(now) = now.filter(|&n| n != index) {
+                    self.renumber(|i| {
+                        Some(match i {
+                            _ if i == index => now,
+                            _ if i == now => index,
+                            _ => i,
+                        })
+                    });
+                }
+                self.back_to_field(ui, text);
+            }
+            TableAct::Delete if whole_tables::holds_words(text, start) => {
+                self.state.dropping = Some(index);
+            }
+            TableAct::Delete => self.drop_table(ui, text, index),
+        }
+        None
+    }
+
+    /// Deletes the table `index` whole (obf-1050).
+    fn drop_table(&mut self, ui: &Ui, text: &mut String, index: usize) {
+        let Some(start) = table::all(text).get(index).map(|t| t.start) else {
+            return;
+        };
+        let Some(change) = whole_tables::delete_table(text, start) else {
+            return;
+        };
+        self.take(ui, text, change);
+        self.renumber(|i| match i.cmp(&index) {
+            std::cmp::Ordering::Less => Some(i),
+            std::cmp::Ordering::Equal => None,
+            std::cmp::Ordering::Greater => Some(i - 1),
+        });
+        if !self.state.answered {
+            self.back_to_field(ui, text);
+        }
+    }
+
+    /// Keeps what is kept of each table, the widths dragged and whether
+    /// it shows as lines, under its place among the text's tables as
+    /// `to` gives it now; none for a table gone.
+    fn renumber(&mut self, to: impl Fn(usize) -> Option<usize>) {
+        let widths = std::mem::take(&mut self.state.widths);
+        self.state.widths = widths
+            .into_iter()
+            .filter_map(|(i, w)| Some((to(i)?, w)))
+            .collect();
+        let raw = std::mem::take(&mut self.state.raw);
+        self.state.raw = raw
+            .into_iter()
+            .filter_map(|(i, r)| Some((to(i)?, r)))
+            .collect();
+    }
+
     /// Takes `change` as the text, one step back for Ctrl+Z in the field
     /// and one of the Note's Undo (obf-1051): every change of a menu of
     /// the grids goes through here.
@@ -1216,6 +1342,23 @@ pub fn edit(ui: &Ui, (id, of): (Id, &str), text: &str, at: usize, (row, column):
     ui.data_mut(|d| d.insert_temp(key, state));
 }
 
+/// Does `act`, picked in the ⋮ of the table beginning at the byte `at`
+/// of `text` where it is read (obf-1050), to the whole table in the
+/// grids of the field `id` holding the text of `of` once they show: a
+/// step of the Note's Undo as their menus' are.
+pub fn act(ui: &Ui, (id, of): (Id, &str), text: &str, at: usize, act: TableAct) {
+    let Some(index) = table::all(text).iter().position(|t| t.start == at) else {
+        return;
+    };
+    let key = state_id(id, of);
+    let mut state: State = ui.data(|d| d.get_temp(key)).unwrap_or_default();
+    state.raw.remove(&index);
+    state.editing = None;
+    state.pending = Some((index, act));
+    state.seen = text.to_string();
+    ui.data_mut(|d| d.insert_temp(key, state));
+}
+
 /// The cell of `table` the byte `at` of `text` is in, by row and column.
 pub fn cell_at(text: &str, table: &Table, at: usize) -> (usize, usize) {
     let chars = text.get(..at).map_or(0, |s| s.chars().count());
@@ -1227,6 +1370,7 @@ pub fn cell_at(text: &str, table: &Table, at: usize) -> (usize, usize) {
 struct Drawn {
     menu: bool,
     boxes: Option<BoxAsk>,
+    act: Option<TableAct>,
 }
 
 /// Where a key moves from a cell.

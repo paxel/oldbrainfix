@@ -1567,6 +1567,19 @@ replace a law of Both apps where they say so. A desktop law marked
   its cells hold words. While a cell is edited the bottom row is hidden,
   the cell's own field shows its words, and Show as table sits on the
   bar above the keyboard while the cursor is in a table shown as lines.
+- **A table's ⋮ sits at its top right corner** (obf-1050), beside its
+  header row on a card, in a text being read and on the editor's grid,
+  and full screen above the table beside the bar that moves it sideways,
+  Copy staying in the page's bar too. It takes its own tap, never the
+  card's, the search card's or the table's, and opens at the finger.
+  It offers Copy everywhere, the same as the full screen's; on the
+  editor's grid also Move up and Move down, past the block of the text
+  above or below, greyed with none there, and Delete table, asking once
+  while its cells hold words. A block is a table, a code block, a
+  heading, the items of a list one under the other, a quote's lines or
+  a paragraph's; blank lines part them and stay where they are. A table
+  that would stand right above a paragraph or another table, which would
+  read as its rows, gets a blank line between. Each is a step of Undo.
 
 ### Checklist and Shopping List Lines
 
@@ -2183,6 +2196,20 @@ replace a law of Both apps where they say so. A desktop law marked
   question has no way back. A step that also waits for Ctrl+Z, as a Line
   deleted, goes from there once the bar's Undo takes it back. Nothing is
   stored: the steps go as the Note closes.
+- **A table's ⋮ sits beside its top right corner** (obf-1050) wherever
+  a table is drawn on the desktop: on a card, in a Section, in the Note
+  dialog's text as it reads and on its grid while edited, in the reading
+  view, in the Markdown viewer, and full screen at the end of the bar,
+  Copy staying in the bar. The table gives up the ⋮'s room, so it never
+  covers a cell. It takes its own click, never the card's or the
+  table's, and opens under it. It offers Copy everywhere, as the full
+  screen's Copy; in the Note dialog and a Note's own window, where the
+  text is edited, also Move up and Move down past the block above or
+  below (the phone's blocks, see Phone ▸ Text editor), greyed with none
+  there, and Delete table, asking "Delete the table?" once while a cell
+  holds words. Move and Delete are each a step of the bar's Undo; done
+  on the text as it reads, the text is then edited, its cursor outside
+  the table.
 - **A right-click in a text field opens its menu at the pointer**
   (#253): every field one types into has Cut, Copy, Paste and Select
   all, Cut and Copy greyed without a selection or in a password field,
