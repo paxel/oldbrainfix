@@ -1,18 +1,5 @@
 import '../l10n/app_localizations.dart';
 
-/// The Heads-ups the Routine editor offers (obf-1046), in minutes before
-/// the start: for a timed schedule 5, 10, 15 and 30 min, 1 h, 2 h, 1 day,
-/// 2 days and 1 week.
-const timedHeadsUps = [5, 10, 15, 30, 60, 120, 1440, 2880, 10080];
-
-/// Those for an all-day schedule, which takes whole days only: 1, 2 and
-/// 3 days and 1 week.
-const allDayHeadsUps = [1440, 2880, 4320, 10080];
-
-/// Whether [minutes] is a whole number of days, the only Heads-ups an
-/// all-day Occurrence takes.
-bool wholeDays(int minutes) => minutes % 1440 == 0;
-
 /// "20 min before", "1 day before": a Heads-up as the editor lists it.
 String headsUpBefore(AppLocalizations t, int minutes) => switch (_span(
   minutes,

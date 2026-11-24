@@ -361,6 +361,22 @@
   "everyLabel": "Every",
   "fewer": "Fewer",
   "more": "More",
+  "unitMinutes": "{count, plural, =1{minute} other{minutes}}",
+  "@unitMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "unitHours": "{count, plural, =1{hour} other{hours}}",
+  "@unitHours": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "unitDays": "{count, plural, =1{day} other{days}}",
   "@unitDays": {
     "placeholders": {
@@ -651,6 +667,20 @@
   "headsUpsHeading": "Heads-ups",
   "addHeadsUp": "Add heads-up",
   "removeHeadsUp": "Remove heads-up",
+  "headsUpCustom": "Custom…",
+  "@headsUpCustom": {"description": "The last item of Add heads-up's menu, which opens a dialog for a number and a unit (obf-1087)."},
+  "headsUpCustomTitle": "Custom heads-up",
+  "headsUpCustomCount": "How long before",
+  "@headsUpCustomCount": {"description": "The label of the custom heads-up dialog's number field."},
+  "headsUpCustomRange": "From 1 to {most}.",
+  "@headsUpCustomRange": {
+    "description": "Under the custom heads-up's number: the numbers its unit takes.",
+    "placeholders": {
+      "most": {
+        "type": "int"
+      }
+    }
+  },
   "headsUpMinutesBefore": "{minutes} min before",
   "@headsUpMinutesBefore": {
     "placeholders": {

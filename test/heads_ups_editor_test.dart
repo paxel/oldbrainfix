@@ -102,20 +102,51 @@ void main() {
       int.parse((chip.key! as ValueKey<String>).value.split('-').last),
   ];
 
-  /// The Heads-ups Add heads-up offers, in their order, in minutes; its
-  /// menu closes again.
+  /// The Heads-ups Add heads-up offers, in their order, in minutes,
+  /// before Custom… at the end (obf-1087); its menu closes again.
   Future<List<int>> offered(WidgetTester tester) async {
     await showPanel(tester);
     await tap(tester, find.byKey(const ValueKey('addHeadsUp')));
-    final items = [
-      for (final item in tester.widgetList<PopupMenuItem<int>>(
-        find.byType(PopupMenuItem<int>),
-      ))
-        item.value!,
-    ];
+    final items = tester
+        .widgetList<PopupMenuItem<int>>(find.byType(PopupMenuItem<int>))
+        .toList();
+    expect(items.last.key, const ValueKey('addHeadsUp-custom'));
+    expect(find.text('Custom…'), findsOneWidget);
     await tester.tapAt(Offset.zero);
     await tester.pumpAndSettle();
-    return items;
+    return [for (final item in items.take(items.length - 1)) item.value!];
+  }
+
+  /// Opens Custom…'s dialog from Add heads-up.
+  Future<void> openCustom(WidgetTester tester) async {
+    await showPanel(tester);
+    await tap(tester, find.byKey(const ValueKey('addHeadsUp')));
+    await tap(tester, find.byKey(const ValueKey('addHeadsUp-custom')));
+    expect(find.text('Custom heads-up'), findsOneWidget);
+  }
+
+  final customAdd = find.byKey(const ValueKey('customHeadsUp-add'));
+
+  bool addEnabled(WidgetTester tester) =>
+      tester.widget<TextButton>(customAdd).onPressed != null;
+
+  /// Types [count] in Custom…'s dialog and picks [unit] when given.
+  Future<void> type(WidgetTester tester, String count, [String? unit]) async {
+    await tester.enterText(
+      find.byKey(const ValueKey('customHeadsUp-count')),
+      count,
+    );
+    await tester.pumpAndSettle();
+    if (unit != null) {
+      await tap(tester, find.byKey(ValueKey('customHeadsUp-$unit')));
+    }
+  }
+
+  /// Adds a custom Heads-up of [count] [unit]s.
+  Future<void> addCustom(WidgetTester tester, String count, String unit) async {
+    await openCustom(tester);
+    await type(tester, count, unit);
+    await tap(tester, customAdd);
   }
 
   Future<void> add(WidgetTester tester, int minutes) async {
@@ -201,6 +232,100 @@ void main() {
       (r) => routines.note(r)?.text == 'water',
     );
     expect(routines.headsUps(water.id), [1440]);
+  });
+
+  testWidgets('Custom… adds a number of minutes, hours, days or weeks, '
+      'shown in the list and removed by its ✕ (obf-1087)', (tester) async {
+    final pills = routines.create('pills', daily([at(20)]));
+    await edit(tester, pills);
+    await openCustom(tester);
+    expect(
+      [
+        for (final unit in HeadsUpUnit.values)
+          find.byKey(ValueKey('customHeadsUp-${unit.name}')),
+      ].every((f) => f.evaluate().length == 1),
+      isTrue,
+    );
+    await type(tester, '45', 'minutes');
+    await tap(tester, customAdd);
+    expect(find.text('Custom heads-up'), findsNothing);
+    expect(listed(tester), [45]);
+    expect(find.text('45 min before'), findsOneWidget);
+
+    await addCustom(tester, '3', 'hours');
+    expect(listed(tester), [180, 45]);
+    expect(find.text('3 h before'), findsOneWidget);
+    await remove(tester, 180);
+    expect(listed(tester), [45]);
+
+    await tap(tester, find.text('Save'));
+    expect(routines.headsUps(pills.id), [45]);
+  });
+
+  testWidgets('a custom Heads-up already set shows, and its ✕ removes it', (
+    tester,
+  ) async {
+    final pills = routines.create('pills', daily([at(20)]));
+    routines.setHeadsUps(pills.id, [45, 7200]);
+    await edit(tester, pills);
+    await showPanel(tester);
+    expect(listed(tester), [7200, 45]);
+    expect(find.text('5 days before'), findsOneWidget);
+    expect(find.text('45 min before'), findsOneWidget);
+    await remove(tester, 45);
+    await tap(tester, find.text('Save'));
+    expect(routines.headsUps(pills.id), [7200]);
+  });
+
+  testWidgets('Custom… adds only from 1 to the most its unit takes, and '
+      'Cancel adds nothing', (tester) async {
+    final pills = routines.create('pills', daily([at(20)]));
+    await edit(tester, pills);
+    await openCustom(tester);
+    expect(addEnabled(tester), isFalse, reason: 'nothing typed');
+    expect(find.text('From 1 to 43200.'), findsOneWidget);
+    await type(tester, '0');
+    expect(addEnabled(tester), isFalse);
+    await type(tester, '43200');
+    expect(addEnabled(tester), isTrue);
+    await type(tester, '721', 'hours');
+    expect(find.text('From 1 to 720.'), findsOneWidget);
+    expect(addEnabled(tester), isFalse);
+    await type(tester, '5', 'weeks');
+    expect(addEnabled(tester), isFalse);
+    await type(tester, '4');
+    expect(addEnabled(tester), isTrue);
+    await tap(tester, find.text('Cancel'));
+    expect(find.text('Custom heads-up'), findsNothing);
+    expect(listed(tester), isEmpty);
+  });
+
+  testWidgets('an all-day schedule takes a custom Heads-up in days and '
+      'weeks only', (tester) async {
+    final bins = routines.create('bins', daily(const []));
+    await edit(tester, bins);
+    await openCustom(tester);
+    expect(find.byKey(const ValueKey('customHeadsUp-minutes')), findsNothing);
+    expect(find.byKey(const ValueKey('customHeadsUp-hours')), findsNothing);
+    expect(find.text('From 1 to 30.'), findsOneWidget, reason: 'days first');
+    await type(tester, '2', 'weeks');
+    await tap(tester, customAdd);
+    expect(listed(tester), [20160]);
+    expect(find.text('2 weeks before'), findsOneWidget);
+    await tap(tester, find.text('Save'));
+    expect(routines.headsUps(bins.id), [20160]);
+  });
+
+  testWidgets('with every choice set, Add heads-up still offers Custom…, '
+      'and a custom one already set is not set twice', (tester) async {
+    final bins = routines.create('bins', daily(const []));
+    routines.setHeadsUps(bins.id, HeadsUpKeys.allDayChoices);
+    await edit(tester, bins);
+    expect(await offered(tester), isEmpty);
+    await addCustom(tester, '2', 'days');
+    expect(listed(tester), [10080, 4320, 2880, 1440]);
+    await tap(tester, find.text('Save'));
+    expect(routines.headsUps(bins.id), HeadsUpKeys.allDayChoices);
   });
 
   group('in a Shared Area', () {

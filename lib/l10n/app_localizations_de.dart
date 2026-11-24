@@ -672,6 +672,28 @@ class AppLocalizationsDe extends AppLocalizations {
   String get more => 'Mehr';
 
   @override
+  String unitMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Minuten',
+      one: 'Minute',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String unitHours(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Stunden',
+      one: 'Stunde',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String unitDays(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -1064,6 +1086,20 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get removeHeadsUp => 'Vorwarnung entfernen';
+
+  @override
+  String get headsUpCustom => 'Eigene…';
+
+  @override
+  String get headsUpCustomTitle => 'Eigene Vorwarnung';
+
+  @override
+  String get headsUpCustomCount => 'Wie lange vorher';
+
+  @override
+  String headsUpCustomRange(int most) {
+    return 'Von 1 bis $most.';
+  }
 
   @override
   String headsUpMinutesBefore(int minutes) {

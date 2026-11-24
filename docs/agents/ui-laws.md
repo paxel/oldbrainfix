@@ -1508,6 +1508,13 @@ replace a law of Both apps where they say so. A desktop law marked
 - An editor with several fields is a full-screen page with Save in the
   top bar; secondary state changes are rows at the bottom of the page.
   The Note editor's settings are its badges (see Cards).
+- **A custom Heads-up** (obf-1087): "Custom…", last in the Routine
+  editor's Add heads-up menu, opens a dialog "Custom heads-up" with a
+  typed number ("How long before", "From 1 to 720." under it for hours)
+  and the units as choice chips under it, minutes, hours, days and weeks,
+  for an all-day schedule days and weeks only; Add stays off until the
+  number fits the unit, Cancel adds nothing. One set already is not set
+  twice; set, it lists like the others ("45 min before") with its ✕.
 - **Something Hidden from AI is not given away** (#267, ADR 0049):
   filing it into a Shared Area (a card, the selection, File into…),
   merging it with a Note of a Shared Area either way (a card, the

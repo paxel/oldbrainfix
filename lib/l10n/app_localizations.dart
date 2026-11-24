@@ -1244,6 +1244,18 @@ abstract class AppLocalizations {
   /// **'More'**
   String get more;
 
+  /// No description provided for @unitMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{minute} other{minutes}}'**
+  String unitMinutes(int count);
+
+  /// No description provided for @unitHours.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{hour} other{hours}}'**
+  String unitHours(int count);
+
   /// No description provided for @unitDays.
   ///
   /// In en, this message translates to:
@@ -1753,6 +1765,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Remove heads-up'**
   String get removeHeadsUp;
+
+  /// The last item of Add heads-up's menu, which opens a dialog for a number and a unit (obf-1087).
+  ///
+  /// In en, this message translates to:
+  /// **'Custom…'**
+  String get headsUpCustom;
+
+  /// No description provided for @headsUpCustomTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom heads-up'**
+  String get headsUpCustomTitle;
+
+  /// The label of the custom heads-up dialog's number field.
+  ///
+  /// In en, this message translates to:
+  /// **'How long before'**
+  String get headsUpCustomCount;
+
+  /// Under the custom heads-up's number: the numbers its unit takes.
+  ///
+  /// In en, this message translates to:
+  /// **'From 1 to {most}.'**
+  String headsUpCustomRange(int most);
 
   /// No description provided for @headsUpMinutesBefore.
   ///

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
@@ -549,7 +550,8 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
   /// schedule, which takes no others.
   List<int> get _keptHeadsUps => [
     for (final minutes in [..._headsUps]..sort())
-      if (_times.isNotEmpty || wholeDays(minutes)) minutes,
+      if (_times.isNotEmpty || minutes % HeadsUpUnit.days.inMinutes == 0)
+        minutes,
   ];
 
   /// Whether leaving may save (#275): what Save takes, a new Session's
@@ -950,12 +952,14 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
   }
 
   /// The Heads-ups (obf-1046): each one set, the earliest warning first,
-  /// with its ✕, and Add heads-up with those not set yet; an all-day
-  /// schedule shows and offers whole days only.
+  /// with its ✕, a custom one too, and Add heads-up with those not set
+  /// yet and Custom… at the end (obf-1087); an all-day schedule shows and
+  /// offers whole days only.
   Widget _headsUpsPanel(AppLocalizations t) {
     final kept = _keptHeadsUps;
+    final allDay = _times.isEmpty;
     final offered = [
-      for (final minutes in _times.isEmpty ? allDayHeadsUps : timedHeadsUps)
+      for (final minutes in HeadsUpKeys.choices(allDay: allDay))
         if (!kept.contains(minutes)) minutes,
     ];
     return EditorPanel(
@@ -978,12 +982,15 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
                 ],
               ),
             ),
-          if (offered.isNotEmpty)
-            _AddHeadsUp(
-              offered: offered,
-              onPicked: (minutes) =>
-                  setState(() => _headsUps = [..._headsUps, minutes]),
-            ),
+          _AddHeadsUp(
+            offered: offered,
+            allDay: allDay,
+            // A custom one already set is not set twice.
+            onPicked: (minutes) {
+              if (_headsUps.contains(minutes)) return;
+              setState(() => _headsUps = [..._headsUps, minutes]);
+            },
+          ),
         ],
       ),
     );
@@ -1290,11 +1297,21 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
 
 /// Add heads-up: a menu at the finger with the Heads-ups [offered], in
 /// their order (UI laws, "menus open at the finger").
+/// Add heads-up: a menu at the finger with the Heads-ups [offered], in
+/// minutes, and Custom… at the end, which asks for a number and a unit
+/// (obf-1087).
 class _AddHeadsUp extends StatefulWidget {
   final List<int> offered;
+
+  /// For an all-day schedule, whose custom one takes days and weeks only.
+  final bool allDay;
   final ValueChanged<int> onPicked;
 
-  const _AddHeadsUp({required this.offered, required this.onPicked});
+  const _AddHeadsUp({
+    required this.offered,
+    required this.allDay,
+    required this.onPicked,
+  });
 
   @override
   State<_AddHeadsUp> createState() => _AddHeadsUpState();
@@ -1326,10 +1343,25 @@ class _AddHeadsUpState extends State<_AddHeadsUp> {
             value: minutes,
             child: Text(headsUpBefore(t, minutes)),
           ),
+        // 0 stands for Custom…: no Heads-up lies 0 min before.
+        PopupMenuItem(
+          key: const ValueKey('addHeadsUp-custom'),
+          value: 0,
+          child: Text(t.headsUpCustom),
+        ),
       ],
     );
     if (!mounted || picked == null) return;
-    widget.onPicked(picked);
+    if (picked != 0) {
+      widget.onPicked(picked);
+      return;
+    }
+    final custom = await showDialog<int>(
+      context: context,
+      builder: (_) => _CustomHeadsUpDialog(allDay: widget.allDay),
+    );
+    if (!mounted || custom == null) return;
+    widget.onPicked(custom);
   }
 
   @override
@@ -1342,4 +1374,100 @@ class _AddHeadsUpState extends State<_AddHeadsUp> {
       onPressed: _open,
     ),
   );
+}
+
+/// Custom…'s dialog (obf-1087): a number and its unit, minutes, hours,
+/// days or weeks, for an all-day schedule days and weeks only; Add, while
+/// they make a Heads-up of at most 30 days, gives it in minutes.
+class _CustomHeadsUpDialog extends StatefulWidget {
+  final bool allDay;
+
+  const _CustomHeadsUpDialog({required this.allDay});
+
+  @override
+  State<_CustomHeadsUpDialog> createState() => _CustomHeadsUpDialogState();
+}
+
+class _CustomHeadsUpDialogState extends State<_CustomHeadsUpDialog> {
+  final _count = TextEditingController();
+  late var _unit = HeadsUpKeys.units(allDay: widget.allDay).first;
+
+  @override
+  void dispose() {
+    _count.dispose();
+    super.dispose();
+  }
+
+  /// The Heads-up typed, in minutes; null while it is none.
+  int? get _minutes => switch (int.tryParse(_count.text)) {
+    final n? => HeadsUpKeys.minutesOf(n, _unit, allDay: widget.allDay),
+    null => null,
+  };
+
+  void _add() {
+    if (_minutes case final minutes?) Navigator.of(context).pop(minutes);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    final count = int.tryParse(_count.text) ?? 0;
+    final minutes = _minutes;
+    return AlertDialog(
+      title: Text(t.headsUpCustomTitle),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              key: const ValueKey('customHeadsUp-count'),
+              controller: _count,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              maxLength: 5,
+              decoration: InputDecoration(
+                labelText: t.headsUpCustomCount,
+                helperText: t.headsUpCustomRange(_unit.most),
+                counterText: '',
+              ),
+              onChanged: (_) => setState(() {}),
+              onSubmitted: (_) => _add(),
+            ),
+            const SizedBox(height: 8),
+            ChoiceChips<HeadsUpUnit>(
+              key: const ValueKey('customHeadsUp-unit'),
+              value: _unit,
+              onChanged: (unit) => setState(() => _unit = unit),
+              options: [
+                for (final unit in HeadsUpKeys.units(allDay: widget.allDay))
+                  RadioOption(
+                    key: ValueKey('customHeadsUp-${unit.name}'),
+                    value: unit,
+                    title: Text(switch (unit) {
+                      HeadsUpUnit.minutes => t.unitMinutes(count),
+                      HeadsUpUnit.hours => t.unitHours(count),
+                      HeadsUpUnit.days => t.unitDays(count),
+                      HeadsUpUnit.weeks => t.unitWeeks(count),
+                    }),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(t.cancel),
+        ),
+        TextButton(
+          key: const ValueKey('customHeadsUp-add'),
+          onPressed: minutes == null ? null : _add,
+          child: Text(t.add),
+        ),
+      ],
+    );
+  }
 }
