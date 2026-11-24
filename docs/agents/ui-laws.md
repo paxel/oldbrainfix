@@ -1206,8 +1206,9 @@ replace a law of Both apps where they say so. A desktop law marked
   Until Done, which takes ⋮'s place, leaving the page or a search, each
   row shows a drag handle in place of its ⋮; a drag that starts anywhere
   on the row, either way, moves the Area, a tap on a row opens nothing,
-  a swipe on it does not change the page, and the Tags row and the swipe
-  left do nothing. Each move is kept at once. Outside of it a row has no
+  a swipe on it does not change the page, and the swipe left does
+  nothing; a tag's chip searches and "All tags…" opens the tag tree,
+  either ending it. Each move is kept at once. Outside of it a row has no
   handle and a long press moves nothing. A screen reader moves an Area
   with the row's actions, Move up, Move down, Move to the start and Move
   to the end. The search's hits carry no handles.
