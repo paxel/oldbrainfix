@@ -36,7 +36,10 @@ There are three kinds, and an action takes the first that fits.
   `look.dart`. Desktop: `theme::primary`,
   `theme::main_action` (which Ctrl+Enter also runs) and
   `theme::destructive` in `theme.rs`. Do not use it for a second action
-  beside the main one, nor as a page's only way to leave.
+  beside the main one, nor as a page's only way to leave. A page's bar
+  is the exception: Save there stays the bar's labelled button, as
+  "The bar" says, and the filled kind is for the actions inside the
+  page (obf-1105).
 - **Outlined: a standing action that is not the main one.** It has a
   1 px outline and its words, an icon before them where one says more,
   for example the quick note's full-width "Open in the editor"
