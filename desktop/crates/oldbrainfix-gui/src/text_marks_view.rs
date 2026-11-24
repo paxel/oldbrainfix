@@ -70,7 +70,7 @@ use oldbrainfix_core::text_boxes::{self, FoundBox};
 use oldbrainfix_core::{BoxState, BoxTick, FoundTag, ShownBox, text_format};
 
 use crate::l10n::L10n;
-use crate::{find_marks, icons, schedule_text, theme, whole_tables};
+use crate::{cell_pick, find_marks, icons, schedule_text, theme, whole_tables};
 
 /// How far apart the lines of a formatted text lie (#327, obf-1020), as
 /// on the phone: a line's height in parts of its font's size.
@@ -211,7 +211,8 @@ pub struct LinkSpot {
 /// move at most (obf-1048); where its ⋮ lies, and whether there is a
 /// block of the text above it and below it to move past (obf-1050);
 /// what of each cell of its header row shows, with its column and its
-/// words, and how its rows show sorted (obf-1052).
+/// words, and how its rows show sorted (obf-1052); whether its cells
+/// are picked by a drag (obf-1054).
 #[derive(Debug, Clone, PartialEq)]
 pub struct TableSpot {
     pub at: usize,
@@ -223,6 +224,7 @@ pub struct TableSpot {
     pub moves: (bool, bool),
     pub heads: Vec<(usize, Rect, String)>,
     pub sort: Option<TableSort>,
+    pub picks: bool,
 }
 
 /// What was done to a table drawn (obf-1050): a click on it, or a pick
@@ -2084,7 +2086,11 @@ fn spots_in(spots: Spots, clip: Rect) -> Spots {
 /// corner (obf-1050) takes the room it needs, `moves` saying whether
 /// there is a block above and below it to move past. Its rows show in
 /// the order its sort gives (obf-1052), the column sorted by with an
-/// arrow in its heading; a card's first rows are the first of it.
+/// arrow in its heading; a card's first rows are the first of it. Where
+/// its text selects, never on a card, a drag that starts on a cell picks
+/// cells and Shift+click does too ([`cell_pick`], obf-1054): those
+/// picked are tinted, Ctrl+C copies them, and while Shift is held its
+/// links, tags and boxes take no click.
 fn table_label(
     ui: &mut Ui,
     (text, table, moves): (&str, &Table, (bool, bool)),
@@ -2256,6 +2262,65 @@ fn table_label(
         }
     }
     let split = (rect.left() + pinned, header_top + head);
+    // Its cells picked (obf-1054), by their row as shown.
+    let picks = ui.style().interaction.selectable_labels && room.card.is_none();
+    let pick_id = key.with("cells");
+    let offset = state.offset;
+    let cell_at = |pos: Pos2| -> Option<(usize, usize)> {
+        if !rect.contains(pos) {
+            return None;
+        }
+        let r = if pos.y < split.1 {
+            0
+        } else {
+            (1..laid.len()).find(|&r| {
+                let y = rect.top() + ys.get(r).copied().unwrap_or(high);
+                (y..y + heights.get(r).copied().unwrap_or_default()).contains(&pos.y)
+            })?
+        };
+        let c = if pinned > 0.0 && pos.x < split.0 {
+            0
+        } else {
+            (0..columns).find(|&c| {
+                let x = rect.left() + xs.get(c).copied().unwrap_or(wide) - offset;
+                (x..x + widths.get(c).copied().unwrap_or_default()).contains(&pos.x)
+            })?
+        };
+        Some((r, c))
+    };
+    let cell_words = |(r, c): (usize, usize)| {
+        shown_rows
+            .get(r)
+            .and_then(|&r| table.rows.get(r))
+            .and_then(|row| row.cells.get(c))
+            .map(|cell| text_boxes::strip(&cell.visible()))
+            .unwrap_or_default()
+    };
+    let picked = if picks {
+        let bounds = rect.intersect(clip);
+        let size = (laid.len(), columns);
+        let (picked, copies) =
+            cell_pick::read_table(ui, (key, pick_id), (bounds, size), cell_at, cell_words);
+        if let Some(cells) = picked.filter(|_| copies) {
+            let rows: Vec<usize> = shown_rows
+                .get(cells.top..=cells.bottom)
+                .unwrap_or_default()
+                .to_vec();
+            let states: BTreeMap<String, BoxState> = found
+                .boxes
+                .iter()
+                .map(|(b, state, _)| (b.id.clone(), *state))
+                .collect();
+            let columns = (cells.left, cells.right);
+            if let Some(copy) = cell_pick::copy(text, table.start, (&rows, columns), &states) {
+                cell_pick::put_copy(ui.ctx(), copy);
+            }
+        }
+        picked
+    } else {
+        None
+    };
+    let tint = ui.visuals().selection.bg_fill;
     // Four parts, each clipped to its own: the body, the first column, the
     // header row and the corner of the two, the cells' labels in parts of
     // their own, which move nothing after the table.
@@ -2312,6 +2377,9 @@ fn table_label(
             if r == 0 && seen.is_positive() {
                 painter.rect_filled(at, 0.0, fill);
             }
+            if seen.is_positive() && picked.is_some_and(|p| p.holds((r, c))) {
+                painter.rect_filled(at, 0.0, tint);
+            }
             let align = table.aligns.get(c).copied().unwrap_or(Align::None);
             let words = cell.size(ui, look);
             let inset = aligned(align, width - beside(r, c), words.x, pad.x);
@@ -2341,6 +2409,18 @@ fn table_label(
                 }
                 painter.rect_stroke(at, 0.0, stroke, egui::StrokeKind::Inside);
             }
+        }
+    }
+    // Over the cells' words: a drag on them picks cells, not words. With
+    // Shift held, or cells picked, a click on its links, tags and boxes
+    // is the pick's too.
+    if picks && !crate::read_text::selecting_all(ui.ctx()) {
+        ui.interact(rect, pick_id, Sense::drag());
+        if picked.is_some() || ui.input(|i| i.modifiers.shift) {
+            let outside = |r: &Rect| !rect.intersects(*r);
+            spots.boxes.retain(|s| outside(&s.rect));
+            spots.tags.retain(|s| outside(&s.rect));
+            spots.links.retain(|s| s.rects.iter().all(outside));
         }
     }
     if let Some((bar, thumb, _)) = bar
@@ -2393,6 +2473,7 @@ fn table_label(
         moves,
         heads,
         sort: state.sort,
+        picks,
     });
     spots
 }
@@ -2407,7 +2488,9 @@ fn table_label(
 /// and, where the text is edited (`edits`), Move up, Move down and
 /// Delete table. Where the text is only read, a click on a cell of a
 /// table's header row sorts its rows shown by that column (obf-1052):
-/// ascending, then descending, then as written.
+/// ascending, then descending, then as written. On a table whose cells a
+/// drag picks (obf-1054), Shift+click picks, and a click while cells are
+/// picked only ends that.
 pub fn table_clicks(
     ui: &mut Ui,
     t: &L10n,
@@ -2417,12 +2500,18 @@ pub fn table_clicks(
 ) -> Option<(usize, TableAct)> {
     let mut picked = None;
     for spot in spots {
+        // A click the cells picked take, which does nothing else.
+        let picking = |ui: &Ui| {
+            spot.picks
+                && (ui.input(|i| i.modifiers.shift) || cell_pick::end_read(ui.ctx(), spot.key))
+        };
         let resp = ui.interact(spot.rect, of.with(("table", spot.at)), Sense::click());
         resp.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, t.table_open()));
         if resp
             .on_hover_cursor(egui::CursorIcon::PointingHand)
             .on_hover_text(t.table_open())
             .clicked()
+            && !picking(ui)
         {
             picked = Some((spot.at, TableAct::Open));
         }
@@ -2438,6 +2527,7 @@ pub fn table_clicks(
                 .on_hover_cursor(egui::CursorIcon::PointingHand)
                 .on_hover_text(t.table_sort())
                 .clicked()
+                && !picking(ui)
             {
                 ui.data_mut(|d| {
                     let state: &mut TableState = d.get_temp_mut_or_default(spot.key);

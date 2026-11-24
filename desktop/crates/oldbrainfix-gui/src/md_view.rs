@@ -409,6 +409,8 @@ impl Viewer {
         }
         read_text::menu(&ctx, t);
         asked.extend(self.copied.take().map(Asked::Copy));
+        // The cells of a table picked and copied (obf-1054).
+        asked.extend(crate::cell_pick::take_copy(&ctx).map(Asked::Copy));
         if let Some(words) = text_menu::take_searched(&ctx) {
             self.open_find(Some(&words));
         }

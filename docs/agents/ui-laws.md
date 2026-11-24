@@ -2284,6 +2284,35 @@ replace a law of Both apps where they say so. A desktop law marked
   column and Sort rows by this column, descending, which rewrite the
   rows in the text, each a step of the bar's Undo, none when the rows
   already stand so.
+- **A drag that starts on a cell selects cells** (obf-1054), as the
+  phone's long press does: in a text only read in the Note dialog, in
+  the reading view, in the Markdown viewer, on the Note dialog's grid
+  (not in the cell being edited, whose field selects its words, the
+  cell edited being left as the drag starts) and full screen; never on a
+  card, whose text selects nothing, nor in the Note dialog's text as it
+  reads, a click on which edits it. The cells from the one pressed to
+  the one under the pointer, in the rows as they show, are tinted; the
+  pointer past the table's edge stays on its last row or column.
+  Shift+click selects from the cell selected first to the one clicked,
+  one cell where none is, also on a cell of the header row, a link, a
+  tag or a box, which then sort, open and tick nothing, as they do for
+  a click while cells are selected. A click and a drag that does not
+  start on a cell still open, sort, edit and select words as before;
+  Shift with the wheel still moves a wide table, keeping the cells
+  selected, its bar still moves it too, and a column's border on the
+  grid still drags it. Ctrl+C (Cmd on macOS) and Copy in the right-click
+  menu of a text only read (obf-1055), and of a cell selected on the
+  grid and full screen, put the cells on the clipboard as a table of
+  their own, as the table's Copy does: HTML beside Markdown, the first
+  row selected its header row, the line marking the first column as
+  headings only while that column is selected, each box as it shows,
+  one cell as a table of one cell. Where the menu has Search, it takes
+  the words of one cell, greyed for more. A click on the table and Esc
+  end the selection, each doing nothing else; a press beside the cells,
+  on the table's bar too, ends it as well, doing what it does. A
+  selection that starts outside a table runs through its cells as
+  through the rest of the text and copies as text; Select all selects
+  words, never cells.
 - **A right-click in a text field opens its menu at the pointer**
   (#253): every field one types into has Cut, Copy, Paste and Select
   all, Cut and Copy greyed without a selection or in a password field,

@@ -28,6 +28,13 @@
 //! column's letter offers that, and putting in, moving or deleting a row
 //! or column shows them as written again. The view forgets it as it
 //! closes.
+//!
+//! A drag that starts on a cell picks the cells from it to the one under
+//! the pointer, in the rows as they show, and Shift+click picks too
+//! (obf-1054, [`cell_pick`]): Ctrl+C and Copy in the right-click menu of
+//! a cell picked put them on the clipboard as a table of their own. Esc,
+//! a click on a cell and a press beside them end the pick, the click
+//! doing nothing else; the cell edited selects its own words.
 
 use egui::{Color32, Frame, Id, Key, Margin, Modifiers, Rect, RichText, Sense, TextEdit, Ui};
 use std::collections::BTreeSet;
@@ -37,6 +44,7 @@ use oldbrainfix_core::markdown::Change;
 use oldbrainfix_core::markdown::table::{self, Align, Table};
 use oldbrainfix_core::{BoxState, text_boxes, text_format};
 
+use crate::cell_pick::{self, Span};
 use crate::format_bar;
 use crate::icons;
 use crate::l10n::L10n;
@@ -91,6 +99,8 @@ pub struct TableView {
     editing: Option<Editing>,
     deleting: Option<Deleting>,
     sort: Option<TableSort>,
+    /// The cells picked (obf-1054), by their row as shown.
+    pick: Option<Span>,
 }
 
 /// How the boxes of the table show and what a click on one offers: as
@@ -179,6 +189,7 @@ impl TableView {
             editing: None,
             deleting: None,
             sort: None,
+            pick: None,
         };
         if let Some((row, column)) = opening.cell {
             view.start_editing(row, column);
@@ -390,6 +401,13 @@ impl TableView {
     /// delete over it; gives what it asks of the window.
     pub fn show(&mut self, ctx: &egui::Context, t: &L10n, tones: Tones) -> Vec<Asked> {
         let mut asked = Vec::new();
+        // Esc ends the cells picked first, the view staying open.
+        if self.pick.is_some()
+            && self.deleting.is_none()
+            && ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Escape))
+        {
+            self.pick = None;
+        }
         // Esc in a cell leaves its words as they were, and the view open.
         if self.editing.is_some()
             && self.deleting.is_none()
@@ -604,6 +622,46 @@ impl TableView {
             .filter(|&(r, c)| r < rows || c < columns)
             .collect();
         cells.sort_by_key(|&(r, c)| (r == 0, c == 0 && sticky_column));
+        // The cells picked by a drag that starts on one, or Shift+click,
+        // by their row as shown (obf-1054); the drag is taken under the
+        // cells' clicks, over the scrolling's.
+        let mut shown_at = vec![0; rows];
+        for (place, &r) in order.iter().enumerate() {
+            if let Some(slot) = shown_at.get_mut(r) {
+                *slot = place;
+            }
+        }
+        let bottom = placed.get(rows).copied().unwrap_or(top);
+        let right = xs.get(columns).copied().unwrap_or(lead);
+        let bounds = Rect::from_min_max(
+            origin + egui::vec2(lead, top),
+            origin + egui::vec2(right, bottom),
+        )
+        .intersect(ui.clip_rect());
+        let cell_at = |pos: egui::Pos2| {
+            cells
+                .iter()
+                .rev()
+                .filter(|&&(r, c)| r < rows && c < columns)
+                .find(|&&(r, c)| rect_of(r, c).contains(pos))
+                .and_then(|&(r, c)| Some((*shown_at.get(r)?, c)))
+        };
+        let pick_id = Id::new("table view pick");
+        let before = self.pick;
+        cell_pick::follow(ui, pick_id, &mut self.pick, bounds, cell_at);
+        self.pick = self.pick.filter(|s| s.within((rows, columns)));
+        // The cell edited is written and left.
+        if self.pick.is_some()
+            && self.pick != before
+            && self.editing.is_some()
+            && let Some(text) = self.commit()
+        {
+            asked.push(Asked::Write(text));
+        }
+        ui.interact(bounds, pick_id, Sense::drag());
+        let picked = self.pick.map(Span::cells);
+        let mut copy = picked.is_some() && cell_pick::copy_asked(ui);
+        let tint = ui.visuals().selection.bg_fill;
         let of = Id::new("table view cells");
         let (stroke, header) = text_marks_view::table_tones(colour);
         for (r, c) in cells {
@@ -614,6 +672,12 @@ impl TableView {
                 if r == 0 {
                     ui.painter().rect_filled(rect, 0.0, header);
                 }
+            }
+            let real = r < rows && c < columns;
+            let shown = (shown_at.get(r).copied().unwrap_or(r), c);
+            let in_pick = real && picked.is_some_and(|p| p.holds(shown));
+            if in_pick && ui.is_rect_visible(rect) {
+                ui.painter().rect_filled(rect, 0.0, tint);
             }
             let mut spots = Spots::default();
             let sorted = sort.filter(|s| r == 0 && s.column == c);
@@ -637,7 +701,8 @@ impl TableView {
             // Where it is only read, a cell of the header row sorts the
             // rows shown by its column.
             let sorts = !edits && r == 0 && c < columns;
-            let sense = if edits || sorts {
+            // A click on any cell ends the cells picked.
+            let sense = if edits || real {
                 Sense::click()
             } else {
                 Sense::hover()
@@ -665,20 +730,41 @@ impl TableView {
                 let now = sort.filter(|s| s.column == c).map(|s| s.descending);
                 resp.widget_info(|| text_marks_view::sort_info(t, &label, now));
                 if resp
+                    .clone()
                     .on_hover_cursor(egui::CursorIcon::PointingHand)
                     .on_hover_text(t.table_sort())
                     .clicked()
+                    && !cell_pick::takes_click(ui, &mut self.pick)
                 {
                     self.sort = text_marks_view::next_sort(self.sort, c);
                 }
             } else {
                 resp.widget_info(|| WidgetInfo::labeled(typ, true, &label));
-                if edits && resp.on_hover_cursor(egui::CursorIcon::Text).clicked() {
+                let clicked = if edits {
+                    resp.clone()
+                        .on_hover_cursor(egui::CursorIcon::Text)
+                        .clicked()
+                } else {
+                    resp.clicked()
+                };
+                let taken = clicked && real && cell_pick::takes_click(ui, &mut self.pick);
+                if clicked && edits && !taken {
                     self.edit((r, c), asked);
                 }
             }
+            // The right-click menu of a cell picked.
+            if in_pick {
+                let one = picked.is_some_and(|p| p.one());
+                let said = one.then_some(label.as_str());
+                if cell_pick::menu(&resp, t, said) == Some(cell_pick::Pick::Copy) {
+                    copy = true;
+                }
+            }
             // The cell's boxes, tags and links over it, under the cells
-            // drawn after it.
+            // drawn after it; none while cells are picked or Shift picks.
+            if self.pick.is_some() || ui.input(|i| i.modifiers.shift) {
+                spots = Spots::default();
+            }
             let ticked = |id: &str| self.ticking.ticked.contains(id);
             let ticks = self.ticking.may_tick && self.boxes.is_some();
             match text_marks_view::box_clicks(ui, t, of, &spots.boxes, (ticks, &ticked)) {
@@ -692,6 +778,19 @@ impl TableView {
                 asked.push(Asked::SearchFor(tag));
             }
             text_marks_view::link_clicks(ui, of, &spots.links);
+        }
+        if let Some(cells) = picked.filter(|_| copy) {
+            let shown: Vec<usize> = order
+                .get(cells.top..=cells.bottom)
+                .unwrap_or_default()
+                .iter()
+                .copied()
+                .filter(|&r| r < rows)
+                .collect();
+            let columns = (cells.left, cells.right);
+            let states = &self.ticking.look.states;
+            let copied = cell_pick::copy(&self.text, self.at, (&shown, columns), states);
+            asked.extend(copied.map(Asked::Copy));
         }
         if edits {
             self.headings(

@@ -25,6 +25,14 @@
 //! The ⋮ at a grid's top right corner (obf-1050) copies the table, moves
 //! it past the block above or below it ([`whole_tables`]) or deletes it,
 //! asked first while a cell holds words; each a step of the Note's Undo.
+//!
+//! A drag that starts on a cell not edited picks the cells from it to the
+//! one under the pointer, and Shift+click picks too (obf-1054,
+//! [`cell_pick`]): the cell edited is left, the field keeping the
+//! keyboard, and Ctrl+C and Copy in the right-click menu of a cell picked
+//! put them on the clipboard as a table of their own. Esc, a click on a
+//! cell and a press beside them end the pick, the click doing nothing
+//! else; a change of the text ends it too.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -39,6 +47,7 @@ use oldbrainfix_core::markdown::Change;
 use oldbrainfix_core::markdown::table::{self, Align, Table, TableCopy};
 use oldbrainfix_core::text_format;
 
+use crate::cell_pick::{self, Span};
 use crate::format_bar::{self, Format};
 use crate::l10n::L10n;
 use crate::table_view::{self, Deleting, Op, Sorts};
@@ -108,6 +117,9 @@ struct State {
     /// Whether the question was answered in the last frame: the field
     /// takes the keyboard back once the question is gone.
     answered: bool,
+    /// The cells picked (obf-1054), by the table's place among the
+    /// text's tables.
+    pick: Option<(usize, Span)>,
 }
 
 /// The cell edited: the table's place among the text's tables, its row
@@ -181,6 +193,9 @@ pub struct Grids {
     room: f32,
     /// What the text was before a menu changed it whole this frame.
     whole: Option<String>,
+    /// Whether Ctrl+C came for the cells picked, taken before the field
+    /// saw it.
+    copying: bool,
 }
 
 impl Grids {
@@ -202,6 +217,17 @@ impl Grids {
             && state.dropping.is_none()
         {
             state.editing = None;
+        }
+        // The cells picked: Esc ends them, Ctrl+C is theirs, not the
+        // field's; a change of the text ends them too.
+        let mut copying = false;
+        if state.pick.is_some() {
+            if state.seen != text || cell_pick::take_escape(ui) {
+                state.pick = None;
+                ui.ctx().request_repaint();
+            } else {
+                copying = cell_pick::take_copy_key(ui);
+            }
         }
         // Changed from outside, say by a save giving its boxes ids or a
         // link set: the cell edited reads its words again, unless they
@@ -242,6 +268,7 @@ impl Grids {
             colour: look.colour,
             room: ui.available_width(),
             whole: None,
+            copying,
         };
         grids.lay(ui, text, look.boxes);
         grids
@@ -422,6 +449,7 @@ impl Grids {
         let mut menu = false;
         // What a ⋮ picked, or a ⋮ of the text read asked.
         let mut acted = self.state.pending.take();
+        let mut copied = None;
         for index in 0..self.shown.len() {
             let Some(&rect) = rects.get(index) else {
                 continue;
@@ -432,6 +460,9 @@ impl Grids {
             }
             let drawn = self.grid(ui, (t, tones), (index, rect), text, (boxes, ticks));
             menu |= drawn.menu;
+            if drawn.copy.is_some() {
+                copied = drawn.copy;
+            }
             if drawn.boxes.is_some() {
                 outcome.boxes = drawn.boxes;
             }
@@ -441,6 +472,9 @@ impl Grids {
         }
         if let Some((index, act)) = acted {
             outcome.copy = self.whole_table(ui, text, index, (act, boxes));
+        }
+        if let Some(copy) = copied {
+            outcome.copy = Some(copy);
         }
         let answered = std::mem::take(&mut self.state.answered);
         if answered {
@@ -824,6 +858,35 @@ impl Grids {
         // A click beside the grid, in its rows, goes on after the table.
         let beside = ui.interact(rect, of.with("beside"), Sense::click());
         let mut out = beside.clicked().then_some(true);
+        // The cells picked by a drag that starts on one, or Shift+click
+        // (obf-1054); the drag is taken under the cells' clicks, a
+        // column's border and the cell edited over it.
+        let bounds = Rect::from_min_max(
+            cell_rect(0, 0).min,
+            cell_rect(rows.saturating_sub(1), columns.saturating_sub(1)).max,
+        )
+        .intersect(ui.clip_rect());
+        let cell_at = |pos: egui::Pos2| {
+            let r = (0..rows).find(|&r| cell_rect(r, 0).y_range().contains(pos.y))?;
+            let c = (0..columns).find(|&c| cell_rect(0, c).x_range().contains(pos.x))?;
+            Some((r, c))
+        };
+        let pick_id = of.with("pick");
+        let mut span = self.state.pick.filter(|(i, _)| *i == index).map(|(_, s)| s);
+        let had = span;
+        cell_pick::follow(ui, pick_id, &mut span, bounds, cell_at);
+        span = span.filter(|s| s.within((rows, columns)));
+        // The cell edited is left, and the field keeps the keyboard, which
+        // a Shift+click on a cell would take from it.
+        let mut keep_keyboard = span.is_some() && span != had;
+        if keep_keyboard && self.state.editing.is_some() {
+            keep_keyboard = false;
+            self.finish(ui, text);
+            self.back_to_field(ui, text);
+        }
+        ui.interact(bounds, pick_id, Sense::drag());
+        let mut copy = span.is_some() && std::mem::take(&mut self.copying);
+        let tint = ui.visuals().selection.bg_fill;
         let (stroke, header) = text_marks_view::table_tones(colour);
         let editing = self
             .state
@@ -840,6 +903,10 @@ impl Grids {
                     if r == 0 || (table.heading_column && c == 0) {
                         ui.painter().rect_filled(at, 0.0, header);
                     }
+                }
+                let in_pick = span.is_some_and(|s| s.cells().holds((r, c)));
+                if in_pick && ui.is_rect_visible(at) {
+                    ui.painter().rect_filled(at, 0.0, tint);
                 }
                 if editing == Some((r, c)) {
                     continue;
@@ -872,16 +939,51 @@ impl Grids {
                     format!("{named}: {words}")
                 };
                 resp.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, &label));
-                if resp.on_hover_cursor(egui::CursorIcon::Text).clicked() {
-                    picked = Some((r, c));
+                if resp
+                    .clone()
+                    .on_hover_cursor(egui::CursorIcon::Text)
+                    .clicked()
+                {
+                    if cell_pick::takes_click(ui, &mut span) {
+                        keep_keyboard = true;
+                    } else {
+                        picked = Some((r, c));
+                    }
                 }
-                // Its boxes tick, over it.
+                // The right-click menu of a cell picked.
+                if in_pick {
+                    let one = span.is_some_and(|s| s.cells().one());
+                    let said = one.then_some(words.as_str());
+                    if cell_pick::menu(&resp, t, said) == Some(cell_pick::Pick::Copy) {
+                        copy = true;
+                    }
+                    // The field stays edited through the menu.
+                    drawn.menu |= menu_open(ui, &resp);
+                }
+                // Its boxes tick, over it; not while cells are picked or
+                // Shift picks.
                 let marked = of.with(("cell marks", r, c));
-                if let Some(asked) = text_marks_view::box_clicks(ui, t, marked, &spots.boxes, ticks)
+                let picking = span.is_some() || ui.input(|i| i.modifiers.shift);
+                if !picking
+                    && let Some(asked) =
+                        text_marks_view::box_clicks(ui, t, marked, &spots.boxes, ticks)
                 {
                     drawn.boxes = Some(asked);
                 }
             }
+        }
+        if let Some(cells) = span.map(Span::cells).filter(|_| copy) {
+            let shown: Vec<usize> = (cells.top..=cells.bottom).collect();
+            let columns = (cells.left, cells.right);
+            drawn.copy = cell_pick::copy(text, table.start, (&shown, columns), &boxes.states);
+        }
+        match (span, self.state.pick) {
+            (Some(span), _) => self.state.pick = Some((index, span)),
+            (None, Some((i, _))) if i == index => self.state.pick = None,
+            _ => {}
+        }
+        if keep_keyboard && self.state.editing.is_none() {
+            ui.memory_mut(|m| m.request_focus(self.id));
         }
         // The rows' numbers, and the "+" under them.
         let weak = ui.visuals().weak_text_color();
@@ -1370,12 +1472,13 @@ pub fn cell_at(text: &str, table: &Table, at: usize) -> (usize, usize) {
     cell_of(text, table, chars)
 }
 
-/// What a grid's drawing found.
+/// What a grid's drawing found; the cells picked copied (obf-1054).
 #[derive(Default)]
 struct Drawn {
     menu: bool,
     boxes: Option<BoxAsk>,
     act: Option<TableAct>,
+    copy: Option<TableCopy>,
 }
 
 /// Where a key moves from a cell.

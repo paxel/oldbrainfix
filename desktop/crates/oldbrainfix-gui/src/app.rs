@@ -126,6 +126,7 @@ use crate::capture_choices::{self, CaptureChoices, Captured, Held, ListTitle, Qu
 use crate::card_glance;
 use crate::card_occurrences::{self, CardOccurrence, OpenAsked};
 use crate::card_selection::CardSelection;
+use crate::cell_pick;
 use crate::checklist_view::{
     self, CardMenu, ChecklistAction, ChecklistShown, LineStep, RemovedAsk, ShownLine,
 };
@@ -12506,6 +12507,10 @@ impl App {
         self.dragged(ui.ctx(), tones);
         // The menu of a text only shown, over everything (#255).
         read_text::menu(ui.ctx(), &self.t);
+        // The cells of a table being read copied (obf-1054).
+        if let Some(copy) = cell_pick::take_copy(ui.ctx()) {
+            actions.push(Action::CopyTable(copy));
+        }
         // Search in a menu of the Note open (obf-1055).
         if let Some(words) = text_menu::take_searched(ui.ctx()) {
             self.open_find(Some(&words));
@@ -12940,6 +12945,9 @@ impl App {
             }
         }
         read_text::menu(&ctx, &self.t);
+        if let Some(copy) = cell_pick::take_copy(&ctx) {
+            actions.push(Action::CopyTable(copy));
+        }
         if let Some(words) = text_menu::take_searched(&ctx) {
             self.open_find(Some(&words));
         }

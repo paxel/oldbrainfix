@@ -11,7 +11,12 @@
 //! window keeps a right-click on such a text from the labels, and copies
 //! what is selected there and then, as Ctrl+C would, for the menu's
 //! Copy. Select all drags over the text, from its first character to its
-//! last, as the mouse would.
+//! last, as the mouse would, a frame after it is picked, the cells of its
+//! tables taking no drag meanwhile.
+//!
+//! While cells of a table in it are picked (obf-1054,
+//! [`crate::cell_pick`]), Copy copies them and Search takes the words of
+//! a single cell.
 
 use egui::plugin::Plugin;
 use egui::{
@@ -41,9 +46,11 @@ struct Open {
     clicked: Option<Pos2>,
 }
 
-/// A drag over a whole text, one step a frame.
+/// A drag over a whole text, one step a frame: first a frame in which
+/// the tables' cells stand down, so the press reaches the words.
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Drag {
+    Wait(Pos2, Pos2),
     Press(Pos2, Pos2),
     Move(Pos2),
     Release(Pos2),
@@ -80,7 +87,13 @@ impl ReadText {
             v.this_pass
                 .widgets
                 .get_layer(region.layer)
-                .filter(|w| w.sense.senses_drag() && region.rect.contains_rect(w.rect))
+                // A label senses clicks too; a table's cells, which a
+                // drag picks (obf-1054), do not.
+                .filter(|w| {
+                    w.sense.senses_drag()
+                        && w.sense.senses_click()
+                        && region.rect.contains_rect(w.rect)
+                })
                 .map(|w| w.rect)
                 .collect()
         });
@@ -132,6 +145,7 @@ impl Plugin for ReadText {
         if let Some(step) = self.drag.take() {
             input.events.retain(|e| !is_pointer(e));
             let (events, next) = match step {
+                Drag::Wait(from, to) => (Vec::new(), Some(Drag::Press(from, to))),
                 Drag::Press(from, to) => (
                     vec![Event::PointerMoved(from), button(from, true)],
                     Some(Drag::Move(to)),
@@ -183,6 +197,31 @@ impl Plugin for ReadText {
             });
             if input.events.len() != before {
                 self.open = None;
+            }
+        }
+        // Esc ends the cells of a table picked alone (obf-1054): the Note
+        // dialog stays. Ctrl+C is theirs, not a field's that kept the
+        // keyboard.
+        if crate::cell_pick::read_pick(ctx).is_some() {
+            let (mut escape, mut copy) = (false, false);
+            input.events.retain(|e| match e {
+                Event::Key {
+                    key: Key::Escape, ..
+                } => {
+                    escape = true;
+                    false
+                }
+                Event::Copy => {
+                    copy = true;
+                    false
+                }
+                _ => true,
+            });
+            if escape {
+                crate::cell_pick::end_any_read(ctx);
+                ctx.request_repaint();
+            } else if copy {
+                crate::cell_pick::ask_copy(ctx);
             }
         }
         // A right-click on a text only shown opens the menu, the labels
@@ -255,6 +294,18 @@ impl Plugin for ReadText {
     }
 }
 
+/// Whether the frame drawn now copies what is selected for the menu: the
+/// right-click's copy, which is no Ctrl+C.
+pub fn copying(ctx: &Context) -> bool {
+    ctx.plugin_or_default::<ReadText>().lock().copying
+}
+
+/// Whether Select all is dragging over a text: the cells of its tables
+/// take no drag meanwhile (obf-1054).
+pub fn selecting_all(ctx: &Context) -> bool {
+    ctx.plugin_or_default::<ReadText>().lock().drag.is_some()
+}
+
 /// Marks `rect` as a text only shown: its right-click opens the menu.
 pub fn region(ui: &Ui, rect: Rect) {
     let layer = ui.layer_id();
@@ -272,6 +323,8 @@ pub fn region(ui: &Ui, rect: Rect) {
 
 /// The menu, where it is open: Copy, greyed while nothing is selected,
 /// Search on a text of the Note open, greyed so too, and Select all.
+/// While cells of a table are picked, Copy copies them and Search takes
+/// the words of a single cell (obf-1054).
 pub fn menu(ctx: &Context, t: &L10n) {
     let plugin = ctx.plugin_or_default::<ReadText>();
     let Some(open) = plugin.lock().open.clone() else {
@@ -280,7 +333,9 @@ pub fn menu(ctx: &Context, t: &L10n) {
     let mut copy = false;
     let mut all = false;
     let mut search = false;
-    let words = crate::text_menu::search_words(&open.selected);
+    let cells = crate::cell_pick::read_pick(ctx);
+    let words = crate::text_menu::search_words(cells.as_deref().unwrap_or(&open.selected));
+    let copies = cells.is_some() || !open.selected.is_empty();
     let shown = egui::Area::new(Id::new("read text menu"))
         .order(egui::Order::Foreground)
         .fixed_pos(open.at)
@@ -293,7 +348,7 @@ pub fn menu(ctx: &Context, t: &L10n) {
                     let at = |p: Pos2| picked.rect.contains(p);
                     picked.clicked() || (enabled && open.clicked.is_some_and(at))
                 };
-                copy = entry(ui, t.menu_copy(), !open.selected.is_empty());
+                copy = entry(ui, t.menu_copy(), copies);
                 if open.region.searches {
                     search = entry(ui, t.menu_search(), !words.is_empty());
                 }
@@ -307,11 +362,14 @@ pub fn menu(ctx: &Context, t: &L10n) {
                 .is_some_and(|at| !shown.response.rect.contains(at))
     });
     let mut state = plugin.lock();
-    if copy {
+    if copy && cells.is_some() {
+        crate::cell_pick::ask_copy(ctx);
+    } else if copy {
         ctx.copy_text(open.selected.clone());
     }
     if all {
-        state.drag = ReadText::ends(ctx, open.region).map(|(from, to)| Drag::Press(from, to));
+        crate::cell_pick::end_any_read(ctx);
+        state.drag = ReadText::ends(ctx, open.region).map(|(from, to)| Drag::Wait(from, to));
         ctx.request_repaint();
     }
     if search {

@@ -13,6 +13,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the phone and the desktop, the Note editor has Undo and Redo, step by step, and Revert all changes in its ⋮. ([obf-1051](https://github.com/paxel/oldbrainfix/issues/362))
 - On the phone and the desktop, a table's ⋮ copies it, and in the editor moves it up or down or deletes it. ([obf-1050](https://github.com/paxel/oldbrainfix/issues/361))
 - On the phone and the desktop, a tap on a table's header sorts it while reading; the editor sorts its rows by a column. ([obf-1052](https://github.com/paxel/oldbrainfix/issues/363))
+- On the phone and the desktop, a long press or drag on a table cell selects a rectangle of cells, which copies as a table. ([obf-1054](https://github.com/paxel/oldbrainfix/issues/365))
 
 ### Changed
 

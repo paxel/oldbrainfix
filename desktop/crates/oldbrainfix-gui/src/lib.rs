@@ -32,6 +32,7 @@ pub mod capture_choices;
 pub mod card_glance;
 pub mod card_occurrences;
 pub mod card_selection;
+pub mod cell_pick;
 pub mod checklist_view;
 pub mod cli;
 pub mod enrich;
