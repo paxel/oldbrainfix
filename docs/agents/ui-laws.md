@@ -1592,6 +1592,10 @@ replace a law of Both apps where they say so. A desktop law marked
 
 ### Settings
 
+- **Every Settings section is a card with its title on top** (obf-1085,
+  C28): on the phone and the desktop each section's rows sit on one
+  card under its title, Look, Units and Complexity included; a search
+  shows the card with only its matching rows.
 - **A search field sits at the top of Settings** (#282), under the bar,
   staying there while the page scrolls, on the band of the list pages'
   search bar (obf-1088); nothing focuses it on opening.
