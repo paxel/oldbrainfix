@@ -1,8 +1,8 @@
 //! A quiet day on the desktop's Agenda (obf-1044), driven headless by
-//! egui_kittest: "Quiet today" in the Agenda's ⋮, the line "Quiet day
-//! until midnight" first on the Agenda with End, today's Occurrences
-//! still there, and End taking the line away and bringing "Quiet today"
-//! back.
+//! egui_kittest: "Quiet today" a button in the Agenda's bar, no ⋮
+//! (obf-1066), the line "Quiet day until midnight" first on the Agenda
+//! with End, today's Occurrences still there, the button reading "End
+//! quiet day" in its place, and either End bringing "Quiet today" back.
 
 // A test may unwrap, expect, panic and index, its helpers too (#229).
 #![allow(
@@ -102,8 +102,10 @@ fn click(harness: &mut Harness<'_, App>, label: &str) -> TestResult {
     Ok(())
 }
 
-/// The Agenda's ⋮.
+/// The Agenda's ⋮ that held Quiet today before obf-1066.
 const MENU: &str = "More for Agenda";
+const QUIET: &str = "Quiet today";
+const END_QUIET: &str = "End quiet day";
 const LINE: &str = "Quiet day until midnight";
 const PLANTS: &str = "Water the plants";
 
@@ -120,22 +122,44 @@ fn plants() -> Result<(Arc<Store>, Arc<AtomicI64>), Box<dyn std::error::Error>> 
     Ok((store, now))
 }
 
+/// The rect of the one button labelled `label`.
+fn rect_of(harness: &Harness<'_, App>, label: &str) -> egui::Rect {
+    harness.get_by_role_and_label(Role::Button, label).rect()
+}
+
 #[test]
-fn quiet_today_shows_its_line_on_top_and_end_brings_the_menu_entry_back() -> TestResult {
+fn quiet_today_is_a_button_that_reads_end_quiet_day_in_its_place() -> TestResult {
     let (store, _now) = plants()?;
     let mut harness = window(&store);
     let wall = utc;
     assert!(!says(&harness, LINE));
     assert!(says(&harness, PLANTS));
+    assert!(!offers(&harness, MENU), "no ⋮ on the Agenda");
+    assert!(offers(&harness, QUIET));
+    assert!(!offers(&harness, END_QUIET));
+    let button = rect_of(&harness, QUIET);
+    let all = rect_of(&harness, "All Routines and Reminders");
+    // One row: the button centred with the icon buttons and the heading.
+    let centre = |r: egui::Rect| r.center().y;
+    assert!(
+        (centre(all) - centre(button)).abs() < 0.5,
+        "{all:?} {button:?}"
+    );
+    let heading = harness
+        .query_all_by_value("Agenda")
+        .next()
+        .ok_or("the heading")?
+        .rect();
+    assert!(
+        (centre(heading) - centre(button)).abs() < 0.5,
+        "{heading:?}"
+    );
 
-    // "Quiet today" in the Agenda's ⋮.
-    click(&mut harness, MENU)?;
-    assert!(offers(&harness, "Quiet today"));
-    click(&mut harness, "Quiet today")?;
+    click(&mut harness, QUIET)?;
     assert!(PersonSettings::new(&store).quiet_until(&wall)?.is_some());
 
-    // The line first of all, today's Occurrence still there, and no ⋮
-    // with nothing left to offer.
+    // The line first of all, today's Occurrence still there, and the
+    // button in its place, reading End quiet day.
     assert!(says(&harness, LINE));
     assert!(offers(&harness, "End"));
     let line = top_of(&harness, LINE).ok_or("the line")?;
@@ -143,14 +167,48 @@ fn quiet_today_shows_its_line_on_top_and_end_brings_the_menu_entry_back() -> Tes
     assert!(line < today, "the line is above today's rows");
     assert!(says(&harness, PLANTS), "today's Occurrence stays");
     assert!(!offers(&harness, MENU));
+    assert!(!offers(&harness, QUIET));
+    assert!(offers(&harness, END_QUIET));
+    let end = rect_of(&harness, END_QUIET);
+    assert_eq!(end.right_top(), button.right_top(), "it keeps its place");
+    assert_eq!(rect_of(&harness, "All Routines and Reminders"), all);
 
-    // End: the line goes, "Quiet today" is back.
+    // End quiet day: the line goes, Quiet today is back.
+    click(&mut harness, END_QUIET)?;
+    assert!(PersonSettings::new(&store).quiet_until(&wall)?.is_none());
+    assert!(!says(&harness, LINE));
+    assert!(offers(&harness, QUIET));
+    assert_eq!(rect_of(&harness, QUIET), button);
+    assert_eq!(rect_of(&harness, "All Routines and Reminders"), all);
+    Ok(())
+}
+
+#[test]
+fn quiet_today_shows_its_line_on_top_and_end_brings_the_button_back() -> TestResult {
+    let (store, _now) = plants()?;
+    let mut harness = window(&store);
+    let wall = utc;
+    assert!(!says(&harness, LINE));
+    assert!(says(&harness, PLANTS));
+
+    click(&mut harness, QUIET)?;
+    assert!(PersonSettings::new(&store).quiet_until(&wall)?.is_some());
+
+    // The line first of all with its End.
+    assert!(says(&harness, LINE));
+    assert!(offers(&harness, "End"));
+    let line = top_of(&harness, LINE).ok_or("the line")?;
+    let today = top_of(&harness, "Today").ok_or("Today")?;
+    assert!(line < today, "the line is above today's rows");
+    assert!(says(&harness, PLANTS), "today's Occurrence stays");
+
+    // End on the line: the line goes, "Quiet today" is back.
     click(&mut harness, "End")?;
     assert!(PersonSettings::new(&store).quiet_until(&wall)?.is_none());
     assert!(!says(&harness, LINE));
     assert!(says(&harness, PLANTS));
-    click(&mut harness, MENU)?;
-    assert!(offers(&harness, "Quiet today"));
+    assert!(offers(&harness, QUIET));
+    assert!(!offers(&harness, END_QUIET));
     Ok(())
 }
 
@@ -164,11 +222,12 @@ fn a_quiet_day_set_elsewhere_shows_its_line_and_it_goes_at_midnight() -> TestRes
     set(&now, "2026-10-26T08:31:00.000Z")?;
     harness.run();
     assert!(says(&harness, LINE));
-    assert!(!offers(&harness, MENU));
+    assert!(offers(&harness, END_QUIET));
     // Midnight ends it by itself.
     set(&now, "2026-10-27T00:00:30.000Z")?;
     harness.run();
     assert!(!says(&harness, LINE));
-    assert!(offers(&harness, MENU));
+    assert!(offers(&harness, QUIET));
+    assert!(!offers(&harness, END_QUIET));
     Ok(())
 }

@@ -225,10 +225,11 @@ replace a law of Both apps where they say so. A desktop law marked
 - **A quiet day shows everything and rings nothing** (obf-1044, ADR
   0053): **Quiet today** in the Agenda's menu, offered while today is
   not quiet (on the phone a bar action with a bell, in ⋮ when the bar
-  is full; on the desktop in a ⋮ last in the Agenda's bar), makes today quiet on all of the person's own Devices,
+  is full; on the desktop a button last in the Agenda's top row, which
+  reads "End quiet day" while the day is quiet, obf-1066), makes today quiet on all of the person's own Devices,
   without an announcement. While it holds, the Agenda's first line reads
-  "Quiet day until midnight" with **End**; End ends it at once and the
-  menu offers Quiet today again; at midnight the line goes by itself.
+  "Quiet day until midnight" with **End**; End ends it at once and
+  Quiet today is offered again; at midnight the line goes by itself.
   Today's rows stay as they are, each checked off on its own; nothing
   notifies, no ring, Re-nag, Heads-up, Escalation, Nudge or Changes
   Nudge, and what is left undone counts as skipped from midnight, never
@@ -1899,6 +1900,13 @@ replace a law of Both apps where they say so. A desktop law marked
 - **The Agenda's bar on the desktop holds All Routines and Reminders and
   New Routine or Reminder** (draft, #196): no Calendar and no Profile
   picture; the menu bar leads to the rest.
+- **Quiet today is a button last in the desktop Agenda's bar, no ⋮**
+  (obf-1066), in place of Both apps' ⋮ for it: its bell and words in
+  the framed look of a list band's buttons. While today is quiet it
+  reads **End quiet day** in the same place, its right edge and the
+  buttons before it where they were, and ends it as End on the line
+  "Quiet day until midnight" does; the line stays on top. The bar's row
+  is as tall as the button, all of it centred in it.
 
 ### Menu bar and keys
 

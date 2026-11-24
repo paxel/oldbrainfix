@@ -639,7 +639,7 @@
   "escalatedChannel": "Escalated alarms",
   "quietChannel": "Routines and Reminders in the Quiet Hours",
   "quietToday": "Quiet today",
-  "@quietToday": {"description": "The Agenda's menu entry that makes today a quiet day: everything shows, nothing notifies (obf-1044)."},
+  "@quietToday": {"description": "The Agenda's bar action (the phone) or button (the desktop) that makes today a quiet day: everything shows, nothing notifies (obf-1044)."},
   "quietDayLine": "Quiet day until midnight",
   "@quietDayLine": {"description": "The line at the top of the Agenda while today is a quiet day (obf-1044)."},
   "quietDayEnd": "End",

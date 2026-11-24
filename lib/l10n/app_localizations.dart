@@ -1706,7 +1706,7 @@ abstract class AppLocalizations {
   /// **'Routines and Reminders in the Quiet Hours'**
   String get quietChannel;
 
-  /// The Agenda's menu entry that makes today a quiet day: everything shows, nothing notifies (obf-1044).
+  /// The Agenda's bar action (the phone) or button (the desktop) that makes today a quiet day: everything shows, nothing notifies (obf-1044).
   ///
   /// In en, this message translates to:
   /// **'Quiet today'**

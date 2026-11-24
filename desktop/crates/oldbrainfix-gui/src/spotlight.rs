@@ -101,11 +101,11 @@ pub const MANIFEST: &[Screen] = &[
                 anchor: "new-routine",
                 text: L10n::spot_desk_agenda_new_routine,
             },
-            // obf-1044: on the menu that holds it, absent while today is
-            // quiet.
+            // obf-1044: on Quiet today in the bar (obf-1066), not shown
+            // while it reads End quiet day.
             Tip {
                 id: "agenda-quiet",
-                anchor: "agenda-menu",
+                anchor: "quiet-today",
                 text: L10n::spot_desk_agenda_quiet,
             },
         ],

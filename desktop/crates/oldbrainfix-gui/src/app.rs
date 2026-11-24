@@ -34,12 +34,10 @@
 //! move the cursor; over a dialog opened from another they lead back to
 //! that one.
 //!
-//! The quick note records voice too: the microphone's button starts
-//! at once and one big stop button ends it and leaves it on the field,
-//! saved with the Note by the Nudge times or Save (UI laws, "Capture").
-//! Once something is typed, the Note card's buttons show above them;
-//! what they set up shows at the top of the field and is saved with the
-//! Note, all of it or nothing (#113). A picture pasted from the clipboard,
+//! The quick note is the text and, once something is typed or held, the
+//! Nudge buttons and Open in the editor, nothing else (UI laws,
+//! "Capture", #352); voice is recorded with Record voice in the Note
+//! dialog, onto its Note. A picture pasted from the clipboard,
 //! and pictures and sound files chosen with "From file…" or dropped onto
 //! the window (where the system hands drops over: not on Wayland), wait
 //! in the quick note, which they open, as its photos and voice recordings and are saved with
@@ -475,7 +473,7 @@ struct AgendaView {
     /// checked Lines and the picks with an entry go as they are drawn.
     hides_checked: bool,
     /// Whether today is a quiet day now (obf-1044): its line shows on
-    /// top, and the Agenda's ⋮ offers no "Quiet today".
+    /// top, and the Agenda's Quiet today reads End quiet day (obf-1066).
     quiet: bool,
 }
 
@@ -1592,11 +1590,12 @@ enum Action {
     /// detailed one and keeps the choice for that list on this Device
     /// (#114, #189).
     Compact(bool),
-    /// "Quiet today" in the Agenda's ⋮ (obf-1044): today shows as it
-    /// is, nothing notifies until midnight, on all of the user's own
-    /// Devices.
+    /// "Quiet today" in the Agenda's bar (obf-1044, obf-1066): today
+    /// shows as it is, nothing notifies until midnight, on all of the
+    /// user's own Devices.
     QuietToday,
-    /// End on the quiet day's line: today's quiet day ends now.
+    /// End on the quiet day's line, or End quiet day in the Agenda's bar
+    /// (obf-1066): today's quiet day ends now.
     EndQuietDay,
     /// Shows the theme chosen in View ▸ Theme at once and keeps it on
     /// this Device (#147).
@@ -17766,12 +17765,18 @@ impl App {
     /// the Checklists' rows after the all-day ones, a gap, and tomorrow's dimmed, then the five days after
     /// the same way, each under its weekday and date; each checkable on
     /// its own, a click on one opens its Routine. Its bar leads to All
-    /// Routines and Reminders, to a new Routine and, in Advanced, to a
-    /// new Session (#246).
+    /// Routines and Reminders, to a new Routine, in Advanced to a new
+    /// Session (#246), and holds Quiet today, End quiet day while today
+    /// is quiet (obf-1066).
     fn agenda_pane(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
         let t = self.t;
         let text = ui.visuals().text_color();
-        ui.horizontal(|ui| {
+        // One row as tall as Quiet today's framed button, all of it
+        // centred in it (obf-1066).
+        let sizes = BandSizes::of(ui);
+        let row = egui::vec2(ui.available_width(), sizes.row);
+        let centred = egui::Layout::left_to_right(egui::Align::Center);
+        ui.allocate_ui_with_layout(row, centred, |ui| {
             ui.heading(RichText::new(t.agenda_title()).color(text));
             // As the phone's bar, without its Calendar (UI laws, "The
             // Agenda's bar").
@@ -17780,12 +17785,22 @@ impl App {
                 actions.push(Action::NewNote);
             }
             // Room for the buttons at the end: 24 wide and 8 apart, and
-            // New Session only in Advanced (#197, #246); ⋮ while it has
-            // "Quiet today" to offer, once the Agenda is read (obf-1044).
+            // New Session only in Advanced (#197, #246); then Quiet today,
+            // once the Agenda is read (obf-1044, obf-1066), room for the
+            // wider of its two words so that its right edge keeps its
+            // place.
             let advanced = self.view.advanced;
-            let menu = self.view.agenda.as_ref().is_some_and(|a| !a.quiet);
-            let buttons = 2 + usize::from(advanced) + usize::from(menu);
-            let room = buttons as f32 * 32.0 - 4.0;
+            let quiet = self.view.agenda.as_ref().map(|a| a.quiet);
+            let quiet_width = quiet.map_or(0.0, |_| {
+                let words = [t.quiet_today(), t.end_quiet_day()];
+                let widest = words
+                    .iter()
+                    .map(|w| band_button_width(ui, w, sizes))
+                    .fold(0.0, f32::max);
+                widest + ui.spacing().item_spacing.x
+            });
+            let buttons = 2 + usize::from(advanced);
+            let room = buttons as f32 * 32.0 - 4.0 + quiet_width;
             ui.add_space((ui.available_width() - room).max(0.0));
             let all = icon_button(ui, icons::ALL_ROUTINES, t.all_routines_title(), text);
             spotlight::anchor(ui, "all-routines", all.rect);
@@ -17804,23 +17819,32 @@ impl App {
             if advanced && icon_button(ui, icons::SESSION, t.new_session(), text).clicked() {
                 actions.push(Action::NewSession(None));
             }
-            // The Agenda's menu, the phone's ⋮ in its bar.
-            if menu {
-                let more = icon_button(
-                    ui,
-                    icons::MORE_VERT,
-                    &t.occurrence_menu(t.agenda_title()),
-                    text,
-                );
-                spotlight::anchor(ui, "agenda-menu", more.rect);
-                egui::Popup::menu(&more).show(|ui| {
-                    if ui
-                        .button(RichText::new(t.quiet_today()).color(text))
-                        .clicked()
-                    {
-                        actions.push(Action::QuietToday);
-                    }
-                });
+            // Quiet today, the phone's bar action, in the band's framed
+            // look; End quiet day in its place while today is quiet.
+            if let Some(quiet) = quiet {
+                let word = if quiet {
+                    t.end_quiet_day()
+                } else {
+                    t.quiet_today()
+                };
+                let width = quiet_width - ui.spacing().item_spacing.x;
+                let resp = ui
+                    .allocate_ui_with_layout(
+                        egui::vec2(width, sizes.row),
+                        egui::Layout::right_to_left(egui::Align::Center),
+                        |ui| band_button(ui, (icons::NOTIFICATIONS_OFF, word, word), sizes, None),
+                    )
+                    .inner;
+                if !quiet {
+                    spotlight::anchor(ui, "quiet-today", resp.rect);
+                }
+                if resp.clicked() {
+                    actions.push(if quiet {
+                        Action::EndQuietDay
+                    } else {
+                        Action::QuietToday
+                    });
+                }
             }
         });
         ui.add_space(8.0);

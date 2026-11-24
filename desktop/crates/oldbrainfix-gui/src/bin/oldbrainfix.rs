@@ -984,7 +984,9 @@ fn run() -> Result<i32, String> {
             changes.fetch_add(1, Ordering::SeqCst);
             let _ = events.send(Event::Wake);
             wake(&window);
-            // A voice Note from the popup is transcribed without the window.
+            // A Note saved from the popup, a pasted picture held on it,
+            // has its Photo Text read without the window; what else waits
+            // to be read or transcribed is taken up too.
             reader.kick();
             files_reader.kick();
             if speech.current().is_some() {

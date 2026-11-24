@@ -29,6 +29,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Desktop sind Ansicht und Neue Notiz gerahmte Knöpfe mit Symbol und Wort, wie „Notizen zeigen von …“. ([obf-1067](https://github.com/paxel/oldbrainfix/issues/380))
 - Auf dem Handy und dem Desktop heißt eine Notiz ohne Text nach ihrem Transkript oder Fototext, auf Karten, in Agenda, Kalender und Benachrichtigungen. ([obf-1049](https://github.com/paxel/oldbrainfix/issues/360))
 - Auf dem Desktop verlassen die Menüs Bereich und Notiz die Menüleiste; ihre Aktionen stehen im ⋮ des Bereichs, Themas und der Notiz. ([obf-1065](https://github.com/paxel/oldbrainfix/issues/378))
+- Auf dem Desktop ist „Heute ruhig“ ein Knopf in der oberen Zeile der Agenda, der während des ruhigen Tags „Ruhigen Tag beenden“ heißt. ([obf-1066](https://github.com/paxel/oldbrainfix/issues/379))
 
 ### Behoben
 
