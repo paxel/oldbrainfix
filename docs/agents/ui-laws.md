@@ -9,6 +9,138 @@ desktop alike; **Phone** and **Desktop** hold what only one app does, and
 replace a law of Both apps where they say so. A desktop law marked
 "(draft, #196)" waits for the user's review.
 
+## Design system
+
+The building blocks every screen is made of, defined once for both apps
+(obf-1081, C24). This section stands before the three parts and binds
+the phone and the desktop alike. A screen uses these blocks and invents
+no others; a block missing here is added here first. The page that
+shows each one live waits for the user's approval before a shared
+widget set is built from it.
+
+- **Everything tappable is recognisable as tappable** (obf-1081): a
+  fill, an outline, or the accent's colour on its words and icon says
+  "this does something". A label with an icon in the text's or the weak
+  text's colour, without a frame, is never the only sign of an action;
+  text in the weak colour reads as a hint, never as a button.
+
+### Buttons
+
+There are three kinds, and an action takes the first that fits.
+
+- **Filled: the main action.** At most one on a dialog or page (Save,
+  Create, Done, Use, Restore, Continue), on the accent with its words
+  in `on_accent`. An action that deletes or removes (Delete, Remove,
+  Move to Trash) is filled on the error colour instead. Phone:
+  `FilledButton` / `FilledButton.icon`. Desktop: `theme::primary`,
+  `theme::main_action` (which Ctrl+Enter also runs) and
+  `theme::destructive` in `theme.rs`. Do not use it for a second action
+  beside the main one, nor as a page's only way to leave.
+- **Outlined: a standing action that is not the main one.** It has a
+  1 px outline and its words, an icon before them where one says more,
+  for example the quick note's full-width "Open in the editor"
+  (obf-1080) or the list band's "+ New Note", "View" and "Show Notes
+  by…" (obf-1067). Phone: `OutlinedButton` / `OutlinedButton.icon`.
+  Desktop: every button egui draws (`ui.button`, `Button::new`) wears
+  the secondary look of "Buttons look like buttons" (Desktop ▸ Buttons
+  and look, #218), a tonal fill with the outline; `band_button` in
+  `app.rs` draws that frame at the band's height, and
+  `capture_choices::open_in_editor` leaves the fill out until the
+  pointer is on it. Do not use it for the main action or in a menu.
+- **Text with icon: a lesser action inside a card or a row** ("Copy
+  text", the Frogs' "Another one"). It has no frame: the icon and the
+  words are both in the accent, which is what makes it a button, and it
+  gets a tinted ground under the finger or pointer. Phone:
+  `TextButton.icon`. Desktop: no helper yet (obf-1081). Do not draw it
+  in the text's or the weak colour, and do not leave out its icon. A
+  dialog's action row is the one place a text button goes without an
+  icon (Cancel, Close, Not now beside the filled main action), because
+  the row itself shows that these are its buttons.
+- Icon-only buttons (⋮, the pencil, the view button, the format bar)
+  get a rounded ground under the pointer and the ring while focused
+  (desktop `theme::icon_button_back`, phone `IconButton`), and they
+  always have a tooltip and a screen-reader label. Menu entries stay
+  flat, links stay links, and badges keep their own look (#192).
+
+### The header band
+
+- **One band carries a list's or a picker's search** (#351, obf-1041,
+  obf-1064, obf-1088). It is filled with a tone set off from the
+  ground, has a line along its bottom, and whatever scrolls goes under
+  that line. On the desktop the band of a list of Notes has two rows:
+  back, forward and the path with the place as its title (22), then
+  the search field (its text 16), the view switch, "Show Notes by…"
+  with its chips, and "+ New Note", all one height (36), wrapping under
+  the field below 200 wide.
+- Phone: `SearchBand`, and `SearchHeaderSliver` for a list that scrolls
+  it away, in `browser.dart`; its fill is `searchHeaderColour`. Desktop:
+  `theme::search_band` with `theme::band_fill`, and `list_band` /
+  `band_tools` with `BandSizes` in `app.rs`.
+- Use it on every page or dialog that searches what it lists. Do not
+  use it as a decoration on a page without a search, and never put a
+  second band under it.
+
+### Cards
+
+- **A card is an embossed panel, radius 16**: the card fill, a shade
+  below and right, a highlight above and left, and a stronger lift for
+  important ones (see Cards). Phone: `Embossed` in `look.dart`. Desktop:
+  `theme::embossed`, laid out by `embossed` / `agenda_card` in `app.rs`.
+  An Area's colour runs down its left edge, 6 wide (`theme::area_band`).
+- Its kinds are a Note's card (`NoteCard`, padding 16, on the desktop
+  14; the card text is 16), a Settings section's card with its title on top
+  (obf-1085, phone `SettingsSection`), and the one card of a Checklist,
+  Shopping List or Tally, its name, description and content together
+  (obf-1071).
+- Use a card for a thing (a Note or a section of settings) that stands
+  over the question marks. Do not nest a card in a card, and do not
+  give a Section, a Line or a field a card of its own.
+
+### Chips
+
+- **A chip is a short, tappable word with rounded ends**, a 1 px
+  outline, and its fill tinted with the accent while picked (the phone
+  uses Material's chip with radius 8, the desktop a pill). There are
+  three uses:
+  - **Filter chips** pick what a list shows and can be taken back
+    (the Session pool's tags, #220; a Routine's weekdays; the person
+    filter's kept people, whose ✕ takes them out, obf-1064). Phone:
+    `FilterChip` / `InputChip`. Desktop: `pill` and `filter_chip` in
+    `app.rs`.
+  - **Tag chips** start a search for a tag, and the row ends in
+    "All tags…" (obf-1074). Phone: `TagChipRow` (`ActionChip`) in
+    `tag_tree_screen.dart`.
+  - **Choice chips** pick exactly one of a few short options (Theme,
+    Text size). Phone: `ChoiceChips` in `look.dart`. Desktop: none
+    yet; it picks one with `radio_column`.
+- Use a chip for a short word in a row of equals. Do not use one for
+  an action with a consequence (use a button), nor for a choice with
+  details (that is a `RadioColumn` or `radio_column`).
+
+### Spacing and type
+
+- **Spacing comes in steps of 4, 8, 12, 16, 24 and 32** (logical pixels
+  on the phone, points on the desktop) for the room between blocks and
+  a card's padding. Use 4 between a control's parts, 8 between chips,
+  the rows of a card or the controls of a row, 12 between groups, 16
+  for a card's padding and the page's side gutter, and 24 or 32 between
+  sections. Any other step there is a break. A block's own inner
+  measures (a button's 10 × 4 padding, a chip's, the Area band's 6) are
+  part of its look and stay as this section gives them.
+- **Text sizes**: content (a card's text, Lines, typed text) is 16 and
+  grows with Text size (#326; phone `bodyLarge` in `ContentText`,
+  desktop `theme::content`). A page's or band's title is 22 (phone
+  `titleLarge`, desktop `BandSizes::title`). A dialog's heading is
+  Material's dialog title on the phone and 18 strong on the desktop
+  (`.size(18.0).strong()`). A card's or section's heading is 16
+  medium (phone `titleMedium`), on the desktop strong. Labels and
+  buttons are 14 (phone `labelLarge` / `bodyMedium`, desktop
+  `BandSizes::words` and `pill`). A caption, meta line or hint is 12 in
+  the weak colour (phone `bodySmall`). The desktop still draws most
+  labels in egui's own sizes (body and buttons 13, `.small()` 9),
+  which these steps replace. Fat fingers grows all of them (#224);
+  Text size grows only content.
+
 ## Both apps
 
 ### Navigation
