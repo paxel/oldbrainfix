@@ -939,7 +939,9 @@ class ShoppingLists {
 
   /// Adds the voice capture [noteId] to the Shopping List [listId]
   /// (#311), all in one batch: each line of its text that is not blank
-  /// becomes a Line as [addLines] makes it, and the Note, with its text
+  /// becomes a Line as [addLines] makes it, but the lines of a Transcript
+  /// the text holds, which the quick note puts there (obf-1082), and the
+  /// Note, with its text
   /// and recordings, goes where the list lies and is merged into it, so
   /// its recordings stay on the list as a Section, to be listened to. It
   /// owes the list the items said in its Transcripts ([spokenItems]),
@@ -961,7 +963,7 @@ class ShoppingLists {
       throw ArgumentError.value(noteId, 'noteId', 'not a Note in the lists');
     }
     return store.batch(() {
-      final typed = addLines(listId, note.shownText, wallClock);
+      final typed = addLines(listId, _untranscribed(note), wallClock);
       final place = into.place;
       if (note.place != place) {
         if (place == null) {
@@ -986,8 +988,12 @@ class ShoppingLists {
   /// [noteId] to the Shopping List it owes them ([owedTo]), once every
   /// recording has a Transcript or a removed one, recording by recording
   /// in their order, each as [add] adds it, and clears what it owes in
-  /// the same batch, so they are added once (#311). While a recording
-  /// waits for its Transcript nothing is written. A Note no longer merged
+  /// the same batch, so they are added once (#311). A Transcript the
+  /// Note's text holds ([_holdsTranscript]) whose lines are each a Line of
+  /// the list already adds those lines as [add] does, a struck one brought
+  /// back, and not its items said: it came after [addVoiceCapture] made
+  /// those lines of the text Lines (obf-1082). While a recording waits
+  /// for its Transcript nothing is written. A Note no longer merged
   /// into that list, in the trash, or a list that can no longer be added
   /// to owes nothing any more: that is cleared, and no Line is added.
   /// Returns the ids of the Lines added, brought back or found.
@@ -1008,12 +1014,23 @@ class ShoppingLists {
     )) {
       return const [];
     }
+    final text = note.shownText;
     try {
       return store.batch(() {
+        final lines = {
+          for (final line
+              in byNote(listId, wallClock)?.lines ?? const <ShoppingLine>[])
+            nameKey(line.text),
+        };
+        bool typed(String said) =>
+            _holdsTranscript(text, said) &&
+            _heardRows(said).every((row) => lines.contains(nameKey(row)));
         final added = [
           for (final hash in note.recordings)
-            for (final item in spokenItems(note.transcripts[hash] ?? ''))
-              add(listId, item, wallClock),
+            if (note.transcripts[hash] case final said?)
+              for (final item
+                  in typed(said) ? _heardRows(said) : spokenItems(said))
+                add(listId, item, wallClock),
         ];
         settled();
         return added;
@@ -1025,6 +1042,41 @@ class ShoppingLists {
     }
     settled();
     return const [];
+  }
+
+  /// Whether the text [text] holds the Transcript [said] (obf-1082):
+  /// each of its lines not blank is a line of [text], both trimmed, so a
+  /// Transcript "Milch" is not held by "Milchreis". A blank one is held
+  /// by none.
+  static bool _holdsTranscript(String text, String said) {
+    final rows = {for (final row in splitLines(text)) row.trim()};
+    final heard = _heardRows(said);
+    return heard.isNotEmpty && heard.every(rows.contains);
+  }
+
+  /// The lines of the Transcript [said] that are not blank, trimmed.
+  static List<String> _heardRows(String said) => [
+    for (final row in splitLines(said))
+      if (row.trim().isNotEmpty) row.trim(),
+  ];
+
+  /// The text of the voice capture [note] without the lines of each
+  /// Transcript it holds ([_holdsTranscript]): the quick note puts a
+  /// Transcript into its text too (obf-1082), and its items said come
+  /// split ([addOwedLines]), not as a line of the text.
+  static String _untranscribed(Note note) {
+    final text = note.shownText;
+    final heard = {
+      for (final hash in note.recordings)
+        if (note.transcripts[hash] case final said?
+            when _holdsTranscript(text, said))
+          ..._heardRows(said),
+    };
+    if (heard.isEmpty) return text;
+    return [
+      for (final row in splitLines(text))
+        if (!heard.contains(row.trim())) row,
+    ].join('\n');
   }
 
   /// Renames the Line [lineId].

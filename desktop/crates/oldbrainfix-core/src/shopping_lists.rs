@@ -548,6 +548,50 @@ fn spoken_piece(piece: &str, items: &mut Vec<String>) {
     }
 }
 
+/// Whether the text `text` holds the Transcript `said` (obf-1082): each
+/// of its lines not blank is a line of `text`, both trimmed, so a
+/// Transcript "Milch" is not held by "Milchreis". A blank one is held by
+/// none.
+fn holds_transcript(text: &str, said: &str) -> bool {
+    let rows = split_lines(text);
+    let rows: HashSet<&str> = rows.iter().map(|row| dart_trim(row)).collect();
+    let heard = heard_rows(said);
+    !heard.is_empty() && heard.iter().all(|row| rows.contains(row.as_str()))
+}
+
+/// The lines of the Transcript `said` that are not blank, trimmed.
+fn heard_rows(said: &str) -> Vec<String> {
+    split_lines(said)
+        .iter()
+        .map(|row| dart_trim(row))
+        .filter(|row| !row.is_empty())
+        .map(str::to_string)
+        .collect()
+}
+
+/// The text of the voice capture `note` without the lines of each
+/// Transcript it holds ([`holds_transcript`]): the quick note puts a
+/// Transcript into its text too (obf-1082), and its items said come split
+/// ([`ShoppingLists::add_owed_lines`]), not as a line of the text.
+fn untranscribed(note: &Note) -> String {
+    let text = note.shown_text();
+    let heard: HashSet<String> = note
+        .recordings
+        .iter()
+        .filter_map(|hash| note.transcripts.get(hash))
+        .filter(|said| holds_transcript(&text, said))
+        .flat_map(|said| heard_rows(said))
+        .collect();
+    if heard.is_empty() {
+        return text;
+    }
+    split_lines(&text)
+        .into_iter()
+        .filter(|row| !heard.contains(dart_trim(row)))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 /// The key for a new Line at the place `at` of the open Lines of `list`,
 /// or after every key with none or one past them: between the last valid
 /// key above it and the first valid key of any Line after that one, a
@@ -1240,8 +1284,10 @@ impl<'a> ShoppingLists<'a> {
 
     /// Adds the voice capture `note_id` to the Shopping List `list_id`
     /// (#311), all in one batch: each line of its text that is not blank
-    /// becomes a Line as [`ShoppingLists::add_lines`] makes it, and the
-    /// Note, with its text and recordings, goes where the list lies and is
+    /// becomes a Line as [`ShoppingLists::add_lines`] makes it, but the
+    /// lines of a Transcript the text holds, which the quick note puts there
+    /// (obf-1082), and the Note, with its text and recordings, goes where
+    /// the list lies and is
     /// merged into it, so its recordings stay on the list as a Section, to
     /// be listened to. It owes the list the items said in its Transcripts
     /// ([`ShoppingLists::spoken_items`]), added at once when every
@@ -1271,7 +1317,7 @@ impl<'a> ShoppingLists<'a> {
             }
         };
         self.store.batch(|| {
-            let mut added = self.add_lines(list_id, &note.shown_text(), wall)?;
+            let mut added = self.add_lines(list_id, &untranscribed(&note), wall)?;
             if note.place != into.place {
                 match &into.place {
                     None => notes.unfile(note_id)?,
@@ -1298,11 +1344,16 @@ impl<'a> ShoppingLists<'a> {
     /// ([`ShoppingLists::owed_to`]), once every recording has a Transcript
     /// or a removed one, recording by recording in their order, each as
     /// [`ShoppingLists::add`] adds it, and clears what it owes in the same
-    /// batch, so they are added once (#311). While a recording waits for
-    /// its Transcript nothing is written. A Note no longer merged into that
-    /// list, in the trash, or a list that can no longer be added to owes
-    /// nothing any more: that is cleared, and no Line is added. Returns the
-    /// ids of the Lines added, brought back or found.
+    /// batch, so they are added once (#311). A Transcript the Note's text
+    /// holds ([`holds_transcript`]) whose lines are each a Line of the list
+    /// already adds those lines as [`ShoppingLists::add`] does, a struck one
+    /// brought back, and not its items said: it came after
+    /// [`ShoppingLists::add_voice_capture`] made those lines of the text
+    /// Lines (obf-1082). While a recording waits for its Transcript nothing
+    /// is written. A Note no longer merged into that list, in the trash, or
+    /// a list that can no longer be added to owes nothing any more: that is
+    /// cleared, and no Line is added. Returns the ids of the Lines added,
+    /// brought back or found.
     pub fn add_owed_lines(&self, note_id: &str, wall: &WallClock) -> Result<Vec<String>> {
         let Some(list_id) = self.owed_to(note_id)? else {
             return Ok(Vec::new());
@@ -1320,11 +1371,32 @@ impl<'a> ShoppingLists<'a> {
         }) {
             return Ok(Vec::new());
         }
+        let text = note.shown_text();
         let added = self.store.batch(|| {
+            let lines: HashSet<String> = self
+                .by_note(&list_id, wall)?
+                .map(|list| list.lines)
+                .unwrap_or_default()
+                .iter()
+                .map(|line| ShoppingLists::name_key(&line.text))
+                .collect();
+            let typed = |said: &str| {
+                holds_transcript(&text, said)
+                    && heard_rows(said)
+                        .iter()
+                        .all(|row| lines.contains(&ShoppingLists::name_key(row)))
+            };
             let mut added = Vec::new();
             for hash in &note.recordings {
-                let said = note.transcripts.get(hash).map_or("", String::as_str);
-                for item in ShoppingLists::spoken_items(said) {
+                let Some(said) = note.transcripts.get(hash) else {
+                    continue;
+                };
+                let items = if typed(said) {
+                    heard_rows(said)
+                } else {
+                    ShoppingLists::spoken_items(said)
+                };
+                for item in items {
                     added.push(self.add(&list_id, &item, wall)?);
                 }
             }

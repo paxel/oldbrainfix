@@ -1853,6 +1853,91 @@ fn a_voice_capture_transcribed_already_adds_the_items_at_once() -> TestResult {
 }
 
 #[test]
+fn a_voice_capture_makes_no_line_of_a_transcript_its_text_holds_but_adds_the_items() -> TestResult {
+    // The quick note puts the Transcript into the text (obf-1082).
+    let store = Clock::new()?.store(1)?;
+    let (notes, lists) = (Notes::new(&store), ShoppingLists::new(&store));
+    let list = shopping(&store, "Groceries\nFlour", None)?;
+    let voice = notes.capture_with("Sugar\n\n Salt and tea ", None, None, &[], &[recording(1)])?;
+    notes.add_recording(&voice.id, &recording(2))?;
+    let hashes = notes.by_id(&voice.id)?.ok_or("the Note")?.recordings;
+    notes.set_transcript(&voice.id, &hashes[0], "Salt and tea")?;
+    notes.set_transcript(&voice.id, &hashes[1], "Milk und Honey")?;
+    lists.add_voice_capture(&list, &voice.id, &wall)?;
+    assert_eq!(
+        shown(&store, &list)?,
+        ["Flour", "Sugar", "Salt", "tea", "Milk", "Honey"]
+    );
+    assert_eq!(lists.owed_to(&voice.id)?, None);
+    let merged = notes.by_id(&voice.id)?.ok_or("the Note")?;
+    assert_eq!(merged.text, "Sugar\n\n Salt and tea ");
+    Ok(())
+}
+
+#[test]
+fn a_voice_capture_adds_the_items_its_text_holds_once_the_other_recording_is_transcribed()
+-> TestResult {
+    let store = Clock::new()?.store(1)?;
+    let (notes, lists) = (Notes::new(&store), ShoppingLists::new(&store));
+    let list = shopping(&store, "Groceries\nFlour", None)?;
+    let voice = notes.capture_with("Salt and tea", None, None, &[], &[recording(1)])?;
+    notes.add_recording(&voice.id, &recording(2))?;
+    let hashes = notes.by_id(&voice.id)?.ok_or("the Note")?.recordings;
+    notes.set_transcript(&voice.id, &hashes[0], "Salt and tea")?;
+    lists.add_voice_capture(&list, &voice.id, &wall)?;
+    assert_eq!(shown(&store, &list)?, ["Flour"]);
+    notes.set_transcript(&voice.id, &hashes[1], "Milk")?;
+    lists.add_owed_lines(&voice.id, &wall)?;
+    assert_eq!(shown(&store, &list)?, ["Flour", "Salt", "tea", "Milk"]);
+    Ok(())
+}
+
+#[test]
+fn a_voice_capture_adds_none_of_a_transcript_its_text_held_as_a_line_before_it_came() -> TestResult
+{
+    let store = Clock::new()?.store(1)?;
+    let (notes, lists) = (Notes::new(&store), ShoppingLists::new(&store));
+    let list = shopping(&store, "Groceries\nFlour", None)?;
+    let voice = notes.capture_with("Tea and jam", None, None, &[], &[recording(1)])?;
+    lists.add_voice_capture(&list, &voice.id, &wall)?;
+    notes.set_transcript(&voice.id, &voice.recordings[0], "Tea and jam")?;
+    lists.add_owed_lines(&voice.id, &wall)?;
+    assert_eq!(shown(&store, &list)?, ["Flour", "Tea and jam"]);
+    assert_eq!(lists.owed_to(&voice.id)?, None);
+    Ok(())
+}
+
+#[test]
+fn a_voice_capture_brings_back_the_struck_lines_its_text_and_transcript_both_name() -> TestResult {
+    let store = Clock::new()?.store(1)?;
+    let (notes, lists) = (Notes::new(&store), ShoppingLists::new(&store));
+    let list = shopping(&store, "Groceries\nFlour", None)?;
+    for text in ["Milk", "Eggs"] {
+        let line = lists.add(&list, text, &wall)?;
+        lists.check(&line, &wall)?;
+    }
+    assert_eq!(shown(&store, &list)?, ["Flour", "~Milk", "~Eggs"]);
+    let voice = notes.capture_with("Milk\nEggs", None, None, &[], &[recording(1)])?;
+    notes.set_transcript(&voice.id, &voice.recordings[0], "Milk\nEggs")?;
+    lists.add_voice_capture(&list, &voice.id, &wall)?;
+    assert_eq!(shown(&store, &list)?, ["Flour", "Milk", "Eggs"]);
+    Ok(())
+}
+
+#[test]
+fn a_voice_capture_adds_a_transcript_held_only_in_part_of_a_line() -> TestResult {
+    let store = Clock::new()?.store(1)?;
+    let (notes, lists) = (Notes::new(&store), ShoppingLists::new(&store));
+    let list = shopping(&store, "Groceries\nFlour", None)?;
+    let voice = notes.capture_with("Milchreis", None, None, &[], &[recording(1)])?;
+    lists.add_voice_capture(&list, &voice.id, &wall)?;
+    notes.set_transcript(&voice.id, &voice.recordings[0], "Milch")?;
+    lists.add_owed_lines(&voice.id, &wall)?;
+    assert_eq!(shown(&store, &list)?, ["Flour", "Milchreis", "Milch"]);
+    Ok(())
+}
+
+#[test]
 fn a_voice_capture_waits_for_every_recording_then_adds_in_their_order() -> TestResult {
     let store = Clock::new()?.store(1)?;
     let (notes, lists) = (Notes::new(&store), ShoppingLists::new(&store));

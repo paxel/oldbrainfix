@@ -1796,7 +1796,9 @@ final _scenarios = <Scenario>[
         'back a week on, and after the open ones, a move before itself and '
         'one to where it is writing nothing (#283); then a voice capture with '
         'a typed line said into a list, still owing the items of its '
-        'Transcript, and one transcribed since (#311).',
+        'Transcript, and one transcribed since (#311); one whose text holds '
+        'its Transcript, that line no Line but the items said, and one whose '
+        'text held it as a Line before it came, adding no item (obf-1082).',
     build: (store) {
       final notes = Notes(store);
       final lists = ShoppingLists(store);
@@ -1988,6 +1990,22 @@ final _scenarios = <Scenario>[
         'Butter, flour und 1,5 Liter Milch.',
       );
       lists.addOwedLines(said.id, wall);
+      // Said into the quick note (obf-1082): its text holds the Transcript,
+      // whose line is no Line, the items said split instead; and a typed
+      // line made a Line before the same words came as its Transcript.
+      final heard = notes.capture(
+        'Honey\n\nTea and jam',
+        recordings: [_recording(33)],
+      );
+      notes.setTranscript(heard.id, heard.recordings.single, 'Tea and jam');
+      lists.addVoiceCapture(market, heard.id, wall);
+      final typed = notes.capture(
+        'Rice and oats',
+        recordings: [_recording(34)],
+      );
+      lists.addVoiceCapture(market, typed.id, wall);
+      notes.setTranscript(typed.id, typed.recordings.single, 'Rice and oats');
+      lists.addOwedLines(typed.id, wall);
     },
   ),
   (

@@ -5223,6 +5223,16 @@ fn write_shopping_lists(store: &Store) -> Built {
         "Butter, flour und 1,5 Liter Milch.",
     )?;
     lists.add_owed_lines(&said.id, &wall)?;
+    // Said into the quick note (obf-1082): its text holds the Transcript,
+    // whose line is no Line, the items said split instead; and a typed line
+    // made a Line before the same words came as its Transcript.
+    let heard = notes.capture_with("Honey\n\nTea and jam", None, None, &[], &[recording(33)])?;
+    notes.set_transcript(&heard.id, &heard.recordings[0], "Tea and jam")?;
+    lists.add_voice_capture(&market, &heard.id, &wall)?;
+    let typed = notes.capture_with("Rice and oats", None, None, &[], &[recording(34)])?;
+    lists.add_voice_capture(&market, &typed.id, &wall)?;
+    notes.set_transcript(&typed.id, &typed.recordings[0], "Rice and oats")?;
+    lists.add_owed_lines(&typed.id, &wall)?;
     Ok(())
 }
 

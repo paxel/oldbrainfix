@@ -1,5 +1,5 @@
 {
-  "now": "2026-02-01T11:38:57.000Z",
+  "now": "2026-02-01T11:39:53.000Z",
   "device": "65b60673d6ed884bf01c2c222d82ada0",
   "areas": [],
   "notes": [
@@ -370,6 +370,74 @@
       "wordless": "voiceRecording",
       "shownName": "Butter, flour und 1,5 Liter Milch.",
       "calendarText": "Butter, flour und 1,5 Liter Milch."
+    },
+    {
+      "id": "note:0000000000000000000000000000003c",
+      "text": "Honey\n\nTea and jam",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-31T11:38:59.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": "note:00000000000000000000000000000034",
+      "spawned": false,
+      "photos": [],
+      "recordings": [
+        "46202a23f8af6d723bfbd8433d16e8026f556bfaf52ba5e40d914518f4cfcdd0"
+      ],
+      "transcripts": {
+        "46202a23f8af6d723bfbd8433d16e8026f556bfaf52ba5e40d914518f4cfcdd0": "Tea and jam"
+      },
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "voiceRecording"
+    },
+    {
+      "id": "note:00000000000000000000000000000040",
+      "text": "Rice and oats",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-31T11:39:34.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": "note:00000000000000000000000000000034",
+      "spawned": false,
+      "photos": [],
+      "recordings": [
+        "6c34d28c3152469851535d0e084d7518aef7ef8f4a6c5c8a19215c771f4b36f5"
+      ],
+      "transcripts": {
+        "6c34d28c3152469851535d0e084d7518aef7ef8f4a6c5c8a19215c771f4b36f5": "Rice and oats"
+      },
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "voiceRecording"
     }
   ],
   "all": [
@@ -451,6 +519,68 @@
         "removedPhotoTexts": [],
         "modified": null,
         "editedBy": null
+      },
+      {
+        "id": "note:0000000000000000000000000000003c",
+        "noteId": "note:00000000000000000000000000000034",
+        "text": "Honey\n\nTea and jam",
+        "textFormat": "plain",
+        "textVersion": 1,
+        "textEditable": true,
+        "captured": "2026-01-31T11:38:59.000Z",
+        "context": {
+          "location": null,
+          "namedPlace": null,
+          "sourceApp": null,
+          "calendarEvents": [],
+          "bluetoothDevices": [],
+          "hasMore": false
+        },
+        "photos": [],
+        "recordings": [
+          "46202a23f8af6d723bfbd8433d16e8026f556bfaf52ba5e40d914518f4cfcdd0"
+        ],
+        "transcripts": {
+          "46202a23f8af6d723bfbd8433d16e8026f556bfaf52ba5e40d914518f4cfcdd0": "Tea and jam"
+        },
+        "photoTexts": {},
+        "removedPhotos": [],
+        "removedRecordings": [],
+        "removedTranscripts": [],
+        "removedPhotoTexts": [],
+        "modified": null,
+        "editedBy": null
+      },
+      {
+        "id": "note:00000000000000000000000000000040",
+        "noteId": "note:00000000000000000000000000000034",
+        "text": "Rice and oats",
+        "textFormat": "plain",
+        "textVersion": 1,
+        "textEditable": true,
+        "captured": "2026-01-31T11:39:34.000Z",
+        "context": {
+          "location": null,
+          "namedPlace": null,
+          "sourceApp": null,
+          "calendarEvents": [],
+          "bluetoothDevices": [],
+          "hasMore": false
+        },
+        "photos": [],
+        "recordings": [
+          "6c34d28c3152469851535d0e084d7518aef7ef8f4a6c5c8a19215c771f4b36f5"
+        ],
+        "transcripts": {
+          "6c34d28c3152469851535d0e084d7518aef7ef8f4a6c5c8a19215c771f4b36f5": "Rice and oats"
+        },
+        "photoTexts": {},
+        "removedPhotos": [],
+        "removedRecordings": [],
+        "removedTranscripts": [],
+        "removedPhotoTexts": [],
+        "modified": null,
+        "editedBy": null
       }
     ],
     "note:0000000000000000000000000000002c": [],
@@ -474,6 +604,14 @@
     "note:00000000000000000000000000000039": [
       "audio/c35d14c0e618f79d8ae181904e1ef74f6c58242eb1286101213b5ea37b04af7c",
       "transcript/c35d14c0e618f79d8ae181904e1ef74f6c58242eb1286101213b5ea37b04af7c"
+    ],
+    "note:0000000000000000000000000000003c": [
+      "audio/46202a23f8af6d723bfbd8433d16e8026f556bfaf52ba5e40d914518f4cfcdd0",
+      "transcript/46202a23f8af6d723bfbd8433d16e8026f556bfaf52ba5e40d914518f4cfcdd0"
+    ],
+    "note:00000000000000000000000000000040": [
+      "audio/6c34d28c3152469851535d0e084d7518aef7ef8f4a6c5c8a19215c771f4b36f5",
+      "transcript/6c34d28c3152469851535d0e084d7518aef7ef8f4a6c5c8a19215c771f4b36f5"
     ]
   },
   "shares": {
@@ -482,9 +620,11 @@
       "photos": [],
       "recordings": [
         "a49955dd65e686efb989db9c45ca0a8a7954dbd740a2600de1d81960a679264e",
-        "c35d14c0e618f79d8ae181904e1ef74f6c58242eb1286101213b5ea37b04af7c"
+        "c35d14c0e618f79d8ae181904e1ef74f6c58242eb1286101213b5ea37b04af7c",
+        "46202a23f8af6d723bfbd8433d16e8026f556bfaf52ba5e40d914518f4cfcdd0",
+        "6c34d28c3152469851535d0e084d7518aef7ef8f4a6c5c8a19215c771f4b36f5"
       ],
-      "text": "Market\n\n2026-01-31T11:38:15.000Z\nSugar\n\n2026-01-31T11:38:31.000Z\nButter, flour und 1,5 Liter Milch."
+      "text": "Market\n\n2026-01-31T11:38:15.000Z\nSugar\n\n2026-01-31T11:38:31.000Z\nButter, flour und 1,5 Liter Milch.\n\n2026-01-31T11:38:59.000Z\nHoney\n\nTea and jam\n\n2026-01-31T11:39:34.000Z\nRice and oats"
     },
     "note:0000000000000000000000000000002c": {
       "html": null,
