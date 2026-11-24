@@ -338,3 +338,140 @@ fn what_this_device_may_not_change_in_a_shared_area_stays_uncounted() -> TestRes
     assert!(ben.missing_blobs()?.is_empty());
     Ok(())
 }
+
+#[test]
+fn it_purges_per_batch_another_connection_writes_between_and_one_brought_back_stays() -> TestResult
+{
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("log.db");
+    // One clock for both, as one Device: what the window writes is later.
+    let devices = Devices::new();
+    let open = || {
+        let ticks = Arc::clone(&devices.0);
+        let clock: Clock = Box::new(move || {
+            let n = ticks.fetch_add(1, Ordering::SeqCst) + 1;
+            let start = Utc.with_ymd_and_hms(2026, 3, 1, 9, 0, 0).single();
+            start.unwrap_or_default() + Duration::seconds(n)
+        });
+        Store::open(&path, clock, || Ok(SigningKey::from_seed([1; 32])))
+    };
+    let (emptying, window) = (open()?, open()?);
+    let writing = Notes::new(&emptying);
+    let (card, reminder) = emptying.batch(|| {
+        let card = writing.capture_with("Card", None, None, &[photo(1)], &[])?;
+        writing.trash(&card.id)?;
+        for i in 0..2 * PER_BATCH {
+            writing.trash(&writing.capture(&format!("Note {i}"), None, None)?.id)?;
+        }
+        let dentist = writing.capture("Dentist", None, None)?;
+        let reminder = Routines::new(&emptying).spawn(&dentist.id, &daily()?)?;
+        Routines::new(&emptying).trash_note(&dentist.id)?;
+        Ok((card, reminder))
+    })?;
+    let trash = Trash::new(&emptying);
+    let asked = trash.to_empty()?;
+    let of = 2 * PER_BATCH + 2;
+    assert_eq!(asked.notes.len(), of);
+    assert_eq!(asked.routines, std::slice::from_ref(&reminder.id));
+    // In the second batch.
+    let back = asked.notes[PER_BATCH + 1].clone();
+    let mark = emptying.current_seq()?;
+    let told = std::cell::RefCell::new(Vec::new());
+    let captured = std::cell::RefCell::new(Vec::new());
+    let restored = std::cell::RefCell::new(Vec::new());
+    // A write here waits for no lock the purge holds.
+    let tell = |done: usize, of: usize| {
+        told.borrow_mut().push((done, of));
+        if done == PER_BATCH {
+            restored
+                .borrow_mut()
+                .push(Routines::new(&window).restore_note(&back));
+        }
+        let made = Notes::new(&window).capture(&format!("Meanwhile {done}"), None, None);
+        captured.borrow_mut().push(made.map(|n| n.id));
+    };
+    let started = std::time::Instant::now();
+    let removed = trash.empty_stopping(&tell, &|| false)?;
+    assert!(started.elapsed() < std::time::Duration::from_secs(4));
+    assert_eq!(
+        told.take(),
+        [(0, of), (PER_BATCH, of), (2 * PER_BATCH, of), (of, of)]
+    );
+    let captured = captured.take();
+    assert_eq!(captured.len(), 4);
+    for made in captured {
+        assert!(writing.by_id(&made?)?.is_some());
+    }
+    let restored = restored.take();
+    assert_eq!(restored.len(), 1);
+    for done in restored {
+        done?;
+    }
+    let expected: Vec<String> = asked
+        .notes
+        .iter()
+        .filter(|id| **id != back)
+        .cloned()
+        .collect();
+    assert_eq!(removed.notes, expected);
+    assert_eq!(removed.routines, std::slice::from_ref(&reminder.id));
+    let card_photo = card.photos.first().ok_or("a photo")?.clone();
+    assert_eq!(removed.blobs, [format!("photo/{card_photo}")]);
+    assert_eq!(emptying.photo(&card_photo), None);
+    assert!(writing.by_id(&back)?.is_some_and(|n| !n.is_trashed()));
+    // The purge's entries in the order one batch wrote them.
+    let written: Vec<String> = emptying
+        .entries_after(mark)?
+        .into_iter()
+        .filter(|e| e.field == note_keys::TYPE && e.value.is_none())
+        .map(|e| e.entity)
+        .collect();
+    let purged: Vec<String> = removed
+        .notes
+        .iter()
+        .chain(&removed.routines)
+        .cloned()
+        .collect();
+    assert_eq!(written, purged);
+    let again = emptying.current_seq()?;
+    assert!(trash.empty()?.is_empty());
+    assert!(emptying.entries_after(again)?.is_empty(), "nothing written");
+    Ok(())
+}
+
+#[test]
+fn stopped_what_it_purged_stays_purged_and_its_files_go() -> TestResult {
+    let ann = Devices::new().device(1, "Ann")?;
+    let notes = Notes::new(&ann);
+    let routines = Routines::new(&ann);
+    let card = notes.capture_with("Card", None, None, &[photo(1)], &[])?;
+    notes.trash(&card.id)?;
+    for i in 0..PER_BATCH {
+        notes.trash(&notes.capture(&format!("Note {i}"), None, None)?.id)?;
+    }
+    let alone = routines.spawn(&notes.capture("Pills", None, None)?.id, &daily()?)?;
+    routines.trash(&alone.id)?;
+    let trash = Trash::new(&ann);
+    let asked = trash.to_empty()?;
+    let batches = std::cell::Cell::new(0);
+    let stop = || {
+        batches.set(batches.get() + 1);
+        batches.get() > 1
+    };
+    let removed = trash.empty_stopping(&|_, _| (), &stop)?;
+    assert_eq!(removed.notes, asked.notes[..PER_BATCH]);
+    assert!(removed.routines.is_empty());
+    let card_photo = card.photos.first().ok_or("a photo")?.clone();
+    assert_eq!(removed.blobs, [format!("photo/{card_photo}")]);
+    assert_eq!(ann.photo(&card_photo), None);
+    let last = asked.notes.last().ok_or("a Note")?.clone();
+    let left: Vec<String> = notes.trashed()?.into_iter().map(|n| n.id).collect();
+    assert_eq!(left, std::slice::from_ref(&last));
+    let kept = routines.by_id(&alone.id)?;
+    assert!(kept.is_some_and(|r| r.trashed.is_some()));
+
+    let rest = trash.empty()?;
+    assert_eq!(rest.notes, std::slice::from_ref(&last));
+    assert_eq!(rest.routines, std::slice::from_ref(&alone.id));
+    Ok(())
+}

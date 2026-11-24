@@ -23,8 +23,8 @@ Future<TrashEmptied> _empty(
 /// "Empty the trash now" of the Trash (obf-1095), run by [runner] on
 /// [store] beside the app: [toEmpty] counts what it removes for the
 /// question, [run] removes it, which keeps the page bar's line moving
-/// meanwhile (UI laws, "The sync line"). It purges in one batch, so
-/// Abort on the page Running cannot stop it; it tells its listeners when
+/// meanwhile (UI laws, "The sync line"). It purges in small batches
+/// and offers no Abort on the page Running; it tells its listeners when
 /// it starts and ends.
 class TrashEmptying extends ChangeNotifier {
   final Store store;

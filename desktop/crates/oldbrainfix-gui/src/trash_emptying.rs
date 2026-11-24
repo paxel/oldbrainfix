@@ -5,8 +5,8 @@
 //! before it names those counts. Once answered, the trash is emptied on a
 //! thread of its own, with a connection of its own to the window's
 //! database, as deleting an Area is ([`crate::area_deletion`]); the page
-//! Running lists it, without Abort: it is one transaction, which either
-//! deletes all of it or nothing.
+//! Running lists it, without Abort. The core purges in small batches, so a
+//! failed batch leaves what came before it deleted.
 
 use std::sync::Arc;
 use std::sync::mpsc::{Receiver, TryRecvError};

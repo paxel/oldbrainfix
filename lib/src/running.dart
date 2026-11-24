@@ -35,8 +35,7 @@ enum RunningKind {
   speechModel,
   areaDeletion,
 
-  /// "Empty the trash now" (obf-1095): one batch, which Abort cannot
-  /// stop.
+  /// "Empty the trash now" (obf-1095), offered no Abort.
   trashEmptying,
 }
 
@@ -104,7 +103,7 @@ class StoppedJob {
 /// what it did; a sync round or a recording, photo or file under way
 /// ends first, then the automatic syncs pause or the others wait, until
 /// Go on or the next start; the speech model's fetch is cancelled; the
-/// trash being emptied is not offered Abort, as it is one batch. What
+/// trash being emptied is not offered Abort. What
 /// Abort stopped stays listed while the app runs, at most
 /// [maxStoppedJobs]. It tells its listeners whenever a job starts, moves
 /// on or ends.

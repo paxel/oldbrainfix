@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
@@ -204,5 +205,103 @@ void main() {
     expect(ben.photo(hers.photos.single), photo(1));
     expect(ben.photo(his.photos.single), isNull);
     expect(ben.missingBlobs(), isEmpty);
+  });
+
+  test('it purges Trash.perBatch Notes at a time: another connection '
+      'writes between two batches, and one it brings back stays', () {
+    final dir = Directory.systemTemp.createTempSync('obf');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final path = '${dir.path}/log.db';
+    // One clock for both, as one Device: what the app writes is later.
+    final shared = ticking();
+    final emptying = Store.open(path, clock: shared);
+    final app = Store.open(path, clock: shared);
+    addTearDown(() {
+      emptying.close();
+      app.close();
+    });
+    final writing = Notes(emptying);
+    final (card, reminder) = emptying.batch(() {
+      final card = writing.capture('Card', photos: [photo(1)]);
+      writing.trash(card.id);
+      for (var i = 0; i < 2 * Trash.perBatch; i++) {
+        writing.trash(writing.capture('Note $i').id);
+      }
+      final dentist = writing.capture('Dentist');
+      final reminder = Routines(emptying).spawn(dentist.id, daily);
+      Routines(emptying).trashNote(dentist.id);
+      return (card, reminder);
+    });
+    final trash = Trash(emptying);
+    final asked = trash.toEmpty();
+    final of = 2 * Trash.perBatch + 2;
+    expect(asked.notes, hasLength(of));
+    expect(asked.routines, [reminder.id]);
+    // In the second batch.
+    final back = asked.notes[Trash.perBatch + 1];
+    final mark = emptying.currentSeq();
+    final told = <(int, int)>[];
+    final captured = <String>[];
+    final watch = Stopwatch()..start();
+    final removed = trash.empty(
+      progress: (done, of) {
+        told.add((done, of));
+        // A write here waits for no lock the purge holds.
+        if (done == Trash.perBatch) Routines(app).restoreNote(back);
+        captured.add(Notes(app).capture('Meanwhile $done').id);
+      },
+    );
+    expect(watch.elapsed, lessThan(const Duration(seconds: 4)));
+    expect(told, [
+      (0, of),
+      (Trash.perBatch, of),
+      (2 * Trash.perBatch, of),
+      (of, of),
+    ]);
+    expect(removed.notes, [...asked.notes]..remove(back));
+    expect(removed.routines, [reminder.id]);
+    expect(removed.blobs, ['photo/${card.photos.single}']);
+    expect(emptying.photo(card.photos.single), isNull);
+    expect(writing.byId(back)?.isTrashed, isFalse);
+    expect(captured, hasLength(4));
+    for (final id in captured) {
+      expect(writing.byId(id), isNotNull);
+    }
+    // The purge's entries in the order one batch wrote them.
+    expect(
+      [
+        for (final e in emptying.entriesAfter(mark))
+          if (e.field == NoteKeys.type && e.value == null) e.entity,
+      ],
+      [...removed.notes, ...removed.routines],
+    );
+    final again = emptying.currentSeq();
+    expect(trash.empty().isEmpty, isTrue);
+    expect(emptying.entriesAfter(again), isEmpty, reason: 'nothing written');
+  });
+
+  test('stopped, what it purged stays purged and its files go; the rest '
+      'stays in the trash', () {
+    final card = notes.capture('Card', photos: [photo(1)]);
+    notes.trash(card.id);
+    for (var i = 0; i < Trash.perBatch; i++) {
+      notes.trash(notes.capture('Note $i').id);
+    }
+    final alone = routines.spawn(notes.capture('Pills').id, daily);
+    routines.trash(alone.id);
+    final trash = Trash(ann);
+    final asked = trash.toEmpty();
+    var batches = 0;
+    final removed = trash.empty(stop: () => batches++ > 0);
+    expect(removed.notes, asked.notes.take(Trash.perBatch));
+    expect(removed.routines, isEmpty);
+    expect(removed.blobs, ['photo/${card.photos.single}']);
+    expect(ann.photo(card.photos.single), isNull);
+    expect(notes.trashed().map((n) => n.id), [asked.notes.last]);
+    expect(routines.byId(alone.id)?.isTrashed, isTrue);
+
+    final rest = trash.empty();
+    expect(rest.notes, [asked.notes.last]);
+    expect(rest.routines, [alone.id]);
   });
 }

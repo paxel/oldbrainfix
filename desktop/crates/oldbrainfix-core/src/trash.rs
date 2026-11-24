@@ -3,9 +3,11 @@
 //! files of those Notes let go on this Device.
 
 use std::collections::BTreeSet;
+use std::time::Instant;
 
 use crate::Result;
 use crate::notes::{Notes, keys as note_keys};
+use crate::places::{MoveProgress, Stopping};
 use crate::routines::{Routines, keys as routine_keys};
 use crate::store::Store;
 use crate::sync::{BLOB_KINDS, split_blob_ref};
@@ -34,6 +36,12 @@ impl TrashEmptied {
     }
 }
 
+/// How many Notes, or Routines and Reminders, [`Trash::empty`] purges in
+/// one transaction, as the Dart core's `Trash.perBatch`: another
+/// connection to the database, such as the window's while it runs beside
+/// it, waits at most for so many.
+pub const PER_BATCH: usize = 25;
+
 /// The trash emptied at once (obf-1095).
 pub struct Trash<'a> {
     store: &'a Store,
@@ -57,71 +65,191 @@ impl<'a> Trash<'a> {
         })
     }
 
-    /// "Empty the trash now": purges what [`Trash::to_empty`] names in one
-    /// batch, as the Dart core's 30-day purge does, then lets go of the
-    /// bytes of the photos, recordings and files of those Notes, their
-    /// Sections and the Notes merged into them, on this Device, unless a
-    /// Note not purged still shows them. The log keeps every entry, so
-    /// sync is unchanged; a file only a purged Note holds is no longer
-    /// wanted from another Device. It cannot be undone. Frogs stay, as the
-    /// 30-day purge leaves them (ADR 0027).
+    /// "Empty the trash now": purges what [`Trash::to_empty`] names, as
+    /// the Dart core's 30-day purge does, [`PER_BATCH`] at a time, each
+    /// batch a transaction of its own, resting as long as it took before
+    /// the next, as the desktop's Import does beside its window; then lets
+    /// go of the bytes of the photos, recordings and files of those Notes,
+    /// their Sections and the Notes merged into them, on this Device,
+    /// unless a Note not purged still shows them. One brought back from
+    /// the trash or purged meanwhile is left as it is. The log keeps every
+    /// entry, so sync is unchanged; a file only a purged Note holds is no
+    /// longer wanted from another Device. It cannot be undone. Frogs stay,
+    /// as the 30-day purge leaves them (ADR 0027).
     pub fn empty(&self) -> Result<TrashEmptied> {
-        let notes = Notes::new(self.store);
+        self.empty_stopping(&|_, _| (), &|| false)
+    }
+
+    /// As [`Trash::empty`]: `progress` hears how many of the Notes it has
+    /// gone through, before the first batch and after each; `stop` is
+    /// asked before each batch. Once it says so, or a batch fails, what
+    /// was purged stays purged and its bytes go all the same.
+    pub fn empty_stopping(
+        &self,
+        progress: MoveProgress<'_>,
+        stop: Stopping<'_>,
+    ) -> Result<TrashEmptied> {
         let mut refs = BTreeSet::new();
-        let (gone, gone_routines) = self.store.batch(|| {
-            let gone = self.notes()?;
-            // Read for all of them at once, before anything is written:
-            // one pass, not one per Note.
-            let mut sections = notes.sections_of(&gone)?;
-            let mut purged = Vec::new();
-            for id in &gone {
-                // A merged Note's Section is the Note itself; both keep
-                // their type under the same key.
-                for section in sections.remove(id).unwrap_or_default() {
-                    if self.store.may_change(&section.id)? {
-                        self.store
-                            .append(&section.id, note_keys::TYPE, None, None)?;
-                        purged.push(section.id);
-                    }
-                }
-                self.store.append(id, note_keys::TYPE, None, None)?;
-                purged.push(id.clone());
+        let mut emptied = TrashEmptied::default();
+        let purged = self.purge(&mut refs, &mut emptied, progress, stop);
+        if let Err(e) = purged {
+            // What went wrong is told; letting go of the bytes of what
+            // went before is tried all the same.
+            let _ = self.drop_blobs(&refs);
+            return Err(e);
+        }
+        emptied.blobs = self.drop_blobs(&refs)?;
+        Ok(emptied)
+    }
+
+    /// The purge behind [`Trash::empty_stopping`]: adds the Notes and the
+    /// Routines and Reminders it purged to `emptied`, and the files they
+    /// held to `refs`, each once its batch is in.
+    fn purge(
+        &self,
+        refs: &mut BTreeSet<String>,
+        emptied: &mut TrashEmptied,
+        progress: MoveProgress<'_>,
+        stop: Stopping<'_>,
+    ) -> Result<()> {
+        let notes = Notes::new(self.store);
+        let mut since: Option<Instant> = None;
+        // Rests as long as the batch before took, so the window's reads
+        // and writes, which wait for its transaction, get the database
+        // between two batches.
+        let mut next = || {
+            if let Some(since) = since {
+                std::thread::sleep(since.elapsed());
             }
-            let held = self
-                .store
-                .current_fields_of(purged.iter().map(String::as_str))?;
-            for fields in held.values() {
-                for (field, _) in fields.iter() {
-                    for (kind, prefix) in BLOB_KINDS {
-                        if let Some(hash) = field.strip_prefix(prefix) {
-                            refs.insert(format!("{kind}/{hash}"));
+            if stop() {
+                return false;
+            }
+            since = Some(Instant::now());
+            true
+        };
+        let selected = self.notes()?;
+        // Read for all of them at once, before anything is written: one
+        // pass, not one per Note.
+        let mut sections = notes.sections_of(&selected)?;
+        progress(0, selected.len());
+        let mut at = 0;
+        for ids in selected.chunks(PER_BATCH) {
+            if !next() {
+                return Ok(());
+            }
+            let (gone, held) = self.store.batch(|| {
+                let mut gone = Vec::new();
+                let mut purged = Vec::new();
+                for id in ids {
+                    if !self.still_purgeable(
+                        id,
+                        (note_keys::TYPE, note_keys::TYPE_NOTE),
+                        note_keys::TRASHED,
+                        &|id| self.store.may_change(id),
+                    )? {
+                        continue;
+                    }
+                    // A merged Note's Section is the Note itself; both
+                    // keep their type under the same key.
+                    for section in sections.remove(id).unwrap_or_default() {
+                        if self.store.may_change(&section.id)? {
+                            self.store
+                                .append(&section.id, note_keys::TYPE, None, None)?;
+                            purged.push(section.id);
                         }
                     }
+                    self.store.append(id, note_keys::TYPE, None, None)?;
+                    purged.push(id.clone());
+                    gone.push(id.clone());
+                }
+                Ok((gone, self.refs_of(&purged)?))
+            })?;
+            emptied.notes.extend(gone);
+            refs.extend(held);
+            at += ids.len();
+            progress(at, selected.len());
+        }
+        let selected = self.routines()?;
+        for ids in selected.chunks(PER_BATCH) {
+            if !next() {
+                return Ok(());
+            }
+            let gone = self.store.batch(|| {
+                let mut gone = Vec::new();
+                for id in ids {
+                    if self.still_purgeable(
+                        id,
+                        (routine_keys::TYPE, routine_keys::TYPE_ROUTINE),
+                        routine_keys::TRASHED,
+                        &|id| self.store.may_change_routine(id),
+                    )? {
+                        self.store.append(id, routine_keys::TYPE, None, None)?;
+                        gone.push(id.clone());
+                    }
+                }
+                Ok(gone)
+            })?;
+            emptied.routines.extend(gone);
+        }
+        Ok(())
+    }
+
+    /// Whether `id`, picked before an earlier batch, still has `type_` and
+    /// is in the trash under `trashed`, also in the log, and this Device
+    /// may still change it, as `may_change` tells: brought back or purged
+    /// meanwhile, it stays as it is.
+    fn still_purgeable(
+        &self,
+        id: &str,
+        type_: (&str, &str),
+        trashed: &str,
+        may_change: &dyn Fn(&str) -> Result<bool>,
+    ) -> Result<bool> {
+        let fields = self.store.current_fields(id)?;
+        Ok(fields.get(type_.0) == Some(type_.1)
+            && fields.get(trashed).is_some()
+            && self.store.logged(id, trashed)?.is_some()
+            && may_change(id)?)
+    }
+
+    /// The photos, recordings and files the `purged` entities name, as
+    /// `<kind>/<hash>`.
+    fn refs_of(&self, purged: &[String]) -> Result<BTreeSet<String>> {
+        let mut refs = BTreeSet::new();
+        let held = self
+            .store
+            .current_fields_of(purged.iter().map(String::as_str))?;
+        for fields in held.values() {
+            for (field, _) in fields.iter() {
+                for (kind, prefix) in BLOB_KINDS {
+                    if let Some(hash) = field.strip_prefix(prefix) {
+                        refs.insert(format!("{kind}/{hash}"));
+                    }
                 }
             }
-            let gone_routines = self.routines()?;
-            for id in &gone_routines {
-                self.store.append(id, routine_keys::TYPE, None, None)?;
-            }
-            Ok((gone, gone_routines))
-        })?;
-        // Once the purge is in: the bytes are not part of the transaction.
-        let known = self.store.known_blobs()?;
+        }
+        Ok(refs)
+    }
+
+    /// Lets go of the bytes of `refs` on this Device, those a Note not
+    /// purged still shows kept; returns those let go, sorted. Once the
+    /// purge is in: the bytes are not part of a transaction.
+    fn drop_blobs(&self, refs: &BTreeSet<String>) -> Result<Vec<String>> {
         let mut blobs = Vec::new();
+        if refs.is_empty() {
+            return Ok(blobs);
+        }
+        let known = self.store.known_blobs()?;
         for reference in refs {
-            if known.contains(&reference) {
+            if known.contains(reference) {
                 continue;
             }
-            let (kind, hash) = split_blob_ref(&reference);
+            let (kind, hash) = split_blob_ref(reference);
             if self.store.drop_blob(kind, hash)? {
-                blobs.push(reference);
+                blobs.push(reference.clone());
             }
         }
-        Ok(TrashEmptied {
-            notes: gone,
-            routines: gone_routines,
-            blobs,
-        })
+        Ok(blobs)
     }
 
     /// The Notes in the trash a purge removes, by id, as the Dart core's
