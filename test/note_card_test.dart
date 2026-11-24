@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/note_card.dart';
+import 'package:oldbrainfix/src/photo_views.dart';
 import 'package:oldbrainfix/src/sent_item_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -282,6 +284,59 @@ void main() {
       expect(find.byType(Divider), findsNothing);
       expect(find.byKey(const ValueKey('note-actions')), findsNothing);
       expect(find.byKey(const ValueKey('note-menu')), findsNothing);
+    });
+  });
+
+  group('a Note without words (obf-1049)', () {
+    Uint8List photo(int n) => Uint8List.fromList([0xFF, 0xD8, 0xFF, 0xD9, n]);
+    Uint8List voice(int n) => Uint8List.fromList([0x52, 0x49, 0x46, 0x46, n]);
+    Note read(String id) => notes.byId(id)!;
+
+    testWidgets('a photo Note is named by the first line of its Photo Text', (
+      tester,
+    ) async {
+      final receipt = notes.capture('', photos: [photo(1)]);
+      notes.setPhotoText(receipt.id, receipt.photos.single, ' RECEIPT\nTotal');
+      await card(tester, read(receipt.id));
+
+      final name = find.byKey(const ValueKey('note-photo-name'));
+      expect(tester.widget<Text>(name).data, 'RECEIPT');
+      expect(top(tester, name), lessThan(top(tester, find.byType(NotePhoto))));
+      expect(read(receipt.id).text, '');
+    });
+
+    testWidgets('a voice Note shows its Transcript once, under the play '
+        'button', (tester) async {
+      final memo = notes.capture('', recordings: [voice(1)]);
+      notes.setTranscript(memo.id, memo.recordings.single, 'Pills\nblue');
+      await card(tester, read(memo.id));
+
+      expect(find.byKey(const ValueKey('note-photo-name')), findsNothing);
+      expect(find.textContaining('Pills'), findsOneWidget);
+    });
+
+    testWidgets('a photo Note with a Transcript goes by it, shown once', (
+      tester,
+    ) async {
+      final both = notes.capture(
+        '',
+        photos: [photo(2)],
+        recordings: [voice(2)],
+      );
+      notes
+        ..setPhotoText(both.id, both.photos.single, 'RECEIPT')
+        ..setTranscript(both.id, both.recordings.single, 'Pills');
+      await card(tester, read(both.id));
+
+      expect(find.byKey(const ValueKey('note-photo-name')), findsNothing);
+      expect(find.text('Pills'), findsOneWidget);
+    });
+
+    testWidgets('without any words it shows no name', (tester) async {
+      final plain = notes.capture('', photos: [photo(3)]);
+      await card(tester, read(plain.id));
+
+      expect(find.byKey(const ValueKey('note-photo-name')), findsNothing);
     });
   });
 

@@ -270,7 +270,7 @@ class CalendarMirror extends ChangeNotifier {
   String _textOf(AppLocalizations t, Routines routines, Routine routine) {
     if (AreaLocks(store).masks(routine)) return maskedText(t, '', routine);
     final note = routines.note(routine);
-    return note == null ? t.noteGone : noteText(t, note);
+    return note == null ? t.noteGone : noteCalendarText(t, note);
   }
 
   Future<void> _sync() async {

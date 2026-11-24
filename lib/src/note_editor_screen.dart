@@ -115,7 +115,7 @@ NoteCalendar noteCalendar(
           context,
           CalendarEvent.ofText(
             note.id,
-            typed.isEmpty ? noteText(t, note) : typed,
+            typed.isEmpty ? noteCalendarText(t, note) : typed,
           ),
         ),
       ),

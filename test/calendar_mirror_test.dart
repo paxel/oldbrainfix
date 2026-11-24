@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/app.dart';
@@ -11,6 +13,7 @@ import 'open_settings.dart';
 
 void main() {
   late Store store;
+  late Notes notes;
   late Routines routines;
   late FakeMirror mirror;
   // 09:00 on Saturday, 24 October 2026, on the test machine's clock.
@@ -20,6 +23,7 @@ void main() {
   setUp(() {
     now = DateTime(2026, 10, 24, 9);
     store = Store.inMemory(clock: () => now)..starterSetOffered = true;
+    notes = Notes(store);
     routines = Routines(store);
     mirror = FakeMirror();
   });
@@ -264,6 +268,31 @@ void main() {
       expect(mirror.mirroredIn('1').keys, [uid(pills, 9)]);
 
       expect(mirror.events[foreign]?.title, 'Dentist');
+    });
+
+    testWidgets('a Note without words goes by its Transcript once it is '
+        'written (obf-1049)', (tester) async {
+      final memo = notes.capture(
+        '',
+        recordings: [
+          Uint8List.fromList([1]),
+        ],
+      );
+      final pills = routines.spawn(memo.id, daily(8));
+      await start(tester);
+      expect(mirror.mirroredIn('1')[uid(pills, 8)]?.title, 'Voice recording');
+
+      notes.setTranscript(memo.id, memo.recordings.single, 'pills\nblue');
+      await settle(tester);
+      final event = mirror.mirroredIn('1')[uid(pills, 8)];
+      expect(event?.title, 'pills');
+      expect(event?.description, 'pills\nblue');
+      expect(notes.byId(memo.id)?.text, '');
+
+      // Only the description changes: the event follows.
+      notes.setTranscript(memo.id, memo.recordings.single, 'pills\nred');
+      await settle(tester);
+      expect(mirror.mirroredIn('1')[uid(pills, 8)]?.description, 'pills\nred');
     });
 
     testWidgets('an event removed by hand comes back', (tester) async {

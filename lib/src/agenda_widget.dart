@@ -386,8 +386,8 @@ class _Words {
     this.hidesChecked,
   );
 
-  /// The first line of [note]'s text, "Photo" for a photo Note without
-  /// words.
+  /// The first line of [note]'s text or of its Transcript or Photo Text,
+  /// "Photo" for a photo Note without any.
   String _firstLine(Note note) =>
       noteText(t, note).trim().split('\n').first.trim();
 

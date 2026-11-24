@@ -110,7 +110,10 @@ List<CalendarEvent> eventsOf(
 ) {
   final t = context.t;
   final note = routines.note(routine);
-  return routineEvents(routine, note == null ? t.noteGone : noteText(t, note));
+  return routineEvents(
+    routine,
+    note == null ? t.noteGone : noteCalendarText(t, note),
+  );
 }
 
 /// One choice of a calendar menu: what it says and what it does.
@@ -193,7 +196,7 @@ Future<void> shareRoutinesFile(
     list,
     (routine) {
       final note = routines.note(routine);
-      return note == null ? t.noteGone : noteText(t, note);
+      return note == null ? t.noteGone : noteCalendarText(t, note);
     },
     stamp: routines.store.clock(),
     allDayFrom: routines.store.allDayFrom,

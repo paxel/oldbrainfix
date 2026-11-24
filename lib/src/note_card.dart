@@ -1759,6 +1759,11 @@ class _CompactNoteState extends State<_CompactNote> {
   NoteKind _kind = NoteKind.plain;
   List<String> _glance = const [];
 
+  /// The Photo Text line a photo Note without words is named by
+  /// (obf-1049); empty when it has none, or when it is named by a
+  /// Transcript, which the card shows under its play button anyway.
+  String _photoName = '';
+
   @override
   void initState() {
     super.initState();
@@ -1776,6 +1781,18 @@ class _CompactNoteState extends State<_CompactNote> {
   void _read() {
     _kind = widget.kind?.call() ?? NoteKind.plain;
     _glance = widget.glance?.call() ?? const [];
+    _photoName = _namedByPhoto(widget.note) ? widget.note.shownName : '';
+  }
+
+  /// Whether [note] has no words and goes by a Photo Text of a photo it
+  /// still shows, which the card does not show otherwise; the Texts of
+  /// recordings and of removed photos show on it already.
+  static bool _namedByPhoto(Note note) {
+    bool words(String? text) => text != null && text.trim().isNotEmpty;
+    return !words(note.shownText) &&
+        !note.recordings.any((hash) => words(note.transcripts[hash])) &&
+        !note.removedRecordings.any((hash) => words(note.transcripts[hash])) &&
+        note.photos.any((hash) => words(note.photoTexts[hash]));
   }
 
   @override
@@ -1870,8 +1887,20 @@ class _CompactNoteState extends State<_CompactNote> {
             ),
           ),
         ...glance,
-        // Without words it shows what it holds instead.
+        // Without words it shows what it holds instead, named by the
+        // first line of a photo's text when it has one.
         if (shown.trim().isEmpty) ...[
+          if (_photoName.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                _photoName,
+                key: const ValueKey('note-photo-name'),
+                style: text.bodyLarge,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           if (note.photos.isNotEmpty)
             // Not a sideways list: swipes on a card belong to the browser.
             Row(

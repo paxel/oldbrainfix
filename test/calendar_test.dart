@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -139,6 +140,61 @@ void main() {
       expect(event.rule, isNull);
     });
 
+    testWidgets('a Note without words goes by its Transcript, the whole of '
+        'it the description (obf-1049)', (tester) async {
+      final memo = notes.capture(
+        '',
+        recordings: [
+          Uint8List.fromList([1]),
+        ],
+      );
+      notes.setTranscript(
+        memo.id,
+        memo.recordings.single,
+        'Ring the plumber\nabout the tap',
+      );
+      routines.spawn(memo.id, daily([at(8)]));
+      await start(tester);
+      await edit(tester, memo.id);
+
+      await tap(tester, calendarButton);
+      await tap(tester, find.text('Add to calendar at a time you pick'));
+      final event = calendar.inserted.single;
+      expect(event.summary, 'Ring the plumber');
+      expect(event.description, 'Ring the plumber\nabout the tap');
+
+      await tap(tester, calendarButton);
+      await tap(tester, find.text('Add to calendar: Every day · 08:00'));
+      expect(calendar.inserted.last.summary, 'Ring the plumber');
+      expect(
+        calendar.inserted.last.description,
+        'Ring the plumber\nabout the tap',
+      );
+
+      await tap(tester, calendarButton);
+      await tap(tester, find.text(share));
+      final (_, ics) = calendar.shared.single;
+      expect(ics, contains('SUMMARY:Ring the plumber'));
+      expect(ics, contains('DESCRIPTION:Ring the plumber\\nabout the tap'));
+      expect(notes.byId(memo.id)?.text, '');
+    });
+
+    testWidgets('a Note without any words keeps its word for what it holds', (
+      tester,
+    ) async {
+      final memo = notes.capture(
+        '',
+        recordings: [
+          Uint8List.fromList([1]),
+        ],
+      );
+      await start(tester);
+      await edit(tester, memo.id);
+
+      await tap(tester, calendarButton);
+      expect(calendar.inserted.single.summary, 'Voice recording');
+    });
+
     testWidgets('a Note offers itself, its Routines and their file', (
       tester,
     ) async {
@@ -268,6 +324,25 @@ void main() {
       expect(ics, contains('UID:${pills.id}-2000@oldbrainfix'));
       expect(ics, contains('UID:${dentist.id}-1430@oldbrainfix'));
       expect('BEGIN:VALARM'.allMatches(ics), hasLength(3));
+    });
+
+    testWidgets('Export names a Note without words by its Transcript '
+        '(obf-1049)', (tester) async {
+      final memo = notes.capture(
+        '',
+        recordings: [
+          Uint8List.fromList([1]),
+        ],
+      );
+      notes.setTranscript(memo.id, memo.recordings.single, 'pills\nblue');
+      routines.spawn(memo.id, daily([at(8)]));
+      await start(tester);
+      await tap(tester, allButton);
+
+      await tap(tester, exportButton);
+      final (_, ics) = calendar.shared.single;
+      expect(ics, contains('SUMMARY:pills'));
+      expect(ics, contains('DESCRIPTION:pills\\nblue'));
     });
 
     testWidgets('nothing to export says so', (tester) async {
