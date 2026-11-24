@@ -595,6 +595,16 @@ void main() {
     await tester.tap(key('two-row-insert-box'));
     await tester.pumpAndSettle();
     expect(controller.text, contains('| **☐oat** | 1 |'));
+    // Code in an empty cell is inline code, never a code block.
+    editing(tester).value = const TextEditingValue(
+      text: '',
+      selection: TextSelection.collapsed(offset: 0),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(key('format-code'));
+    await tester.pumpAndSettle();
+    expect(editing(tester).text, '``');
+    expect(controller.text, isNot(contains('```')));
     await tester.pumpWidget(const SizedBox.shrink());
 
     // Simple: no bar while a cell is edited.

@@ -8048,7 +8048,7 @@ abstract class AppLocalizations {
   /// **'Link'**
   String get formatLink;
 
-  /// Format bar button: shows the selection or word as code, in a fixed-width font.
+  /// Format bar button: shows the selection or word as code, in a fixed-width font; a selection over several lines or an empty line becomes a code block.
   ///
   /// In en, this message translates to:
   /// **'Code'**

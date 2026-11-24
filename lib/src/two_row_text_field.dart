@@ -299,7 +299,9 @@ typedef FieldAction = ({
 /// of a formatted text shows the source of the cursor's line.
 ///
 /// With [lineFormats], the bar also has the formats of whole lines and
-/// the table button, which puts a new table at the cursor. A table of a
+/// the table button, which puts a new table at the cursor, and its Code
+/// makes a code block of lines, or of an empty line, as well as inline
+/// code. A table of a
 /// formatted text shows as the grid it is edited in ([TableGrid], #257):
 /// a tap on a cell edits it there, and the cursor goes into the grid
 /// with ◀ ▶ and the arrow keys rather than past it, also with the table
@@ -700,6 +702,34 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
     if (change.text != text && !controller.markdown) {
       _becomeFormatted(controller);
     }
+  }
+
+  /// What Code of the bar does: with the formats of lines, a selection
+  /// over more than one line, the cursor on an empty line, or either in a
+  /// code block makes or takes off a code block ([Markdown.codeBlock]),
+  /// the cursor in a new one's first line; else the selection or the word
+  /// at the cursor becomes inline code or stops being it.
+  MarkdownChange _codeOf(
+    String text,
+    int start,
+    int end, {
+    required bool inBlock,
+  }) {
+    bool isBreak(int at) =>
+        text.codeUnitAt(at) == 0x0A || text.codeUnitAt(at) == 0x0D;
+    final (s, e) = start <= end ? (start, end) : (end, start);
+    final lines = text.substring(s, e).contains(RegExp(r'\r|\n'));
+    final empty =
+        s == e &&
+        (s == 0 || isBreak(s - 1)) &&
+        (s == text.length || isBreak(s));
+    if (widget.lineFormats && (lines || empty || inBlock)) {
+      final change = Markdown.codeBlock(text, start, end);
+      // A new block of lines puts the cursor in its first line.
+      if (inBlock) return change;
+      return (text: change.text, start: change.start, end: change.start);
+    }
+    return Markdown.toggle(text, start, end, MarkdownSpanKind.code);
   }
 
   /// Asks for the address of a link on the selection or the word at the
@@ -1532,6 +1562,25 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
           active: at.spans.contains(MarkdownSpanKind.strike),
           run: () => toggle(MarkdownSpanKind.strike),
         ),
+        // Before the line formats, so that a narrow phone shows it
+        // without ⋮: the backtick is far into its keyboard (#410).
+        _Format(
+          key: 'format-code',
+          label: t.formatCode,
+          icon: (_) => const Icon(Icons.code),
+          toggles: true,
+          active:
+              at.spans.contains(MarkdownSpanKind.code) ||
+              (widget.lineFormats && at.line == MarkdownBlockKind.code),
+          run: () => _format(
+            (text, start, end) => _codeOf(
+              text,
+              start,
+              end,
+              inBlock: at.line == MarkdownBlockKind.code,
+            ),
+          ),
+        ),
         if (widget.lineFormats) ...[
           _Format(
             key: 'format-heading1',
@@ -1589,14 +1638,6 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
             icon: (_) => const Icon(Icons.add_link),
             run: () => unawaited(_linkTo(pick)),
           ),
-        _Format(
-          key: 'format-code',
-          label: t.formatCode,
-          icon: (_) => const Icon(Icons.code),
-          toggles: true,
-          active: at.spans.contains(MarkdownSpanKind.code),
-          run: () => toggle(MarkdownSpanKind.code),
-        ),
         if (widget.lineFormats) ...[
           _Format(
             key: 'format-code-block',
