@@ -199,6 +199,19 @@ fn click(
     wanted: &OccurrenceWanted,
     (routine, occurrence): (&str, Occurrence),
 ) -> TestResult {
+    ask(harness, wanted, (routine, occurrence))?;
+    harness.run();
+    Ok(())
+}
+
+/// The click of [`click`] without running the window after it: while
+/// the Agenda is read on its own thread, the window keeps repainting
+/// until the read comes in, so the caller steps it.
+fn ask(
+    harness: &mut Harness<'_, App>,
+    wanted: &OccurrenceWanted,
+    (routine, occurrence): (&str, Occurrence),
+) -> TestResult {
     let key = occurrence_key(routine, &occurrence);
     let at = DateTime::from_timestamp(1_793_000_000, 0).unwrap_or_default();
     let tap = Tap {
@@ -209,7 +222,6 @@ fn click(
     harness.state().click_trace().arrived(&tap);
     let asked = AgendaWanted::Occurrence(routine.to_string(), occurrence);
     *wanted.lock().map_err(|e| e.to_string())? = Some(asked);
-    harness.run();
     Ok(())
 }
 
@@ -513,14 +525,15 @@ fn with_the_agenda_read_on_its_thread_the_occurrence_is_placed_once_read() -> Te
             app,
         );
     harness.run();
-    click(&mut harness, &wanted, (&routine, monday()))?;
-    for _ in 0..40 {
+    ask(&mut harness, &wanted, (&routine, monday()))?;
+    for _ in 0..80 {
+        harness.run_steps(1);
         if went(&harness).is_some() {
             break;
         }
         std::thread::sleep(std::time::Duration::from_millis(25));
-        harness.run();
     }
+    harness.run_steps(2);
     assert_eq!(went(&harness).as_deref(), Some("Agenda today"));
     assert!(marked(&harness, PLANTS));
     Ok(())
