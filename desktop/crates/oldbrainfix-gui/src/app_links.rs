@@ -130,7 +130,13 @@ pub enum Picked {
 pub fn picker(ui: &mut Ui, t: &L10n, picker: &mut Picker, focus: bool) -> Option<Picked> {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
-    ui.label(RichText::new(t.format_link_to()).heading().color(text));
+    // A dialog's heading, not a page's title (obf-1121).
+    ui.label(
+        RichText::new(t.format_link_to())
+            .size(18.0)
+            .strong()
+            .color(text),
+    );
     // On its band, so the targets scroll under its line (obf-1088).
     let field = theme::search_band(ui, |ui| {
         ui.add(

@@ -156,7 +156,8 @@ There are three kinds, and an action takes the first that fits.
 - **Text sizes**: content (a card's text, Lines, typed text) is 16 and
   grows with Text size (#326; phone `bodyLarge` in `ContentText`,
   desktop `theme::content`). A page's or band's title is 22 (phone
-  `titleLarge`, desktop `BandSizes::title`). A dialog's heading is
+  `titleLarge`, desktop egui's heading text style, `ui.heading`, and
+  `BandSizes::title`, both `theme::TITLE`, obf-1121). A dialog's heading is
   Material's dialog title on the phone and 18 strong on the desktop
   (`.size(18.0).strong()`). A card's or section's heading is 16
   medium (phone `titleMedium`, through `sectionHeading` in `look.dart`,

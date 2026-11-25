@@ -25650,7 +25650,7 @@ impl BandSizes {
             arrow: 28.0 * factor,
             glyph: 20.0 * factor,
             words: 14.0 * factor,
-            title: 22.0 * factor,
+            title: theme::TITLE * factor,
         }
     }
 }

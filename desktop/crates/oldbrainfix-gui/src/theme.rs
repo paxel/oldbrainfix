@@ -359,9 +359,14 @@ pub const LABEL: f32 = 14.0;
 /// text size: egui's small text, `.small()`.
 pub const CAPTION: f32 = 12.0;
 
+/// The size of a page's or band's title (obf-1121), before the text
+/// size: egui's heading text, `ui.heading`.
+pub const TITLE: f32 = 22.0;
+
 /// Sets egui's text styles to the design's sizes (obf-1081): body and
-/// buttons [`LABEL`], small text [`CAPTION`], grown by this Device's
-/// text size as a card's text is; headings and code keep egui's.
+/// buttons [`LABEL`], small text [`CAPTION`], headings [`TITLE`]
+/// (obf-1121), grown by this Device's text size as a card's text is;
+/// code keeps egui's.
 fn text_styles(ctx: &Context) {
     let factor = text_factor(ctx);
     for theme in [Theme::Light, Theme::Dark] {
@@ -370,6 +375,7 @@ fn text_styles(ctx: &Context) {
                 (egui::TextStyle::Body, LABEL),
                 (egui::TextStyle::Button, LABEL),
                 (egui::TextStyle::Small, CAPTION),
+                (egui::TextStyle::Heading, TITLE),
             ] {
                 s.text_styles
                     .insert(style, egui::FontId::proportional(size * factor));

@@ -1,6 +1,6 @@
 //! The desktop's shared blocks of the design system (obf-1081): labels
-//! and buttons 14 and captions 12 in egui's text styles, growing with
-//! Text size; a chip a full pill, 32 high and 36 in a band; the text
+//! and buttons 14, captions 12 and page titles 22 (obf-1121) in egui's
+//! text styles, growing with Text size; a chip a full pill, 32 high and 36 in a band; the text
 //! button with an icon in the accent's colour, tinted under the pointer;
 //! and "Open in the editor" in the outlined button's tonal fill.
 
@@ -80,7 +80,7 @@ fn near(a: f32, b: f32) -> bool {
 }
 
 #[test]
-fn labels_and_buttons_are_14_and_captions_12_growing_with_text_size() {
+fn labels_and_buttons_are_14_captions_12_and_titles_22_growing_with_text_size() {
     for (size, factor) in [(TextSize::Normal, 1.0), (TextSize::Largest, 1.3)] {
         let harness = harness(size, |ui| {
             ui.label("Words");
@@ -95,6 +95,10 @@ fn labels_and_buttons_are_14_and_captions_12_growing_with_text_size() {
         assert!(
             near(of(TextStyle::Small), 12.0 * factor),
             "small at {size:?}"
+        );
+        assert!(
+            near(of(TextStyle::Heading), 22.0 * factor),
+            "heading at {size:?}"
         );
     }
 }

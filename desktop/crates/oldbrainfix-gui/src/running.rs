@@ -121,12 +121,8 @@ pub fn page(
         .auto_shrink([false, true])
         .show(ui, |ui| {
             ui.spacing_mut().item_spacing.y = 8.0;
-            ui.label(
-                RichText::new(t.running_title())
-                    .size(18.0)
-                    .strong()
-                    .color(text),
-            );
+            // A page's title (obf-1121).
+            ui.heading(RichText::new(t.running_title()).color(text));
             if jobs.is_empty() {
                 ui.label(RichText::new(t.running_none()).color(weak));
             }

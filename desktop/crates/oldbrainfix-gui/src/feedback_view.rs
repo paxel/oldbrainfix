@@ -255,12 +255,8 @@ pub fn form(
         .auto_shrink([false, true])
         .show(ui, |ui| {
             ui.spacing_mut().item_spacing.y = 8.0;
-            ui.label(
-                RichText::new(t.feedback_title())
-                    .size(18.0)
-                    .strong()
-                    .color(text),
-            );
+            // A page's title (obf-1121).
+            ui.heading(RichText::new(t.feedback_title()).color(text));
             let field = ui.add(
                 TextEdit::multiline(&mut form.text)
                     .id(egui::Id::new("feedback-text"))
