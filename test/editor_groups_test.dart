@@ -207,7 +207,7 @@ void main() {
     expect(
       tester.getSemantics(key('badge-add')),
       // A button as its group's others, which takes the focus too.
-      containsSemantics(
+      isSemantics(
         label: 'Routine, Reminder, Frog or Session',
         isButton: true,
         hasTapAction: true,
