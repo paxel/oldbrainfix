@@ -10,6 +10,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On tablets and iPads from 700 dp wide, the app shows the desktop's layout: a sidebar beside the list, a Note as a dialog. ([obf-1148](https://github.com/paxel/oldbrainfix/issues/464))
 - The app runs on the iPad as an iPad app, not at iPhone size. ([obf-1149](https://github.com/paxel/oldbrainfix/issues/465))
 - Export as AXT file… hands Notes, a selection, a Topic or an Area to other apps that speak AXT. ([obf-1145](https://github.com/paxel/oldbrainfix/issues/461))
+- An AXT file from another app opens in Old Brain Fix, and its ticked records become Notes in the place picked. ([obf-1146](https://github.com/paxel/oldbrainfix/issues/462))
 
 ---
 

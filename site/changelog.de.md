@@ -9,6 +9,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf einem Tablet oder iPad ab 700 dp Breite zeigt die App das Desktop-Layout: eine Seitenleiste neben der Liste, eine Notiz als Dialog. ([obf-1148](https://github.com/paxel/oldbrainfix/issues/464))
 - Die App läuft auf dem iPad als iPad-App, nicht in iPhone-Größe. ([obf-1149](https://github.com/paxel/oldbrainfix/issues/465))
 - „Als AXT-Datei exportieren…“ gibt Notizen, eine Auswahl, ein Thema oder einen Bereich an andere Apps, die AXT verstehen. ([obf-1145](https://github.com/paxel/oldbrainfix/issues/461))
+- Eine AXT-Datei aus einer anderen App öffnet sich in Old Brain Fix, und ihre angehakten Einträge werden Notizen am gewählten Ort. ([obf-1146](https://github.com/paxel/oldbrainfix/issues/462))
 
 ## [0.8.0] - 2026-11-25
 

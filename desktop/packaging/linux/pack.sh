@@ -19,7 +19,8 @@ entry=io.github.paxel.oldbrainfix.desktop
 mkdir -p "$dist"
 stage=$(mktemp -d)
 
-# The tarball: everything flat, as the formula expects.
+# The tarball: everything flat, as the formula expects. The app writes
+# the AXT file's type (io.github.paxel.oldbrainfix.xml) itself on start.
 bundle="$stage/bundle"
 mkdir -p "$bundle"
 cp "$binary" "$bundle/oldbrainfix"
@@ -37,10 +38,13 @@ case $arch in
 esac
 deb="$stage/deb"
 mkdir -p "$deb/DEBIAN" "$deb/usr/bin" "$deb/usr/share/applications" \
-  "$deb/usr/share/icons/hicolor/256x256/apps" "$deb/usr/share/doc/oldbrainfix"
+  "$deb/usr/share/icons/hicolor/256x256/apps" "$deb/usr/share/doc/oldbrainfix" \
+  "$deb/usr/share/mime/packages"
 cp "$binary" "$deb/usr/bin/oldbrainfix"
 chmod 0755 "$deb/usr/bin/oldbrainfix"
 cp "$here/$entry" "$deb/usr/share/applications/$entry"
+# The AXT file's type the entry's MimeType names (obf-1146).
+cp "$here/io.github.paxel.oldbrainfix.xml" "$deb/usr/share/mime/packages/"
 cp "$icons/icon_256.png" "$deb/usr/share/icons/hicolor/256x256/apps/oldbrainfix.png"
 cp "$root/LICENSE-APACHE" "$root/LICENSE-MIT" "$deb/usr/share/doc/oldbrainfix/"
 # Depends: what the binary links (readelf -d), plus the libraries winit

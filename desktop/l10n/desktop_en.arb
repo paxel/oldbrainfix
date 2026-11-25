@@ -996,7 +996,7 @@
   "menuRunning": "Running",
   "@menuRunning": {"description": "View menu entry (obf-1078): opens the page Running, which lists what runs in the background with Abort."},
   "deskMenuOpen": "Open",
-  "@deskMenuOpen": {"description": "File menu submenu (obf-1014): Markdown file…, Pack… and A Backup…."},
+  "@deskMenuOpen": {"description": "File menu submenu (obf-1014): Markdown file…, Pack…, AXT file… (obf-1146) and A Backup…."},
   "deskOpenMarkdownFile": "Markdown file…",
   "@deskOpenMarkdownFile": {"description": "File ▸ Open ▸ (obf-1014, obf-1056): picks a Markdown file and shows it in a viewer of its own."},
   "deskOpenPack": "Pack…",
@@ -1126,5 +1126,15 @@
   "deskAxtNotSaved": "The AXT file was not saved.",
   "@deskAxtNotSaved": {"description": "Announced at the top of the desktop when the AXT file could not be written; the click opens the dialog with the cause and the fix (obf-1145)."},
   "deskAxtNotSavedTitle": "AXT file not saved",
-  "@deskAxtNotSavedTitle": {"description": "Title of the dialog behind 'deskAxtNotSaved'."}
+  "@deskAxtNotSavedTitle": {"description": "Title of the dialog behind 'deskAxtNotSaved'."},
+  "deskOpenAxt": "AXT file…",
+  "@deskOpenAxt": {"description": "File ▸ Open ▸ on the desktop (obf-1146): picks an AXT file, the open format other small apps write, and shows its records to take."},
+  "deskAxtOpenTitle": "Open an AXT file",
+  "@deskAxtOpenTitle": {"description": "Title of the desktop's open dialog after File ▸ Open ▸ AXT file… (obf-1146)."},
+  "deskAxtOpening": "Opening the AXT file…",
+  "@deskAxtOpening": {"description": "Names the line under the desktop's menu bar and the job on the page Running while an AXT file is read beside the window (obf-1146)."},
+  "deskRunningAxtAbort": "The AXT file is not shown, and nothing is taken from it.",
+  "@deskRunningAxtAbort": {"description": "Under the Abort of reading an AXT file on the page Running (obf-1146)."},
+  "deskRunningAxtStopped": "Stopped: the AXT file was not opened.",
+  "@deskRunningAxtStopped": {"description": "On the page Running for reading an AXT file Abort stopped (obf-1146)."}
 }

@@ -592,7 +592,7 @@ fn older_stays(locale: &'static str, launch: &Launch) -> Result<i32, String> {
     );
     if !matches!(
         launch,
-        Launch::Window | Launch::Tray | Launch::Popup | Launch::Open(_) | Launch::Markdown(_)
+        Launch::Window | Launch::Tray | Launch::Popup | Launch::Open(_) | Launch::Files(_)
     ) {
         return Ok(cli::FAILED);
     }
@@ -782,9 +782,10 @@ fn run() -> Result<i32, String> {
             }
             Some(Command::Open)
         }
-        Launch::Markdown(files) => {
-            // Each in a viewer of the running app, one connection each
-            // (obf-1056); without one, this start shows them.
+        Launch::Files(files) => {
+            // Each in a viewer of the running app, an AXT file in its
+            // dialog, one connection each (obf-1056, obf-1146); without
+            // one, this start shows them.
             let paths: Vec<std::path::PathBuf> = files
                 .iter()
                 .map(|f| std::path::absolute(f).unwrap_or_else(|_| f.into()))
@@ -809,7 +810,7 @@ fn run() -> Result<i32, String> {
     // The menu entry and icon the window's app id names, kept current.
     #[cfg(target_os = "linux")]
     std::thread::spawn(oldbrainfix_gui::launcher::register);
-    // Offered under "Open with" for Markdown files, kept current; a file
+    // Offered under "Open with" for Markdown and AXT files, kept current; a file
     // opened with it while it runs comes in over the named pipe (Q12).
     #[cfg(windows)]
     std::thread::spawn(oldbrainfix_gui::open_with::register);

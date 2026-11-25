@@ -586,5 +586,10 @@
   "deskAreaExport": "Exportieren",
   "deskAxtSaveTitle": "Die AXT-Datei speichern",
   "deskAxtNotSaved": "Die AXT-Datei wurde nicht gespeichert.",
-  "deskAxtNotSavedTitle": "AXT-Datei nicht gespeichert"
+  "deskAxtNotSavedTitle": "AXT-Datei nicht gespeichert",
+  "deskOpenAxt": "AXT-Datei …",
+  "deskAxtOpenTitle": "Eine AXT-Datei öffnen",
+  "deskAxtOpening": "Die AXT-Datei wird geöffnet …",
+  "deskRunningAxtAbort": "Die AXT-Datei wird nicht gezeigt, und nichts daraus wird übernommen.",
+  "deskRunningAxtStopped": "Angehalten: Die AXT-Datei wurde nicht geöffnet."
 }

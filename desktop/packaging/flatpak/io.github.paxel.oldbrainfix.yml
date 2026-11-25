@@ -57,6 +57,9 @@ modules:
       # Without the marker: inside the sandbox the app never rewrites it.
       - grep -v '^X-Oldbrainfix-Managed=' desktop/packaging/linux/io.github.paxel.oldbrainfix.desktop > io.github.paxel.oldbrainfix.desktop
       - install -Dm644 -t /app/share/applications io.github.paxel.oldbrainfix.desktop
+      # The AXT file's type its MimeType names (obf-1146), exported by its
+      # app-id name.
+      - install -Dm644 -t /app/share/mime/packages desktop/packaging/linux/io.github.paxel.oldbrainfix.xml
       - install -Dm644 desktop/packaging/icon/icon_256.png /app/share/icons/hicolor/256x256/apps/oldbrainfix.png
       - install -Dm644 -t /app/share/metainfo io.github.paxel.oldbrainfix.metainfo.xml
       - install -Dm644 -t /app/share/licenses/io.github.paxel.oldbrainfix LICENSE-APACHE LICENSE-MIT THIRD-PARTY-NOTICES.md

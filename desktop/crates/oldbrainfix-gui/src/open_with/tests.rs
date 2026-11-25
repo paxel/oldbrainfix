@@ -28,6 +28,8 @@ fn markdown_files_are_offered_never_made_the_programs_default() {
     let keys: Vec<&str> = calls.iter().map(|c| c[1].as_str()).collect();
     assert!(keys.contains(&"HKCU\\Software\\Classes\\.md\\OpenWithList\\oldbrainfix.exe"));
     assert!(keys.contains(&"HKCU\\Software\\Classes\\.markdown\\OpenWithList\\oldbrainfix.exe"));
+    // And AXT files (obf-1146).
+    assert!(keys.contains(&"HKCU\\Software\\Classes\\.axt\\OpenWithList\\oldbrainfix.exe"));
     // Nothing names the ending's own program, which picks the default.
     for call in &calls {
         let key = call[1].as_str();

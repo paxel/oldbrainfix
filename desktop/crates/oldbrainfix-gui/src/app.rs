@@ -117,7 +117,7 @@ use crate::ask_view::{self, AskAsked, AskFields, AskPanel, AskSetting};
 use crate::attachment_view::{self, HeldFile};
 use crate::auto_sync::Syncing;
 use crate::autostart::Autostart;
-use crate::axt_view::{self, AxtOf};
+use crate::axt_view::{self, AxtAsk, AxtOf, AxtOpened};
 use crate::background;
 use crate::backup_view::{
     self, BackupAction, BackupNotes, BackupNotesAction, Passphrase, Welcome, WelcomeAction,
@@ -636,6 +636,8 @@ enum PackDid {
     BackupAdded(oldbrainfix_core::Result<oldbrainfix_core::PackAdded>),
     /// An AXT file saved (obf-1145).
     AxtSaved(std::result::Result<(), String>),
+    /// An AXT file read (obf-1146), or why it is none.
+    AxtRead(std::result::Result<oldbrainfix_core::axt::AxtFile, String>),
 }
 
 /// What a Pack's work off the window's thread is doing: opening a Pack,
@@ -648,6 +650,9 @@ enum PackWork {
     Saving,
     Backup,
     AxtSaving,
+    /// Reading an AXT file opened (obf-1146), which the line under the
+    /// menu bar says.
+    AxtOpening,
 }
 
 /// The file at `path` as far as it may be a Pack (#165).
@@ -1247,6 +1252,9 @@ enum Dialog {
     },
     /// A Pack opened here (#165): its tree, the items `ticks` ticks, and
     /// whether "Claim as mine" is ticked.
+    /// An AXT file opened (obf-1146): its records, ticked, and where
+    /// they go.
+    AxtOpened(Box<AxtOpened>),
     PackOpened {
         opened: Box<OpenedPack>,
         ticks: PackTicks,
@@ -2039,6 +2047,11 @@ enum Action {
     Feedback(FeedbackAsk),
     /// File ▸ Open Pack…: asks for the file and opens it (#165).
     OpenPack,
+    /// File ▸ Open ▸ AXT file…: asks for the file and opens it
+    /// (obf-1146).
+    OpenAxt,
+    /// Take it or Cancel in an AXT file's dialog (obf-1146).
+    Axt(AxtAsk),
     /// Removes the "From …" badge of the Note (#165), without asking
     /// (#268).
     RemovePackFrom(String),
@@ -2614,6 +2627,8 @@ pub struct App {
     feedback_facts: FeedbackFacts,
     feedback: FeedbackForm,
     pack_opener: FolderPicker,
+    /// Asks which AXT file to open (obf-1146).
+    axt_opener: FolderPicker,
     /// Asks where to save a calendar file, of one Routine or of all.
     calendar_saver: FileSaver,
     /// Asks where to save a Note as Markdown (#129).
@@ -3244,6 +3259,7 @@ impl App {
             feedback_facts: FeedbackFacts::of_this_computer(),
             feedback: FeedbackForm::default(),
             pack_opener: Box::new(|title| pack_dialog(title).pick_file()),
+            axt_opener: Box::new(|title| axt_dialog(title).pick_file()),
             calendar_saver: Box::new(|title, name| {
                 calendar_dialog(title).set_file_name(name).save_file()
             }),
@@ -4122,6 +4138,11 @@ impl App {
         self.pack_opener = opener;
     }
 
+    /// Hands in the dialog asking which AXT file to open (obf-1146).
+    pub fn set_axt_opener(&mut self, opener: FolderPicker) {
+        self.axt_opener = opener;
+    }
+
     /// Hands in the dialog asking where to save a calendar file.
     pub fn set_calendar_saver(&mut self, saver: FileSaver) {
         self.calendar_saver = saver;
@@ -4605,6 +4626,11 @@ impl App {
             self.open_viewer(path.to_path_buf());
             return;
         }
+        // An AXT file by its content or its name (obf-1146).
+        if axt_view::looks_like_axt(path) {
+            self.open_axt(path.to_path_buf());
+            return;
+        }
         let most = sent::MAX_BYTES.max(cards::MAX_FILE_BYTES) as u64;
         match pack_file(path, most) {
             PackFile::Bytes(bytes) => {
@@ -4706,6 +4732,14 @@ impl App {
         self.pack_work
             .iter()
             .any(|w| w.kind == PackWork::Opening && !w.dropped)
+    }
+
+    /// Whether an AXT file is being read off the window's thread
+    /// (obf-1146).
+    fn axt_opening(&self) -> bool {
+        self.pack_work
+            .iter()
+            .any(|w| w.kind == PackWork::AxtOpening && !w.dropped)
     }
 
     /// Whether a Pack is being saved off the window's thread.
@@ -4836,6 +4870,20 @@ impl App {
                 since: Some(opening.since),
                 abort: Abort::Offered,
                 abort_does: Some(t.running_pack_abort().to_string()),
+            });
+        }
+        for opening in self
+            .pack_work
+            .iter()
+            .filter(|w| w.kind == PackWork::AxtOpening && !w.dropped)
+        {
+            jobs.push(Job {
+                id: JobId::AxtOpening,
+                what: t.desk_axt_opening().to_string(),
+                far: None,
+                since: Some(opening.since),
+                abort: Abort::Offered,
+                abort_does: Some(t.desk_running_axt_abort().to_string()),
             });
         }
         // The window waits for it: no Abort.
@@ -4981,6 +5029,21 @@ impl App {
                     goes_on: false,
                 });
             }
+            running::Act::Abort(JobId::AxtOpening) => {
+                for opening in self
+                    .pack_work
+                    .iter_mut()
+                    .filter(|w| w.kind == PackWork::AxtOpening)
+                {
+                    opening.dropped = true;
+                }
+                self.stopped_jobs.push(Ended {
+                    id: JobId::AxtOpening,
+                    what: t.desk_axt_opening().to_string(),
+                    said: t.desk_running_axt_stopped().to_string(),
+                    goes_on: false,
+                });
+            }
             running::Act::Abort(JobId::AgendaRead | JobId::TrashEmptying) => {}
             running::Act::GoOn(JobId::Sync) => self.sync_goes_on(),
             running::Act::GoOn(JobId::Reading(kind)) => {
@@ -5057,6 +5120,7 @@ impl App {
             PackDid::BackupOpened(path, opened) => self.backup_notes_opened(&path, opened),
             PackDid::BackupAdded(added) => self.backup_notes_added(added),
             PackDid::AxtSaved(saved) => self.axt_saved(saved),
+            PackDid::AxtRead(read) => self.axt_read(read),
         }
     }
 
@@ -5160,6 +5224,67 @@ impl App {
         self.pack_aside(PackWork::AxtSaving, move |store| {
             PackDid::AxtSaved(axt_view::write_file(store, &ids, &path))
         });
+        Ok(())
+    }
+
+    /// Opens the AXT file at `path` (obf-1146): read off the window's
+    /// thread, its records then shown in their dialog.
+    fn open_axt(&mut self, path: std::path::PathBuf) {
+        let wall = self.wall.clone();
+        self.pack_aside(PackWork::AxtOpening, move |store| {
+            let read = std::fs::read(&path)
+                .map_err(|e| e.to_string())
+                .and_then(|bytes| store.axt_read(&bytes, &*wall).map_err(|e| e.to_string()))
+                .and_then(|file| file.map_err(|_| "no AXT file".to_string()));
+            PackDid::AxtRead(read)
+        });
+    }
+
+    /// An AXT file read (obf-1146): its dialog, every record it can take
+    /// ticked, into Unsorted; one that is none is announced, why behind
+    /// the click.
+    fn axt_read(&mut self, read: std::result::Result<oldbrainfix_core::axt::AxtFile, String>) {
+        let t = self.t;
+        let shown = read.and_then(|file| {
+            let places = axt_view::places_for(&t, &self.store, &self.view.areas, &file)
+                .map_err(|e| e.to_string())?;
+            Ok(AxtOpened::new(file, places))
+        });
+        match shown {
+            Ok(opened) => self.dialog = Some(Dialog::AxtOpened(Box::new(opened))),
+            Err(e) => self.announce_failure(
+                t.axt_not_opened(),
+                t.axt_not_opened_title(),
+                (t.axt_unreadable(), t.axt_send_again_fix()),
+                format!("axt: {e}"),
+            ),
+        }
+    }
+
+    /// Take it (obf-1146): the records ticked become Notes where picked,
+    /// the dialog closed, how many announced; refused, nothing is written
+    /// and the dialog stays as it is, why behind the click.
+    fn take_axt(&mut self) -> oldbrainfix_core::Result<()> {
+        let Some(Dialog::AxtOpened(opened)) = &self.dialog else {
+            return Ok(());
+        };
+        let t = self.t;
+        let picked = opened.picked();
+        match self
+            .store
+            .axt_take(&opened.file, &picked, opened.place_id())
+        {
+            Ok(made) => {
+                self.dialog = None;
+                self.notice = Some(t.axt_taken(made.len() as i64));
+            }
+            Err(e) => self.announce_failure(
+                t.axt_not_taken(),
+                t.axt_not_taken_title(),
+                (t.axt_place_refused(), t.axt_pick_another_fix()),
+                format!("axt take: {e}"),
+            ),
+        }
         Ok(())
     }
 
@@ -10142,6 +10267,13 @@ impl App {
             }
             Action::Pack(asked) => self.pack_action(asked)?,
             Action::Feedback(asked) => self.feedback_action(asked)?,
+            Action::OpenAxt => {
+                if let Some(path) = (self.axt_opener)(self.t.desk_axt_open_title()) {
+                    self.open_axt(path);
+                }
+            }
+            Action::Axt(AxtAsk::Cancel) => self.dialog = None,
+            Action::Axt(AxtAsk::Take) => self.take_axt()?,
             Action::OpenPack => {
                 if let Some(path) = (self.pack_opener)(self.t.pack_open_title()) {
                     self.open_file(&path);
@@ -12155,8 +12287,9 @@ impl App {
     }
 
     /// The files dropped onto this window this frame: those of the app's
-    /// own kinds (a bundle, Sent Item, Profile card or Pack) by their
-    /// paths, to open, and every other one read whole in the order
+    /// own kinds (a bundle, Sent Item, Profile card or Pack) and AXT files,
+    /// by their ending or their content (obf-1146), by their paths, to
+    /// open, and every other one read whole in the order
     /// dropped, told by its size before it is read; one too large or
     /// unreadable is announced (#267).
     fn dropped(&mut self, ui: &Ui) -> (Vec<std::path::PathBuf>, Vec<(String, Vec<u8>)>) {
@@ -12170,7 +12303,7 @@ impl App {
                     || e == sent::EXTENSION
                     || e == cards::EXTENSION
                     || e == packs::EXTENSION
-            });
+            }) || path.is_some_and(axt_view::looks_like_axt);
             match (&file.bytes, path) {
                 (_, Some(path)) if ours => own.push(path.to_path_buf()),
                 (Some(bytes), _) => read.files.push((file.name.clone(), bytes.to_vec())),
@@ -13873,6 +14006,9 @@ impl App {
             } else if self.pack_opening() {
                 // And while a Pack opens off the window's thread.
                 Some(self.t.pack_opening())
+            } else if self.axt_opening() {
+                // And while an AXT file is read (obf-1146).
+                Some(self.t.desk_axt_opening())
             } else if self.import.running() {
                 // And while an Import runs beside the window (obf-1061).
                 Some(self.t.import_running())
@@ -15866,6 +16002,7 @@ impl App {
                             Action::OpenMarkdown,
                         ),
                         (t.desk_open_pack(), None, true, Action::OpenPack),
+                        (t.desk_open_axt(), None, true, Action::OpenAxt),
                         (
                             t.desk_open_backup(),
                             None,
@@ -19037,6 +19174,11 @@ impl App {
                         let form = (ticks, profile, worked);
                         pack_view::export_form(ui, &t, pack, form, saving, &mut asked);
                         actions.extend(asked.map(Action::Pack));
+                    }
+                    Dialog::AxtOpened(opened) => {
+                        let mut asked = None;
+                        axt_view::opened_form(ui, &t, opened, &mut asked);
+                        actions.extend(asked.map(Action::Axt));
                     }
                     Dialog::PackOpened {
                         opened,

@@ -751,6 +751,21 @@ There are three kinds, and an action takes the first that fits.
   the Note, the selection, the Topic or the Area go at once as an AXT
   file named after it (`<title>.axt`), nothing asked, to the share
   sheet; with no Note in it nothing is written and the top says so.
+- **An AXT file opened shows its records as an opened Pack does**
+  (obf-1146, ADR 0056): told by what it holds, not by its name, it opens
+  a page titled "AXT file" with who it is from ("From your own Device",
+  else "From" and the app name its file gives) and the key's short
+  fingerprint under it, then every record to take, each ticked, by its
+  first line with its type and its Reminder or Routine under it, "Tick
+  all" and "Untick all" on the bar; the records not taken follow greyed
+  under "Not taken", each named by its type. "Take them into" with its
+  place, Unsorted at first, opens at the finger Unsorted, then the Areas
+  and Topics this Device may file into, as File into… lists them, and
+  while a ticked record brings a Reminder or Routine only where it may
+  make them. "Take it" makes the ticked records Notes there, says how
+  many at the top and closes the page; greyed while nothing is ticked.
+  A file that does not read, and a place refused, are announced at the
+  top with why.
 - **"Open a Backup…"** (#285) is on the Backups page, in a card of its
   own ("Take Notes back"), set up or not, and on the desktop also in the
   File menu, its page then alone, without the way back to Backups. It
@@ -1555,8 +1570,8 @@ There are three kinds, and an action takes the first that fits.
   extension open its app, so "Old Brain Fix" in the share sheet keeps
   the text, links, pictures, the app's own files or any other file and
   says so on a small card with OK. The next time the app opens or comes back, each share
-  opens Capture as on Android, and a Pack, Profile card, Sent Item or
-  bundle opens as "Open with" opens it. A share carries no source app on
+  opens Capture as on Android, and a Pack, Profile card, Sent Item,
+  bundle or AXT file (obf-1146) opens as "Open with" opens it. A share carries no source app on
   the iPhone.
 - **On the iPhone iOS's own prompts may come beside Capture** (#243,
   #244): the first Photo asks iOS's camera permission, and Paste may
@@ -1567,7 +1582,8 @@ There are three kinds, and an action takes the first that fits.
   app shares, other than a picture or a sound file, opens Capture with it
   attached, one Note with the text and pictures shared with it, written
   at once; a file of the app's own types (a bundle, Sent Item, Profile
-  card or Pack) shared to the app opens as "Open with" opens it.
+  card or Pack) and an AXT file (`.axt` or `application/vnd.axt`,
+  obf-1146) shared to the app open as "Open with" opens them.
 - **A page printed to the app comes in as a shared PDF does** (#293):
   on Android, Old Brain Fix is a print service with one printer, "Old
   Brain Fix"; a print job opens Capture with its PDF attached, named
@@ -2451,8 +2467,8 @@ There are three kinds, and an action takes the first that fits.
   badges, its buttons and its bar's ⋮, which holds History). Its menus
   keep to seven entries (#321, obf-1014): **File** holds New Note
   (Ctrl+N; the quick note, while an Area or a Topic is shown the Note
-  dialog on a new Note filed there, obf-1140), Quick note, Import…, Open ▸ (Markdown file…, Pack…, A
-  Backup…), Export as vault… and Quit; **Edit** Undo, Cut, Copy, Paste,
+  dialog on a new Note filed there, obf-1140), Quick note, Import…, Open ▸ (Markdown file…, Pack…, AXT file…
+  (obf-1146), A Backup…), Export as vault… and Quit; **Edit** Undo, Cut, Copy, Paste,
   Find in Note (Ctrl+F) where it opens the Note's find bar, else Search,
   and Settings…; **View** Go to ▸ (Agenda, Unsorted, All Notes, Frogs,
   All Routines and Reminders, the one shown marked), Running, Detailed
@@ -2485,7 +2501,7 @@ There are three kinds, and an action takes the first that fits.
   Import, the Transcripts, Photo Texts and Attachment Texts being read,
   the speech model's download, an Area being deleted, the trash being
   emptied, a Pack being
-  opened, the Agenda's first read) with what it does, how far it is when
+  opened, an AXT file being read (obf-1146), the Agenda's first read) with what it does, how far it is when
   known ("120 of 340 Notes"), "Since 14:32", and Abort, which stops it at
   its next safe point and reads "Stopping…" until then; with none, "Nothing
   runs in the background." An Import stops before its next Note and keeps
@@ -2715,6 +2731,21 @@ There are three kinds, and an action takes the first that fits.
   stands beside its words; Save… saves the file where the user says, in
   place of Share…; "Add … to People" takes the person in and keeps the
   dialog open.
+- **An AXT file opened is a dialog on the desktop** (obf-1146): File ▸
+  Open ▸ AXT file…, a drop on the window, `oldbrainfix records.axt` on
+  the command line and "Open with" open it, a later start handing it to
+  the running app; it is known by its content (Avro's header) or by its
+  ending `.axt`, and a drop of one opens it rather than attaching it.
+  While it is read beside the window the line under the menu bar says
+  "Opening the AXT file…" and Running lists it with Abort. The dialog
+  holds what the phone's page holds; under "Take them into" the places
+  are a column of radio buttons, Unsorted first and picked, then each
+  Area and its Topics ("Health / Running"), and Cancel takes nothing. A
+  refused "Take it" keeps the dialog and its ticks. The app is offered
+  for `.axt` (`application/vnd.axt`) under "Open with", never as its
+  default: on Linux the launcher's MimeType with a mime type of its own
+  (`io.github.paxel.oldbrainfix.xml`, by the ending only), on macOS the
+  bundle's document types, on Windows the ending's OpenWithList.
 - **Export as AXT file… saves where the user says on the desktop**
   (obf-1145): in place of the phone's share sheet the system's save
   dialog asks, the file proposed under the Note's, the Topic's or the

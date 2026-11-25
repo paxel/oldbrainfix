@@ -7,8 +7,9 @@ Terminal=false
 Type=Application
 Categories=Utility;
 # Offered in "Open with" for Markdown files (obf-1056), which open in its
-# viewer; it never asks to be their default program.
-MimeType=text/markdown;text/x-markdown;
+# viewer, and for AXT files (obf-1146, io.github.paxel.oldbrainfix.xml),
+# which open in their dialog; it never asks to be their default program.
+MimeType=text/markdown;text/x-markdown;application/vnd.axt;
 # The running window carries this app id (set in the desktop binary). On
 # Wayland the compositor finds this entry by its file name, which is why
 # the file is called io.github.paxel.oldbrainfix.desktop; on X11 it

@@ -1,12 +1,13 @@
-//! Markdown files opened with the app from the Finder on macOS (Q12):
+//! Markdown and AXT files opened with the app from the Finder on macOS
+//! (Q12, obf-1146):
 //! "Open with" and a double click on a file whose program it is hand the
 //! files over as the open documents Apple Event (`kAEOpenDocuments`), at
 //! the launch it causes and while the app runs. The handler goes in as
 //! the app is about to finish launching, where AppKit's own ones are in
 //! place and the event of the launch has not come yet; each file goes on
 //! as one a later start hands over ([`crate::instance::file_handed`]).
-//! The bundle offers the app for `.md` and `.markdown` files, as an
-//! Alternate handler, never their default (`packaging/macos/pack.sh`).
+//! The bundle offers the app for `.md`, `.markdown` and `.axt` files, as
+//! an Alternate handler, never their default (`packaging/macos/pack.sh`).
 
 // The handler is an Objective-C object (#229): unsafe code is allowed in
 // this module only, to define it and to send the messages it needs.

@@ -27,6 +27,10 @@ use crate::{ICON, ICON_NAME};
 /// The marker claiming an entry as ours to update.
 const MARKER: &str = "X-Oldbrainfix-Managed=true";
 
+/// The AXT file's type (obf-1146), which the launcher's MimeType names:
+/// written into the user's mime packages, as the launcher is.
+const MIME_XML: &str = include_str!("../../../packaging/linux/io.github.paxel.oldbrainfix.xml");
+
 /// Registers icon and launcher for the running binary; call from a
 /// thread of its own. Best effort: errors, a home-less environment and a
 /// Flatpak are ignored.
@@ -94,6 +98,13 @@ fn register_at(data_home: &Path, exec: &Path) -> io::Result<bool> {
         wrote = true;
     }
 
+    // Ours by its name, so always kept current (obf-1146).
+    let mime_path = data_home.join(format!("mime/packages/{APP_ID}.xml"));
+    if fs::read_to_string(&mime_path).ok().as_deref() != Some(MIME_XML) {
+        write_atomic(&mime_path, MIME_XML.as_bytes())?;
+        wrote = true;
+    }
+
     let desktop_path = data_home.join(format!("applications/{APP_ID}.desktop"));
     let desired = desktop_entry(exec);
     match fs::read_to_string(&desktop_path) {
@@ -110,8 +121,9 @@ fn register_at(data_home: &Path, exec: &Path) -> io::Result<bool> {
 /// The launcher, as `packaging/linux/io.github.paxel.oldbrainfix.desktop`
 /// has it, with Exec and TryExec pointed at the binary: TryExec hides the
 /// entry once an AppImage was moved away instead of failing. Exec takes
-/// the files "Open with" hands it, Markdown files by its MimeType
-/// (obf-1056), which offers it there and never makes it their default.
+/// the files "Open with" hands it, Markdown files (obf-1056) and AXT
+/// files (obf-1146) by its MimeType, which offers it there and never
+/// makes it their default.
 fn desktop_entry(exec: &Path) -> String {
     let exec_str = exec.to_string_lossy();
     format!(
@@ -124,7 +136,7 @@ fn desktop_entry(exec: &Path) -> String {
          Terminal=false\n\
          Type=Application\n\
          Categories=Utility;\n\
-         MimeType=text/markdown;text/x-markdown;\n\
+         MimeType=text/markdown;text/x-markdown;application/vnd.axt;\n\
          StartupWMClass={APP_ID}\n\
          {MARKER}\n",
         quote_exec(&exec_str),
@@ -187,6 +199,10 @@ fn refresh_caches(data_home: &Path) {
         &["-f".as_ref(), "-t".as_ref(), icons.as_os_str()],
     );
     run("update-desktop-database", &[apps.as_os_str()]);
+    run(
+        "update-mime-database",
+        &[data_home.join("mime").as_os_str()],
+    );
     run("kbuildsycoca6", &[]);
 }
 
