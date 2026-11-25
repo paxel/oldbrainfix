@@ -178,6 +178,8 @@ Future<void> _openAndRun(Directory dir) async {
           : HelpSetup(const BundledHelp(), version: version),
       // The screens explain themselves here only (obf-1043).
       spotlights: true,
+      // And show each button tap (obf-1143).
+      tapMarks: true,
     ),
   );
 }

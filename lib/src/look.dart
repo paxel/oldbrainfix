@@ -3,6 +3,7 @@ import 'package:flutter/rendering.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'l10n.dart';
+import 'tap_mark.dart';
 
 /// The colours of one brightness (UI laws, "Look"): a light teal ground
 /// or an anthracite one, question marks a touch darker or brighter than
@@ -297,6 +298,7 @@ ThemeData lookTheme(
   Brightness brightness, {
   bool fatFingers = false,
   TextSize textSize = TextSize.normal,
+  TapMarkSplashFactory? tapMarks,
 }) {
   final tones = LookTones.of(brightness);
   final scheme = ColorScheme.fromSeed(
@@ -309,45 +311,70 @@ ThemeData lookTheme(
   final buttonIcon = WidgetStatePropertyAll(18 * scale);
   final density = kMinInteractiveDimension * (scale - 1) / 4;
   final grown = VisualDensity(horizontal: density, vertical: density);
+  // Every button's ink marks its taps with [tapMarks] (obf-1143); the
+  // "+" takes it through [TapMarked].
+  ButtonStyle? marked(ButtonStyle? style) => tapMarks == null
+      ? style
+      : (style ?? const ButtonStyle()).copyWith(splashFactory: tapMarks);
+  final iconButton = marked(
+    fatFingers
+        ? ButtonStyle(
+            iconSize: WidgetStatePropertyAll(icon),
+            minimumSize: WidgetStatePropertyAll(
+              Size.square(kMinInteractiveDimension * scale),
+            ),
+          )
+        : null,
+  );
+  final textButton = marked(
+    fatFingers ? ButtonStyle(iconSize: buttonIcon) : null,
+  );
+  final filledButton = marked(
+    fatFingers ? ButtonStyle(iconSize: buttonIcon) : null,
+  );
+  final elevatedButton = marked(
+    fatFingers ? ButtonStyle(iconSize: buttonIcon) : null,
+  );
   return ThemeData(
     colorScheme: scheme,
     scaffoldBackgroundColor: Colors.transparent,
-    extensions: [LookScale(scale), TextSizeScale(textSize.factor)],
+    extensions: [
+      LookScale(scale),
+      TextSizeScale(textSize.factor),
+      if (tapMarks != null) TapMarkTheme(tapMarks),
+    ],
     visualDensity: fatFingers ? grown : null,
     iconTheme: fatFingers ? IconThemeData(size: icon) : null,
     // Material 3's icon buttons take no density: their target is set
     // as their least size, 48 grown.
-    iconButtonTheme: fatFingers
-        ? IconButtonThemeData(
-            style: ButtonStyle(
-              iconSize: WidgetStatePropertyAll(icon),
-              minimumSize: WidgetStatePropertyAll(
-                Size.square(kMinInteractiveDimension * scale),
-              ),
-            ),
-          )
-        : null,
-    textButtonTheme: fatFingers
-        ? TextButtonThemeData(style: ButtonStyle(iconSize: buttonIcon))
-        : null,
-    filledButtonTheme: fatFingers
-        ? FilledButtonThemeData(style: ButtonStyle(iconSize: buttonIcon))
-        : null,
+    iconButtonTheme: iconButton == null
+        ? null
+        : IconButtonThemeData(style: iconButton),
+    textButtonTheme: textButton == null
+        ? null
+        : TextButtonThemeData(style: textButton),
+    filledButtonTheme: filledButton == null
+        ? null
+        : FilledButtonThemeData(style: filledButton),
     // The outlined button, a standing action that is not the main one
     // (UI laws, "Design system", obf-1081): a tonal fill with its 1 px
     // outline, so it reads as a button on the question marks too.
     outlinedButtonTheme: OutlinedButtonThemeData(
-      style: OutlinedButton.styleFrom(
-        backgroundColor: brightness == Brightness.light
-            ? lightButtonFill
-            : scheme.secondaryContainer,
-        foregroundColor: scheme.onSecondaryContainer,
-        disabledBackgroundColor: scheme.onSurface.withValues(alpha: 0.12),
-      ).copyWith(iconSize: fatFingers ? buttonIcon : null),
+      style:
+          OutlinedButton.styleFrom(
+            backgroundColor: brightness == Brightness.light
+                ? lightButtonFill
+                : scheme.secondaryContainer,
+            foregroundColor: scheme.onSecondaryContainer,
+            disabledBackgroundColor: scheme.onSurface.withValues(alpha: 0.12),
+          ).copyWith(
+            iconSize: fatFingers ? buttonIcon : null,
+            splashFactory: tapMarks,
+          ),
     ),
-    elevatedButtonTheme: fatFingers
-        ? ElevatedButtonThemeData(style: ButtonStyle(iconSize: buttonIcon))
-        : null,
+    elevatedButtonTheme: elevatedButton == null
+        ? null
+        : ElevatedButtonThemeData(style: elevatedButton),
     // The bar is plain ground: titles stay readable over scrolled cards.
     appBarTheme: AppBarTheme(
       backgroundColor: tones.background,

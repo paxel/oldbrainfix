@@ -7,6 +7,7 @@ import 'package:flutter/semantics.dart';
 import 'file_platform.dart';
 import 'l10n.dart';
 import 'photo_platform.dart';
+import 'tap_mark.dart';
 import 'voice_platform.dart';
 
 /// A way the Agenda's "+" fans out to capture a Note; [editor] opens an
@@ -65,12 +66,14 @@ class FanRoute<T> extends PopupRoute<T> {
       final (:key, :icon, :label) = describe(context, value);
       return Padding(
         padding: const EdgeInsets.only(top: 12),
-        child: FloatingActionButton.extended(
-          key: key,
-          heroTag: null,
-          onPressed: () => Navigator.of(context).pop(value),
-          icon: icon,
-          label: Text(label),
+        child: TapMarked(
+          child: FloatingActionButton.extended(
+            key: key,
+            heroTag: null,
+            onPressed: () => Navigator.of(context).pop(value),
+            icon: icon,
+            label: Text(label),
+          ),
         ),
       );
     }
@@ -103,12 +106,14 @@ class FanRoute<T> extends PopupRoute<T> {
             ),
             Positioned.fromRect(
               rect: anchor,
-              child: FloatingActionButton(
-                key: closeKey,
-                heroTag: null,
-                tooltip: context.t.captureFanClose,
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Icon(Icons.close),
+              child: TapMarked(
+                child: FloatingActionButton(
+                  key: closeKey,
+                  heroTag: null,
+                  tooltip: context.t.captureFanClose,
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Icon(Icons.close),
+                ),
               ),
             ),
           ],
@@ -170,11 +175,13 @@ class CapturePlus extends StatelessWidget {
               unawaited(Feedback.forLongPress(context));
               onLongPress();
             },
-            child: FloatingActionButton(
-              key: plusKey,
-              heroTag: heroTag,
-              onPressed: onPressed,
-              child: const Icon(Icons.add),
+            child: TapMarked(
+              child: FloatingActionButton(
+                key: plusKey,
+                heroTag: heroTag,
+                onPressed: onPressed,
+                child: const Icon(Icons.add),
+              ),
             ),
           ),
         ),

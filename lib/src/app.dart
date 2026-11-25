@@ -69,6 +69,7 @@ import 'speech_model_screen.dart';
 import 'speech_offer_screen.dart';
 import 'speech_platform.dart';
 import 'spotlight.dart';
+import 'tap_mark.dart';
 import 'starter_set_screen.dart';
 import 'sync_platform.dart';
 import 'sync_runner.dart';
@@ -227,6 +228,11 @@ class OldBrainFixApp extends StatefulWidget {
   /// tip unless it switches them on.
   final bool spotlights;
 
+  /// Whether a button tap shows its green "!" (obf-1143); only the app
+  /// `main.dart` starts, so no test or screenshot shows one unless it
+  /// switches them on.
+  final bool tapMarks;
+
   const OldBrainFixApp({
     super.key,
     required this.store,
@@ -265,6 +271,7 @@ class OldBrainFixApp extends StatefulWidget {
     this.workDir,
     this.help,
     this.spotlights = false,
+    this.tapMarks = false,
   });
 
   @override
@@ -275,16 +282,28 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
   final _scroll = ParallaxScroll();
   late var _fatFingers = widget.store.fatFingers;
   late var _textSize = widget.store.textSize;
+
+  /// The green "!" of the button taps (obf-1143), and the ink that shows
+  /// them while this Device has them on.
+  final _tapMarks = TapMarks();
+  late final _tapInk = widget.tapMarks ? TapMarkSplashFactory(_tapped) : null;
   late var _light = lookTheme(
     Brightness.light,
     fatFingers: _fatFingers,
     textSize: _textSize,
+    tapMarks: _tapInk,
   );
   late var _dark = lookTheme(
     Brightness.dark,
     fatFingers: _fatFingers,
     textSize: _textSize,
+    tapMarks: _tapInk,
   );
+
+  void _tapped(Offset at) {
+    if (TapMarkSwitch.of(widget.store).value) _tapMarks.show(at);
+  }
+
   late final _announcements = widget.announcements ?? Announcements();
   late final _drafts = widget.drafts ?? MemoryDrafts();
   late var _themeMode = themeModeOf(widget.store.themeChoice);
@@ -440,6 +459,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     _stopWork();
     _pager.dispose();
     _scroll.dispose();
+    _tapMarks.dispose();
     if (widget.announcements == null) _announcements.dispose();
     super.dispose();
   }
@@ -482,6 +502,11 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     ),
   );
 
+  /// [child] with the green "!" of the button taps over it while they
+  /// are on (obf-1143).
+  Widget _marked(Widget child) =>
+      widget.tapMarks ? TapMarkLayer(marks: _tapMarks, child: child) : child;
+
   /// [child] under the Spotlights' scope while they are on (obf-1043).
   Widget _spotlit(Widget child) => widget.spotlights
       ? SpotlightScope(store: widget.store, child: child)
@@ -497,90 +522,95 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     darkTheme: _dark,
     themeMode: _themeMode,
     navigatorObservers: [_scroll, _routes, spotlightRoutes],
-    builder: (context, child) => FrameTimesScope(
-      frameTimes: _frameTimes,
-      child: FrameTimesOverlay(
+    // Over everything, dialogs and fans included (obf-1143).
+    builder: (context, child) => _marked(
+      FrameTimesScope(
         frameTimes: _frameTimes,
-        child: FatFingersText(
-          on: _fatFingers,
-          child: QuestionMarkBackground(
-            scroll: _scroll,
-            child: AnnouncementStrip(
-              announcements: _announcements,
-              child: AnnouncementsScope(
+        child: FrameTimesOverlay(
+          frameTimes: _frameTimes,
+          child: FatFingersText(
+            on: _fatFingers,
+            child: QuestionMarkBackground(
+              scroll: _scroll,
+              child: AnnouncementStrip(
                 announcements: _announcements,
-                child: LocationScope(
-                  location: widget.location,
-                  child: ContextScope(
-                    source: widget.context,
-                    child: PhotoScope(
-                      photos: widget.photos,
-                      bytes: _notes.photoBytes,
-                      child: VoiceScope(
-                        voice: widget.voice,
-                        playback: _playback,
-                        child: SpeechScope(
-                          model: _speechModel,
-                          transcriber: _transcriber,
-                          child: PhotoReaderScope(
-                            reader: _photoReader,
-                            child: FileScope(
-                              files: widget.files,
-                              child: PrintScope(
-                                printing: widget.printing,
-                                child: AttachmentReaderScope(
-                                  reader: _attachmentReader,
-                                  child: AttachmentScope(
-                                    notes: _notes,
-                                    child: CalendarScope(
-                                      calendar: widget.calendar,
-                                      child: CalendarMirrorScope(
-                                        mirror: _mirror,
-                                        child: AppointmentScope(
-                                          source: widget.appointments,
-                                          child: DraftsScope(
-                                            drafts: _drafts,
-                                            child: LockScope(
-                                              lock: _lock,
-                                              child: PairingScope(
-                                                pairing: widget.pairing,
-                                                child: AutoSyncScope(
-                                                  sync: _autoSync,
-                                                  child: FolderScope(
-                                                    folders: widget.folders,
-                                                    child: BundleScope(
-                                                      bundles: widget.bundles,
-                                                      child: PersonScope(
-                                                        store: widget.store,
-                                                        platform:
-                                                            widget.profile,
-                                                        onChangesSent:
-                                                            _alarms.replan,
-                                                        child: TagSearchScope(
-                                                          onSearch: _searchTag,
-                                                          child: AppLinkScope(
-                                                            onOpen: _links.open,
-                                                            onPick: _pickLink,
-                                                            child: AlarmSyncScope(
-                                                              alarms: _alarms,
-                                                              child: HomeShortcutsScope(
-                                                                shortcuts: widget
-                                                                    .shortcuts,
-                                                                child: ImportJobsScope(
-                                                                  jobs:
-                                                                      _imports,
-                                                                  child: AreaDeletionsScope(
-                                                                    deletions:
-                                                                        _deletions,
-                                                                    child: TrashEmptyingScope(
-                                                                      emptying:
-                                                                          _emptying,
-                                                                      child: RunningScope(
-                                                                        running:
-                                                                            _running,
-                                                                        child: _spotlit(
-                                                                          child ??
-                                                                              const SizedBox.shrink(),
+                child: AnnouncementsScope(
+                  announcements: _announcements,
+                  child: LocationScope(
+                    location: widget.location,
+                    child: ContextScope(
+                      source: widget.context,
+                      child: PhotoScope(
+                        photos: widget.photos,
+                        bytes: _notes.photoBytes,
+                        child: VoiceScope(
+                          voice: widget.voice,
+                          playback: _playback,
+                          child: SpeechScope(
+                            model: _speechModel,
+                            transcriber: _transcriber,
+                            child: PhotoReaderScope(
+                              reader: _photoReader,
+                              child: FileScope(
+                                files: widget.files,
+                                child: PrintScope(
+                                  printing: widget.printing,
+                                  child: AttachmentReaderScope(
+                                    reader: _attachmentReader,
+                                    child: AttachmentScope(
+                                      notes: _notes,
+                                      child: CalendarScope(
+                                        calendar: widget.calendar,
+                                        child: CalendarMirrorScope(
+                                          mirror: _mirror,
+                                          child: AppointmentScope(
+                                            source: widget.appointments,
+                                            child: DraftsScope(
+                                              drafts: _drafts,
+                                              child: LockScope(
+                                                lock: _lock,
+                                                child: PairingScope(
+                                                  pairing: widget.pairing,
+                                                  child: AutoSyncScope(
+                                                    sync: _autoSync,
+                                                    child: FolderScope(
+                                                      folders: widget.folders,
+                                                      child: BundleScope(
+                                                        bundles: widget.bundles,
+                                                        child: PersonScope(
+                                                          store: widget.store,
+                                                          platform:
+                                                              widget.profile,
+                                                          onChangesSent:
+                                                              _alarms.replan,
+                                                          child: TagSearchScope(
+                                                            onSearch:
+                                                                _searchTag,
+                                                            child: AppLinkScope(
+                                                              onOpen:
+                                                                  _links.open,
+                                                              onPick: _pickLink,
+                                                              child: AlarmSyncScope(
+                                                                alarms: _alarms,
+                                                                child: HomeShortcutsScope(
+                                                                  shortcuts: widget
+                                                                      .shortcuts,
+                                                                  child: ImportJobsScope(
+                                                                    jobs:
+                                                                        _imports,
+                                                                    child: AreaDeletionsScope(
+                                                                      deletions:
+                                                                          _deletions,
+                                                                      child: TrashEmptyingScope(
+                                                                        emptying:
+                                                                            _emptying,
+                                                                        child: RunningScope(
+                                                                          running:
+                                                                              _running,
+                                                                          child: _spotlit(
+                                                                            child ??
+                                                                                const SizedBox.shrink(),
+                                                                          ),
                                                                         ),
                                                                       ),
                                                                     ),
@@ -659,11 +689,13 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
       Brightness.light,
       fatFingers: _fatFingers,
       textSize: _textSize,
+      tapMarks: _tapInk,
     );
     _dark = lookTheme(
       Brightness.dark,
       fatFingers: _fatFingers,
       textSize: _textSize,
+      tapMarks: _tapInk,
     );
   });
 }

@@ -32,6 +32,7 @@ import 'speech_model_screen.dart';
 import 'speech_platform.dart';
 import 'spotlight.dart';
 import 'system_bars.dart';
+import 'tap_mark.dart';
 import 'voice_platform.dart';
 
 export 'settings_search.dart' show SettingsHeading, SettingsSection;
@@ -115,6 +116,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   /// Show tips (obf-1060), which "No more tips" on a tip over this page
   /// switches off too.
   late final _tips = TipsSwitch.of(widget.store);
+
+  /// Show button taps (obf-1143).
+  late final _tapMarks = TapMarkSwitch.of(widget.store);
 
   /// Show tips again (obf-1043): every screen of this Device shows its
   /// Spotlights again on its next visit, "Show tips" on, and the top
@@ -443,6 +447,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 onChanged: _setFatFingers,
                                 title: Text(t.fatFingers),
                                 subtitle: Text(t.fatFingersDetail),
+                              ),
+                            ),
+                            SettingsRow(
+                              words: [t.tapMarks, t.tapMarksDetail],
+                              child: ValueListenableBuilder<bool>(
+                                valueListenable: _tapMarks,
+                                builder: (context, on, _) => SwitchBelow(
+                                  switchKey: const ValueKey('tapMarks'),
+                                  leading: const Icon(Icons.priority_high),
+                                  value: on,
+                                  onChanged: _tapMarks.set,
+                                  title: Text(t.tapMarks),
+                                  subtitle: Text(t.tapMarksDetail),
+                                ),
                               ),
                             ),
                           ],

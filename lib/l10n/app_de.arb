@@ -485,6 +485,8 @@
   "themeDark": "Dunkel",
   "fatFingers": "Dicke Finger",
   "fatFingersDetail": "Schrift, Symbole und Knöpfe erscheinen 1,3-mal so groß, zusätzlich zur Schriftgröße des Systems, auch im Widget der Agenda.",
+  "tapMarks": "Tippen auf Knöpfe zeigen",
+  "tapMarksDetail": "Ein grünes „!“ erscheint kurz über dem Finger, wenn ein Knopf ein Tippen annimmt.",
   "textSize": "Textgröße",
   "textSizeDetail": "Wie groß der Text von Notizen, Zeilen, der Agenda und den Antworten von Fragen erscheint, zusätzlich zur Schriftgröße des Systems und zu „Dicke Finger“.",
   "textSizeNormal": "Normal",

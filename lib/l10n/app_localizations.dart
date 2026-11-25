@@ -2954,6 +2954,18 @@ abstract class AppLocalizations {
   /// **'Text, icons and buttons show 1.3 times their size, on top of the system\'s font size, on the Agenda\'s widget too.'**
   String get fatFingersDetail;
 
+  /// Switch in Settings ▸ Look (obf-1143), on by default: every button tap shows a green exclamation mark above the finger for a moment.
+  ///
+  /// In en, this message translates to:
+  /// **'Show button taps'**
+  String get tapMarks;
+
+  /// No description provided for @tapMarksDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'A green \"!\" shows above the finger for a moment when a button takes a tap.'**
+  String get tapMarksDetail;
+
   /// The choice in Settings > Look, on the desktop in Settings > This computer and View > Text size, of how large the text of Notes, Lines, Sections, the Agenda's rows and Ask's answers shows on this Device, apart from Fat fingers (#326, obf-1019).
   ///
   /// In en, this message translates to:

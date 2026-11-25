@@ -1906,6 +1906,13 @@ class AppLocalizationsDe extends AppLocalizations {
       'Schrift, Symbole und Knöpfe erscheinen 1,3-mal so groß, zusätzlich zur Schriftgröße des Systems, auch im Widget der Agenda.';
 
   @override
+  String get tapMarks => 'Tippen auf Knöpfe zeigen';
+
+  @override
+  String get tapMarksDetail =>
+      'Ein grünes „!“ erscheint kurz über dem Finger, wenn ein Knopf ein Tippen annimmt.';
+
+  @override
   String get textSize => 'Textgröße';
 
   @override

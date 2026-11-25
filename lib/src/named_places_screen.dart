@@ -10,6 +10,7 @@ import 'look.dart';
 import 'note_card.dart';
 import 'page_bar.dart';
 import 'system_bars.dart';
+import 'tap_mark.dart';
 
 /// The radii a Named Place can have, in metres.
 const namedPlaceRadii = [50.0, 100.0, 250.0, 500.0, 1000.0];
@@ -171,15 +172,17 @@ class _NamedPlacesScreenState extends State<NamedPlacesScreen> {
                   ),
               ],
       ),
-      floatingActionButton: FloatingActionButton(
-        tooltip: t.newNamedPlace,
-        onPressed: _locating ? null : _add,
-        child: _locating
-            ? const SizedBox.square(
-                dimension: 24,
-                child: CircularProgressIndicator(strokeWidth: 3),
-              )
-            : const Icon(Icons.add_location_alt_outlined),
+      floatingActionButton: TapMarked(
+        child: FloatingActionButton(
+          tooltip: t.newNamedPlace,
+          onPressed: _locating ? null : _add,
+          child: _locating
+              ? const SizedBox.square(
+                  dimension: 24,
+                  child: CircularProgressIndicator(strokeWidth: 3),
+                )
+              : const Icon(Icons.add_location_alt_outlined),
+        ),
       ),
     );
   }

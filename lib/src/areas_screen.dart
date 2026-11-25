@@ -36,6 +36,7 @@ import 'share_area_screen.dart';
 import 'spotlight.dart';
 import 'system_bars.dart';
 import 'tag_tree_screen.dart';
+import 'tap_mark.dart';
 import 'text_marks_view.dart';
 import 'trash_screen.dart';
 
@@ -866,10 +867,12 @@ class _AreasScreenState extends State<AreasScreen>
                 ],
               ],
             ),
-            floatingActionButton: FloatingActionButton(
-              tooltip: t.newArea,
-              onPressed: _add,
-              child: const Icon(Icons.add),
+            floatingActionButton: TapMarked(
+              child: FloatingActionButton(
+                tooltip: t.newArea,
+                onPressed: _add,
+                child: const Icon(Icons.add),
+              ),
             ),
           ),
         ),
@@ -1329,10 +1332,12 @@ class _AreaScreenState extends State<AreaScreen>
               : Spotlight(
                   id: 'area-add',
                   child: Builder(
-                    builder: (button) => FloatingActionButton(
-                      tooltip: t.addHere,
-                      onPressed: () => _add(button),
-                      child: const Icon(Icons.add),
+                    builder: (button) => TapMarked(
+                      child: FloatingActionButton(
+                        tooltip: t.addHere,
+                        onPressed: () => _add(button),
+                        child: const Icon(Icons.add),
+                      ),
                     ),
                   ),
                 ),
@@ -1652,10 +1657,12 @@ class _TopicScreenState extends State<TopicScreen>
               : Spotlight(
                   id: 'area-add',
                   child: Builder(
-                    builder: (button) => FloatingActionButton(
-                      tooltip: t.addHere,
-                      onPressed: () => _add(button),
-                      child: const Icon(Icons.add),
+                    builder: (button) => TapMarked(
+                      child: FloatingActionButton(
+                        tooltip: t.addHere,
+                        onPressed: () => _add(button),
+                        child: const Icon(Icons.add),
+                      ),
                     ),
                   ),
                 ),

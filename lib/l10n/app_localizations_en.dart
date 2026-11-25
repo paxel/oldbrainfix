@@ -1893,6 +1893,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Text, icons and buttons show 1.3 times their size, on top of the system\'s font size, on the Agenda\'s widget too.';
 
   @override
+  String get tapMarks => 'Show button taps';
+
+  @override
+  String get tapMarksDetail =>
+      'A green \"!\" shows above the finger for a moment when a button takes a tap.';
+
+  @override
   String get textSize => 'Text size';
 
   @override
