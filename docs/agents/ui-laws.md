@@ -117,7 +117,7 @@ There are three kinds, and an action takes the first that fits.
 
 - **A chip is a short, tappable word with rounded ends**, a 1 px
   outline, and its fill tinted with the accent while picked (the phone
-  gives Material's chip the pill and 32 with the outline once, in
+  gives Material's chip the pill and 32 inside the outline once, in
   `lookTheme`'s `chipTheme` in `look.dart`; the desktop
   `design::Chip` and `design::chip` in `design.rs`, a full pill 32
   high, in a list's band the band's 36, obf-1081). There are

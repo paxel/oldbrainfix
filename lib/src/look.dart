@@ -371,10 +371,13 @@ ThemeData lookTheme(
     ),
     // Chips are full pills, round ends at half their height, 32 high
     // inside their outline (UI laws, "Design system", obf-1081):
-    // Material's 8 above and below its 20 high words made them 36.
-    chipTheme: const ChipThemeData(
-      shape: StadiumBorder(),
-      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+    // Material's 8 above and below its 20 high words made them 36. The
+    // 1 px outline is in the outline colour in every state, picked too,
+    // so it shows on the cards in dark as well (obf-1115).
+    chipTheme: ChipThemeData(
+      shape: const StadiumBorder(),
+      side: BorderSide(color: scheme.outline),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
     ),
     // Text fields sit on the question marks too and must stand out.
     inputDecorationTheme: InputDecorationThemeData(

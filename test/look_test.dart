@@ -500,6 +500,35 @@ void main() {
         expect(tester.getSize(pill).height, 32 + 2);
       });
 
+      for (final picked in [false, true]) {
+        testWidgets('a ${picked ? 'picked' : 'free'} chip has its 1 px '
+            'outline in the outline colour in the $brightness look '
+            '(obf-1115)', (tester) async {
+          final scheme = await show(
+            tester,
+            brightness,
+            FilterChip(
+              label: const Text('#home'),
+              selected: picked,
+              onSelected: (_) {},
+            ),
+          );
+          final pill = find
+              .descendant(
+                of: find.byType(FilterChip),
+                matching: find.byType(Material),
+              )
+              .first;
+          final shape = tester.widget<Material>(pill).shape;
+          expect(shape, isA<OutlinedBorder>());
+          final side = (shape as OutlinedBorder).side;
+          expect(side.width, 1);
+          expect(side.style, BorderStyle.solid);
+          expect(side.color, scheme.outline);
+          expect(tester.getSize(pill).height, 32 + 2);
+        });
+      }
+
       testWidgets('a text button with an icon has both in the accent in the '
           '$brightness look', (tester) async {
         await show(
