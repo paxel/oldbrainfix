@@ -32,6 +32,7 @@ use oldbrainfix_core::markdown::table::{self, TableCopy};
 use oldbrainfix_core::text_format;
 
 use crate::app::{READ_EDGE, READ_SIZE, icon_button};
+use crate::design;
 use crate::find_bar::{self, FindBar};
 use crate::find_marks::{self, Current};
 use crate::l10n::L10n;
@@ -831,8 +832,7 @@ impl Viewer {
                 if ui.add(alone).clicked() {
                     picked = Some(false);
                 }
-                let cancel = egui::Button::new(RichText::new(t.cancel()).color(text));
-                if ui.add(cancel).clicked() {
+                if design::row_button(ui, t.cancel()).clicked() {
                     self.asking = false;
                 }
             });

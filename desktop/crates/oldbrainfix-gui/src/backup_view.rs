@@ -19,6 +19,7 @@ use oldbrainfix_core::recovery::{self, Sheet};
 use oldbrainfix_core::{Error, PackTicks, Store};
 
 use crate::app::Wall;
+use crate::design;
 use crate::l10n::L10n;
 use crate::{pack_view, theme};
 
@@ -394,7 +395,7 @@ pub fn welcome(
         if theme::primary(ui, true, t.restore_start()).clicked() {
             actions.push(WelcomeAction::Restore);
         }
-        if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+        if design::row_button(ui, t.cancel()).clicked() {
             actions.push(WelcomeAction::Back);
         }
     });

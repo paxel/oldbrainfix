@@ -171,6 +171,41 @@ fn a_text_button_is_in_the_accent_and_tinted_under_the_pointer() {
 }
 
 #[test]
+fn a_dialog_rows_cancel_is_a_text_button_without_its_icon() {
+    let mut harness = harness(TextSize::Normal, |ui| {
+        ui.add_space(40.0);
+        design::row_button(ui, "Cancel");
+    });
+    let at = rect(&harness, Role::Button, "Cancel");
+    assert!(frame(&harness, at).is_none(), "no frame while idle");
+    let pad = harness.ctx.global_style().spacing.button_padding.x;
+    let shapes = drawn(&harness);
+    let words = shapes.iter().find_map(|shape| match shape {
+        Shape::Text(text) if text.galley.text() == "Cancel" => Some(text.clone()),
+        _ => None,
+    });
+    let words = words.unwrap_or_else(|| panic!("no words"));
+    assert_eq!(words.fallback_color, theme::LIGHT_TEXT.link);
+    // No icon: the words start where the padding ends, and nothing else
+    // is drawn on it.
+    assert!(
+        near(words.pos.x, at.min.x + pad),
+        "{} {}",
+        words.pos.x,
+        at.min.x
+    );
+    let on = shapes
+        .iter()
+        .filter(|shape| at.expand(1.0).contains_rect(shape.visual_bounding_rect()))
+        .count();
+    assert_eq!(on, 1, "only its words on it");
+    harness.get_by_label("Cancel").hover();
+    harness.run_steps(2);
+    let (fill, _) = frame(&harness, at).unwrap_or_else(|| panic!("no tint under the pointer"));
+    assert_eq!(fill, LIGHT.accent.gamma_multiply(0.15));
+}
+
+#[test]
 fn open_in_the_editor_wears_the_outlined_buttons_tonal_fill() {
     let t = L10n::new("en");
     let harness = harness(TextSize::Normal, move |ui| {

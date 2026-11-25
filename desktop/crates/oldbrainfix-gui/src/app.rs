@@ -13113,12 +13113,10 @@ impl App {
                                     }
                                     if !hosted
                                         && ui
-                                            .add_enabled(
-                                                !joining,
-                                                egui::Button::new(
-                                                    RichText::new(t.cancel()).color(text),
-                                                ),
-                                            )
+                                            .add_enabled_ui(!joining, |ui| {
+                                                design::row_button(ui, t.cancel())
+                                            })
+                                            .inner
                                             .clicked()
                                     {
                                         asked.push(WelcomeAction::Back);
@@ -18612,7 +18610,7 @@ impl App {
                                     });
                                 }
                             });
-                        if ui.button(RichText::new(t.close()).color(text)).clicked() {
+                        if design::row_button(ui, t.close()).clicked() {
                             actions.push(Action::CloseDialog);
                         }
                     }
@@ -18631,7 +18629,7 @@ impl App {
                                     note_change(ui, &t, (i, row), (text, weak), actions);
                                 }
                             });
-                        if ui.button(RichText::new(t.close()).color(text)).clicked() {
+                        if design::row_button(ui, t.close()).clicked() {
                             actions.push(Action::CloseDialog);
                         }
                     }
@@ -18762,8 +18760,7 @@ impl App {
                         if manages {
                             share_form(ui, &t, (role, !afar.is_empty(), view.advanced), actions);
                         } else {
-                            let text = ui.visuals().text_color();
-                            if ui.button(RichText::new(t.close()).color(text)).clicked() {
+                            if design::row_button(ui, t.close()).clicked() {
                                 actions.push(Action::CloseDialog);
                             }
                         }
@@ -18903,7 +18900,7 @@ impl App {
                         if *area_first {
                             let said = t.hidden_from_ai_area_first_desktop(names);
                             ui.label(RichText::new(said).color(text));
-                            if ui.button(RichText::new(t.close()).color(text)).clicked() {
+                            if design::row_button(ui, t.close()).clicked() {
                                 actions.push(Action::CloseDialog);
                             }
                         } else {
@@ -18993,10 +18990,7 @@ impl App {
                                 focus,
                                 &mut asked,
                             );
-                            if ui
-                                .button(RichText::new(t.close()).color(ui.visuals().text_color()))
-                                .clicked()
-                            {
+                            if design::row_button(ui, t.close()).clicked() {
                                 actions.push(Action::CloseDialog);
                             }
                         }
@@ -19055,7 +19049,7 @@ impl App {
                         let text = ui.visuals().text_color();
                         ui.label(RichText::new(t.desk_import_fill_in_detail()).color(text));
                         ui.horizontal_wrapped(|ui| {
-                            if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+                            if design::row_button(ui, t.cancel()).clicked() {
                                 actions.push(Action::FillIn(FillIn::Cancel));
                             }
                             if ui
@@ -19114,7 +19108,7 @@ impl App {
                         if importing.is_some() {
                             ui.label(RichText::new(t.import_goes_on_desktop()).color(text));
                         }
-                        if ui.button(RichText::new(t.close()).color(text)).clicked() {
+                        if design::row_button(ui, t.close()).clicked() {
                             actions.push(Action::CloseDialog);
                         }
                     }
@@ -19130,7 +19124,7 @@ impl App {
                                 ui.label(RichText::new(said).small().color(weak));
                             });
                         }
-                        if ui.button(RichText::new(t.close()).color(text)).clicked() {
+                        if design::row_button(ui, t.close()).clicked() {
                             actions.push(Action::CloseDialog);
                         }
                     }
@@ -19161,10 +19155,7 @@ impl App {
                     Dialog::ProfileQr { link } => {
                         ui.set_width(500.0);
                         profile_view::qr_page(ui, &t, link);
-                        if ui
-                            .button(RichText::new(t.close()).color(ui.visuals().text_color()))
-                            .clicked()
-                        {
+                        if design::row_button(ui, t.close()).clicked() {
                             actions.push(Action::CloseDialog);
                         }
                     }
@@ -21345,7 +21336,7 @@ pub(crate) fn failure_form(
             );
         });
     ui.horizontal(|ui| {
-        if ui.button(RichText::new(t.close()).color(text)).clicked() {
+        if design::row_button(ui, t.close()).clicked() {
             closed = true;
         }
         if ui.button(RichText::new(t.report()).color(text)).clicked() {
@@ -21363,7 +21354,7 @@ pub(crate) fn done_form(ui: &mut Ui, t: &L10n, heading: &str, details: &str) -> 
     title(ui, heading);
     let text = ui.visuals().text_color();
     ui.label(RichText::new(details).color(text));
-    ui.button(RichText::new(t.close()).color(text)).clicked()
+    design::row_button(ui, t.close()).clicked()
 }
 
 /// The first line of what an Import made, `summary`, in the Area shown
@@ -21391,7 +21382,7 @@ fn imported_form(ui: &mut Ui, t: &L10n, details: &str) -> (bool, bool) {
     let text = ui.visuals().text_color();
     ui.label(RichText::new(details).color(text));
     ui.horizontal(|ui| {
-        let close = ui.button(RichText::new(t.close()).color(text)).clicked();
+        let close = design::row_button(ui, t.close()).clicked();
         let open = ui
             .button(RichText::new(t.import_open_area()).color(text))
             .clicked();
@@ -21452,8 +21443,7 @@ fn problem_line(problem: oldbrainfix_whisper::Problem, name: &str) -> String {
 
 /// Cancel, which closes the dialog without a change.
 fn cancel(ui: &mut Ui, t: &L10n, actions: &mut Vec<Action>) {
-    let text = ui.visuals().text_color();
-    if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+    if design::row_button(ui, t.cancel()).clicked() {
         actions.push(Action::CloseDialog);
     }
 }
@@ -21803,7 +21793,7 @@ fn block_form(ui: &mut Ui, t: &L10n, name: &str, areas: &str, actions: &mut Vec<
     };
     ui.label(RichText::new(detail).color(text));
     ui.horizontal(|ui| {
-        if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+        if design::row_button(ui, t.cancel()).clicked() {
             actions.push(Action::CancelBlock);
         }
         if destructive(ui, verb) {
@@ -21818,7 +21808,7 @@ fn unblock_form(ui: &mut Ui, t: &L10n, name: &str, actions: &mut Vec<Action>) {
     title(ui, &t.person_unblock_question(name));
     ui.label(RichText::new(t.person_unblock_detail()).color(text));
     ui.horizontal(|ui| {
-        if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+        if design::row_button(ui, t.cancel()).clicked() {
             actions.push(Action::CancelBlock);
         }
         if ui

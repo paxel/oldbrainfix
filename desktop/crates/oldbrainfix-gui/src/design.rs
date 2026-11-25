@@ -3,7 +3,8 @@
 //! and the text button with an icon. The filled buttons are
 //! [`crate::theme::primary`], [`crate::theme::main_action`] and
 //! [`crate::theme::destructive`]; every other button egui draws wears the
-//! outlined one's tonal fill and outline.
+//! outlined one's tonal fill and outline, but Cancel and Close in a
+//! dialog's action row, which are [`row_button`]s.
 
 use egui::{Color32, CornerRadius, Response, Sense, Ui, WidgetInfo, WidgetType};
 
@@ -194,6 +195,18 @@ const TEXT_BUTTON_TINT: f32 = 0.15;
 /// without a frame, a rounded tint of the accent under the pointer and
 /// the ring while it has the keyboard; greyed while `ui` is disabled.
 pub fn text_button(ui: &mut Ui, icon: char, words: &str) -> Response {
+    plain_button(ui, Some(icon), words)
+}
+
+/// Cancel or Close in a dialog's action row (UI laws, "Buttons",
+/// obf-1102): a [`text_button`] without its icon, the one place it goes
+/// without one, as the row shows these are its buttons.
+pub fn row_button(ui: &mut Ui, words: &str) -> Response {
+    plain_button(ui, None, words)
+}
+
+/// A [`text_button`], with `icon` before its words where there is one.
+fn plain_button(ui: &mut Ui, icon: Option<char>, words: &str) -> Response {
     let tones = theme::tones(ui.visuals());
     let font = egui::TextStyle::Button.resolve(ui.style());
     let colour = if ui.is_enabled() {
@@ -207,7 +220,8 @@ pub fn text_button(ui: &mut Ui, icon: char, words: &str) -> Response {
     let pad = ui.spacing().button_padding;
     let gap = ui.spacing().icon_spacing;
     let glyph = font.size * 1.25;
-    let inner = egui::vec2(glyph + gap + galley.size().x, glyph.max(galley.size().y));
+    let before = if icon.is_some() { glyph + gap } else { 0.0 };
+    let inner = egui::vec2(before + galley.size().x, glyph.max(galley.size().y));
     let size = (inner + pad * 2.0).max(egui::vec2(0.0, ui.spacing().interact_size.y));
     let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
     resp.widget_info(|| WidgetInfo::labeled(WidgetType::Button, ui.is_enabled(), words));
@@ -221,8 +235,10 @@ pub fn text_button(ui: &mut Ui, icon: char, words: &str) -> Response {
             egui::pos2(rect.left() + pad.x, rect.center().y - glyph / 2.0),
             egui::vec2(glyph, glyph),
         );
-        icons::paint(painter, at, icon, colour);
-        let left = at.right() + gap;
+        if let Some(icon) = icon {
+            icons::paint(painter, at, icon, colour);
+        }
+        let left = at.left() + before;
         let top = rect.center().y - galley.size().y / 2.0;
         painter.galley(egui::pos2(left, top), galley, colour);
         if resp.has_focus() {

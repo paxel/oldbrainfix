@@ -9,6 +9,7 @@ use egui::{RichText, Ui};
 use oldbrainfix_core::places::STARTER_SET;
 
 use crate::backup_view::WelcomeAction;
+use crate::design;
 use crate::l10n::L10n;
 use crate::names::offered_area_name;
 use crate::theme;
@@ -86,7 +87,7 @@ pub fn starter_set(
         if theme::primary(ui, true, t.starter_set_done()).clicked() {
             actions.push(WelcomeAction::Plant);
         }
-        if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+        if design::row_button(ui, t.cancel()).clicked() {
             actions.push(WelcomeAction::Back);
         }
     });

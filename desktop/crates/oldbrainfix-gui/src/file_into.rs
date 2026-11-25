@@ -14,6 +14,7 @@ use egui::{Id, Key, RichText, TextEdit, Ui};
 use oldbrainfix_core::{Area, DeviceSettings, PersonSettings, Places, Store, Topic};
 
 use crate::app::name_field;
+use crate::design;
 use crate::l10n::L10n;
 use crate::names::{area_name, topic_name};
 use crate::text_menu;
@@ -296,7 +297,7 @@ impl FileIntoPicker {
             }
         });
         self.tall = self.tall.max(list.content_size.y.min(LIST_HEIGHT));
-        if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+        if design::row_button(ui, t.cancel()).clicked() {
             return Some(Picked::Close);
         }
         match row? {
@@ -343,7 +344,7 @@ impl FileIntoPicker {
         let mut made = ready && field.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter));
         let mut back = false;
         ui.horizontal(|ui| {
-            back = ui.button(RichText::new(t.cancel()).color(text)).clicked();
+            back = design::row_button(ui, t.cancel()).clicked();
             made |= theme::main_action(ui, ready, t.create());
         });
         let picked = made.then(|| Picked::Make {

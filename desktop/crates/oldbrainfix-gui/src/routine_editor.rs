@@ -1012,7 +1012,7 @@ impl RoutineEditor {
                     changed |= self.schedule_panels(ui, t, tones, (once, shown_now, now));
                 }
                 ui.horizontal(|ui| {
-                    if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+                    if design::row_button(ui, t.cancel()).clicked() {
                         intent = Some(Intent::Close);
                     }
                     if self.routine.is_some()

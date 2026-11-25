@@ -28,6 +28,7 @@ use oldbrainfix_core::{
 
 use crate::app::{chip_row, embossed, icon_button, when};
 use crate::capture_choices::TallyFieldChoice;
+use crate::design;
 use crate::icons;
 use crate::l10n::L10n;
 use crate::leave_saves::Leaving;
@@ -835,7 +836,7 @@ fn page_bar(ui: &mut Ui, t: &L10n, heading: &str, delete: bool) -> Option<FormIn
         if theme::main_action(ui, true, t.save()) {
             intent = Some(FormIntent::Save);
         }
-        if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+        if design::row_button(ui, t.cancel()).clicked() {
             intent = Some(FormIntent::Close);
         }
         if delete && theme::destructive(ui, true, t.delete()).clicked() {

@@ -15,6 +15,7 @@ use oldbrainfix_core::{
     OpenedPack, Pack, PackItem, PackItemKind, PackNote, PackTicks, text_format,
 };
 
+use crate::design;
 use crate::icons;
 use crate::l10n::L10n;
 use crate::profile_view::{self, Pictures};
@@ -119,7 +120,7 @@ pub fn export_form(
     tick_with_hint(ui, profile, t.pack_add_profile(), t.pack_add_profile_hint());
     let picked = worked.of(pack, ticks).0 > 0;
     ui.horizontal(|ui| {
-        if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+        if design::row_button(ui, t.cancel()).clicked() {
             *asked = Some(PackAsk::Cancel);
         }
         if theme::main_action(ui, picked && !busy, t.pack_save()) {
@@ -170,7 +171,7 @@ pub fn import_form(
     }
     let picked = worked.of(pack, ticks).0 > 0;
     ui.horizontal(|ui| {
-        if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+        if design::row_button(ui, t.cancel()).clicked() {
             *asked = Some(PackAsk::Cancel);
         }
         if theme::main_action(ui, picked, t.pack_add()) {

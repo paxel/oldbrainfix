@@ -16,6 +16,7 @@ use egui::{Id, Key, RichText, TextEdit, Ui};
 use oldbrainfix_core::{DeviceSettings, Search, Store};
 
 use crate::app::{merge_row, name_field, row_title};
+use crate::design;
 use crate::l10n::L10n;
 use crate::text_menu;
 use crate::theme::{self, Tones};
@@ -180,7 +181,7 @@ impl NotePicker {
                     }
                 }
             });
-        if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+        if design::row_button(ui, t.cancel()).clicked() {
             return Some(NoteAsk::Close);
         }
         match picked {

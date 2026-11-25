@@ -18,6 +18,7 @@ use oldbrainfix_core::tally_units;
 use oldbrainfix_core::{Notes, Store, Tallies, TallyRule, UnitSystem};
 
 use crate::app::{chip_row, embossed};
+use crate::design;
 use crate::icons;
 use crate::l10n::L10n;
 use crate::leave_saves::Leaving;
@@ -288,7 +289,7 @@ impl TallyPage {
                     if theme::main_action(ui, true, t.save()) {
                         intent = Some(PageIntent::Save);
                     }
-                    if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+                    if design::row_button(ui, t.cancel()).clicked() {
                         intent = Some(PageIntent::Close);
                     }
                 });

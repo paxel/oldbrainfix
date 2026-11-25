@@ -45,6 +45,7 @@ use oldbrainfix_core::markdown::table::{self, Align, Table};
 use oldbrainfix_core::{BoxState, text_boxes, text_format};
 
 use crate::cell_pick::{self, Span};
+use crate::design;
 use crate::format_bar;
 use crate::icons;
 use crate::l10n::L10n;
@@ -1025,7 +1026,7 @@ pub(crate) fn question(
             ui.label(RichText::new(question).size(18.0).color(text));
             ui.label(RichText::new(t.table_delete_body()).color(text));
             ui.horizontal_wrapped(|ui| {
-                if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+                if design::row_button(ui, t.cancel()).clicked() {
                     answer = Some(false);
                 }
                 if theme::destructive(ui, true, t.delete()).clicked() {

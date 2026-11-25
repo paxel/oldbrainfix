@@ -10,6 +10,7 @@ use egui::{Id, RichText, ScrollArea, TextEdit, Ui};
 use oldbrainfix_core::app_link::AppLink;
 use oldbrainfix_core::{Note, Notes, PersonSettings, Places, Result, Store};
 
+use crate::design;
 use crate::icons;
 use crate::l10n::L10n;
 use crate::names::{area_name, topic_name};
@@ -179,7 +180,7 @@ pub fn picker(ui: &mut Ui, t: &L10n, picker: &mut Picker, focus: bool) -> Option
                 }
             }
         });
-    if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+    if design::row_button(ui, t.cancel()).clicked() {
         picked = Some(Picked::Cancel);
     }
     picked

@@ -48,7 +48,9 @@ There are three kinds, and an action takes the first that fits.
   which `lookTheme`'s `outlinedButtonTheme` in `look.dart` gives the
   tonal fill with the outline. Desktop: every button egui draws (`ui.button`, `Button::new`) wears
   the secondary look of "Buttons look like buttons" (Desktop ▸ Buttons
-  and look, #218), a tonal fill with the outline; `band_button` in
+  and look, #218), a tonal fill with the outline, except Cancel and
+  Close in a dialog's action row, which are text buttons without an
+  icon (`design::row_button`, obf-1102); `band_button` in
   `app.rs` draws that frame at the band's height, and
   `capture_choices::open_in_editor` wears it across the width
   (obf-1081). Do not use it for the main action or in a menu.
@@ -61,7 +63,8 @@ There are three kinds, and an action takes the first that fits.
   in the text's or the weak colour, and do not leave out its icon. A
   dialog's action row is the one place a text button goes without an
   icon (Cancel, Close, Not now beside the filled main action), because
-  the row itself shows that these are its buttons.
+  the row itself shows that these are its buttons; desktop:
+  `design::row_button` (obf-1102).
 - Icon-only buttons (⋮, the pencil, the view button, the format bar)
   get a rounded ground under the pointer and the ring while focused
   (desktop `theme::icon_button_back`, phone `IconButton`), and they
@@ -114,7 +117,7 @@ There are three kinds, and an action takes the first that fits.
 
 - **A chip is a short, tappable word with rounded ends**, a 1 px
   outline, and its fill tinted with the accent while picked (the phone
-  gives Material's chip the pill and 32 inside the outline once, in
+  gives Material's chip the pill and 32 with the outline once, in
   `lookTheme`'s `chipTheme` in `look.dart`; the desktop
   `design::Chip` and `design::chip` in `design.rs`, a full pill 32
   high, in a list's band the band's 36, obf-1081). There are
@@ -3004,7 +3007,9 @@ There are three kinds, and an action takes the first that fits.
   the keyboard focus a step further with a 2 px ring. The main action of
   a dialog or page (Save, Create, Done, Use, Restore, Continue) is
   on the accent with its text in `on_accent`; Delete, Remove and Move to
-  Trash are on the error colour; every other button is secondary. The
+  Trash are on the error colour; Cancel and Close in a dialog's action
+  row are text buttons without an icon (Design system ▸ Buttons,
+  obf-1102); every other button is secondary. The
   text on every fill is at least 4.5:1. Links stay links, entries of a
   menu stay flat, icon-only buttons (⋮, Edit, the view button, the
   format bar) get the same rounded background under the pointer and the

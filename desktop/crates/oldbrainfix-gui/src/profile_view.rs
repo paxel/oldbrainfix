@@ -12,6 +12,7 @@ use egui::{
 use oldbrainfix_core::CardTaken;
 use oldbrainfix_core::profile::{self, Profile, ProfileChoice};
 
+use crate::design;
 use crate::icons;
 use crate::l10n::L10n;
 use crate::media::pixels;
@@ -613,7 +614,7 @@ pub fn square_page(ui: &mut Ui, t: &L10n, square: &mut Square, actions: &mut Vec
         if theme::main_action(ui, true, t.profile_crop_use()) {
             actions.push(ProfileAction::UseSquare);
         }
-        if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+        if design::row_button(ui, t.cancel()).clicked() {
             actions.push(ProfileAction::CancelSquare);
         }
     });

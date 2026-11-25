@@ -13,6 +13,7 @@ use egui::{
     Align2, Color32, FontId, Frame, Id, Margin, RichText, Sense, Ui, WidgetInfo, WidgetType,
 };
 
+use crate::design;
 use crate::icons;
 use crate::l10n::L10n;
 use crate::theme::{self, Tones};
@@ -184,7 +185,7 @@ pub fn badge_dialog(
             });
             content(ui);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
-                if ui.button(RichText::new(t.close()).color(text)).clicked() {
+                if design::row_button(ui, t.close()).clicked() {
                     closed = true;
                 }
             });

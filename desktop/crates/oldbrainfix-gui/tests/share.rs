@@ -336,6 +336,8 @@ fn sharing_an_area_hosts_its_invite() -> TestResult {
     // The dialog's main action, filled on the accent (obf-1101).
     assert!(wears(&harness, "Show the code", ButtonKind::Primary));
     assert!(!wears(&harness, "Cancel", ButtonKind::Primary));
+    // Cancel beside it a text button, no outlined one (obf-1102).
+    assert!(!wears(&harness, "Cancel", ButtonKind::Secondary));
     harness.get_by_label("Show the code").click();
     harness.step();
     harness.step();
