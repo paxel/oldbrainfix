@@ -14841,17 +14841,23 @@ impl App {
                 });
         } else if self.arrived > 0 && !self.pages.contains(&Page::Sync) {
             // One at a time: Conflicts from an automatic sync, a click
-            // away from the Sync dialog that lists them.
+            // away from the Sync dialog that lists them; Review beside
+            // the words, the outlined button the AI line has (obf-1113).
             let text = self.t.sync_conflicts_arrived(self.arrived as i64);
+            let review = self.t.sync_conflicts_review();
             egui::Panel::top("announcement")
                 .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
                 .show(ui, |ui| {
                     let colour = ui.visuals().text_color();
-                    let label = egui::Label::new(RichText::new(text).strong().color(colour))
-                        .sense(egui::Sense::click());
-                    if ui.add(label).clicked() {
-                        actions.push(Action::OpenPage(Page::Sync));
-                    }
+                    ui.horizontal_wrapped(|ui| {
+                        let label = egui::Label::new(RichText::new(text).strong().color(colour))
+                            .sense(egui::Sense::click());
+                        let words = ui.add(label);
+                        let button = ui.button(RichText::new(review).strong().color(colour));
+                        if words.clicked() || button.clicked() {
+                            actions.push(Action::OpenPage(Page::Sync));
+                        }
+                    });
                 });
         } else if let Some(source) = self.speech_offer_shows() {
             // The speech model a restored Backup's Device used (obf-1098),

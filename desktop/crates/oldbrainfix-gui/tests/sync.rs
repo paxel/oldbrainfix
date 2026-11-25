@@ -534,10 +534,19 @@ fn conflicts_an_automatic_sync_brought_are_announced_until_sync_shows() -> TestR
         );
     harness.step();
     assert_eq!(harness.state().arrived_conflicts(), 1);
+    assert!(
+        harness
+            .query_all_by_label_contains("A sync found something changed on both Devices")
+            .next()
+            .is_some(),
+        "the announcement"
+    );
+    // Review beside it, a button (obf-1113), leads to Sync as the
+    // words do.
     harness
-        .query_all_by_label_contains("A sync found something changed on both Devices")
+        .query_all_by_role_and_label(Role::Button, "Review")
         .next()
-        .ok_or("the announcement")?
+        .ok_or("Review")?
         .click_accesskit();
     step_until(&mut harness, |app| app.sync_host().hosting())?;
     harness.step();

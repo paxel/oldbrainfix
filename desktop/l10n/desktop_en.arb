@@ -157,6 +157,8 @@
   "@syncAutoIntro": {"description": "The desktop's Sync view, over the paired Devices."},
   "syncConflictsArrived": "{count, plural, =1{A sync found something changed on both Devices. Click to pick which version stays.} other{A sync found things changed on both Devices. Click to pick which versions stay.}}",
   "@syncConflictsArrived": {"description": "Announced at the top after an automatic sync found Conflicts; a click opens Sync. The count only picks the grammar and is never shown.", "placeholders": {"count": {"type": "int"}}},
+  "syncConflictsReview": "Review",
+  "@syncConflictsReview": {"description": "Button beside the announcement at the top after an automatic sync found Conflicts: opens Sync, which lists them."},
   "syncConflictsBelow": "{count, plural, =1{1 thing was changed on both Devices. Pick below which version stays.} other{{count} things were changed on both Devices. Pick below which versions stay.}}",
   "@syncConflictsBelow": {"description": "The desktop's Sync view after a session that found Conflicts; they are listed below it.", "placeholders": {"count": {"type": "int"}}},
   "folderSyncNow": "Sync now",
