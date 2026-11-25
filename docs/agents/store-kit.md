@@ -119,8 +119,18 @@ and F-Droid both take them. `docs/screenshots/play` links to
 | 7 | `7-history.png` | Routine history with Streak and Adherence                                                |
 | 8 | `8-dark.png`    | Agenda in the dark theme, scrolled to the rest of the week                               |
 
-No tablet frames. Feature graphic (1024 × 500) and hi-res icon (512 × 512)
-are uploaded in the Play Console by hand.
+The same run writes Play's 10" tablet frames (obf-1150), 1440 × 2560
+(900 × 1600 at 1.6, 9:16 as Play's screenshots are), per locale to
+`fastlane/metadata/android/<locale>/images/tenInchScreenshots/`, the same
+eight scenes in the big screen's layout (obf-1148): the sidebar beside the
+list, the diary reached through the sidebar, the Note editor as a dialog
+over it. They are uploaded in the Play Console as the 10-inch tablet
+screenshots. The Play steps of a release record name them as "replace
+tablet screenshots N…", apart from the phone's "replace phone
+screenshots N…".
+
+Feature graphic (1024 × 500) and hi-res icon (512 × 512) are uploaded in
+the Play Console by hand.
 
 ### App Store
 
@@ -152,6 +162,7 @@ Sizes, from Apple's
 | iPhone with Face ID (large), 6.5"              | 1284 × 2778, 1242 × 2688              | scaled by Apple           |
 | iPhone with Dynamic Island (medium), 6.3"/6.1" | 1206 × 2622, 1179 × 2556              | scaled by Apple           |
 | Smaller iPhones                                | down to 640 × 1136                    | scaled by Apple           |
+| iPad 13"                                       | 2064 × 2752, 2048 × 2732              | 2064 × 2752, `ipad-13`    |
 
 - Apple requires at least one screenshot for the iPhone with Dynamic
   Island (medium); "you only need to provide screenshots for the highest
@@ -163,7 +174,15 @@ Sizes, from Apple's
 - iPad frames: the app runs on the iPhone and the iPad
   (`TARGETED_DEVICE_FAMILY = "1,2"` for the app and both extensions,
   obf-1149; iPhone only before, #236), so App Store Connect asks for
-  iPad 13" screenshots as well; the generator draws them with obf-1150.
+  iPad 13" screenshots as well. The same run of 'iphone screenshots'
+  writes them (obf-1150), 2064 × 2752 (the 13" iPad Pro's 1032 × 1376
+  points at 2, with its status bar and home indicator), opaque, to
+  `fastlane/metadata/ios/<locale>/screenshots/ipad-13/`: the same
+  eight files as the iPhone's in the big screen's layout (obf-1148),
+  the Note editor as a dialog over the list. The release job's
+  `appstore-screenshots` artifact carries them with the iPhone's. The
+  App Store steps of a release record name them as "Replace iPad frames
+  N…", apart from the iPhone's "Replace frames N…".
 - iPhone Duo (1398 × 2034 outer, 2007 × 2853 inner) is required from
   April 2027 for apps built with the iOS 27.1 SDK or later; no frames for
   it yet.

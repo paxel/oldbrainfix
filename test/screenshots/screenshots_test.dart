@@ -35,6 +35,8 @@ import 'package:oldbrainfix/src/all_routines_screen.dart';
 import 'package:oldbrainfix/src/appointments.dart';
 import 'package:oldbrainfix/src/alarm_platform.dart';
 import 'package:oldbrainfix/src/app.dart';
+import 'package:oldbrainfix/src/areas_screen.dart';
+import 'package:oldbrainfix/src/big_screen.dart';
 import 'package:oldbrainfix/src/browser.dart';
 import 'package:oldbrainfix/src/bundle_platform.dart';
 import 'package:oldbrainfix/src/calendar_screen.dart';
@@ -98,6 +100,20 @@ const _dpr = 2.5;
 const _iphoneScreen = Size(440, 956);
 const _iphoneDpr = 3.0;
 const _iphoneSafeArea = FakeViewPadding(top: 62 * 3, bottom: 34 * 3);
+
+/// The App Store's iPad 13" frame (obf-1150): the 13" iPad Pro's
+/// screen, 1032 × 1376 points at 2, exactly 2064 × 2752, with its status
+/// bar on top and its home indicator below, in the big screen's layout
+/// (obf-1148).
+const _ipadScreen = Size(1032, 1376);
+const _ipadDpr = 2.0;
+const _ipadSafeArea = FakeViewPadding(top: 24 * 2, bottom: 20 * 2);
+
+/// Play's 10" tablet frame (obf-1150): 900 × 1600 at 1.6, exactly
+/// 1440 × 2560, 9:16 as Play's screenshots are, in the big screen's
+/// layout (obf-1148).
+const _tabletScreen = Size(900, 1600);
+const _tabletDpr = 1.6;
 
 /// The guide's frames: the same 432 × 768 screen at 1.5, 648 × 1152,
 /// enough for a page and light in the repository.
@@ -1044,6 +1060,7 @@ Future<AppLocalizations> _start(
   PrintPlatform printing = const _GuidePrinting(),
   Size screen = _screen,
   FakeViewPadding padding = FakeViewPadding.zero,
+  bool bigScreen = false,
 }) async {
   tester.view
     ..physicalSize = screen * dpr
@@ -1068,6 +1085,7 @@ Future<AppLocalizations> _start(
         folders: folders,
         appointments: appointments,
         speech: speech,
+        bigScreen: bigScreen,
       ),
     ),
   );
@@ -1215,14 +1233,17 @@ void _shot(
   });
 }
 
-/// The store frames of one store, eight per locale: Play's and
-/// F-Droid's 1080 × 1920 frames, or with [iphone] the App Store's
-/// 1320 × 2868 ones (#244), drawn as on iOS: the iOS platform, so pushed
-/// pages carry the Cupertino back arrow and the edge back swipe, its
-/// safe area, Roboto standing in for the system font, and opaque PNGs,
-/// as App Store Connect takes no alpha channel. The iPhone has no alarm
-/// ring screen, as AlarmKit's own screen replaces it, so its sixth frame
-/// is All Routines and Reminders.
+/// The store frames of one store, eight per locale and device: Play's
+/// and F-Droid's 1080 × 1920 phone frames and Play's 1440 × 2560 10"
+/// tablet frames, or with [iphone] the App Store's 1320 × 2868 iPhone
+/// frames (#244) and its 2064 × 2752 iPad 13" frames, drawn as on iOS:
+/// the iOS platform, so pushed pages carry the Cupertino back arrow and
+/// the edge back swipe, its safe area, Roboto standing in for the system
+/// font, and opaque PNGs, as App Store Connect takes no alpha channel.
+/// The tablet and the iPad show the big screen's layout (obf-1148,
+/// obf-1150): the sidebar beside the list, a Note as a dialog over it.
+/// The iPhone has no alarm ring screen, as AlarmKit's own screen replaces
+/// it, so its sixth frame is All Routines and Reminders, the iPad's too.
 void _storeScreenshots({required bool iphone}) {
   group(
     iphone ? 'iphone screenshots' : 'store screenshots',
@@ -1232,157 +1253,230 @@ void _storeScreenshots({required bool iphone}) {
         await _loadFonts();
         if (iphone) await _loadCupertinoFonts();
       });
-      final screen = iphone ? _iphoneScreen : _screen;
-      final dpr = iphone ? _iphoneDpr : _dpr;
-      final size = (
-        (screen.width * dpr).round(),
-        (screen.height * dpr).round(),
-      );
+      final devices = iphone
+          ? [
+              (
+                name: '',
+                folder: 'screenshots/iphone-6.9',
+                screen: _iphoneScreen,
+                dpr: _iphoneDpr,
+                padding: _iphoneSafeArea,
+                big: false,
+              ),
+              (
+                name: 'ipad ',
+                folder: 'screenshots/ipad-13',
+                screen: _ipadScreen,
+                dpr: _ipadDpr,
+                padding: _ipadSafeArea,
+                big: true,
+              ),
+            ]
+          : [
+              (
+                name: '',
+                folder: 'images/phoneScreenshots',
+                screen: _screen,
+                dpr: _dpr,
+                padding: FakeViewPadding.zero,
+                big: false,
+              ),
+              (
+                name: 'tablet ',
+                folder: 'images/tenInchScreenshots',
+                screen: _tabletScreen,
+                dpr: _tabletDpr,
+                padding: FakeViewPadding.zero,
+                big: true,
+              ),
+            ];
 
-      for (final (locale, language, texts) in [
-        ('en-US', 'en', _en),
-        ('de-DE', 'de', _de),
-      ]) {
-        final out = Directory(
-          iphone
-              ? 'fastlane/metadata/ios/$locale/screenshots/iphone-6.9'
-              : 'fastlane/metadata/android/$locale/images/phoneScreenshots',
-        );
-        final boundary = GlobalKey();
-
-        Future<AppLocalizations> start(
-          WidgetTester tester,
-          _Seeded seeded, {
-          FakeAlarms? alarms,
-          AppointmentSource appointments = const NoAppointments(),
-        }) => _start(
-          tester,
-          boundary,
-          language,
-          seeded.store,
-          dpr,
-          alarms: alarms,
-          appointments: appointments,
-          screen: screen,
-          padding: iphone ? _iphoneSafeArea : FakeViewPadding.zero,
-          // Only Android lets an app be a printer (#293).
-          printing: iphone ? const NoPrinting() : const _GuidePrinting(),
-        );
-
-        Future<void> tap(WidgetTester tester, Finder finder) =>
-            _tap(tester, finder);
-
-        /// Writes what the app shows now as [name].
-        Future<void> shoot(WidgetTester tester, String name) async {
-          final shot = await _capture(tester, boundary, dpr);
-          expect((shot.width, shot.height), size);
-          out.createSync(recursive: true);
-          File('${out.path}/$name').writeAsBytesSync(
-            iphone ? _opaquePng(shot.width, shot.height, shot.rgba) : shot.png,
+      for (final device in devices) {
+        for (final (locale, language, texts) in [
+          ('en-US', 'en', _en),
+          ('de-DE', 'de', _de),
+        ]) {
+          final screen = device.screen;
+          final dpr = device.dpr;
+          final size = (
+            (screen.width * dpr).round(),
+            (screen.height * dpr).round(),
           );
-        }
+          final out = Directory(
+            iphone
+                ? 'fastlane/metadata/ios/$locale/${device.folder}'
+                : 'fastlane/metadata/android/$locale/${device.folder}',
+          );
+          final boundary = GlobalKey();
 
-        void frame(String name, Future<void> Function(WidgetTester) body) {
-          _shot('$locale $name', platform: iphone ? TargetPlatform.iOS : null, (
+          Future<AppLocalizations> start(
+            WidgetTester tester,
+            _Seeded seeded, {
+            FakeAlarms? alarms,
+            AppointmentSource appointments = const NoAppointments(),
+          }) => _start(
             tester,
-          ) async {
-            await body(tester);
-            await shoot(tester, name);
-          });
-        }
+            boundary,
+            language,
+            seeded.store,
+            dpr,
+            alarms: alarms,
+            appointments: appointments,
+            screen: screen,
+            padding: device.padding,
+            // Only Android lets an app be a printer (#293).
+            printing: iphone ? const NoPrinting() : const _GuidePrinting(),
+            bigScreen: device.big,
+          );
 
-        /// On the iPhone, a pushed page goes back with iOS's arrow.
-        void backArrow() {
-          if (!iphone) return;
-          expect(find.byIcon(Icons.arrow_back_ios_new_rounded), findsWidgets);
-          expect(find.byIcon(Icons.arrow_back), findsNothing);
-        }
+          Future<void> tap(WidgetTester tester, Finder finder) =>
+              _tap(tester, finder);
 
-        frame('1-agenda.png', (tester) async {
-          await start(tester, _Seeded(texts));
-          expect(find.byType(AgendaScreen), findsOneWidget);
-        });
+          /// Writes what the app shows now as [name].
+          Future<void> shoot(WidgetTester tester, String name) async {
+            final shot = await _capture(tester, boundary, dpr);
+            expect((shot.width, shot.height), size);
+            out.createSync(recursive: true);
+            File('${out.path}/$name').writeAsBytesSync(
+              iphone
+                  ? _opaquePng(shot.width, shot.height, shot.rgba)
+                  : shot.png,
+            );
+          }
 
-        frame('2-capture.png', (tester) async {
-          final t = await start(tester, _Seeded(texts));
-          await openTextCapture(tester);
-          await tester.enterText(find.byType(TextField), texts.captureText);
-          await tester.pumpAndSettle();
-          // The quick note: the text, three Nudge buttons and Open in the
-          // editor (#352, obf-1080).
-          expect(find.byType(NudgeButtons), findsOneWidget);
-          expect(find.text(t.captureOpenInEditor), findsOneWidget);
-        });
+          void frame(String name, Future<void> Function(WidgetTester) body) {
+            _shot(
+              '${device.name}$locale $name',
+              platform: iphone ? TargetPlatform.iOS : null,
+              (tester) async {
+                await body(tester);
+                await shoot(tester, name);
+              },
+            );
+          }
 
-        frame('3-diary.png', (tester) async {
-          final t = await start(tester, _Seeded(texts));
-          await tap(tester, find.byTooltip(t.browseTooltip));
-          await tap(tester, find.text(t.starterHousehold));
-          backArrow();
-        });
+          /// On the iPhone, a pushed page goes back with iOS's arrow.
+          void backArrow() {
+            if (!iphone) return;
+            expect(find.byIcon(Icons.arrow_back_ios_new_rounded), findsWidgets);
+            expect(find.byIcon(Icons.arrow_back), findsNothing);
+          }
 
-        frame('4-editor.png', (tester) async {
-          final t = await start(tester, _Seeded(texts));
-          await tap(tester, find.byTooltip(t.browseTooltip));
-          await tap(tester, find.text(t.starterHousehold));
-          await tester.longPress(find.text(texts.boiler));
-          await tester.pumpAndSettle();
-          expect(find.byType(NoteEditorScreen), findsOneWidget);
-          backArrow();
-        });
-
-        if (iphone) {
-          frame('6-routines.png', (tester) async {
+          frame('1-agenda.png', (tester) async {
             await start(tester, _Seeded(texts));
-            await tap(tester, find.byKey(const ValueKey('allRoutines')));
-            expect(find.byType(AllRoutinesScreen), findsOneWidget);
+            expect(find.byType(AgendaScreen), findsOneWidget);
+          });
+
+          frame('2-capture.png', (tester) async {
+            final t = await start(tester, _Seeded(texts));
+            await openTextCapture(tester);
+            await tester.enterText(find.byType(TextField), texts.captureText);
+            await tester.pumpAndSettle();
+            // The quick note: the text, three Nudge buttons and Open in the
+            // editor (#352, obf-1080).
+            expect(find.byType(NudgeButtons), findsOneWidget);
+            expect(find.text(t.captureOpenInEditor), findsOneWidget);
+          });
+
+          /// The Household's diary: through the folder and the Areas list
+          /// on a phone, the sidebar on the big screen.
+          Future<void> openHousehold(
+            WidgetTester tester,
+            AppLocalizations t,
+          ) async {
+            if (device.big) {
+              await tap(
+                tester,
+                find.descendant(
+                  of: find.byType(Sidebar),
+                  matching: find.text(t.starterHousehold),
+                ),
+              );
+            } else {
+              await tap(tester, find.byTooltip(t.browseTooltip));
+              await tap(tester, find.text(t.starterHousehold));
+            }
+            expect(find.byType(AreaScreen), findsOneWidget);
+          }
+
+          frame('3-diary.png', (tester) async {
+            final t = await start(tester, _Seeded(texts));
+            await openHousehold(tester, t);
             backArrow();
           });
-        } else {
-          frame('6-alarm.png', (tester) async {
+
+          frame('4-editor.png', (tester) async {
+            final t = await start(tester, _Seeded(texts));
+            await openHousehold(tester, t);
+            await tester.longPress(find.text(texts.boiler));
+            await tester.pumpAndSettle();
+            expect(find.byType(NoteEditorScreen), findsOneWidget);
+            // Over the list as a dialog on the big screen.
+            expect(
+              find.ancestor(
+                of: find.byType(NoteEditorScreen),
+                matching: find.byType(Dialog),
+              ),
+              device.big ? findsOneWidget : findsNothing,
+            );
+            backArrow();
+          });
+
+          if (iphone) {
+            frame('6-routines.png', (tester) async {
+              await start(tester, _Seeded(texts));
+              await tap(tester, find.byKey(const ValueKey('allRoutines')));
+              expect(find.byType(AllRoutinesScreen), findsOneWidget);
+              backArrow();
+            });
+          } else {
+            frame('6-alarm.png', (tester) async {
+              final seeded = _Seeded(texts);
+              final alarms = FakeAlarms()
+                ..ringingNow = Ringing(
+                  routineId: seeded.snack.id,
+                  occurrenceKey: Occurrence(
+                    Day(2026, 10, 27),
+                    ClockTime(15, 0),
+                  ).key,
+                  title: texts.snack,
+                  body: '15:00',
+                );
+              await start(tester, seeded, alarms: alarms);
+              expect(find.byType(RingScreen), findsOneWidget);
+            });
+          }
+
+          frame('7-history.png', (tester) async {
+            await start(tester, _Seeded(texts));
+            // From the row's menu, as a tap opens the Note (#270).
+            await tester.longPress(find.text(texts.snack).first);
+            await tester.pumpAndSettle();
+            await tap(tester, find.byKey(const ValueKey('row-history')));
+            expect(find.byType(RoutineHistoryScreen), findsOneWidget);
+            backArrow();
+          });
+
+          frame('5-fan.png', (tester) async {
+            await start(tester, _Seeded(texts));
+            await tap(tester, find.byIcon(Icons.add));
+            for (final way in ['text', 'voice', 'photo', 'gallery']) {
+              expect(fanEntry(way), findsOneWidget);
+            }
+          });
+
+          frame('8-dark.png', (tester) async {
             final seeded = _Seeded(texts);
-            final alarms = FakeAlarms()
-              ..ringingNow = Ringing(
-                routineId: seeded.snack.id,
-                occurrenceKey: Occurrence(
-                  Day(2026, 10, 27),
-                  ClockTime(15, 0),
-                ).key,
-                title: texts.snack,
-                body: '15:00',
-              );
-            await start(tester, seeded, alarms: alarms);
-            expect(find.byType(RingScreen), findsOneWidget);
+            seeded.store.themeChoice = ThemeChoice.dark;
+            final t = await start(tester, seeded);
+            // Scrolled to the rest of the week, dimmed.
+            Scrollable.ensureVisible(
+              tester.element(find.text(t.agendaTomorrow)),
+            );
+            await tester.pumpAndSettle();
+            expect(find.byType(AgendaScreen), findsOneWidget);
           });
         }
-
-        frame('7-history.png', (tester) async {
-          await start(tester, _Seeded(texts));
-          // From the row's menu, as a tap opens the Note (#270).
-          await tester.longPress(find.text(texts.snack).first);
-          await tester.pumpAndSettle();
-          await tap(tester, find.byKey(const ValueKey('row-history')));
-          expect(find.byType(RoutineHistoryScreen), findsOneWidget);
-          backArrow();
-        });
-
-        frame('5-fan.png', (tester) async {
-          await start(tester, _Seeded(texts));
-          await tap(tester, find.byIcon(Icons.add));
-          for (final way in ['text', 'voice', 'photo', 'gallery']) {
-            expect(fanEntry(way), findsOneWidget);
-          }
-        });
-
-        frame('8-dark.png', (tester) async {
-          final seeded = _Seeded(texts);
-          seeded.store.themeChoice = ThemeChoice.dark;
-          final t = await start(tester, seeded);
-          // Scrolled to the rest of the week, dimmed.
-          Scrollable.ensureVisible(tester.element(find.text(t.agendaTomorrow)));
-          await tester.pumpAndSettle();
-          expect(find.byType(AgendaScreen), findsOneWidget);
-        });
       }
     },
   );

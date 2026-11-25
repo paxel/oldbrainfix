@@ -13,9 +13,11 @@ What's New.
 
 fails unless the console steps of the record name exactly the store
 frames that changed since that tag: the Play steps' "replace phone
-screenshots …" the phone frames under `fastlane/metadata/android/`, the
-App Store steps' "Replace frames …" the iPhone frames under
-`fastlane/metadata/ios/`. "none" names no frame.
+screenshots …" the phone frames and their "replace tablet screenshots …"
+the 10" tablet frames under `fastlane/metadata/android/`, the App Store
+steps' "Replace frames …" the iPhone frames and their "Replace iPad
+frames …" the iPad 13" frames under `fastlane/metadata/ios/` (obf-1150).
+"none" names no frame.
 """
 import os
 import re
@@ -86,8 +88,9 @@ def named(lines, heading, verb):
     raise ValueError(f'"{heading}" names no frames after "{verb}"')
 
 
-def changed(base, folder, root=ROOT):
-    """The numbers of the frames under `folder` that differ from `base`."""
+def changed(base, folder, root=ROOT, kinds=("phoneScreenshots", "iphone-")):
+    """The numbers of the frames under `folder` that differ from `base`,
+    of the devices whose folder holds one of `kinds`."""
     out = subprocess.run(
         ["git", "diff", "--name-only", base, "--", folder],
         cwd=root, capture_output=True, text=True, check=True,
@@ -96,7 +99,7 @@ def changed(base, folder, root=ROOT):
     for path in out.split():
         name = os.path.basename(path)
         m = re.match(r"([0-9]+)-.*\.png$", name)
-        if m and ("phoneScreenshots" in path or "iphone-" in path):
+        if m and any(kind in path for kind in kinds):
             numbers.add(int(m.group(1)))
     return numbers
 
@@ -104,16 +107,20 @@ def changed(base, folder, root=ROOT):
 def frames(lines, base, root=ROOT):
     """The problems of the console steps against the frames that changed."""
     problems = []
-    pairs = [
-        ("## Play Console, in order", "replace phone screenshots", PLAY),
-        ("## App Store Connect, in order", "Replace frames", IOS),
+    play = "## Play Console, in order"
+    app_store = "## App Store Connect, in order"
+    steps = [
+        (play, "replace phone screenshots", PLAY, "phoneScreenshots", "phone"),
+        (play, "replace tablet screenshots", PLAY, "tenInchScreenshots", "tablet"),
+        (app_store, "Replace frames", IOS, "iphone-", "iPhone"),
+        (app_store, "Replace iPad frames", IOS, "ipad-", "iPad"),
     ]
-    for heading, verb, folder in pairs:
+    for heading, verb, folder, kind, device in steps:
         said = named(lines, heading, verb)
-        real = changed(base, folder, root)
+        real = changed(base, folder, root, (kind,))
         if said != real:
             problems.append(
-                f'{heading[3:]}: names {sorted(said) or "none"}, but {sorted(real) or "none"} changed since {base}'
+                f'{heading[3:]}, {device}: names {sorted(said) or "none"}, but {sorted(real) or "none"} changed since {base}'
             )
     return problems
 
