@@ -54,6 +54,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 
 ### Fixed
 
+- On the phone, the line under a list's bar stays once its search band has scrolled away. ([obf-1129](https://github.com/paxel/oldbrainfix/issues/445))
 - On the phone, a Conflict is a card like the others, also in dark mode, and each version is a row to pick. ([obf-1119](https://github.com/paxel/oldbrainfix/issues/435))
 - On the phone, New Tally, Their Notes, Send changes and Conflicts no longer look like plain text but like something to tap. ([obf-1108](https://github.com/paxel/oldbrainfix/issues/424))
 - On the phone and the desktop, no search bar cuts off what scrolls under it; each sits on a band with a line under it. ([obf-1088](https://github.com/paxel/oldbrainfix/issues/401))

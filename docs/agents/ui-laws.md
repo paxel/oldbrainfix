@@ -91,7 +91,9 @@ There are three kinds, and an action takes the first that fits.
   with its chips, and "+ New Note", all one height (36), wrapping under
   the field below 200 wide.
 - Phone: `SearchBand`, and `SearchHeaderSliver` for a list that scrolls
-  it away, in `browser.dart`; its fill is `searchHeaderColour`, the
+  it away, followed by `SearchHeaderLine`, whose line stays under the
+  bar once the band is gone (obf-1129), in `browser.dart`; its fill is
+  `searchHeaderColour`, the
   marks' tone (`LookTones.mark` in `look.dart`). Desktop:
   `theme::search_band` with `theme::band_fill`, and `list_band` /
   `band_tools` with `BandSizes` in `app.rs`.

@@ -825,20 +825,54 @@ class SearchBand extends StatelessWidget {
   /// The search field, with what goes under it.
   final Widget child;
 
-  const SearchBand({super.key, required this.child});
+  /// Whether the band draws its line itself; in a [SearchHeaderSliver] the
+  /// [SearchHeaderLine] under it draws it, so it stays when the band has
+  /// scrolled away (obf-1129).
+  final bool line;
+
+  /// The room under the bar, its line included, so the line runs along
+  /// the band's bottom and not along the field's edge (#351, obf-1041).
+  static const _room = 8.0;
+
+  const SearchBand({super.key, required this.child, this.line = true});
 
   @override
   Widget build(BuildContext context) => DecoratedBox(
     decoration: BoxDecoration(
       color: searchHeaderColour(context),
-      border: Border(
-        // Material's outline: its variant fades into the marks' tone.
-        bottom: BorderSide(color: Theme.of(context).colorScheme.outline),
+      border: line ? Border(bottom: _side(context)) : null,
+    ),
+    child: Padding(
+      padding: EdgeInsets.only(bottom: line ? _room : _room - _width),
+      child: child,
+    ),
+  );
+
+  /// The line under the band, Material's outline: its variant fades into
+  /// the marks' tone.
+  static BorderSide _side(BuildContext context) =>
+      BorderSide(color: Theme.of(context).colorScheme.outline);
+
+  /// A [BorderSide]'s width.
+  static const _width = 1.0;
+}
+
+/// The line under a [SearchHeaderSliver]'s band, the sliver right after
+/// it: it runs along the band's bottom while any of the band shows, and
+/// under the page's bar once the band has scrolled away, so what scrolls
+/// goes under a line there too (obf-1129).
+class SearchHeaderLine extends StatelessWidget {
+  const SearchHeaderLine({super.key});
+
+  @override
+  Widget build(BuildContext context) => PinnedHeaderSliver(
+    child: IgnorePointer(
+      child: SizedBox(
+        height: SearchBand._width,
+        width: double.infinity,
+        child: ColoredBox(color: SearchBand._side(context).color),
       ),
     ),
-    // Room under the bar, so its line runs along the band's bottom and
-    // not along the field's edge (#351, obf-1041).
-    child: Padding(padding: const EdgeInsets.only(bottom: 8), child: child),
   );
 }
 
@@ -850,6 +884,7 @@ class SearchBand extends StatelessWidget {
 /// [controller] holds a search it stays, so a search being typed or shown
 /// never goes away. It sits on a [SearchBand] (#351, obf-1041), and the
 /// cards go under it, shown over the list or with the list pulled down.
+/// A [SearchHeaderLine] follows it in the list and draws the band's line.
 class SearchHeaderSliver extends StatefulWidget {
   /// The field's text: a search in it keeps the header.
   final TextEditingController controller;
@@ -906,6 +941,7 @@ class _SearchHeaderSliverState extends State<SearchHeaderSliver> {
     final header = KeyedSubtree(
       key: _kept,
       child: SearchBand(
+        line: false,
         child: Focus(
           canRequestFocus: false,
           skipTraversal: true,

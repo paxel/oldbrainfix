@@ -823,6 +823,7 @@ class _AreasScreenState extends State<AreasScreen>
                     ],
                   ),
                 ),
+                const SearchHeaderLine(),
                 if (searching || _areas.isEmpty)
                   SliverPadding(
                     padding: padding,
@@ -1285,6 +1286,7 @@ class _AreaScreenState extends State<AreaScreen>
                   ],
                 ),
               ),
+              const SearchHeaderLine(),
               SliverPadding(
                 // Where this Device may not write, no "+" floats to clear.
                 padding: _writes
@@ -1584,6 +1586,7 @@ class _TopicScreenState extends State<TopicScreen>
                   ],
                 ),
               ),
+              const SearchHeaderLine(),
               SliverPadding(
                 // Where this Device may not write, no "+" floats to clear.
                 padding: _writes
