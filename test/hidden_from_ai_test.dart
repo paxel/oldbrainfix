@@ -3,6 +3,7 @@ import 'dart:isolate';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/merge_into_screen.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/note_card.dart';
@@ -50,7 +51,10 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Future<void> start(WidgetTester tester) async {
+  Future<void> start(
+    WidgetTester tester, {
+    String browse = 'Search and browse',
+  }) async {
     tester.view.physicalSize = const Size(800, 2400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -58,7 +62,7 @@ void main() {
       OldBrainFixApp(store: store, bundles: FakeBundles(dir)),
     );
     await tester.pumpAndSettle();
-    await tap(tester, find.byTooltip('Search and browse'));
+    await tap(tester, find.byTooltip(browse));
   }
 
   Future<void> allNotes(WidgetTester tester) async {
@@ -153,6 +157,37 @@ void main() {
     await tap(tester, find.byTooltip('All Notes'));
     expect(shieldOn('Back pain'), findsOneWidget);
   });
+
+  for (final german in [false, true]) {
+    testWidgets('the menu entry is one flat line, its switch at the end '
+        '(obf-1135)${german ? ', in German' : ''}', (tester) async {
+      if (german) {
+        tester.platformDispatcher.localesTestValue = const [Locale('de')];
+        addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+      }
+      final health = places.addArea('Health');
+      await start(
+        tester,
+        browse: lookupAppLocalizations(Locale(german ? 'de' : 'en'))
+            .browseTooltip,
+      );
+      await tap(tester, key('area-menu-${health.id}'));
+      final entry = key('area-hidden-from-ai-${health.id}');
+      Rect of(Type type) => tester.getRect(
+        find.descendant(of: entry, matching: find.byType(type)).first,
+      );
+      final icon = of(Icon);
+      final words = of(Text);
+      final toggle = of(Switch);
+      expect(words.left, greaterThan(icon.right));
+      expect(toggle.left, greaterThan(words.left));
+      // All on one line: each of them across the middle of the others.
+      for (final part in [icon, toggle]) {
+        expect(part.top, lessThan(words.center.dy));
+        expect(part.bottom, greaterThan(words.center.dy));
+      }
+    });
+  }
 
   testWidgets('filing a hidden Note into a Shared Area asks first: Cancel '
       'keeps it as it was, Show to the AI takes the mark off and files it', (

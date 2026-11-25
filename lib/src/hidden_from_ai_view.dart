@@ -149,8 +149,9 @@ Future<T?> unlessHiddenFromAi<T>(
   }
 }
 
-/// The menu entry of the mark, "Hidden from AI" with its switch below
-/// it, [on] while marked; picking it gives [value].
+/// The menu entry of the mark, one flat line (UI laws, "Design system":
+/// menu entries stay flat, obf-1135): its icon, "Hidden from AI" and its
+/// switch at the end, [on] while marked; picking it gives [value].
 PopupMenuItem<T> hiddenFromAiMenuItem<T>(
   BuildContext context, {
   required Key key,
@@ -165,18 +166,11 @@ PopupMenuItem<T> hiddenFromAiMenuItem<T>(
       children: [
         const Icon(hiddenFromAiIcon),
         const SizedBox(width: 12),
-        Flexible(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(context.t.hiddenFromAi),
-              ExcludeSemantics(
-                child: IgnorePointer(
-                  child: Switch(value: on, onChanged: (_) {}),
-                ),
-              ),
-            ],
+        Expanded(child: Text(context.t.hiddenFromAi)),
+        const SizedBox(width: 12),
+        ExcludeSemantics(
+          child: IgnorePointer(
+            child: Switch(value: on, onChanged: (_) {}),
           ),
         ),
       ],
