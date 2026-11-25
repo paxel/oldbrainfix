@@ -34,5 +34,9 @@
   "0.8.0": {
     "de": "Neu\n• In der Notiz suchen.\n• Suche zeigt Fundstellen.\n• Rückgängig und Wiederholen.\n• Tabellen sortieren.\n• Eigene Vorwarnzeiten.\n• Aufnahmen enden nach Pausen.\n• Seite „Im Hintergrund“.\n• Papierkorb jetzt leeren.\n• Grünes „!“ beim Tippen.\nGeändert\n• Suche übergeht Akzente.\n• Schnellnotiz mit Transkript.\n• Knöpfe in vier Gruppen.\n• Sicherungen mit Einstellungen.\n• Erinnerung öffnet Agenda.\n• Bereiche öffnen den Editor.\nBehoben\n• Suchleisten verdecken nichts.\n• Pakete mit Profilbild öffnen.",
     "en": "Added\n• Find in a Note.\n• Search shows the places.\n• Undo and Redo in the editor.\n• Tables: sort, select, move.\n• A custom Heads-up length.\n• Recordings end after a pause.\n• A Running page.\n• Empty the trash now.\n• A green \"!\" on button taps.\nChanged\n• Search ignores accents.\n• Quick notes keep Transcripts.\n• Note buttons in four groups.\n• Backups keep settings.\n• Reminders open the Agenda.\n• Areas open the editor.\nFixed\n• Search bars cut off nothing.\n• Packs with a picture open."
+  },
+  "0.9.0": {
+    "de": "Neu\n• AXT-Dateien: Notizen und Erinnerungen von und zu anderen Apps.\n• Tablets und iPads zeigen eine Seitenleiste neben der Liste.\n• Das iPad ist ein eigenes Gerät.",
+    "en": "Added\n• AXT files: Notes and reminders to and from other apps.\n• Tablets and iPads show a sidebar beside the list.\n• The iPad is a device of its own."
   }
 }
