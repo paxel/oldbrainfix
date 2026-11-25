@@ -60,6 +60,9 @@ class ShareInboxTests: XCTestCase {
     XCTAssertEqual(ShareTypes.kind(of: ["public.data"], name: "Ann.OBFCARD")?.0, .file(ext: "obfcard"))
     XCTAssertEqual(
       ShareTypes.kind(of: ["public.file-url"], name: "Trip.obfpack")?.0, .file(ext: "obfpack"))
+    // Another app's AXT file (obf-1146), by its type or its name.
+    XCTAssertEqual(ShareTypes.kind(of: ["io.github.paxel.axt"])?.0, .file(ext: "axt"))
+    XCTAssertEqual(ShareTypes.kind(of: ["public.data"], name: "Vet.AXT")?.0, .file(ext: "axt"))
   }
 
   func testPicturesLinksAndText() {

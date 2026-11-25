@@ -15,6 +15,7 @@ import 'announcements.dart';
 import 'app_links.dart';
 import 'attachment_reader.dart';
 import 'attachment_views.dart';
+import 'axt_open_screen.dart' show isAxtFile;
 import 'app_lock.dart';
 import 'appointments.dart';
 import 'area_deletion.dart';
@@ -1085,8 +1086,10 @@ class _HomeState extends State<_Home> {
     var conflicts = 0;
     for (final path in paths) {
       if (!mounted) return;
-      // A Pack names its sender as a card does (#164).
-      final card = isProfileCardFile(path) || await isPackFile(path);
+      // A Pack names its sender as a card does (#164); an AXT file
+      // shows its records as a Pack does (obf-1146).
+      final card =
+          isProfileCardFile(path) || await isPackFile(path) || isAxtFile(path);
       if (!mounted) return;
       // A Sent Item, a card or a Pack shows what is in it: not past the
       // App Lock.

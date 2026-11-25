@@ -6151,6 +6151,87 @@ class AppLocalizationsEn extends AppLocalizations {
   String get axtNoNotes => 'There are no Notes here to put in an AXT file.';
 
   @override
+  String get axtTitle => 'AXT file';
+
+  @override
+  String get axtFromOwnDevice => 'From your own Device';
+
+  @override
+  String axtFromApp(String app) {
+    return 'From $app';
+  }
+
+  @override
+  String get axtFromNoName => 'From an app without a name';
+
+  @override
+  String axtKey(String fingerprint) {
+    return 'Key $fingerprint';
+  }
+
+  @override
+  String get axtTypeNote => 'Note';
+
+  @override
+  String get axtTypeTask => 'Task';
+
+  @override
+  String get axtTypeAppointment => 'Appointment';
+
+  @override
+  String get axtNoType => 'A record without a type, such as a deletion';
+
+  @override
+  String get axtNotTakenHeading => 'Not taken';
+
+  @override
+  String get axtInto => 'Take them into';
+
+  @override
+  String get axtTake => 'Take it';
+
+  @override
+  String get axtNothingToTake => 'Nothing in this file can be taken.';
+
+  @override
+  String axtTaken(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Notes taken',
+      one: '1 Note taken',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get axtNotOpened => 'The AXT file was not opened.';
+
+  @override
+  String get axtNotOpenedTitle => 'AXT file not opened';
+
+  @override
+  String get axtUnreadable =>
+      'This file is no AXT file this app can read, or it was changed after it was signed.';
+
+  @override
+  String get axtSendAgainFix =>
+      'Ask for the file again, or write it again in the other app.';
+
+  @override
+  String get axtNotTaken => 'The records were not taken.';
+
+  @override
+  String get axtNotTakenTitle => 'Records not taken';
+
+  @override
+  String get axtPlaceRefused => 'This Device may not put them there.';
+
+  @override
+  String get axtPickAnotherFix =>
+      'Pick another place, such as Unsorted, and take them again. Nothing was changed.';
+
+  @override
   String get packExportTitle => 'Export as Pack';
 
   @override

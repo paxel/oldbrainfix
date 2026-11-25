@@ -9866,6 +9866,138 @@ abstract class AppLocalizations {
   /// **'There are no Notes here to put in an AXT file.'**
   String get axtNoNotes;
 
+  /// Title of the page of an AXT file opened with the app, shared to it or picked (obf-1146).
+  ///
+  /// In en, this message translates to:
+  /// **'AXT file'**
+  String get axtTitle;
+
+  /// Who an AXT file is from when one of the user's own Devices wrote it.
+  ///
+  /// In en, this message translates to:
+  /// **'From your own Device'**
+  String get axtFromOwnDevice;
+
+  /// Who an AXT file is from: the app name its file gives, as the sender says.
+  ///
+  /// In en, this message translates to:
+  /// **'From {app}'**
+  String axtFromApp(String app);
+
+  /// Who an AXT file is from when its file gives no app name.
+  ///
+  /// In en, this message translates to:
+  /// **'From an app without a name'**
+  String get axtFromNoName;
+
+  /// Under who an AXT file is from: the short fingerprint of the key that signed it, to compare with the sender.
+  ///
+  /// In en, this message translates to:
+  /// **'Key {fingerprint}'**
+  String axtKey(String fingerprint);
+
+  /// An AXT record of the type Note, under its title on the page of an AXT file.
+  ///
+  /// In en, this message translates to:
+  /// **'Note'**
+  String get axtTypeNote;
+
+  /// An AXT record of the type Task, under its title on the page of an AXT file.
+  ///
+  /// In en, this message translates to:
+  /// **'Task'**
+  String get axtTypeTask;
+
+  /// An AXT record of the type Appointment, under its title on the page of an AXT file.
+  ///
+  /// In en, this message translates to:
+  /// **'Appointment'**
+  String get axtTypeAppointment;
+
+  /// A record of an AXT file that has no type, listed as not taken.
+  ///
+  /// In en, this message translates to:
+  /// **'A record without a type, such as a deletion'**
+  String get axtNoType;
+
+  /// Heading over the records of an AXT file this app does not take, greyed.
+  ///
+  /// In en, this message translates to:
+  /// **'Not taken'**
+  String get axtNotTakenHeading;
+
+  /// Over the button that picks where the records of an AXT file go.
+  ///
+  /// In en, this message translates to:
+  /// **'Take them into'**
+  String get axtInto;
+
+  /// The button on the page of an AXT file that makes the ticked records Notes in the place picked.
+  ///
+  /// In en, this message translates to:
+  /// **'Take it'**
+  String get axtTake;
+
+  /// On the page of an AXT file that holds no record of a type this app takes.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing in this file can be taken.'**
+  String get axtNothingToTake;
+
+  /// Announced after 'Take it' made Notes of the records of an AXT file.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 Note taken} other{{count} Notes taken}}'**
+  String axtTaken(int count);
+
+  /// Announced when an AXT file could not be read; the tap shows why.
+  ///
+  /// In en, this message translates to:
+  /// **'The AXT file was not opened.'**
+  String get axtNotOpened;
+
+  /// Title of the dialog behind 'axtNotOpened'.
+  ///
+  /// In en, this message translates to:
+  /// **'AXT file not opened'**
+  String get axtNotOpenedTitle;
+
+  /// Why an AXT file did not open.
+  ///
+  /// In en, this message translates to:
+  /// **'This file is no AXT file this app can read, or it was changed after it was signed.'**
+  String get axtUnreadable;
+
+  /// What to do when an AXT file did not open.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask for the file again, or write it again in the other app.'**
+  String get axtSendAgainFix;
+
+  /// Announced when 'Take it' was refused; the tap shows why.
+  ///
+  /// In en, this message translates to:
+  /// **'The records were not taken.'**
+  String get axtNotTaken;
+
+  /// Title of the dialog behind 'axtNotTaken'.
+  ///
+  /// In en, this message translates to:
+  /// **'Records not taken'**
+  String get axtNotTakenTitle;
+
+  /// Why the records of an AXT file were not taken: the place picked refuses them.
+  ///
+  /// In en, this message translates to:
+  /// **'This Device may not put them there.'**
+  String get axtPlaceRefused;
+
+  /// What to do when the records of an AXT file were not taken.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick another place, such as Unsorted, and take them again. Nothing was changed.'**
+  String get axtPickAnotherFix;
+
   /// Title of the page where the user ticks what goes into a Pack (#164).
   ///
   /// In en, this message translates to:

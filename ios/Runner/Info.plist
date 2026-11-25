@@ -29,6 +29,18 @@
 				<string>io.github.paxel.oldbrainfix.pack</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>AXT file</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>io.github.paxel.axt</string>
+			</array>
+		</dict>
 	</array>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
@@ -140,6 +152,34 @@
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<!-- AXT files of other apps (obf-1146, ADR 0056): a format the app
+	     does not own, so imported, by the extension and media type AXT's
+	     spec/envelope.md names; opened with the app and taken by its
+	     Share extension. -->
+	<key>UTImportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>AXT file</string>
+			<key>UTTypeIdentifier</key>
+			<string>io.github.paxel.axt</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>axt</string>
+				</array>
+				<key>public.mime-type</key>
+				<array>
+					<string>application/vnd.axt</string>
+				</array>
+			</dict>
+		</dict>
 	</array>
 	<!-- The app's own files (#241), as Android's manifest names them:
 	     opened with the app and taken by its Share extension. -->
