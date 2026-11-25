@@ -1,6 +1,7 @@
-//! A search leads to what it found (obf-1047) on the desktop: under each
-//! card of a search's list its first three places found, each its line
-//! with the words found tinted, and "+n more"; a click on one opens the
+//! A search leads to what it found (obf-1047) on the desktop: inside each
+//! card of a search's list, at its end, its first three places found,
+//! each its line as a link in the accent with the words found tinted, and
+//! "+n more" a text button (obf-1114); a click on one opens the
 //! Note at it, opening the card at its first place; a place in a long
 //! table unfolds the table on the card. The opened Note shows every
 //! place tinted, the current one stronger, with the find bar "2 of 4",
@@ -120,6 +121,52 @@ fn buttons(harness: &Harness<'_, App>, label: &str) -> usize {
         .count()
 }
 
+/// How many links are labelled `label`.
+fn links(harness: &Harness<'_, App>, label: &str) -> usize {
+    harness
+        .query_all_by(|n| n.role() == Role::Link && n.label().as_deref() == Some(label))
+        .count()
+}
+
+/// Where the widget of `role` labelled `label` lies; for a card, whose
+/// label is its whole text, the one whose label starts with it.
+fn rect_of(harness: &Harness<'_, App>, role: Role, label: &str) -> egui::Rect {
+    let at = harness
+        .get_by(|n| n.role() == role && n.label().is_some_and(|l| l.starts_with(label)))
+        .rect();
+    let scale = harness.ctx.pixels_per_point();
+    egui::Rect::from_min_max(
+        (at.min.to_vec2() / scale).to_pos2(),
+        (at.max.to_vec2() / scale).to_pos2(),
+    )
+}
+
+/// Whether text starting with `start` is drawn in the accent's text
+/// colour, a link's or a text button's.
+fn in_accent(harness: &Harness<'_, App>, start: &str) -> bool {
+    fn flat(shape: &egui::Shape, start: &str, accent: Color32) -> bool {
+        match shape {
+            egui::Shape::Vec(shapes) => shapes.iter().any(|s| flat(s, start, accent)),
+            egui::Shape::Text(text) => {
+                let job = &text.galley.job;
+                job.text.starts_with(start)
+                    && (text.fallback_color == accent
+                        || job
+                            .sections
+                            .first()
+                            .is_some_and(|s| s.format.color == accent))
+            }
+            _ => false,
+        }
+    }
+    let accent = harness.ctx.global_style().visuals.hyperlink_color;
+    harness
+        .output()
+        .shapes
+        .iter()
+        .any(|clipped| flat(&clipped.shape, start, accent))
+}
+
 fn press(harness: &mut Harness<'_, App>, modifiers: Modifiers, key: Key) {
     harness.key_press_modifiers(modifiers, key);
     harness.run();
@@ -145,15 +192,26 @@ fn a_search_lists_its_places_under_the_card_and_a_click_opens_the_note_at_one() 
         "The milk at MÜLLER is cheap",
         "muller's bread",
     ];
+    // Inside the card, links in the accent; "+1 more" a text button
+    // there (obf-1114).
+    let card = rect_of(&harness, Role::Button, "Buy milk at Müller");
     for line in found {
-        assert_eq!(buttons(&harness, &format!("Open at “{line}”")), 1, "{line}");
+        let label = format!("Open at “{line}”");
+        assert_eq!(links(&harness, &label), 1, "{line}");
+        assert!(
+            card.contains_rect(rect_of(&harness, Role::Link, &label)),
+            "{line}"
+        );
+        assert!(in_accent(&harness, line), "{line}");
     }
-    assert_eq!(buttons(&harness, "Open at “Ask Muller for eggs”"), 0);
+    assert_eq!(links(&harness, "Open at “Ask Muller for eggs”"), 0);
     assert_eq!(buttons(&harness, "+1 more"), 1);
+    assert!(card.contains_rect(rect_of(&harness, Role::Button, "+1 more")));
+    assert!(in_accent(&harness, "+1 more"));
     // The words found tinted on the card and under it.
     assert!(tinted(&harness, false).iter().any(|w| w == "MÜLLER"));
     harness
-        .get_by_role_and_label(Role::Button, "Open at “The milk at MÜLLER is cheap”")
+        .get_by_role_and_label(Role::Link, "Open at “The milk at MÜLLER is cheap”")
         .click();
     harness.run();
     assert!(harness.state().note_open());
@@ -297,7 +355,7 @@ fn a_place_in_a_long_table_unfolds_it_on_the_card_and_shows_tinted() -> TestResu
     // Opened at it, the table's row on the current tint.
     harness
         .get_by(|n| {
-            n.role() == Role::Button && n.label().is_some_and(|l| l.starts_with("Open at “row 30"))
+            n.role() == Role::Link && n.label().is_some_and(|l| l.starts_with("Open at “row 30"))
         })
         .click_accesskit();
     harness.run();

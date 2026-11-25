@@ -17081,6 +17081,7 @@ impl App {
                     },
                     today: self.view.card_today.get(id).map_or(&[], Vec::as_slice),
                     hidden: self.view.hidden_notes.contains(id),
+                    found: found.as_deref().map_or(&[], Vec::as_slice),
                     // A card names its place unless the list is of it: in
                     // an Area's search its Topics' hits name the Topic
                     // (#330).
@@ -17092,7 +17093,7 @@ impl App {
                 // Its own id, however many cards above were laid out.
                 let card = egui::UiBuilder::new().id(Id::new(("list card", id)));
                 let drawn = ui.scope_builder(card, |ui| {
-                    let clicks = note_card(
+                    let mut clicks = note_card(
                         ui,
                         &self.t,
                         tones,
@@ -17101,9 +17102,7 @@ impl App {
                         look,
                         media,
                     );
-                    let opened = found
-                        .as_deref()
-                        .and_then(|found| card_findings(ui, &self.t, id, found));
+                    let opened = clicks.found.take();
                     (clicks, opened)
                 });
                 let drawn_height = drawn.response.rect.height();
@@ -25330,6 +25329,9 @@ struct CardMedia<'a> {
 #[derive(Debug, Clone, Copy)]
 struct CardLook<'a> {
     full: bool,
+    /// The places a search found in it, drawn inside it at its end
+    /// (obf-1047, obf-1114).
+    found: &'a [Finding],
     glance: &'a [String],
     switches: bool,
     /// Which of its folds this Device keeps open (#189).
@@ -25454,6 +25456,8 @@ struct CardClicks {
     tally: Vec<TallyAction>,
     /// What was asked of the picks on a Session Note's full card (#191).
     session: Vec<SessionAction>,
+    /// The Note opened at a place a search found in it (obf-1114).
+    found: Option<Action>,
 }
 
 /// The room after the last row of every list (#158): its last card,
@@ -26952,57 +26956,94 @@ fn card_tables(id: &str) -> TableRoom {
 /// (obf-1047, C7b); "+n more" stands for the others.
 const CARD_FINDINGS: usize = 3;
 
-/// The places the search found in a card's Note `id` (obf-1047, C7b),
-/// under its card: the first [`CARD_FINDINGS`], each its context line
-/// with the words found on their tint, a Transcript's, Photo Text's,
-/// Attachment Text's or file name's after what it is, then "+n more"
-/// for the others. A click on one opens the Note at it, "+n more" at the
-/// first not shown.
-fn card_findings(ui: &mut Ui, t: &L10n, id: &str, found: &[Finding]) -> Option<Action> {
+/// The places the search found in a card's Note (obf-1047, C7b), drawn
+/// inside its card at its end, indented 16, as links in the accent
+/// (obf-1114): the first [`CARD_FINDINGS`], each its context line with
+/// the words found on their tint, a Transcript's, Photo Text's,
+/// Attachment Text's or file name's after what it is, then "+n more" for
+/// the others, a text button. They take no clicks yet: the card, which
+/// takes the clicks over it, has them take theirs after its own with
+/// [`finding_clicks`].
+fn card_findings(ui: &mut Ui, t: &L10n, found: &[Finding]) -> FoundRows {
+    let mut drawn = FoundRows::default();
     if found.is_empty() {
-        return None;
+        return drawn;
     }
-    let mut asked = None;
-    let open =
-        |finding: &Finding| Action::OpenFinding(id.to_string(), Some(Box::new(finding.clone())));
     ui.horizontal(|ui| {
-        ui.add_space(20.0);
+        ui.add_space(16.0);
         ui.vertical(|ui| {
             ui.spacing_mut().item_spacing.y = 4.0;
-            for (at, finding) in found.iter().take(CARD_FINDINGS).enumerate() {
+            for finding in found.iter().take(CARD_FINDINGS) {
                 let job = finding_job(ui, t, finding);
                 let said = t.desk_finding_open(&job.text);
                 let shown = ui.add(egui::Label::new(job).truncate());
-                let click = ui.interact(shown.rect, Id::new(("finding", id, at)), Sense::click());
-                click.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, &said));
-                if click
-                    .on_hover_cursor(egui::CursorIcon::PointingHand)
-                    .clicked()
-                {
-                    asked = Some(open(finding));
-                }
+                drawn.rows.push((shown.rect, said));
             }
-            if let Some(next) = found.get(CARD_FINDINGS) {
-                let more = (found.len() - CARD_FINDINGS) as i64;
-                let accent = theme::tones(ui.visuals()).accent;
-                let label = RichText::new(t.desk_find_more(more)).color(accent);
-                let button = ui.add(egui::Button::new(label).frame(false));
-                if button
-                    .on_hover_cursor(egui::CursorIcon::PointingHand)
-                    .clicked()
-                {
-                    asked = Some(open(next));
-                }
+            if found.len() > CARD_FINDINGS {
+                let words = t.desk_find_more((found.len() - CARD_FINDINGS) as i64);
+                let button = design::text_button_under(ui, icons::SEARCH, &words);
+                drawn.more = Some((button, words));
             }
         });
     });
+    drawn
+}
+
+/// The places found drawn inside a card by [`card_findings`]: each row's
+/// rect with what a screen reader says for it, and "+n more" with its
+/// words.
+#[derive(Default)]
+struct FoundRows {
+    rows: Vec<(egui::Rect, String)>,
+    more: Option<(design::UnderClick, String)>,
+}
+
+/// Takes the clicks on the places found in the Note `id`, `drawn` inside
+/// its card, registered after the card's own: a click on one opens the
+/// Note at it, on "+n more" at the first not shown. A row is underlined
+/// under the pointer, as a link.
+fn finding_clicks(ui: &mut Ui, id: &str, found: &[Finding], drawn: &FoundRows) -> Option<Action> {
+    let mut asked = None;
+    let open =
+        |finding: &Finding| Action::OpenFinding(id.to_string(), Some(Box::new(finding.clone())));
+    for (at, ((rect, said), finding)) in drawn.rows.iter().zip(found).enumerate() {
+        let click = ui.interact(*rect, Id::new(("finding", id, at)), Sense::click());
+        click.widget_info(|| WidgetInfo::labeled(WidgetType::Link, true, said));
+        if click.hovered() {
+            let accent = ui.visuals().hyperlink_color;
+            ui.painter().hline(
+                rect.x_range(),
+                rect.bottom(),
+                egui::Stroke::new(1.0, accent),
+            );
+        }
+        if click
+            .on_hover_cursor(egui::CursorIcon::PointingHand)
+            .clicked()
+        {
+            asked = Some(open(finding));
+        }
+    }
+    if let (Some((button, words)), Some(next)) = (&drawn.more, found.get(CARD_FINDINGS)) {
+        let click = ui.interact(button.rect, Id::new(("findings more", id)), Sense::click());
+        click.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, words));
+        button.answer(ui, &click);
+        if click
+            .on_hover_cursor(egui::CursorIcon::PointingHand)
+            .clicked()
+        {
+            asked = Some(open(next));
+        }
+    }
     asked
 }
 
-/// A place found under its card (obf-1047): what it lies in, but for a
-/// text, then its context line, the words found on their tint.
+/// A place found in its card (obf-1047): what it lies in, but for a
+/// text, then its context line in the accent, the words found on their
+/// tint.
 fn finding_job(ui: &Ui, t: &L10n, finding: &Finding) -> egui::text::LayoutJob {
-    let text = ui.visuals().text_color();
+    // A link's colour (obf-1114).
+    let text = ui.visuals().hyperlink_color;
     let weak = ui.visuals().weak_text_color();
     let font = FontId::proportional(theme::content(ui, 14.0));
     let plain = egui::TextFormat::simple(font.clone(), text);
@@ -27174,6 +27215,8 @@ fn note_card(
     let mut session_asked = Vec::new();
     // Where the boxes of today's Occurrences lie (#215).
     let mut today_rects = Vec::new();
+    // The places a search found in it, inside it (obf-1114).
+    let mut found_rows = FoundRows::default();
     let CardMedia {
         photos,
         pictures,
@@ -27521,6 +27564,8 @@ fn note_card(
                     },
                 );
             });
+            // Under it all, across the card (obf-1114).
+            found_rows = card_findings(ui, t, look.found);
         });
         let rect = card.rect;
         if important {
@@ -27945,6 +27990,7 @@ fn note_card(
     for row in &linked_rows {
         app_links::linked_row_clicks(ui, &note.id, row);
     }
+    let found = finding_clicks(ui, &note.id, look.found, &found_rows);
     CardClicks {
         card: resp.on_hover_cursor(egui::CursorIcon::PointingHand),
         author,
@@ -27962,6 +28008,7 @@ fn note_card(
         picked,
         tally: tally_asked,
         session: session_asked,
+        found,
     }
 }
 
