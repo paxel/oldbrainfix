@@ -111,7 +111,7 @@ What to test
 • Make a Backup, reinstall or use a second phone, restore it: the theme, text size and other settings come back, and the speech model is offered.
 • Tap the moving line while an Import runs: the Running page shows it; Abort keeps the Notes made so far.
 • Android: import a folder, then the same folder again from the Areas list's ⋮ ▸ Import…: it asks to fill in the first Import and adds only what is missing.
-• Trash a few Notes, open the Trash, ⋮ ▸ Empty the trash now: the question names the counts, and Delete for good empties it.
+• Trash a few Notes, open the Trash, tap Empty the trash now in its bar (or its ⋮): the question names the counts, and Delete for good empties it.
 • Let a Reminder ring and tap its notification: the Agenda opens with its row marked.
 Known
 • On the iPhone, importing the same folder or zip again makes a new Area; only Android offers to fill in.
@@ -375,7 +375,7 @@ None: 0.8.0 makes no line of either listing untrue; its changes refine what the 
 
 ## Screenshots: Play
 
-Phone 1080 × 1920 per locale. Regenerated for 0.8.0: frames 1, 5 and 8 gain the ⋮ in the Agenda's bar, 2 shows "Open in the editor", 4 the editor's Undo, Redo and Find and its named groups; 3, 6 and 7 are unchanged. Feature graphic 1024 × 500, unchanged.
+Phone 1080 × 1920 per locale. Regenerated for 0.8.0: frames 1, 5 and 8 gain the ⋮ in the Agenda's bar, 2 shows "Open in the editor", 4 the editor's Undo, Redo and Find and its named groups; all eight take the one look of buttons, chips and headings. Feature graphic 1024 × 500, unchanged.
 
 | # | Files | Size | What is on it |
 |---|---|---|---|
@@ -390,7 +390,7 @@ Phone 1080 × 1920 per locale. Regenerated for 0.8.0: frames 1, 5 and 8 gain the
 
 ## Screenshots: App Store
 
-iPhone 6.9″ 1320 × 2868 per locale, the one size App Store Connect scales to every iPhone; no iPad (iPhone only). Regenerated for 0.8.0: frames 1, 5 and 8 gain the ⋮ in the Agenda\'s bar, 2 shows "Open in the editor", 4 the editor\'s Undo, Redo and Find and its named groups; 3, 6 and 7 are unchanged.
+iPhone 6.9″ 1320 × 2868 per locale, the one size App Store Connect scales to every iPhone; no iPad (iPhone only). Regenerated for 0.8.0: frames 1, 5 and 8 gain the ⋮ in the Agenda\'s bar, 2 shows "Open in the editor", 4 the editor\'s Undo, Redo and Find and its named groups; all but 6 take the one look of buttons, chips and headings.
 
 | # | Files | Size | What is on it |
 |---|---|---|---|
