@@ -16,7 +16,7 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use egui::{Id, Key, RichText, TextEdit, Ui};
+use egui::{Id, Key, RichText, Ui};
 use oldbrainfix_core::findings::{self, Finding};
 
 use crate::app::{icon_button, name_field};
@@ -231,7 +231,7 @@ impl FindBar {
                     icons::show(ui, icons::SEARCH, 20.0, weak);
                     let id = self.field_id();
                     let field = ui.add(
-                        TextEdit::singleline(&mut self.query)
+                        crate::theme::field(ui, &mut self.query)
                             .id(id)
                             .hint_text(hint)
                             .text_color(text)

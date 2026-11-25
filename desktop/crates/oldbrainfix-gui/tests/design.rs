@@ -2,7 +2,8 @@
 //! and buttons 14, captions 12 and page titles 22 (obf-1121) in egui's
 //! text styles, growing with Text size; a chip a full pill, 32 high and 36 in a band; the text
 //! button with an icon in the accent's colour, tinted under the pointer;
-//! and "Open in the editor" in the outlined button's tonal fill.
+//! "Open in the editor" in the outlined button's tonal fill; and a
+//! single-line field as tall as a button in any font (obf-1128).
 
 // A test may unwrap, expect, panic and index, its helpers too (#229).
 #![allow(clippy::panic, clippy::indexing_slicing)]
@@ -305,5 +306,76 @@ fn a_dialog_title_is_18_strong_at_every_text_size() {
         let format = &title.galley.job.sections[0].format;
         assert!(near(format.font_id.size, 18.0), "at {size:?}");
         assert_eq!(format.color, strong, "at {size:?}");
+    }
+}
+
+#[test]
+fn a_field_is_as_tall_as_a_button_in_any_font_its_text_clear_of_the_outline() {
+    for size in [TextSize::Normal, TextSize::Largest] {
+        let mut body = String::from("Body");
+        let mut mono = String::from("Mono");
+        let mut content = String::from("Content");
+        let harness = harness(size, move |ui| {
+            ui.horizontal(|ui| {
+                ui.add(theme::field(ui, &mut body).desired_width(100.0));
+                let font = TextStyle::Monospace.resolve(ui.style());
+                let margin = theme::field_margin(ui, &font);
+                ui.add(
+                    theme::field(ui, &mut mono)
+                        .font(font)
+                        .margin(margin)
+                        .desired_width(100.0),
+                );
+                let font = egui::FontId::proportional(theme::content(ui, theme::CONTENT));
+                let margin = theme::field_margin(ui, &font);
+                ui.add(
+                    theme::field(ui, &mut content)
+                        .font(font)
+                        .margin(margin)
+                        .desired_width(120.0),
+                );
+                let _ = ui.button("Go");
+            });
+        });
+        let button = rect(&harness, Role::Button, "Go");
+        let scale = harness.ctx.pixels_per_point();
+        let fields: Vec<Rect> = harness
+            .query_all_by(|n| n.role() == Role::TextInput)
+            .map(|n| {
+                let at = n.rect();
+                Rect::from_min_max(
+                    (at.min.to_vec2() / scale).to_pos2(),
+                    (at.max.to_vec2() / scale).to_pos2(),
+                )
+            })
+            .collect();
+        assert_eq!(fields.len(), 3, "at {size:?}");
+        for field in &fields {
+            assert!(
+                (field.height() - button.height()).abs() <= 1.0,
+                "at {size:?}: the field {field:?}, the button {button:?}"
+            );
+        }
+        // The typed text 8 inside the outline, never touching it.
+        let shapes = drawn(&harness);
+        for (words, field) in ["Body", "Mono", "Content"].iter().zip(&fields) {
+            let at = shapes
+                .iter()
+                .find_map(|shape| match shape {
+                    Shape::Text(text) if text.galley.text() == *words => {
+                        Some(text.visual_bounding_rect())
+                    }
+                    _ => None,
+                })
+                .unwrap_or_else(|| panic!("no {words} at {size:?}"));
+            assert!(
+                at.left() - field.left() >= 7.5,
+                "{words} at {at:?} in {field:?}"
+            );
+            assert!(
+                at.top() > field.top() && at.bottom() < field.bottom(),
+                "{words} {at:?}"
+            );
+        }
     }
 }

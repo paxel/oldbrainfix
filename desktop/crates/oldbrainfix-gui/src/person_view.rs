@@ -8,7 +8,7 @@
 //! changes to Ann" saves a bundle for all of their Devices (#108); once
 //! saved, the Changes Nudge no longer waits for them (#109).
 
-use egui::{Id, RichText, TextEdit, Ui, WidgetInfo, WidgetType};
+use egui::{Id, RichText, Ui, WidgetInfo, WidgetType};
 use oldbrainfix_core::{Profile, Store};
 
 use crate::l10n::L10n;
@@ -273,7 +273,7 @@ fn for_me(
     });
     ui.label(RichText::new(t.person_for_me_name()).color(text));
     let field = ui.add(
-        TextEdit::singleline(name)
+        crate::theme::field(ui, name)
             .id(Id::new("person name"))
             .hint_text(theirs)
             .desired_width(320.0),

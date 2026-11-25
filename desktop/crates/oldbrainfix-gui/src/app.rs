@@ -20448,7 +20448,7 @@ impl App {
                         ui.horizontal(|ui| {
                             ui.label(RichText::new(t.all_day_from()).color(text));
                             let field = ui.add(
-                                TextEdit::singleline(all_day_text)
+                                crate::theme::field(ui, all_day_text)
                                     .id(Id::new("all day from"))
                                     .hint_text(t.time_hint())
                                     .text_color(text)
@@ -21210,7 +21210,7 @@ fn focused_field(
 ) -> egui::Response {
     let text = ui.visuals().text_color();
     let field = ui.add(
-        TextEdit::singleline(value)
+        crate::theme::field(ui, value)
             .id(Id::new(id))
             .hint_text(hint)
             .text_color(text)
@@ -21831,7 +21831,7 @@ fn custom_heads_up_form(
     let label = ui.label(RichText::new(t.heads_up_custom_count()).color(text));
     let field = ui
         .add(
-            TextEdit::singleline(count)
+            crate::theme::field(ui, count)
                 .id(Id::new("custom heads-up"))
                 .char_limit(5)
                 .text_color(text)
@@ -22919,7 +22919,7 @@ fn quick_capture_card(
     ui.horizontal(|ui| {
         ui.label(RichText::new(t.hotkey_label()).color(text));
         let field = ui.add(
-            TextEdit::singleline(typed)
+            crate::theme::field(ui, typed)
                 .id(Id::new("hotkey"))
                 .hint_text(oldbrainfix_core::settings::DEFAULT_CAPTURE_HOTKEY)
                 .text_color(text)
@@ -23065,7 +23065,7 @@ fn quiet_hours(
         ] {
             ui.label(RichText::new(label).color(text));
             let field = ui.add(
-                TextEdit::singleline(value)
+                crate::theme::field(ui, value)
                     .id(Id::new(id))
                     .hint_text(t.time_hint())
                     .text_color(text)

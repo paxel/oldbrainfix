@@ -6,7 +6,7 @@
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-use egui::{Id, RichText, ScrollArea, TextEdit, Ui};
+use egui::{Id, RichText, ScrollArea, Ui};
 use oldbrainfix_core::app_link::AppLink;
 use oldbrainfix_core::{Note, Notes, PersonSettings, Places, Result, Store};
 
@@ -134,7 +134,7 @@ pub fn picker(ui: &mut Ui, t: &L10n, picker: &mut Picker, focus: bool) -> Option
     // On its band, so the targets scroll under its line (obf-1088).
     let field = theme::search_band(ui, |ui| {
         ui.add(
-            TextEdit::singleline(&mut picker.search)
+            crate::theme::field(ui, &mut picker.search)
                 .id(Id::new("link to search"))
                 .hint_text(t.link_to_search())
                 .text_color(text)

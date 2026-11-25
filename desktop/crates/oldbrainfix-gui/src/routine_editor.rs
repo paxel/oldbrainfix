@@ -937,7 +937,7 @@ impl RoutineEditor {
                         let label = ui.label(RichText::new(t.kind_name()).strong());
                         let field = ui
                             .add(
-                                TextEdit::singleline(&mut self.text)
+                                crate::theme::field(ui, &mut self.text)
                                     .id(Id::new("routine text"))
                                     .text_color(text)
                                     .desired_width(f32::INFINITY),
@@ -1504,7 +1504,7 @@ impl RoutineEditor {
         let weak = ui.visuals().weak_text_color();
         ui.label(RichText::new(t.rrule_label()).color(text));
         let field = ui.add(
-            TextEdit::singleline(&mut self.rule)
+            crate::theme::field(ui, &mut self.rule)
                 .id(Id::new("rrule"))
                 .hint_text(t.rrule_label())
                 .text_color(text)
@@ -1566,7 +1566,7 @@ impl RoutineEditor {
             }
             ui.horizontal(|ui| {
                 let field = ui.add(
-                    TextEdit::singleline(&mut self.time_text)
+                    crate::theme::field(ui, &mut self.time_text)
                         .id(Id::new("new time"))
                         .hint_text(t.time_hint())
                         .text_color(text)
@@ -1707,7 +1707,7 @@ fn day_stepper(ui: &mut Ui, t: &L10n, day: &mut Day, text: &mut String, id: &str
         *text = day.to_string();
     }
     let field = ui.add(
-        TextEdit::singleline(text)
+        crate::theme::field(ui, text)
             .id(Id::new(id))
             .hint_text(t.date_hint())
             .text_color(colour)

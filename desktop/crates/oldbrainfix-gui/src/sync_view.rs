@@ -721,11 +721,14 @@ impl SyncHost {
             ui.label(RichText::new(t.sync_join_title()).strong());
             ui.label(RichText::new(t.sync_type_code_intro()).small().color(weak));
             let label = ui.label(RichText::new(t.sync_code_label()).color(text));
+            let mono = egui::TextStyle::Monospace.resolve(ui.style());
+            let margin = crate::theme::field_margin(ui, &mono);
             let field = ui
                 .add_enabled(
                     !joining,
-                    egui::TextEdit::singleline(&mut self.code)
-                        .font(egui::TextStyle::Monospace)
+                    crate::theme::field(ui, &mut self.code)
+                        .font(mono)
+                        .margin(margin)
                         .desired_width(f32::INFINITY),
                 )
                 .labelled_by(label.id);

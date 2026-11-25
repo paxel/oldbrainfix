@@ -12,7 +12,7 @@
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
-use egui::{Id, RichText, TextEdit, Ui};
+use egui::{Id, RichText, Ui};
 use oldbrainfix_core::backup::{self, Header, MIN_PASSPHRASE, Problem};
 use oldbrainfix_core::profile::OwnProfile;
 use oldbrainfix_core::recovery::{self, Sheet};
@@ -82,7 +82,7 @@ impl Passphrase {
 fn secret(ui: &mut Ui, t: &L10n, id: &str, hint: &str, value: &mut String) {
     let text = ui.visuals().text_color();
     let field = ui.add(
-        TextEdit::singleline(value)
+        crate::theme::field(ui, value)
             .id(Id::new(id))
             .password(true)
             .hint_text(hint)
@@ -375,7 +375,7 @@ pub fn welcome(
     );
     ui.label(RichText::new(t.restore_or()).color(weak));
     let code = ui.add(
-        TextEdit::singleline(&mut state.code)
+        crate::theme::field(ui, &mut state.code)
             .id(Id::new("restore code"))
             .hint_text(t.restore_code_label())
             .text_color(text)
@@ -556,7 +556,7 @@ pub fn notes_page(
         );
         ui.label(RichText::new(t.restore_or()).color(weak));
         let code = ui.add(
-            TextEdit::singleline(&mut state.code)
+            crate::theme::field(ui, &mut state.code)
                 .id(Id::new("backup notes code"))
                 .hint_text(t.restore_code_label())
                 .text_color(text)

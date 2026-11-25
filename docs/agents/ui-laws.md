@@ -143,6 +143,16 @@ There are three kinds, and an action takes the first that fits.
   an action with a consequence (use a button), nor for a choice with
   details (that is a `RadioColumn` or `radio_column`).
 
+### Fields
+
+- **Fields share one height** (obf-1128): on the desktop a framed
+  single-line field is as tall as a button beside it, whatever its
+  font and the text size, its text 8 inside the outline at the sides.
+  Desktop: `theme::field`, and `theme::field_margin` for a field in
+  another font. A list's search field is the band's 36 (`band_search`
+  in `app.rs`); a field without a frame inside a card, a cell or a
+  Line keeps its own measures.
+
 ### Spacing and type
 
 - **Spacing comes in steps of 4, 8, 12, 16, 24 and 32** (logical pixels

@@ -12,7 +12,7 @@
 //! Enter in the filter takes the first row shown: the Note added to
 //! last while nothing is typed, else the first found.
 
-use egui::{Id, Key, RichText, TextEdit, Ui};
+use egui::{Id, Key, RichText, Ui};
 use oldbrainfix_core::{DeviceSettings, Search, Store};
 
 use crate::app::{merge_row, name_field, row_title};
@@ -128,7 +128,7 @@ impl NotePicker {
         // On its band, so the Notes scroll under its line (obf-1088).
         let field = theme::search_band(ui, |ui| {
             let field = ui.add(
-                TextEdit::singleline(&mut self.query)
+                crate::theme::field(ui, &mut self.query)
                     .id(Id::new("add to note filter"))
                     .hint_text(t.search_all_hint())
                     .text_color(text)

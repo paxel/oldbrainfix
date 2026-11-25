@@ -19,7 +19,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use chrono::{DateTime, Duration, Utc};
-use egui::{Id, RichText, Sense, TextEdit, Ui, WidgetInfo, WidgetType};
+use egui::{Id, RichText, Sense, Ui, WidgetInfo, WidgetType};
 use oldbrainfix_core::tally_units::{self, KnownUnit};
 use oldbrainfix_core::{
     Day, Error, Occurrence, PersonFilter, Profile, Sessions, Store, Tallies, Tally, TallyBucket,
@@ -1113,7 +1113,7 @@ impl FieldForm {
                     let label = ui.label(RichText::new(t.tally_field_name()).strong());
                     let field = ui
                         .add(
-                            TextEdit::singleline(&mut self.name)
+                            crate::theme::field(ui, &mut self.name)
                                 .id(Id::new(NAME_FIELD))
                                 .hint_text(t.tally_field_name_hint())
                                 .text_color(text)
@@ -1156,7 +1156,7 @@ impl FieldForm {
                         }
                         let field = ui
                             .add(
-                                TextEdit::singleline(&mut self.unit_text)
+                                crate::theme::field(ui, &mut self.unit_text)
                                     .id(Id::new(UNIT_FIELD))
                                     .hint_text(t.tally_unit_hint())
                                     .text_color(text)
@@ -1214,7 +1214,7 @@ impl FieldForm {
                             };
                             let field = ui
                                 .add(
-                                    TextEdit::singleline(&mut self.target)
+                                    crate::theme::field(ui, &mut self.target)
                                         .id(Id::new(TARGET_FIELD))
                                         .text_color(text)
                                         .desired_width(120.0),
@@ -1677,7 +1677,7 @@ impl EntryForm {
                                 };
                                 let edit = ui
                                     .add(
-                                        TextEdit::singleline(typed)
+                                        crate::theme::field(ui, typed)
                                             .id(id)
                                             .text_color(text)
                                             .desired_width(120.0),
@@ -1737,7 +1737,7 @@ impl EntryForm {
                     let label = ui.label(RichText::new(t.tally_entry_line()).strong());
                     let field = ui
                         .add(
-                            TextEdit::singleline(&mut self.line)
+                            crate::theme::field(ui, &mut self.line)
                                 .id(Id::new(LINE_FIELD))
                                 .text_color(text)
                                 .desired_width(f32::INFINITY),
@@ -1774,7 +1774,7 @@ impl EntryForm {
             }
             let field = ui
                 .add(
-                    TextEdit::singleline(&mut self.day_text)
+                    crate::theme::field(ui, &mut self.day_text)
                         .id(Id::new(DAY_FIELD))
                         .hint_text(t.date_hint())
                         .text_color(text)

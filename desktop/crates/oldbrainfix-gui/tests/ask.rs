@@ -172,6 +172,26 @@ fn ai_ask_and_ctrl_k_show_the_panel_with_the_cursor_in_its_field() -> TestResult
 }
 
 #[test]
+fn the_question_field_is_as_tall_as_the_ask_button_beside_it() -> TestResult {
+    let (store, _) = store()?;
+    let mut harness = harness(store, &Fake::default());
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::K);
+    harness.run();
+    let t = L10n::new("en");
+    let at = field(&harness, t.ask_hint()).rect();
+    let button = harness
+        .get_by_role_and_label(Role::Button, t.ask_button())
+        .rect();
+    // One height for fields and buttons (obf-1128), one row.
+    assert!(
+        (at.height() - button.height()).abs() <= 1.0,
+        "the field {at:?}, the button {button:?}"
+    );
+    assert!((at.center().y - button.center().y).abs() <= 1.0);
+    Ok(())
+}
+
+#[test]
 fn the_ai_is_off_by_default_also_with_a_provider_set_up_before() -> TestResult {
     // Anthropic's key entered before the switch came, never switched on.
     let (store, _) = store()?;

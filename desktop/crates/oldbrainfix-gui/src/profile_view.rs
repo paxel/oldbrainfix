@@ -6,8 +6,8 @@
 //! from theirs (#107, #144).
 
 use egui::{
-    Color32, ColorImage, FontId, Id, Rect, RichText, Sense, Stroke, StrokeKind, TextEdit,
-    TextureHandle, TextureOptions, Ui, WidgetInfo, WidgetType,
+    Color32, ColorImage, FontId, Id, Rect, RichText, Sense, Stroke, StrokeKind, TextureHandle,
+    TextureOptions, Ui, WidgetInfo, WidgetType,
 };
 use oldbrainfix_core::CardTaken;
 use oldbrainfix_core::profile::{self, Profile, ProfileChoice};
@@ -347,7 +347,7 @@ pub fn header(
     ui.add_space(8.0);
     ui.label(RichText::new(t.profile_name()).strong());
     let field = ui.add(
-        TextEdit::singleline(&mut view.name)
+        crate::theme::field(ui, &mut view.name)
             .id(Id::new("profile name"))
             .hint_text(t.profile_no_name())
             .desired_width(320.0),
@@ -407,7 +407,7 @@ pub fn add_person(ui: &mut Ui, t: &L10n, form: &mut CardForm, actions: &mut Vec<
     let text = ui.visuals().text_color();
     ui.label(RichText::new(t.person_add_link()).color(text));
     let field = ui.add(
-        TextEdit::singleline(&mut form.link)
+        crate::theme::field(ui, &mut form.link)
             .id(Id::new("profile card link"))
             .desired_width(320.0),
     );

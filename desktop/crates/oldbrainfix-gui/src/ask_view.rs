@@ -19,7 +19,7 @@
 //! the API key, a local setting of this computer.
 
 use egui::text::{CCursor, CCursorRange};
-use egui::{Align, Id, Key, Layout, RichText, TextEdit, Ui};
+use egui::{Align, Id, Key, Layout, RichText, Ui};
 use oldbrainfix_core::ask::{Answer, AskError, Exchange, Protocol, Provider, Unready};
 use oldbrainfix_core::share::NoteShare;
 use oldbrainfix_core::{markdown, text_format};
@@ -309,7 +309,7 @@ fn field_rows(
         let width = (ui.available_width() - 220.0).max(160.0);
         let field = ui.add_enabled(
             !asking,
-            TextEdit::singleline(&mut panel.question)
+            crate::theme::field(ui, &mut panel.question)
                 .id(id)
                 .hint_text(t.ask_hint())
                 .text_color(text)
@@ -621,7 +621,7 @@ pub fn settings_card(
                      password: bool| {
             ui.label(RichText::new(label).color(text));
             let edit = ui.add(
-                TextEdit::singleline(value)
+                crate::theme::field(ui, value)
                     .id(Id::new(("ask setting", id)))
                     .hint_text(hint)
                     .password(password)

@@ -13,7 +13,7 @@
 //! it can't be saved it asks once whether to discard it. Left as it
 //! opened, or by Cancel, it makes nothing.
 
-use egui::{Id, RichText, TextEdit, Ui};
+use egui::{Id, RichText, Ui};
 use oldbrainfix_core::tally_units;
 use oldbrainfix_core::{Notes, Store, Tallies, TallyRule, UnitSystem};
 
@@ -297,7 +297,7 @@ impl TallyPage {
                     let label = ui.label(RichText::new(t.kind_name()).strong());
                     let field = ui
                         .add(
-                            TextEdit::singleline(&mut self.name)
+                            crate::theme::field(ui, &mut self.name)
                                 .id(Id::new(NAME_FIELD))
                                 .text_color(text)
                                 .desired_width(f32::INFINITY),
@@ -320,7 +320,7 @@ impl TallyPage {
                         let id = field_id(field.key);
                         let typed = ui
                             .add(
-                                TextEdit::singleline(&mut field.name)
+                                crate::theme::field(ui, &mut field.name)
                                     .id(id)
                                     .hint_text(t.tally_field_name_hint())
                                     .text_color(text)
@@ -474,7 +474,7 @@ impl TallyPage {
                     let weak = ui.visuals().weak_text_color();
                     let id = Id::new("new tally unit");
                     let typed = ui.add(
-                        TextEdit::singleline(&mut field.unit_text)
+                        crate::theme::field(ui, &mut field.unit_text)
                             .id(id)
                             .hint_text(t.tally_unit_hint())
                             .text_color(text)
@@ -532,7 +532,7 @@ impl TallyPage {
                     ui.horizontal(|ui| {
                         let typed = ui
                             .add(
-                                TextEdit::singleline(&mut field.target)
+                                crate::theme::field(ui, &mut field.target)
                                     .id(Id::new("new tally target"))
                                     .text_color(text)
                                     .desired_width(120.0),

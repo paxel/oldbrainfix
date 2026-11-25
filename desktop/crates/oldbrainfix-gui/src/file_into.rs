@@ -10,7 +10,7 @@
 //! Enter in the filter takes the first row shown: the latest place filed
 //! into, else the first match, else New Area… with what is typed.
 
-use egui::{Id, Key, RichText, TextEdit, Ui};
+use egui::{Id, Key, RichText, Ui};
 use oldbrainfix_core::{Area, DeviceSettings, PersonSettings, Places, Store, Topic};
 
 use crate::app::name_field;
@@ -192,7 +192,7 @@ impl FileIntoPicker {
         // On its band, so the places scroll under its line (obf-1088).
         let field = theme::search_band(ui, |ui| {
             let field = ui.add(
-                TextEdit::singleline(&mut self.query)
+                crate::theme::field(ui, &mut self.query)
                     .id(Id::new("file into filter"))
                     .hint_text(t.file_into_filter_hint())
                     .text_color(text)
@@ -332,7 +332,7 @@ impl FileIntoPicker {
         };
         ui.label(RichText::new(heading).strong());
         let field = ui.add(
-            TextEdit::singleline(&mut naming.name)
+            crate::theme::field(ui, &mut naming.name)
                 .id(Id::new("file into name"))
                 .hint_text(t.name_hint())
                 .text_color(text)

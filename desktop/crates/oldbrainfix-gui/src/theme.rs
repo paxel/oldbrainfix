@@ -115,6 +115,39 @@ pub const BUTTON_RADIUS: u8 = 8;
 /// The room between a button's words and its outline.
 const BUTTON_PADDING: egui::Vec2 = egui::vec2(10.0, 4.0);
 
+/// The room left and right of a field's text (obf-1128).
+const FIELD_SIDE: i8 = 8;
+
+/// The room around a single-line field's text in `font` (obf-1128):
+/// [`FIELD_SIDE`] at its sides, and above and below what makes it as tall
+/// as a button beside it, whatever its font and the text size.
+pub fn field_margin(ui: &Ui, font: &egui::FontId) -> egui::Margin {
+    let words = egui::TextStyle::Button.resolve(ui.style());
+    // A button is as tall as its words' line, a field at least as its
+    // font's row.
+    let line = |f: &mut egui::epaint::text::FontsView<'_>, font: &egui::FontId| {
+        f.layout_no_wrap("Mg".into(), font.clone(), Color32::PLACEHOLDER)
+            .size()
+            .y
+    };
+    let (button, own) = ui.ctx().fonts_mut(|f| {
+        let own = line(f, font).max(f.row_height(font));
+        (line(f, &words), own)
+    });
+    let height = (button + 2.0 * BUTTON_PADDING.y).max(ui.spacing().interact_size.y);
+    let margin = ((height - own) / 2.0).max(0.0).round() as i8;
+    egui::Margin::symmetric(FIELD_SIDE, margin)
+}
+
+/// A framed single-line field over `text` (UI laws, "Design system",
+/// obf-1128): every field of the desktop the same height, a button's,
+/// its text clear of its outline. A field in another font takes
+/// [`field_margin`] of that font after it.
+pub fn field<'t>(ui: &Ui, text: &'t mut dyn egui::TextBuffer) -> egui::TextEdit<'t> {
+    let body = egui::TextStyle::Body.resolve(ui.style());
+    egui::TextEdit::singleline(text).margin(field_margin(ui, &body))
+}
+
 /// What a button does (#218): the main action of a dialog or page, one
 /// that deletes or removes, or any other.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
