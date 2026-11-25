@@ -9998,6 +9998,54 @@ abstract class AppLocalizations {
   /// **'Pick another place, such as Unsorted, and take them again. Nothing was changed.'**
   String get axtPickAnotherFix;
 
+  /// Under a record of an AXT file that rewrites a Note taken from it before (obf-1147).
+  ///
+  /// In en, this message translates to:
+  /// **'Updates “{note}”'**
+  String axtUpdates(String note);
+
+  /// Under a deletion in an AXT file of a record a Note was taken from before (obf-1147).
+  ///
+  /// In en, this message translates to:
+  /// **'Moves “{note}” to the trash'**
+  String axtDeletes(String note);
+
+  /// Under an update or deletion that changes nothing, as the user changed the Note since it was taken (obf-1147).
+  ///
+  /// In en, this message translates to:
+  /// **'Kept your change'**
+  String get axtKeptChange;
+
+  /// Under 'Not taken': a record of another sender or type under the id a Note was taken under (obf-1147).
+  ///
+  /// In en, this message translates to:
+  /// **'May not change “{note}”'**
+  String axtRefusedRecord(String note);
+
+  /// Under 'Not taken': a record no newer than the one the Note was taken from (obf-1147).
+  ///
+  /// In en, this message translates to:
+  /// **'“{note}” has this already'**
+  String axtStaleRecord(String note);
+
+  /// Announced after 'Take it' when updates or deletions were among the records taken (obf-1147).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 record taken} other{{count} records taken}}'**
+  String axtRecordsTaken(int count);
+
+  /// Announced after 'Take it' when the records were all taken already, as when the same file is taken twice (obf-1147).
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing changed: these records were taken before.'**
+  String get axtNothingChanged;
+
+  /// Why the records of an AXT file were not taken, when updates or deletions were ticked (obf-1147).
+  ///
+  /// In en, this message translates to:
+  /// **'This Device may not put them there, or may not change a Note they update.'**
+  String get axtChangeRefused;
+
   /// Title of the page where the user ticks what goes into a Pack (#164).
   ///
   /// In en, this message translates to:

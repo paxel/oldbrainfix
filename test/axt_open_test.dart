@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -232,6 +234,220 @@ void main() {
     expect(startsLikeAxt([0x4F, 0x62]), isFalse);
   });
 
+  group('a later file of the same sender (obf-1147)', () {
+    /// Reads [bytes] as the app does.
+    Future<AxtFile> read(WidgetTester tester, Uint8List bytes) async =>
+        (await tester.runAsync(
+          () => AxtFiles(store).read(bytes, wallClock: (utc) => utc),
+        ))!;
+
+    /// Ann's Note Dentist, and the Note this Device took of her file.
+    Future<({String ann, String ben, AxtFile file})> taken(
+      WidgetTester tester,
+    ) async {
+      final id = Notes(ann).capture('Dentist\nOld place').id;
+      final file = await read(
+        tester,
+        (await tester.runAsync(() => AxtFiles(ann).write([id])))!,
+      );
+      final ben = AxtFiles(store).take(file, [file.taken.single.id]).single;
+      now = now.add(const Duration(minutes: 5));
+      return (ann: id, ben: ben, file: file);
+    }
+
+    /// Opens [file]'s page on the app as it is.
+    Future<void> show(WidgetTester tester, AxtFile file) async {
+      final context = tester.element(find.byType(Navigator).first);
+      unawaited(
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => AxtOpenScreen(store: store, file: file),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('an update shows the Note it changes, ticked, and Take it '
+        'rewrites it', (tester) async {
+      await start(tester);
+      final dentist = await taken(tester);
+      Notes(ann).edit(dentist.ann, 'Dentist\nNew place');
+      final later = (await tester.runAsync(
+        () => AxtFiles(ann).write([dentist.ann]),
+      ))!;
+      files.open(copyOf(later));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Updates “Dentist”'), findsOneWidget);
+      final record = find.ancestor(
+        of: find.text('Updates “Dentist”'),
+        matching: find.byType(CheckboxListTile),
+      );
+      expect(tester.widget<CheckboxListTile>(record).value, isTrue);
+      // Nothing new in it: no place to pick.
+      expect(key('axt-place'), findsNothing);
+      await tap(tester, key('axt-take'));
+
+      expect(announcements.visible, '1 record taken');
+      expect(Notes(store).byId(dentist.ben)!.text, 'Dentist\nNew place');
+      expect(Notes(store).all(), hasLength(1));
+    });
+
+    testWidgets('a Note changed here since keeps the change, greyed with '
+        '"Kept your change"', (tester) async {
+      await start(tester);
+      final dentist = await taken(tester);
+      Notes(store).edit(dentist.ben, 'Dentist\nMy own note');
+      now = now.add(const Duration(minutes: 5));
+      Notes(ann).edit(dentist.ann, 'Dentist\nNew place');
+      final later = (await tester.runAsync(
+        () => AxtFiles(ann).write([dentist.ann]),
+      ))!;
+      files.open(copyOf(later));
+      await tester.pumpAndSettle();
+
+      final text = 'Updates “Dentist” · Kept your change';
+      expect(find.text(text), findsOneWidget);
+      final record = tester.widget<CheckboxListTile>(
+        find.ancestor(
+          of: find.text(text),
+          matching: find.byType(CheckboxListTile),
+        ),
+      );
+      expect(record.onChanged, isNull);
+      expect(record.value, isFalse);
+      expect(key('axt-take'), findsNothing);
+      expect(Notes(store).byId(dentist.ben)!.text, 'Dentist\nMy own note');
+    });
+
+    testWidgets('a deletion moves the Note to the trash; a refused and a '
+        'stale record are named under Not taken', (tester) async {
+      await start(tester);
+      final dentist = await taken(tester);
+      final first = dentist.file.taken.single;
+      final file = AxtFile(
+        sender: dentist.file.sender,
+        shortFingerprint: dentist.file.shortFingerprint,
+        appName: dentist.file.appName,
+        fromOwnDevice: false,
+        records: [
+          AxtRecord(
+            id: first.id,
+            version: first.version + 1,
+            type: null,
+            result: 'APPLIED',
+            kind: AxtRecordKind.deletion,
+            noteId: dentist.ben,
+          ),
+          AxtRecord(
+            id: 'refused',
+            version: 9,
+            type: AxtTypes.note,
+            result: 'APPLIED',
+            kind: AxtRecordKind.refused,
+            noteId: dentist.ben,
+          ),
+          AxtRecord(
+            id: 'stale',
+            version: 1,
+            type: AxtTypes.note,
+            result: 'APPLIED',
+            kind: AxtRecordKind.stale,
+            noteId: dentist.ben,
+          ),
+        ],
+      );
+      await show(tester, file);
+
+      expect(find.text('Moves “Dentist” to the trash'), findsOneWidget);
+      expect(find.text('May not change “Dentist”'), findsOneWidget);
+      expect(find.text('“Dentist” has this already'), findsOneWidget);
+      await tap(tester, key('axt-take'));
+
+      expect(announcements.visible, '1 record taken');
+      expect(Notes(store).byId(dentist.ben)!.isTrashed, isTrue);
+    });
+
+    testWidgets('the same file taken a second time makes nothing, and says '
+        'so', (tester) async {
+      await start(tester);
+      final id = Notes(ann).capture('Buy milk').id;
+      final file = await read(
+        tester,
+        (await tester.runAsync(() => AxtFiles(ann).write([id])))!,
+      );
+      await show(tester, file);
+      await tap(tester, key('axt-take'));
+      expect(announcements.visible, '1 Note taken');
+      announcements.dismiss();
+      await tester.pumpAndSettle();
+      // The page as it was read before the first take.
+      await show(tester, file);
+      await tap(tester, key('axt-take'));
+
+      expect(
+        announcements.visible,
+        'Nothing changed: these records were taken before.',
+      );
+      expect(Notes(store).all(), hasLength(1));
+    });
+
+    testWidgets('a Note this Device may no longer change is refused at the '
+        'top, nothing written', (tester) async {
+      ann.applyProfileDefaults(name: 'Ann');
+      final area = ann.share(Places(ann).addArea('Household').id);
+      final done = answerSync(
+        ann,
+        _wire(
+          syncRequest(
+            store,
+            ann.versionVector(),
+            name: 'Phone',
+            hostDevice: ann.deviceId,
+            invited: true,
+          ),
+        ),
+        name: 'Desk',
+        inviting: Invite(area, role: AreaRole.member),
+      )!;
+      applyAnswer(store, _wire(done.answer), shared: true);
+      final id = Notes(ann).capture('Milk').id;
+      final first = await read(
+        tester,
+        (await tester.runAsync(() => AxtFiles(ann).write([id])))!,
+      );
+      final milk = AxtFiles(store)
+          .take(first, [first.taken.single.id], place: area)
+          .single;
+      store.leaveArea(area);
+      now = now.add(const Duration(minutes: 5));
+      Notes(ann).edit(id, 'Milk and eggs');
+      final later = await read(
+        tester,
+        (await tester.runAsync(() => AxtFiles(ann).write([id])))!,
+      );
+      expect(later.changes, hasLength(1));
+      await start(tester);
+      await show(tester, later);
+      final before = store.allEntries().length;
+      await tap(tester, key('axt-take'));
+
+      expect(announcements.visible, 'The records were not taken.');
+      expect(store.allEntries().length, before);
+      expect(find.byType(AxtOpenScreen), findsOneWidget);
+      final action = announcements.visibleAction;
+      announcements.dismiss();
+      action?.call();
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('may not change a Note they update'),
+        findsOneWidget,
+      );
+      expect(Notes(store).byId(milk), isNotNull);
+    });
+  });
+
   group('in an isolate of its own', () {
     late Directory home;
     late Store app;
@@ -268,3 +484,6 @@ void main() {
     });
   });
 }
+
+Map<String, Object?> _wire(Map<String, Object?> json) =>
+    jsonDecode(jsonEncode(json)) as Map<String, Object?>;

@@ -130,10 +130,13 @@ Future<void> openAxtBytes(
 }
 
 /// The page of an AXT file opened: who it is from, the records to take,
-/// each ticked, with its type and its Reminder or Routine, "Tick all"
-/// and "Untick all" on the bar, the records not taken greyed under
-/// them, where they go, and "Take it", which takes the ticked ones there
-/// and closes the page.
+/// each ticked, with its type and its Reminder or Routine, and the
+/// updates and deletions of Notes taken from the same sender before
+/// (obf-1147), each with the Note it changes, ticked, greyed with "Kept
+/// your change" where the user changed that Note since; "Tick all" and
+/// "Untick all" on the bar, the records not taken greyed under them,
+/// refused and stale ones with the Note they leave alone, where new ones
+/// go, and "Take it", which takes the ticked ones and closes the page.
 class AxtOpenScreen extends StatefulWidget {
   final Store store;
   final AxtFile file;
@@ -145,9 +148,43 @@ class AxtOpenScreen extends StatefulWidget {
 }
 
 class _AxtOpenScreenState extends State<AxtOpenScreen> {
-  late final List<AxtRecord> _records = widget.file.taken;
-  late final List<AxtRecord> _notTaken = widget.file.notTaken;
-  late Set<String> _ticks = {for (final r in _records) r.id};
+  /// The new records and the changes, in the file's order.
+  late final List<AxtRecord> _records;
+  late final List<AxtRecord> _notTaken;
+
+  /// What can be ticked: all but the changes the user's own change keeps.
+  late final List<AxtRecord> _tickable;
+  late Set<String> _ticks;
+
+  /// Whether the file holds a new record, which goes to the place.
+  late final bool _anyNew;
+
+  /// The first line of each Note a record changes or leaves alone, read
+  /// once as the page opens.
+  late final Map<String, String> _noteNames;
+
+  @override
+  void initState() {
+    super.initState();
+    final file = widget.file;
+    _records = [
+      for (final r in file.records)
+        if (r.taken || r.changes) r,
+    ];
+    _notTaken = file.notTaken;
+    _tickable = [
+      for (final r in _records)
+        if (!r.kept) r,
+    ];
+    _ticks = {for (final r in _tickable) r.id};
+    _anyNew = _records.any((r) => r.taken);
+    final notes = Notes(widget.store);
+    _noteNames = {
+      for (final r in file.records)
+        if (r.noteId case final id?)
+          if (notes.byId(id) case final note?) id: _firstLine(note.visibleText),
+    };
+  }
 
   /// The Area or Topic picked; null for Unsorted.
   String? _place;
@@ -157,7 +194,7 @@ class _AxtOpenScreenState extends State<AxtOpenScreen> {
 
   /// The records ticked, in the file's order.
   List<String> get _ticked => [
-    for (final r in _records)
+    for (final r in _tickable)
       if (_ticks.contains(r.id)) r.id,
   ];
 
@@ -177,7 +214,7 @@ class _AxtOpenScreenState extends State<AxtOpenScreen> {
     final places = Places(store);
     final lock = LockScope.of(context);
     final schedules = _records.any(
-      (r) => _ticks.contains(r.id) && r.draft?.schedule != null,
+      (r) => r.taken && _ticks.contains(r.id) && r.draft?.schedule != null,
     );
     PopupMenuEntry<String> entry(
       String id,
@@ -248,28 +285,44 @@ class _AxtOpenScreenState extends State<AxtOpenScreen> {
     final t = context.t;
     final announcements = AnnouncementsScope.of(context);
     final root = Navigator.of(context, rootNavigator: true);
+    final ticked = _ticked;
+    final changes = _records.any((r) => r.changes && ticked.contains(r.id));
     void refused(String details) => announceFailureWith(
       announcements,
       root,
       t.axtNotTaken,
       title: t.axtNotTakenTitle,
-      cause: t.axtPlaceRefused,
+      cause: changes ? t.axtChangeRefused : t.axtPlaceRefused,
       fix: t.axtPickAnotherFix,
       details: details,
     );
+    // Taking judges each record again by the store as it is now (ADR
+    // 0056): the same file taken twice writes nothing the second time.
+    final store = widget.store;
+    var wrote = false;
+    void heard() => wrote = true;
+    store.addListener(heard);
     final List<String> made;
     try {
-      made = AxtFiles(widget.store).take(widget.file, _ticked, place: _place);
+      made = AxtFiles(store).take(widget.file, ticked, place: _place);
     } on Exception catch (e) {
       refused('$e');
       return;
     } on Error catch (e) {
-      // The core refuses a place with an ArgumentError or a StateError,
-      // before anything is written.
+      // The core refuses a place, or a Note this Device may not change,
+      // with an ArgumentError or a StateError, before anything is written.
       refused('$e');
       return;
+    } finally {
+      store.removeListener(heard);
     }
-    announcements?.announce(t.axtTaken(made.length));
+    announcements?.announce(
+      !wrote
+          ? t.axtNothingChanged
+          : changes
+          ? t.axtRecordsTaken(ticked.length)
+          : t.axtTaken(made.length),
+    );
     Navigator.of(context).pop();
   }
 
@@ -296,12 +349,12 @@ class _AxtOpenScreenState extends State<AxtOpenScreen> {
       appBar: pageBar(
         context,
         title: t.axtTitle,
-        actions: _records.isEmpty
+        actions: _tickable.isEmpty
             ? const []
             : packTickActions(
                 t,
                 onAll: () =>
-                    setState(() => _ticks = {for (final r in _records) r.id}),
+                    setState(() => _ticks = {for (final r in _tickable) r.id}),
                 onNone: () => setState(() => _ticks = {}),
               ),
       ),
@@ -329,10 +382,13 @@ class _AxtOpenScreenState extends State<AxtOpenScreen> {
               key: ValueKey('axt-record-${record.id}'),
               contentPadding: EdgeInsets.zero,
               controlAffinity: ListTileControlAffinity.leading,
-              value: _ticks.contains(record.id),
-              onChanged: (on) => _tick(record.id, on ?? false),
+              value: !record.kept && _ticks.contains(record.id),
+              enabled: !record.kept,
+              onChanged: record.kept
+                  ? null
+                  : (on) => _tick(record.id, on ?? false),
               title: Text(
-                _title(record),
+                _title(t, record),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -353,10 +409,14 @@ class _AxtOpenScreenState extends State<AxtOpenScreen> {
                 value: false,
                 onChanged: null,
                 title: Text(_typeName(record.type)),
+                subtitle: switch (_leftAlone(t, record)) {
+                  final why? => Text(why),
+                  null => null,
+                },
               ),
           ],
-          if (_records.isNotEmpty) ...[
-            const Divider(height: 32),
+          if (_records.isNotEmpty) const Divider(height: 32),
+          if (_anyNew) ...[
             ControlBelow(
               padding: EdgeInsets.zero,
               title: Text(t.axtInto),
@@ -370,6 +430,8 @@ class _AxtOpenScreenState extends State<AxtOpenScreen> {
               ),
             ),
             const SizedBox(height: 16),
+          ],
+          if (_tickable.isNotEmpty) ...[
             FilledButton(
               key: const ValueKey('axt-take'),
               onPressed: any ? _take : null,
@@ -382,20 +444,52 @@ class _AxtOpenScreenState extends State<AxtOpenScreen> {
     );
   }
 
-  /// The first line of [record]'s text as it reads.
-  static String _title(AxtRecord record) {
+  /// The first line of [record]'s text as it reads; of a deletion, the
+  /// Note's it moves to the trash.
+  String _title(AppLocalizations t, AxtRecord record) {
     final draft = record.draft;
-    if (draft == null) return record.id;
-    final shown = TextFormats.visible(draft.format, draft.text);
-    for (final line in shown.split('\n')) {
+    if (draft == null) return _noteName(t, record);
+    return _firstLine(TextFormats.visible(draft.format, draft.text));
+  }
+
+  /// The first line of the Note [record] changes or leaves alone, or its
+  /// type's name where it has none.
+  String _noteName(AppLocalizations t, AxtRecord record) =>
+      switch (_noteNames[record.noteId]) {
+        final name? when name.isNotEmpty => name,
+        _ => _typeName(record.type),
+      };
+
+  /// Why a record not taken leaves its Note alone: refused, or no newer
+  /// than what the Note was taken from (obf-1147); null for the others.
+  String? _leftAlone(AppLocalizations t, AxtRecord record) =>
+      record.noteId == null
+      ? null
+      : switch (record.kind) {
+          AxtRecordKind.refused => t.axtRefusedRecord(_noteName(t, record)),
+          AxtRecordKind.stale => t.axtStaleRecord(_noteName(t, record)),
+          _ => null,
+        };
+
+  /// The first line of [text] with words in it.
+  static String _firstLine(String text) {
+    for (final line in text.split('\n')) {
       if (line.trim().isNotEmpty) return line.trim();
     }
-    return shown.trim();
+    return text.trim();
   }
 
   /// [record]'s type and, for a Task or Appointment with a date, its
   /// Reminder or Routine.
   String _detail(AppLocalizations t, String locale, AxtRecord record) {
+    final change = switch (record.kind) {
+      AxtRecordKind.update => t.axtUpdates(_noteName(t, record)),
+      AxtRecordKind.deletion => t.axtDeletes(_noteName(t, record)),
+      _ => null,
+    };
+    if (change != null) {
+      return record.kept ? '$change · ${t.axtKeptChange}' : change;
+    }
     final type = _typeName(record.type);
     final schedule = record.draft?.schedule;
     if (schedule == null) return type;

@@ -6311,6 +6311,48 @@ class AppLocalizationsDe extends AppLocalizations {
       'Wähle einen anderen Ort, etwa Unsortiert, und übernimm sie noch einmal. Nichts wurde geändert.';
 
   @override
+  String axtUpdates(String note) {
+    return 'Ändert „$note“';
+  }
+
+  @override
+  String axtDeletes(String note) {
+    return 'Verschiebt „$note“ in den Papierkorb';
+  }
+
+  @override
+  String get axtKeptChange => 'Deine Änderung bleibt';
+
+  @override
+  String axtRefusedRecord(String note) {
+    return 'Darf „$note“ nicht ändern';
+  }
+
+  @override
+  String axtStaleRecord(String note) {
+    return '„$note“ hat das schon';
+  }
+
+  @override
+  String axtRecordsTaken(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Einträge übernommen',
+      one: '1 Eintrag übernommen',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get axtNothingChanged =>
+      'Nichts geändert: Diese Einträge wurden schon übernommen.';
+
+  @override
+  String get axtChangeRefused =>
+      'Dieses Gerät darf sie dort nicht ablegen, oder es darf eine der Notizen nicht ändern, die sie ändern sollen.';
+
+  @override
   String get packExportTitle => 'Als Paket exportieren';
 
   @override

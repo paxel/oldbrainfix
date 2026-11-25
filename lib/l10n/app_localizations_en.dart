@@ -6232,6 +6232,48 @@ class AppLocalizationsEn extends AppLocalizations {
       'Pick another place, such as Unsorted, and take them again. Nothing was changed.';
 
   @override
+  String axtUpdates(String note) {
+    return 'Updates “$note”';
+  }
+
+  @override
+  String axtDeletes(String note) {
+    return 'Moves “$note” to the trash';
+  }
+
+  @override
+  String get axtKeptChange => 'Kept your change';
+
+  @override
+  String axtRefusedRecord(String note) {
+    return 'May not change “$note”';
+  }
+
+  @override
+  String axtStaleRecord(String note) {
+    return '“$note” has this already';
+  }
+
+  @override
+  String axtRecordsTaken(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count records taken',
+      one: '1 record taken',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get axtNothingChanged =>
+      'Nothing changed: these records were taken before.';
+
+  @override
+  String get axtChangeRefused =>
+      'This Device may not put them there, or may not change a Note they update.';
+
+  @override
   String get packExportTitle => 'Export as Pack';
 
   @override
