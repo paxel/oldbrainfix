@@ -316,6 +316,19 @@ jobs:
           fi
           python3 tool/whats_new.py --bundle --require "${RELEASE_TAG#v}"
           git diff --exit-code -- assets/help/whats_new.json
+      # The store files follow the same record: the App Store's What's New
+      # files hold its blocks, and its console steps name exactly the
+      # store frames that changed since the tag before (tool/store_release.py).
+      - name: The App Store's What's New and the console's frames match the release notes
+        run: |
+          notes="docs/release-notes-${RELEASE_TAG#v}.md"
+          if [ "$PUBLISH" != true ] && [ ! -f "$notes" ]; then
+            echo "::warning::no release notes yet, so no store files to check"
+            exit 0
+          fi
+          python3 tool/store_release.py appstore "$notes" --check
+          base=$(git describe --tags --abbrev=0 --match 'v*' "${RELEASE_TAG}^")
+          python3 tool/store_release.py frames "$notes" "$base"
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         if: env.TESTED_BEFORE_MERGE != 'true'
         with:

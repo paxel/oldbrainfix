@@ -32,6 +32,27 @@ that publish wait for SonarQube Cloud's quality gate of the tagged commit,
 up to 75 minutes while `summer`'s analysis of the merge runs, and stop when
 it fails.
 
+## Before the release pull request
+
+The store kit is done on the release branch, before its pull request is
+called green, never after the tag:
+
+1. `python3 ~/.claude/skills/store-kit/scripts/live.py --package
+   io.github.paxel.oldbrainfix --bundle io.github.paxel.oldbrainfix`: the
+   live versions.
+2. `docs/release-notes-<version>.md` for every change of the release, and
+   the listing edits put to the user, or the user's answer that there are
+   none; `check.py` passes.
+3. The store frames regenerated where a screen on them changed, and the
+   console steps naming exactly those frames.
+4. `python3 tool/whats_new.py --bundle --require <version>` and
+   `python3 tool/store_release.py appstore docs/release-notes-<version>.md`
+   write the bundled What's new and the App Store's What's New files.
+5. `python3 tool/store_release.py frames docs/release-notes-<version>.md
+   <last tag>` passes, and both kit pages are published.
+
+The tag pipeline checks 4 and 5 again and stops on a difference.
+
 ## Locales
 
 `en-US` and `de-DE`, from `lib/l10n/app_en.arb` and `lib/l10n/app_de.arb`,
