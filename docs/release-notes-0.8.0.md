@@ -4,7 +4,7 @@ Paste source for the Google Play Console and App Store Connect: the release's Wh
 
 ## Summary
 
-Version 0.8.0. Live: 0.7.2 in both stores. Every text here describes the `## [0.8.0]` section of the changelog against 0.7.2. The phone texts leave out what only the desktop got: the Markdown viewer, the desktop's header band, its menus, Quiet today as a button, the AI port's line and review, and its own Running page. The biggest changes for a phone are the find bar and the places a search lists, Undo and Redo in the Note editor, tables (sorting, selecting cells, the table's ⋮, readable at the text size), the quick note (Transcribing…, the Transcript in its text, Open in the editor), the Note editor's four named groups, a Running page with Abort, a custom Heads-up length, a recording that ends after a pause, a switch for the tips, and Backups that bring back the settings; then Empty the trash now, a Reminder's notification that opens the Agenda at its row, the Imports in the Areas list's ⋮, a card's ⋮ in four groups, one name for each action and one look for buttons and chips. Filling in an earlier Import works on Android only, since the iPhone's pickers hand no stable place, so it stays out of the shared texts. The listing blocks are the files in `fastlane/metadata/`, word for word; 0.8.0 brings no listing edit. Frames: see the two screenshot tables.
+Version 0.8.0. Live: 0.7.2 in both stores. Every text here describes the `## [0.8.0]` section of the changelog against 0.7.2. The phone texts leave out what only the desktop got: the Markdown viewer, the desktop's header band, its menus, Quiet today as a button, the AI port's line and review, and its own Running page. The biggest changes for a phone are the find bar and the places a search lists, Undo and Redo in the Note editor, tables (sorting, selecting cells, the table's ⋮, readable at the text size), the quick note (Transcribing…, the Transcript in its text, Open in the editor), the Note editor's four named groups, a Running page with Abort, a custom Heads-up length, a recording that ends after a pause, a switch for the tips, and Backups that bring back the settings; then Empty the trash now, a Reminder's notification that opens the Agenda at its row, the Imports in the Areas list's ⋮, a card's ⋮ in four groups, one name for each action and one look for buttons and chips, the full editor from an Area's or Topic's "+" and from Editor in the Agenda's fan, the green "!" on button taps, and Packs with a Profile picture opening again. Filling in an earlier Import works on Android only, since the iPhone's pickers hand no stable place, so it stays out of the shared texts. The listing blocks are the files in `fastlane/metadata/`, word for word; 0.8.0 brings no listing edit. Frames: see the two screenshot tables.
 
 - [Play Kit](https://claude.ai/artifact/Ds5iewxVwTLoPwAWFbpWiJ)
 - [App Store Kit](https://claude.ai/artifact/PvZUte3cRrwyoHg2feLj1T)
@@ -24,43 +24,49 @@ The same text is the in-app What's new Note on every platform.
 <!-- block id=play_notes_en limit=500 lang=en title="Release notes, en-US" where="Internal testing release" -->
 ```
 Added
-• Find in a Note, matches highlighted.
-• Search lists where each Note matches.
-• Undo and Redo in the Note editor.
+• Find in a Note.
+• Search shows the places.
+• Undo and Redo in the editor.
 • Tables: sort, select, move.
 • A custom Heads-up length.
 • Recordings end after a pause.
-• A Running page with Abort.
+• A Running page.
 • Empty the trash now.
+• A green "!" on button taps.
 Changed
-• Search ignores accents and umlauts.
-• Quick notes take their Transcript.
+• Search ignores accents.
+• Quick notes keep Transcripts.
 • Note buttons in four groups.
-• A Backup brings back the settings.
-• A reminder opens the Agenda at its row.
+• Backups keep settings.
+• Reminders open the Agenda.
+• Areas open the editor.
 Fixed
 • Search bars cut off nothing.
+• Packs with a picture open.
 ```
 
 <!-- block id=play_notes_de limit=500 lang=de title="Versionshinweise, de-DE" where="Internal testing release" -->
 ```
 Neu
 • In der Notiz suchen.
-• Die Suche zeigt, wo jede Notiz passt.
-• Rückgängig und Wiederholen im Editor.
-• Tabellen sortieren, wählen.
-• Vorwarnungen mit eigener Länge.
+• Suche zeigt Fundstellen.
+• Rückgängig und Wiederholen.
+• Tabellen sortieren.
+• Eigene Vorwarnzeiten.
 • Aufnahmen enden nach Pausen.
-• „Im Hintergrund“ mit Abbrechen.
+• Seite „Im Hintergrund“.
 • Papierkorb jetzt leeren.
+• Grünes „!“ beim Tippen.
 Geändert
-• Suche übergeht Akzente und Umlaute.
+• Suche übergeht Akzente.
 • Schnellnotiz mit Transkript.
-• Notiz-Knöpfe in vier Gruppen.
+• Knöpfe in vier Gruppen.
 • Sicherungen mit Einstellungen.
-• Erinnerungen öffnen die Agenda.
+• Erinnerung öffnet Agenda.
+• Bereiche öffnen den Editor.
 Behoben
-• Suchleisten schneiden nichts mehr ab.
+• Suchleisten verdecken nichts.
+• Pakete mit Profilbild öffnen.
 ```
 
 ## App Store: What's New
@@ -77,9 +83,9 @@ The quick note shows "Transcribing…" after a recording and puts the Transcript
 
 A Heads-up can have a length of your own, in minutes, hours, days or weeks. A Note without text is named by its Transcript or Photo Text on cards, the Agenda, the calendar and notifications. The most used tags sit under the search of the Areas list. A Running page, from the moving line or ⋮, shows what runs in the background and stops it. A Backup now brings back the iPhone's settings and offers the speech model chosen before. Tips can be switched off.
 
-The Trash has "Empty the trash now", which deletes everything in it for good after one question. A Reminder's or Routine's notification opens the Agenda with its row marked. Import has moved from the Settings to the ⋮ of the Areas list, a card's ⋮ holds Edit and four groups, and buttons, chips and headings share one look.
+The Trash has "Empty the trash now", which deletes everything in it for good after one question. A Reminder's or Routine's notification opens the Agenda with its row marked. Import has moved from the Settings to the ⋮ of the Areas list, a card's ⋮ holds Edit and four groups, and buttons, chips and headings share one look. In an Area or a Topic, "+" ▸ Note opens the full Note editor; on the Agenda, "+" offers Editor at the top of its fan. Every button tap shows a green "!" above the finger for a moment; Settings ▸ Look turns it off.
 
-Search bars no longer cut off what scrolls under them, and the Conflicts page and the Hidden from AI entry look like the rest of the app.
+Search bars no longer cut off what scrolls under them, the Conflicts page and the Hidden from AI entry look like the rest of the app, and a Pack made with "Add my Profile" and a Profile picture opens again.
 ```
 
 <!-- block id=appstore_whatsnew_de limit=4000 lang=de title="Neue Funktionen, Deutsch" where="Version information" -->
@@ -94,9 +100,9 @@ Die Schnellnotiz zeigt nach einer Aufnahme „Wird transkribiert …“ und setz
 
 Eine Vorwarnung kann eine eigene Länge haben, in Minuten, Stunden, Tagen oder Wochen. Eine Notiz ohne Text heißt nach ihrem Transkript oder Fototext, auf Karten, in der Agenda, im Kalender und in Benachrichtigungen. Die meistgenutzten #Wörter stehen unter der Suche der Bereiche. Eine Seite „Im Hintergrund“, über die wandernde Linie oder ⋮, zeigt, was gerade läuft, und hält es an. Eine Sicherung bringt jetzt die Einstellungen des iPhones zurück und bietet das vorher gewählte Sprachmodell an. Tipps lassen sich abschalten.
 
-Der Papierkorb hat „Papierkorb jetzt leeren“, das nach einer Frage alles darin endgültig löscht. Die Benachrichtigung einer Erinnerung oder Routine öffnet die Agenda mit ihrer Zeile markiert. Importieren steht jetzt im ⋮ der Bereiche statt in den Einstellungen, das ⋮ einer Karte hält Bearbeiten und vier Gruppen, und Knöpfe, Chips und Überschriften sehen überall gleich aus.
+Der Papierkorb hat „Papierkorb jetzt leeren“, das nach einer Frage alles darin endgültig löscht. Die Benachrichtigung einer Erinnerung oder Routine öffnet die Agenda mit ihrer Zeile markiert. Importieren steht jetzt im ⋮ der Bereiche statt in den Einstellungen, das ⋮ einer Karte hält Bearbeiten und vier Gruppen, und Knöpfe, Chips und Überschriften sehen überall gleich aus. In einem Bereich oder Thema öffnet „+“ ▸ Notiz den vollen Notiz-Editor; auf der Agenda bietet „+“ oben im Fächer „Editor“ an. Jedes Tippen auf einen Knopf zeigt kurz ein grünes „!“ über dem Finger; Einstellungen ▸ Aussehen schaltet es ab.
 
-Suchleisten schneiden nicht mehr ab, was darunter scrollt, und die Konflikte und „Vor KI verborgen“ sehen aus wie der Rest der App.
+Suchleisten schneiden nicht mehr ab, was darunter scrollt, die Konflikte und „Vor KI verborgen“ sehen aus wie der Rest der App, und ein Paket mit „Mein Profil beifügen“ und Profilbild lässt sich wieder öffnen.
 ```
 
 ## Tester notes
@@ -113,6 +119,9 @@ What to test
 • Android: import a folder, then the same folder again from the Areas list's ⋮ ▸ Import…: it asks to fill in the first Import and adds only what is missing.
 • Trash a few Notes, open the Trash, tap Empty the trash now in its bar (or its ⋮): the question names the counts, and Delete for good empties it.
 • Let a Reminder ring and tap its notification: the Agenda opens with its row marked.
+• In an Area, "+" ▸ Note opens the Note editor filed there; leaving it empty makes nothing. On the Agenda, "+" ▸ Editor opens an empty Note in the editor.
+• Tap a few buttons: a green "!" shows above the finger; Settings ▸ Look ▸ Show button taps turns it off.
+• Export a Pack with "Add my Profile" while your Profile has a picture, send it, and open it on both phones.
 Known
 • On the iPhone, importing the same folder or zip again makes a new Area; only Android offers to fill in.
 ```
@@ -375,7 +384,7 @@ None: 0.8.0 makes no line of either listing untrue; its changes refine what the 
 
 ## Screenshots: Play
 
-Phone 1080 × 1920 per locale. Regenerated for 0.8.0: frames 1, 5 and 8 gain the ⋮ in the Agenda's bar, 2 shows "Open in the editor", 4 the editor's Undo, Redo and Find and its named groups; all eight take the one look of buttons, chips and headings. Feature graphic 1024 × 500, unchanged.
+Phone 1080 × 1920 per locale. Regenerated for 0.8.0: frames 1, 5 and 8 gain the ⋮ in the Agenda's bar, 5 also Editor at the top of the fan, 2 shows "Open in the editor", 4 the editor's Undo, Redo and Find and its named groups; all eight take the one look of buttons, chips and headings. Feature graphic 1024 × 500, unchanged.
 
 | # | Files | Size | What is on it |
 |---|---|---|---|
@@ -390,7 +399,7 @@ Phone 1080 × 1920 per locale. Regenerated for 0.8.0: frames 1, 5 and 8 gain the
 
 ## Screenshots: App Store
 
-iPhone 6.9″ 1320 × 2868 per locale, the one size App Store Connect scales to every iPhone; no iPad (iPhone only). Regenerated for 0.8.0: frames 1, 5 and 8 gain the ⋮ in the Agenda\'s bar, 2 shows "Open in the editor", 4 the editor\'s Undo, Redo and Find and its named groups; all but 6 take the one look of buttons, chips and headings.
+iPhone 6.9″ 1320 × 2868 per locale, the one size App Store Connect scales to every iPhone; no iPad (iPhone only). Regenerated for 0.8.0: frames 1, 5 and 8 gain the ⋮ in the Agenda\'s bar, 5 also Editor at the top of the fan, 2 shows "Open in the editor", 4 the editor\'s Undo, Redo and Find and its named groups; all but 6 take the one look of buttons, chips and headings.
 
 | # | Files | Size | What is on it |
 |---|---|---|---|
