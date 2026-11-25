@@ -421,3 +421,42 @@ fn cancel_and_back_return_to_the_choices() -> TestResult {
     harness.step();
     untouched(&harness)
 }
+
+#[test]
+fn the_starter_sets_title_groups_and_choices_stand_apart_in_steps() -> TestResult {
+    let mut harness = first_start()?;
+    click(&mut harness, "New to Old Brain Fix");
+    let t = oldbrainfix_gui::l10n::L10n::new("en");
+    let at = |words: &str| -> egui::Rect {
+        harness
+            .query_all_by_label(words)
+            .next()
+            .unwrap_or_else(|| panic!("no {words:?}"))
+            .rect()
+    };
+    let between = |above: &str, below: &str, room: f32| {
+        let gap = at(below).top() - at(above).bottom();
+        assert!(
+            (gap - room).abs() <= 2.0,
+            "{gap} between {above:?} and {below:?}, not {room}"
+        );
+    };
+    // 24 between groups, 12 under a group's heading, 8 between the
+    // choices (obf-1131).
+    between(t.starter_set_title(), t.features(), 24.0);
+    between(t.features(), t.features_detail(), 12.0);
+    between(t.features_simple_detail(), t.features_advanced(), 8.0);
+    between(t.features_advanced_detail(), t.starter_set_intro(), 24.0);
+    between(t.starter_set_intro(), "Household", 12.0);
+    let start = at(t.starter_set_done());
+    let last = harness
+        .query_all_by(|n| n.role() == egui::accesskit::Role::CheckBox)
+        .map(|n| n.rect().bottom())
+        .fold(f32::MIN, f32::max);
+    assert!(
+        (start.top() - last - 24.0).abs() <= 2.0,
+        "{} above Start",
+        start.top() - last
+    );
+    Ok(())
+}
