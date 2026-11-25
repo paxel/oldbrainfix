@@ -207,7 +207,56 @@ pub fn row_button(ui: &mut Ui, words: &str) -> Response {
 
 /// A [`text_button`], with `icon` before its words where there is one.
 fn plain_button(ui: &mut Ui, icon: Option<char>, words: &str) -> Response {
-    let tones = theme::tones(ui.visuals());
+    let (placed, resp) = lay(ui, icon, words, Sense::click());
+    placed.answer(ui, &resp);
+    resp.on_hover_cursor(egui::CursorIcon::PointingHand)
+}
+
+/// A [`text_button`] drawn under a click laid over it afterwards, as a
+/// card's fold whose click the card's own would cover (obf-1110): its
+/// icon and words now, without taking a click; its tint and ring once
+/// [`UnderClick::answer`] has the click's response.
+pub fn text_button_under(ui: &mut Ui, icon: char, words: &str) -> UnderClick {
+    lay(ui, Some(icon), words, Sense::hover()).0
+}
+
+/// Where a text button lies and the room kept under its words for its
+/// tint and ring.
+#[derive(Clone)]
+pub struct UnderClick {
+    pub rect: egui::Rect,
+    ground: egui::layers::ShapeIdx,
+    /// The painter it was drawn with: its layer and clip.
+    painter: egui::Painter,
+}
+
+impl UnderClick {
+    /// Tints the ground under the pointer and rings it while `resp` has
+    /// the keyboard.
+    pub fn answer(&self, ui: &Ui, resp: &Response) {
+        let radius = CornerRadius::same(theme::BUTTON_RADIUS);
+        let mut ground = Vec::new();
+        if resp.hovered() {
+            let tint = theme::tones(ui.visuals())
+                .accent
+                .gamma_multiply(TEXT_BUTTON_TINT);
+            ground.push(egui::Shape::rect_filled(self.rect, radius, tint));
+        }
+        if resp.has_focus() {
+            let ring = ui.visuals().widgets.active.bg_stroke;
+            ground.push(egui::Shape::rect_stroke(
+                self.rect,
+                radius,
+                ring,
+                egui::StrokeKind::Inside,
+            ));
+        }
+        self.painter.set(self.ground, egui::Shape::Vec(ground));
+    }
+}
+
+/// Lays out and draws a text button's icon and words, `sense` its own.
+fn lay(ui: &mut Ui, icon: Option<char>, words: &str, sense: Sense) -> (UnderClick, Response) {
     let font = egui::TextStyle::Button.resolve(ui.style());
     let colour = if ui.is_enabled() {
         ui.visuals().hyperlink_color
@@ -223,14 +272,13 @@ fn plain_button(ui: &mut Ui, icon: Option<char>, words: &str) -> Response {
     let before = if icon.is_some() { glyph + gap } else { 0.0 };
     let inner = egui::vec2(before + galley.size().x, glyph.max(galley.size().y));
     let size = (inner + pad * 2.0).max(egui::vec2(0.0, ui.spacing().interact_size.y));
-    let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
-    resp.widget_info(|| WidgetInfo::labeled(WidgetType::Button, ui.is_enabled(), words));
+    let ground = ui.painter().add(egui::Shape::Noop);
+    let (rect, resp) = ui.allocate_exact_size(size, sense);
+    if sense.senses_click() {
+        resp.widget_info(|| WidgetInfo::labeled(WidgetType::Button, ui.is_enabled(), words));
+    }
     if ui.is_rect_visible(rect) {
-        let radius = CornerRadius::same(theme::BUTTON_RADIUS);
         let painter = ui.painter();
-        if resp.hovered() {
-            painter.rect_filled(rect, radius, tones.accent.gamma_multiply(TEXT_BUTTON_TINT));
-        }
         let at = egui::Rect::from_min_size(
             egui::pos2(rect.left() + pad.x, rect.center().y - glyph / 2.0),
             egui::vec2(glyph, glyph),
@@ -241,10 +289,14 @@ fn plain_button(ui: &mut Ui, icon: Option<char>, words: &str) -> Response {
         let left = at.left() + before;
         let top = rect.center().y - galley.size().y / 2.0;
         painter.galley(egui::pos2(left, top), galley, colour);
-        if resp.has_focus() {
-            let ring = ui.visuals().widgets.active.bg_stroke;
-            painter.rect_stroke(rect, radius, ring, egui::StrokeKind::Inside);
-        }
     }
-    resp.on_hover_cursor(egui::CursorIcon::PointingHand)
+    let painter = ui.painter().clone();
+    (
+        UnderClick {
+            rect,
+            ground,
+            painter,
+        },
+        resp,
+    )
 }

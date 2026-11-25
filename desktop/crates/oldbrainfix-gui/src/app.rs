@@ -27280,10 +27280,15 @@ fn note_card(
                                     boxes = checklist_view::card_lines(ui, tones, &open);
                                     if !struck.is_empty() {
                                         let said = t.shopping_struck_count(struck.len() as i64);
-                                        let row = folded_row(ui, struck_open, |ui| {
-                                            ui.label(RichText::new(&said).small().color(weak));
-                                        });
-                                        struck_rect = Some((row.response.rect, said));
+                                        // A text button with its chevron
+                                        // (obf-1110), its click the card's.
+                                        let chevron = if struck_open {
+                                            icons::EXPAND_LESS
+                                        } else {
+                                            icons::EXPAND_MORE
+                                        };
+                                        let drawn = design::text_button_under(ui, chevron, &said);
+                                        struck_rect = Some((drawn, said));
                                         if struck_open {
                                             boxes.extend(checklist_view::card_lines(
                                                 ui, tones, &struck,
@@ -27606,9 +27611,10 @@ fn note_card(
         }
     }
     // A click on the struck Lines' fold shows or hides them (#189).
-    if let Some((rect, said)) = &struck_rect {
-        let fold = ui.interact(*rect, struck_id.with("fold"), Sense::click());
+    if let Some((drawn, said)) = &struck_rect {
+        let fold = ui.interact(drawn.rect, struck_id.with("fold"), Sense::click());
         fold.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, said));
+        drawn.answer(ui, &fold);
         if fold
             .on_hover_cursor(egui::CursorIcon::PointingHand)
             .clicked()

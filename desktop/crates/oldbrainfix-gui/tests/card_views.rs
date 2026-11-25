@@ -24,6 +24,7 @@ use oldbrainfix_core::{
     Checklists, Day, Notes, Recurrence, Schedule, SessionRule, Sessions, ShoppingLists, SigningKey,
     Store, Tallies, parse_time,
 };
+use oldbrainfix_gui::theme;
 use oldbrainfix_gui::{App, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -386,6 +387,21 @@ fn an_older_session_set_up_on_its_routine_shows_as_a_session() -> TestResult {
     Ok(())
 }
 
+/// Every shape drawn, out of its lists.
+fn drawn(harness: &Harness<'_, App>) -> Vec<egui::Shape> {
+    fn flat(shape: &egui::Shape, into: &mut Vec<egui::Shape>) {
+        match shape {
+            egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| flat(s, into)),
+            other => into.push(other.clone()),
+        }
+    }
+    let mut shapes = Vec::new();
+    for egui::epaint::ClippedShape { shape, .. } in &harness.output().shapes {
+        flat(shape, &mut shapes);
+    }
+    shapes
+}
+
 #[test]
 fn a_detailed_shopping_list_folds_its_struck_lines_until_a_click() -> TestResult {
     let store = store()?;
@@ -401,6 +417,33 @@ fn a_detailed_shopping_list_folds_its_struck_lines_until_a_click() -> TestResult
 
     assert!(shows(&harness, "Bread"));
     assert!(!shows(&harness, "Milk"));
+    // The fold is a text button: its words in the accent, tinted under
+    // the pointer (obf-1110).
+    let accent = harness.ctx.global_style().visuals.hyperlink_color;
+    let words = drawn(&harness).into_iter().any(|shape| match shape {
+        egui::Shape::Text(text) => {
+            text.galley.text() == "1 struck through" && text.fallback_color == accent
+        }
+        _ => false,
+    });
+    assert!(words, "the fold's words in the accent");
+    let fold = harness.get_by_role_and_label(Role::Button, "1 struck through");
+    let scale = harness.ctx.pixels_per_point();
+    let at = fold.rect();
+    let at = egui::Rect::from_min_max(
+        (at.min.to_vec2() / scale).to_pos2(),
+        (at.max.to_vec2() / scale).to_pos2(),
+    );
+    fold.hover();
+    harness.run();
+    let tint = theme::tones(&harness.ctx.global_style().visuals)
+        .accent
+        .gamma_multiply(0.15);
+    let tinted = drawn(&harness).into_iter().any(|shape| match shape {
+        egui::Shape::Rect(r) => r.fill == tint && (r.rect.center() - at.center()).length() < 1.0,
+        _ => false,
+    });
+    assert!(tinted, "tinted under the pointer");
     harness
         .get_by_role_and_label(Role::Button, "1 struck through")
         .click();
