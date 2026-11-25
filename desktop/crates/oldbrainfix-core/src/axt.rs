@@ -23,7 +23,7 @@ use sha2::{Digest, Sha256};
 
 use crate::box_keys::box_secret_of;
 use crate::entry::{dart_iso, parse_time};
-use crate::notes::{Note, Notes};
+use crate::notes::{Note, Notes, keys as note_keys};
 use crate::places::Places;
 use crate::routines::{Routine, Routines, heads_up_keys, keys as routine_keys};
 use crate::schedule::{ClockTime, Day, Occurrence, Recurrence, Schedule, Until, WallClock};
@@ -117,11 +117,54 @@ pub struct AxtNoteDraft {
     pub heads_ups: Vec<i64>,
 }
 
+/// What a record of a file is to the Notes taken from that sender before
+/// (obf-1147), as the Dart core's `AxtRecordKind`, by the record id and
+/// the sender's key their [`AxtFrom`] names, as the user's own Devices
+/// wrote it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AxtRecordKind {
+    /// A record no Note was taken from: a `Note`, `Task` or `Appointment`
+    /// that came in whole, to become a new Note.
+    New,
+    /// A later version of a record a Note was taken from: it rewrites the
+    /// Note's text and its Reminder or Routine.
+    Update,
+    /// A later deletion of such a record: it moves the Note
+    /// to the trash.
+    Deletion,
+    /// A record that may not change the Note taken under its id: one of
+    /// another sender, one of another type than the Note was taken as, or
+    /// one the library refused.
+    Refused,
+    /// A version of the record no later than the one taken: nothing to do.
+    Stale,
+    /// Nothing to take: a record of a type not taken, one the library
+    /// refused, or a deletion of a record no Note was taken from.
+    None,
+}
+
+impl AxtRecordKind {
+    /// How the fixtures and the Dart core name it.
+    pub fn code(self) -> &'static str {
+        match self {
+            AxtRecordKind::New => "new",
+            AxtRecordKind::Update => "update",
+            AxtRecordKind::Deletion => "deletion",
+            AxtRecordKind::Refused => "refused",
+            AxtRecordKind::Stale => "stale",
+            AxtRecordKind::None => "none",
+        }
+    }
+}
+
 /// One record of an AXT file, as its last message the library applied
 /// leaves it: its `id` as its sender wrote it, its `version`, its
 /// `type_name` when it came in whole, and `result`, what the library made
 /// of that message (`APPLIED`, or why not). A record of a type this app
-/// takes has its `draft`; a deletion has none.
+/// takes has its `draft`; a deletion has none. `kind` says what it is to
+/// the Notes taken before, `note_id` which Note it updates, deletes or
+/// may not change, and `kept` whether the user changed that Note since it
+/// was taken or last updated, so that nothing changes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AxtRecord {
     pub id: String,
@@ -129,14 +172,41 @@ pub struct AxtRecord {
     pub type_name: Option<String>,
     pub result: String,
     pub draft: Option<AxtNoteDraft>,
+    pub kind: AxtRecordKind,
+    pub note_id: Option<String>,
+    pub kept: bool,
 }
 
 impl AxtRecord {
-    /// Whether it can be taken: a `Note`, `Task` or `Appointment` that
-    /// came in whole.
+    /// Whether it becomes a new Note when taken: a `Note`, `Task` or
+    /// `Appointment` that came in whole, under an id no Note was taken
+    /// from.
     pub fn taken(&self) -> bool {
-        self.draft.is_some()
+        self.kind == AxtRecordKind::New
     }
+
+    /// Whether taking it updates or deletes the Note it was taken as,
+    /// unless the user changed that Note since (`kept`).
+    pub fn changes(&self) -> bool {
+        matches!(self.kind, AxtRecordKind::Update | AxtRecordKind::Deletion)
+    }
+
+    fn classified(&self, kind: AxtRecordKind, note_id: Option<&str>, kept: bool) -> AxtRecord {
+        AxtRecord {
+            kind,
+            note_id: note_id.map(str::to_string),
+            kept,
+            ..self.clone()
+        }
+    }
+}
+
+/// A Note taken from a record: its id, where it came from, and the entry
+/// of the user's own Devices that says so last.
+struct Taken {
+    note_id: String,
+    from: AxtFrom,
+    entry: crate::entry::Entry,
 }
 
 /// What an AXT file holds, checked as a whole and read, nothing taken
@@ -156,15 +226,25 @@ pub struct AxtFile {
 }
 
 impl AxtFile {
-    /// The records that can be taken, in the file's order.
+    /// The records that become new Notes when taken, in the file's order.
     pub fn taken(&self) -> Vec<&AxtRecord> {
         self.records.iter().filter(|r| r.taken()).collect()
     }
 
-    /// The records that cannot, in the file's order: of another type, a
-    /// deletion, or one the library refused.
+    /// The records that update or delete a Note taken before, in the
+    /// file's order, those the user changed since among them (`kept`).
+    pub fn changes(&self) -> Vec<&AxtRecord> {
+        self.records.iter().filter(|r| r.changes()).collect()
+    }
+
+    /// The others, in the file's order: of another type, a deletion of a
+    /// record never taken, one the library refused, one that may not
+    /// change the Note taken under its id, or one no later than it.
     pub fn not_taken(&self) -> Vec<&AxtRecord> {
-        self.records.iter().filter(|r| !r.taken()).collect()
+        self.records
+            .iter()
+            .filter(|r| !r.taken() && !r.changes())
+            .collect()
     }
 }
 
@@ -530,36 +610,183 @@ impl Store {
                 type_name,
                 result,
                 draft,
+                kind: AxtRecordKind::None,
+                note_id: None,
+                kept: false,
             });
         }
         let key = hex::decode(&preview.sender).unwrap_or_default();
         Ok(Ok(AxtFile {
             from_own_device: self.written_by_own(&device_id_from_key(&key))?,
+            records: self.axt_classified(&preview.sender, &records)?,
             sender: preview.sender,
             short_fingerprint: preview.short_fingerprint,
             app_name: preview.app_name,
-            records,
         }))
     }
 
-    /// Takes the records of `file` whose ids are among `ids` and can be
-    /// taken, as the Dart core's `AxtFiles.take`: in the file's order,
-    /// all in one batch, each a new Note of this Device's, captured now,
-    /// filed into the Area or Topic `place` or left in Unsorted with
-    /// `None`, with its Reminder or Routine written, not spawned, its
-    /// first Occurrence Done when the record says so, its Heads-ups, and
-    /// where it came from ([`AxtFrom`]). Returns the new Notes' ids.
-    /// Refused before anything is written for a place that is no Area or
-    /// Topic, where this Device may not write, or may not make Reminders
-    /// and Routines.
+    /// `records` of a file of `sender`, each with what it is to the Notes
+    /// taken before, as the Dart core's `_classified`: the Note taken
+    /// under its id from the same sender, by the [`AxtFrom`] the user's
+    /// own Devices wrote last, the one of the highest version where two
+    /// were, the first by id where they tie. A record from another
+    /// sender under an id taken may change nothing.
+    fn axt_classified(&self, sender: &str, records: &[AxtRecord]) -> Result<Vec<AxtRecord>> {
+        let mut own = HashMap::new();
+        let taken = self.axt_taken_by_record(&mut own)?;
+        let mut out = Vec::with_capacity(records.len());
+        for r in records {
+            let held = taken.get(&r.id).map(Vec::as_slice).unwrap_or(&[]);
+            out.push(self.axt_classify(r, sender, held, &mut own)?);
+        }
+        Ok(out)
+    }
+
+    /// Every Note taken from an AXT file, by the record id it came from,
+    /// in the order of the Notes' ids.
+    fn axt_taken_by_record(
+        &self,
+        own: &mut HashMap<String, bool>,
+    ) -> Result<HashMap<String, Vec<Taken>>> {
+        let mut ids = Vec::new();
+        for (entity, _, device) in self.writers_of(&[keys::FROM])? {
+            if self.written_by_own_in(&device, own)? {
+                ids.push(entity);
+            }
+        }
+        ids.sort();
+        ids.dedup();
+        let histories = self.logged_histories_of(ids.iter().map(String::as_str))?;
+        let mut by_record: HashMap<String, Vec<Taken>> = HashMap::new();
+        for id in &ids {
+            let mut held: Option<&crate::entry::Entry> = None;
+            for e in histories.get(id).map(Vec::as_slice).unwrap_or(&[]) {
+                if e.field != keys::FROM || !self.written_by_own_in(&e.device, own)? {
+                    continue;
+                }
+                if held.is_none_or(|h| Store::latest_wins(e, h) == std::cmp::Ordering::Greater) {
+                    held = Some(e);
+                }
+            }
+            let Some(entry) = held else {
+                continue;
+            };
+            if let Some(from) = AxtFrom::parse(entry.value.as_deref()) {
+                by_record.entry(from.id.clone()).or_default().push(Taken {
+                    note_id: id.clone(),
+                    from,
+                    entry: entry.clone(),
+                });
+            }
+        }
+        Ok(by_record)
+    }
+
+    fn axt_classify(
+        &self,
+        r: &AxtRecord,
+        sender: &str,
+        taken: &[Taken],
+        own: &mut HashMap<String, bool>,
+    ) -> Result<AxtRecord> {
+        let Some(first) = taken.first() else {
+            let kind = if r.draft.is_some() {
+                AxtRecordKind::New
+            } else {
+                AxtRecordKind::None
+            };
+            return Ok(r.classified(kind, None, false));
+        };
+        let mut target: Option<&Taken> = None;
+        for t in taken {
+            if t.from.sender != sender {
+                continue;
+            }
+            if target.is_none_or(|h| t.from.version > h.from.version) {
+                target = Some(t);
+            }
+        }
+        let Some(target) = target else {
+            return Ok(r.classified(AxtRecordKind::Refused, Some(&first.note_id), false));
+        };
+        let note_id = Some(target.note_id.as_str());
+        let deletion =
+            r.type_name.is_none() && matches!(r.result.as_str(), "APPLIED" | "WITHDRAWN");
+        let data =
+            r.draft.is_some() && r.type_name.as_deref() == Some(target.from.type_name.as_str());
+        if !deletion && !data {
+            return Ok(r.classified(AxtRecordKind::Refused, note_id, false));
+        }
+        if r.version <= target.from.version {
+            return Ok(r.classified(AxtRecordKind::Stale, note_id, false));
+        }
+        let kind = if deletion {
+            AxtRecordKind::Deletion
+        } else {
+            AxtRecordKind::Update
+        };
+        let kept = self.axt_changed_since(target, own)?;
+        Ok(r.classified(kind, note_id, kept))
+    }
+
+    /// Whether the user changed the Note `taken` since it was taken or
+    /// last updated, as the Dart core's `_changedSince`: an entry of one
+    /// of their own Devices after the [`AxtFrom`] that says so, on the
+    /// Note, on a Routine, Reminder or Section that ever was the Note's,
+    /// on their Heads-ups, or on a Note ever merged into it. What another
+    /// person's Device wrote is no change of the user's.
+    fn axt_changed_since(&self, taken: &Taken, own: &mut HashMap<String, bool>) -> Result<bool> {
+        let note_id = taken.note_id.as_str();
+        let mut linked = self.ever_with(routine_keys::NOTE, note_id)?;
+        linked.extend(self.ever_with(note_keys::MERGED, note_id)?);
+        let mut entities: Vec<String> = vec![note_id.to_string()];
+        for id in &linked {
+            entities.push(id.clone());
+            entities.push(heads_up_keys::of(id));
+        }
+        let histories = self.logged_histories_of(entities.iter().map(String::as_str))?;
+        for (entity, entries) in &histories {
+            for e in entries {
+                if entity == note_id && e.field == keys::FROM {
+                    continue;
+                }
+                if !self.written_by_own_in(&e.device, own)? {
+                    continue;
+                }
+                if Store::latest_wins(e, &taken.entry) == std::cmp::Ordering::Greater {
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
+    }
+
+    /// Takes the records of `file` whose ids are among `ids`, as the Dart
+    /// core's `AxtFiles.take`: in the file's order, all in one batch, each
+    /// as it is to the Notes taken before now, whatever `file` said when
+    /// it was read. A new one becomes a new Note of this Device's,
+    /// captured now, filed into the Area or Topic `place` or left in
+    /// Unsorted with `None`, with its Reminder or Routine written, not
+    /// spawned, its first Occurrence Done when the record says so, its
+    /// Heads-ups, and where it came from ([`AxtFrom`]); an update
+    /// rewrites the text of the Note taken from it and its Reminder or
+    /// Routine to the record's, bringing it back from the trash a
+    /// deletion put it in; a deletion moves that Note to the trash with
+    /// its Reminders and Routines; one whose Note the user changed since
+    /// (`kept`), one refused and one stale change nothing. An update or a
+    /// deletion keeps the record's version in [`AxtFrom`], written last.
+    /// Returns the new Notes' ids. Refused before anything is written for
+    /// a place that is no Area or Topic, where this Device may not write,
+    /// or may not make Reminders and Routines, or may not change a Note to
+    /// update or delete.
     pub fn axt_take(
         &self,
         file: &AxtFile,
         ids: &[String],
         place: Option<&str>,
     ) -> Result<Vec<String>> {
-        let records: Vec<&AxtRecord> = file
-            .taken()
+        let records: Vec<AxtRecord> = self
+            .axt_classified(&file.sender, &file.records)?
             .into_iter()
             .filter(|r| ids.contains(&r.id))
             .collect();
@@ -579,35 +806,175 @@ impl Store {
         };
         let scheduled = records
             .iter()
-            .any(|r| r.draft.as_ref().is_some_and(|d| d.schedule.is_some()));
+            .any(|r| r.taken() && r.draft.as_ref().is_some_and(|d| d.schedule.is_some()));
         if scheduled && !self.may_manage(area.as_deref())? {
             return Err(Error::Invalid(format!(
                 "not a Manager of the Area of {}",
                 place.unwrap_or_default()
             )));
         }
+        for r in &records {
+            let (true, false, Some(note_id)) = (r.changes(), r.kept, r.note_id.as_deref()) else {
+                continue;
+            };
+            if !self.may_change(note_id)? {
+                return Err(Error::Invalid(format!("{note_id} may not be changed here")));
+            }
+            let schedules = (r.kind == AxtRecordKind::Update
+                && r.draft.as_ref().is_some_and(|d| d.schedule.is_some()))
+                || !self.axt_routines_of(note_id)?.is_empty();
+            if schedules && !self.may_manage(self.area_of(note_id)?.as_deref())? {
+                return Err(Error::Invalid(format!(
+                    "not a Manager of the Area of {note_id}"
+                )));
+            }
+        }
         self.batch(|| {
             let notes = Notes::new(self);
             let mut made = Vec::new();
             for record in &records {
-                let (Some(draft), Some(type_name)) = (&record.draft, &record.type_name) else {
-                    continue;
-                };
-                let note = notes.capture_as(&draft.text, &draft.format, place, None)?;
-                let from = AxtFrom {
-                    sender: file.sender.clone(),
-                    id: record.id.clone(),
-                    type_name: type_name.clone(),
-                    version: record.version,
-                };
-                self.append(&note.id, keys::FROM, Some(&from.encode()), None)?;
-                if let Some(schedule) = &draft.schedule {
-                    self.axt_write_routine(&note.id, schedule, draft)?;
+                let note_id = record.note_id.as_deref();
+                match (record.kind, &record.draft, &record.type_name, note_id) {
+                    (AxtRecordKind::New, Some(draft), Some(type_name), _) => {
+                        let note = notes.capture_as(&draft.text, &draft.format, place, None)?;
+                        if let Some(schedule) = &draft.schedule {
+                            self.axt_write_routine(&note.id, schedule, draft)?;
+                        }
+                        // Last, so that what the record wrote lies before
+                        // it and is no change of the user's.
+                        let from = AxtFrom {
+                            sender: file.sender.clone(),
+                            id: record.id.clone(),
+                            type_name: type_name.clone(),
+                            version: record.version,
+                        };
+                        self.append(&note.id, keys::FROM, Some(&from.encode()), None)?;
+                        made.push(note.id);
+                    }
+                    (AxtRecordKind::Update, Some(draft), _, Some(note_id)) if !record.kept => {
+                        self.axt_update(note_id, draft, record.version)?;
+                    }
+                    (AxtRecordKind::Deletion, _, _, Some(note_id)) if !record.kept => {
+                        self.axt_delete(note_id, record.version)?;
+                    }
+                    _ => {}
                 }
-                made.push(note.id);
             }
             Ok(made)
         })
+    }
+
+    /// The Reminders and Routines of the Note `note_id` not in the trash,
+    /// by id, as the Dart core's `_routinesOf`: found by what ever named
+    /// the Note rather than by reading every Routine.
+    fn axt_routines_of(&self, note_id: &str) -> Result<Vec<Routine>> {
+        let routines = Routines::new(self);
+        let mut ids: Vec<String> = self
+            .ever_with(routine_keys::NOTE, note_id)?
+            .into_iter()
+            .collect();
+        ids.sort();
+        let mut live = Vec::new();
+        for id in ids {
+            if let Some(r) = routines.by_id(&id)?
+                && r.note_id == note_id
+                && !r.is_trashed()
+            {
+                live.push(r);
+            }
+        }
+        Ok(live)
+    }
+
+    /// Rewrites the Note `note_id` to `draft`, the record of `version`, as
+    /// the Dart core's `_update`: its text when it differs, its first
+    /// Reminder or Routine to the record's schedule, Heads-ups and first
+    /// Occurrence Done or not, one written where it had none, every other
+    /// one in the trash.
+    fn axt_update(&self, note_id: &str, draft: &AxtNoteDraft, version: i64) -> Result<()> {
+        let notes = Notes::new(self);
+        let routines = Routines::new(self);
+        let (Some(note), Some(from)) = (notes.by_id(note_id)?, self.axt_from(note_id)?) else {
+            return Ok(());
+        };
+        if note.is_trashed() {
+            routines.restore_note(note_id)?;
+        }
+        let text = draft.text.trim();
+        let format = match note.text_format.as_str() {
+            text_format::MARKDOWN | text_format::CODE => note.text_format.as_str(),
+            _ => draft.format.as_str(),
+        };
+        if !text.is_empty() && (note.shown_text().trim() != text || note.text_format != format) {
+            notes.edit_as(note_id, text, &draft.format)?;
+        }
+        let live = self.axt_routines_of(note_id)?;
+        match (&draft.schedule, live.split_first()) {
+            (None, _) => {
+                for r in &live {
+                    routines.trash(&r.id)?;
+                }
+            }
+            (Some(schedule), None) => self.axt_write_routine(note_id, schedule, draft)?,
+            (Some(schedule), Some((routine, others))) => {
+                routines.reschedule(&routine.id, schedule)?;
+                routines.set_heads_ups(&routine.id, &draft.heads_ups)?;
+                if let Some(first) = schedule.next(schedule.start, 1).first() {
+                    let done_at = routine.done_at(first);
+                    if draft.done && done_at.is_none() {
+                        let at = draft.done_at.unwrap_or_else(|| self.now());
+                        self.append(
+                            &routine.id,
+                            &routine_keys::done(first),
+                            Some(&dart_iso(at)),
+                            None,
+                        )?;
+                    } else if !draft.done && done_at.is_some() {
+                        self.append(&routine.id, &routine_keys::done(first), None, None)?;
+                    }
+                }
+                for other in others {
+                    routines.trash(&other.id)?;
+                }
+            }
+        }
+        self.axt_bump(note_id, &from, version)
+    }
+
+    /// Moves the Note `note_id` to the trash with its Reminders and
+    /// Routines, as [`Routines::trash_note`] does, for the record's
+    /// deletion of `version`, as the Dart core's `_delete`; one in the
+    /// trash already stays there.
+    fn axt_delete(&self, note_id: &str, version: i64) -> Result<()> {
+        let notes = Notes::new(self);
+        let (Some(note), Some(from)) = (notes.by_id(note_id)?, self.axt_from(note_id)?) else {
+            return Ok(());
+        };
+        if !note.is_trashed() {
+            let live = self.axt_routines_of(note_id)?;
+            notes.trash(note_id)?;
+            // The same moment as the Note's, so both are purged together.
+            let at = match self.current(note_id, note_keys::TRASHED)? {
+                Some(at) => at,
+                None => dart_iso(self.now()),
+            };
+            for r in &live {
+                self.append(&r.id, routine_keys::TRASHED, Some(&at), None)?;
+                self.append(&r.id, routine_keys::TRASHED_WITH, Some(note_id), None)?;
+            }
+        }
+        self.axt_bump(note_id, &from, version)
+    }
+
+    /// The [`AxtFrom`] of the Note `note_id` at `version`, written last,
+    /// so that what the record changed lies before it.
+    fn axt_bump(&self, note_id: &str, from: &AxtFrom, version: i64) -> Result<()> {
+        let from = AxtFrom {
+            version,
+            ..from.clone()
+        };
+        self.append(note_id, keys::FROM, Some(&from.encode()), None)
+            .map(drop)
     }
 
     /// A Reminder or Routine of the Note `note_id` on `schedule`, written,
@@ -1069,3 +1436,6 @@ fn heads_ups(reminders: Option<&Value>, all_day: bool) -> Vec<i64> {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod update_tests;

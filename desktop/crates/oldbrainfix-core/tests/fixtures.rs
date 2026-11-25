@@ -10334,6 +10334,9 @@ fn axt_file_json(file: &oldbrainfix_core::axt::AxtFile) -> Value {
             "version": r.version,
             "type": r.type_name,
             "result": r.result,
+            "kind": r.kind.code(),
+            "noteId": r.note_id,
+            "kept": r.kept,
             "draft": r.draft.as_ref().map(|d| json!({
                 "text": d.text,
                 "format": d.format,
@@ -10463,5 +10466,58 @@ fn axt_files_go_as_the_dart_core_writes_reads_and_takes_them() -> TestResult {
     insert_lines(&ben, &dir.join("foreign.jsonl"))?;
     assert_eq!(from_of(&ben)?, expected["fromAfterForeign"]);
     assert_eq!(ben.axt_from(&plain.id)?, None);
+
+    // Later files of both senders (obf-1147): Ben changes Garden and
+    // checks off the first Pills, reads the desktop core's file again and
+    // the later ones as the Dart core reads them, takes every record of
+    // them an hour later into the same entries, and reads Ada's again.
+    let changed = &expected["changed"];
+    *clock.lock() = parse_time(changed["at"].as_str().ok_or("at")?)?;
+    let mark = ben.current_seq()?;
+    let (Some(garden), Some(pills)) = (taken_rust.get(1), taken_rust.get(3)) else {
+        return Err("garden and pills".into());
+    };
+    assert_eq!(json!(garden), changed["garden"]);
+    Notes::new(&ben).edit(garden, "# Garden\nWater the roses today")?;
+    let routine = Routines::new(&ben).of_note(pills)?.pop().ok_or("pills")?;
+    assert_eq!(json!(routine.id), changed["pills"]);
+    Routines::new(&ben).mark_done(
+        &routine.id,
+        &Occurrence::new(Day::new(2026, 11, 1), ClockTime::new(8, 0)),
+        None,
+    )?;
+    let read = |name: &str| -> Result<oldbrainfix_core::axt::AxtFile, Box<dyn std::error::Error>> {
+        let bytes = std::fs::read(files.join(format!("{name}.axt")))?;
+        Ok(ben.axt_read(&bytes, &utc)?.map_err(|_| "no AXT file")?)
+    };
+    assert_eq!(axt_file_json(&read("from-rust")?), expected["again"]);
+    let later = read("later")?;
+    assert_eq!(axt_file_json(&later), expected["later"]["later"]);
+    let catalog_later = read("catalog-later")?;
+    assert_eq!(
+        axt_file_json(&catalog_later),
+        expected["later"]["catalog-later"]
+    );
+    *clock.lock() = parse_time(expected["laterAt"].as_str().ok_or("laterAt")?)?;
+    let ids_of = |file: &oldbrainfix_core::axt::AxtFile| -> Vec<String> {
+        file.records.iter().map(|r| r.id.clone()).collect()
+    };
+    let taken_later = ben.axt_take(&later, &ids_of(&later), None)?;
+    let taken_catalog_later = ben.axt_take(&catalog_later, &ids_of(&catalog_later), None)?;
+    assert_eq!(
+        lines_after(&ben, mark)?,
+        lines_of(&dir.join("later.jsonl"))?
+    );
+    assert_eq!(json!(taken_later), expected["takenLater"]);
+    assert_eq!(json!(taken_catalog_later), expected["takenCatalogLater"]);
+    assert_eq!(axt_file_json(&read("later")?), expected["laterAgain"]);
+    let mut from = serde_json::Map::new();
+    for id in taken_catalog.iter().chain(&taken_rust).chain(&taken_later) {
+        from.insert(
+            id.clone(),
+            json!(ben.axt_from(id)?.map(|f: AxtFrom| f.encode())),
+        );
+    }
+    assert_eq!(Value::Object(from), expected["fromAfterLater"]);
     Ok(())
 }

@@ -12653,6 +12653,153 @@ Future<Uint8List> _catalogAxt() async {
   ]);
 }
 
+/// A later file of the key [seed] at [at], with [records]: what the
+/// generator writes as another app would, deletions among them.
+Future<Uint8List> _laterAxt(
+  Uint8List seed,
+  DateTime at,
+  List<OutgoingRecord> records,
+) async {
+  final node = await AxtNode.open(
+    store: _AxtMemory(),
+    signingSeed: seed,
+    manifest: axtManifest,
+    readers: [
+      for (final text in [
+        axtNoteDescription,
+        axtTaskDescription,
+        axtAppointmentDescription,
+      ])
+        TypeDescription.fromJson(jsonDecode(text)),
+    ],
+    clock: () => at,
+  );
+  return node.writeFile(records);
+}
+
+/// Ada's later file (obf-1147), signed with her key a day after the
+/// desktop core's: Shopping and Garden as Notes again, Dentist and Pills
+/// deleted, Walk at another time and count, Bins without its Routine,
+/// Plants as a Note under its Task's id, and a new Note Tea.
+Future<Uint8List> _adaLaterAxt(Uint8List seed, List<String> ids) {
+  final [shopping, garden, dentist, pills, walk, bins, plants, ...] = ids;
+  final note = TypeDescription.fromJson(jsonDecode(axtNoteDescription));
+  final task = TypeDescription.fromJson(jsonDecode(axtTaskDescription));
+  Map<String, Object?> asNote(String text, {bool markdown = false}) => {
+    'title': text.split('\n').first.replaceAll('# ', ''),
+    'text': text,
+    'format': markdown ? 'MARKDOWN' : 'PLAIN',
+    'created': null,
+    'updated': null,
+    'tags': <Object?>[],
+    'relations': <Object?>[],
+    'extensions': <Object?>[],
+  };
+  Map<String, Object?> asTask(String title, String notes, {String? repeat}) => {
+    'title': title,
+    'notes': notes,
+    'due': repeat == null
+        ? null
+        : {
+            'year': 2026,
+            'month': 11,
+            'day': 2,
+            'hour': 7,
+            'minute': 15,
+            'second': 0,
+            'millisecond': 0,
+            'zone': null,
+            'offset_seconds': null,
+            'instant_ms': null,
+          },
+    'due_all_day': false,
+    'repeat': repeat,
+    'done': false,
+    'done_at': null,
+    'priority': 'NONE',
+    'relations': <Object?>[],
+    'extensions': <Object?>[],
+  };
+  return _laterAxt(seed, DateTime.utc(2026, 11, 26), [
+    OutgoingRecord(
+      axtRecordId(shopping, AxtTypes.note),
+      note,
+      asNote('Shopping\nMilk, #Eggs ☐ and bread'),
+    ),
+    OutgoingRecord(
+      axtRecordId(garden, AxtTypes.note),
+      note,
+      asNote('# Garden\nWater the roses and the tulips', markdown: true),
+    ),
+    OutgoingRecord.deleted(axtRecordId(dentist, AxtTypes.task)),
+    OutgoingRecord.deleted(axtRecordId(pills, AxtTypes.task)),
+    OutgoingRecord(
+      axtRecordId(walk, AxtTypes.task),
+      task,
+      asTask('Walk', 'Around the park', repeat: 'FREQ=DAILY;COUNT=3'),
+    ),
+    OutgoingRecord(
+      axtRecordId(bins, AxtTypes.task),
+      task,
+      asTask('Bins out', 'Blue bin this week'),
+    ),
+    OutgoingRecord(axtRecordId(plants, AxtTypes.task), note, asNote('Plants')),
+    OutgoingRecord('5f6a7b8c-9d0e-4f1a-8b2c-3d4e5f6a7b8c', note, asNote('Tea')),
+  ]);
+}
+
+/// The catalog's later file (obf-1147), a day after it: the Appointment
+/// an hour later for two with one reminder a day before, the Task and
+/// the Memo deleted, and a Note under the id of Ada's Shopping.
+Future<Uint8List> _catalogLaterAxt(String shopping) {
+  final appointment = TypeDescription.fromJson(
+    jsonDecode(axtAppointmentDescription),
+  );
+  final note = TypeDescription.fromJson(jsonDecode(axtNoteDescription));
+  return _laterAxt(
+    Uint8List.fromList(List.generate(32, (i) => 200 - i)),
+    DateTime.utc(2026, 11, 21),
+    [
+      OutgoingRecord('0b9a8f1e-3c2d-4e5f-8a7b-6c5d4e3f2a10', appointment, {
+        'title': 'Vet: Mia and Leo',
+        'start': {
+          'year': 2026,
+          'month': 12,
+          'day': 3,
+          'hour': 11,
+          'minute': 0,
+          'second': 0,
+          'millisecond': 0,
+          'zone': 'Europe/Berlin',
+          'offset_seconds': 3600,
+          'instant_ms': DateTime.utc(2026, 12, 3, 10).millisecondsSinceEpoch,
+        },
+        'end': null,
+        'all_day': false,
+        'location': 'Main Street 4',
+        'notes': 'Bring both booklets',
+        'reminders': [
+          {'months': 0, 'days': -1, 'millis': 0},
+        ],
+        'relations': <Object?>[],
+        'extensions': <Object?>[],
+      }),
+      OutgoingRecord.deleted('1c2d3e4f-5a6b-4c7d-8e9f-a0b1c2d3e4f5'),
+      OutgoingRecord.deleted('2d3e4f5a-6b7c-4d8e-9fa0-b1c2d3e4f5a6'),
+      OutgoingRecord(axtRecordId(shopping, AxtTypes.note), note, {
+        'title': 'Not from Ada',
+        'text': 'Not from Ada',
+        'format': 'PLAIN',
+        'created': null,
+        'updated': null,
+        'tags': <Object?>[],
+        'relations': <Object?>[],
+        'extensions': <Object?>[],
+      }),
+    ],
+  );
+}
+
 /// The library's state for one file, in memory.
 final class _AxtMemory implements AxtStore {
   final _values = <String, Uint8List>{};
@@ -12688,6 +12835,9 @@ Map<String, Object?> _axtFileJson(AxtFile file) => {
         'version': r.version,
         'type': r.type,
         'result': r.result,
+        'kind': r.kind.code,
+        'noteId': r.noteId,
+        'kept': r.kept,
         'draft': switch (r.draft) {
           null => null,
           final d => {
@@ -12709,6 +12859,70 @@ Map<String, Object?> _axtFileJson(AxtFile file) => {
       },
   ],
 };
+
+/// Later files of both senders (obf-1147): Ben changes Garden and checks
+/// off the first Pills, reads the desktop core's file again and the later
+/// files of Ada and of the catalog, takes every record of them an hour
+/// later, and reads Ada's later file again. The later files are written
+/// when they are missing or with `UPDATE_AXT=1`.
+Future<Map<String, Object?>> _axtLater(
+  Directory dir,
+  Directory out,
+  Store ada,
+  Store ben,
+  List<String> ids, {
+  required List<String> takenCatalog,
+  required List<String> takenRust,
+}) async {
+  final update = Platform.environment['UPDATE_AXT'] == '1';
+  final laterFile = File('${dir.path}/later.axt');
+  if (update || !laterFile.existsSync()) {
+    _writeBytes(laterFile, await _adaLaterAxt(ada.signingKey.seed, ids));
+  }
+  final catalogLaterFile = File('${dir.path}/catalog-later.axt');
+  if (update || !catalogLaterFile.existsSync()) {
+    _writeBytes(catalogLaterFile, await _catalogLaterAxt(ids.first));
+  }
+  Future<AxtFile> read(File file) =>
+      AxtFiles(ben).read(file.readAsBytesSync(), wallClock: (utc) => utc);
+  _held = DateTime.utc(2026, 11, 25, 14);
+  final mark = ben.currentSeq();
+  final [_, garden, _, pills, ...] = takenRust;
+  Notes(ben).edit(garden, '# Garden\nWater the roses today');
+  final pillsRoutine = Routines(ben).ofNote(pills).single;
+  Routines(ben)
+      .markDone(pillsRoutine.id, Occurrence(Day(2026, 11, 1), ClockTime(8, 0)));
+  final again = await read(File('${dir.path}/from-rust.axt'));
+  final later = await read(laterFile);
+  final catalogLater = await read(catalogLaterFile);
+  _held = DateTime.utc(2026, 11, 25, 15);
+  final takenLater = AxtFiles(ben)
+      .take(later, [for (final r in later.records) r.id]);
+  final takenCatalogLater = AxtFiles(ben)
+      .take(catalogLater, [for (final r in catalogLater.records) r.id]);
+  _writeAfter(ben, mark, File('${out.path}/later.jsonl'));
+  final laterAgain = await read(laterFile);
+  return {
+    'changed': {
+      'garden': garden,
+      'pills': pillsRoutine.id,
+      'at': '2026-11-25T14:00:00.000Z',
+    },
+    'again': _axtFileJson(again),
+    'later': {
+      'later': _axtFileJson(later),
+      'catalog-later': _axtFileJson(catalogLater),
+    },
+    'laterAt': '2026-11-25T15:00:00.000Z',
+    'takenLater': takenLater,
+    'takenCatalogLater': takenCatalogLater,
+    'laterAgain': _axtFileJson(laterAgain),
+    'fromAfterLater': {
+      for (final id in [...takenCatalog, ...takenRust, ...takenLater])
+        id: AxtFiles(ben).from(id)?.encode(),
+    },
+  };
+}
 
 /// AXT files (obf-1144, ADR 0056): Ada's Notes as records, the files of
 /// both cores and of another app read by Ben, and what Ben takes of them.
@@ -12834,6 +13048,20 @@ Future<void> _axtFixture(Directory root) async {
       foreign.writeln(jsonEncode(entry.toJson()));
     }
     _write(File('${out.path}/foreign.jsonl'), foreign.toString());
+    final fromAfterForeign = fromOf();
+    // Later files of both senders (obf-1147), once Ben took the desktop
+    // core's file.
+    final later = fromRust == null
+        ? const <String, Object?>{}
+        : await _axtLater(
+            dir,
+            out,
+            ada,
+            ben,
+            ids,
+            takenCatalog: takenCatalog,
+            takenRust: takenRust,
+          );
     _write(
       File('${out.path}/expected.json'),
       '${_json.convert({
@@ -12854,7 +13082,8 @@ Future<void> _axtFixture(Directory root) async {
         'takenRust': takenRust,
         'from': from,
         'plain': plain,
-        'fromAfterForeign': fromOf(),
+        'fromAfterForeign': fromAfterForeign,
+        ...later,
       })}\n',
     );
   } finally {
@@ -13368,7 +13597,16 @@ Future<void> main(List<String> args) async {
     'clock (`taken.jsonl`, ids counted from 0x2001), where each Note came '
     'from, and the same once another person\'s Device wrote `axtFrom` on '
     'a taken Note and on one of his own an hour later (`foreign.jsonl`, '
-    '`fromAfterForeign`).\n'
+    '`fromAfterForeign`). Then later files of both senders (obf-1147, '
+    '`tests/axt/later.axt` by Ada\'s key and `catalog-later.axt` by the '
+    'catalog\'s, written by the library): Ben changes Garden and checks '
+    'off the first Pills, reads the desktop core\'s file again (`again`, '
+    'every record stale) and both later files (`later`: updates, '
+    'deletions, a change of type and another sender\'s record refused, '
+    'Garden and Pills kept as he changed them), takes every record of '
+    'them an hour later (`later.jsonl`, `takenLater`, '
+    '`takenCatalogLater`), and reads Ada\'s again (`laterAgain`, '
+    '`fromAfterLater`).\n'
     '- `block/`: Ann shares her Household with Carol as a Member and '
     'joins the School Carol manages; Carol writes a Note with a photo and '
     'its Photo Text, Amends Ann\'s Note and checks off Ann\'s Routine, and '

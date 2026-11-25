@@ -133,17 +133,57 @@ class AxtNoteDraft {
   });
 }
 
+/// What a record of a file is to the Notes taken from that sender before
+/// (obf-1147), by the record id and the sender's key their [AxtFrom]
+/// names, as the user's own Devices wrote it.
+enum AxtRecordKind {
+  /// A record no Note was taken from: a `Note`, `Task` or `Appointment`
+  /// that came in whole, to become a new Note.
+  newRecord('new'),
+
+  /// A later version of a record a Note was taken from: it rewrites the
+  /// Note's text and its Reminder or Routine.
+  update('update'),
+
+  /// A later deletion of such a record: it moves the Note
+  /// to the trash.
+  deletion('deletion'),
+
+  /// A record that may not change the Note taken under its id: one of
+  /// another sender, one of another type than the Note was taken as, or
+  /// one the library refused.
+  refused('refused'),
+
+  /// A version of the record no later than the one taken: nothing to do.
+  stale('stale'),
+
+  /// Nothing to take: a record of a type not taken, one the library
+  /// refused, or a deletion of a record no Note was taken from.
+  none('none');
+
+  /// How the fixtures and the desktop core name it.
+  final String code;
+
+  const AxtRecordKind(this.code);
+}
+
 /// One record of an AXT file, as its last message the library applied
 /// leaves it: its [id] as its sender wrote it, its [version], its [type]
 /// when it came in whole, and [result], what the library made of that
 /// message (`APPLIED`, or why not, such as `VALUE_INVALID`). A record of a
-/// type this app takes has its [draft]; a deletion has none.
+/// type this app takes has its [draft]; a deletion has none. [kind] says
+/// what it is to the Notes taken before, [noteId] which Note it updates,
+/// deletes or may not change, and [kept] whether the user changed that
+/// Note since it was taken or last updated, so that nothing changes.
 class AxtRecord {
   final String id;
   final int version;
   final String? type;
   final String result;
   final AxtNoteDraft? draft;
+  final AxtRecordKind kind;
+  final String? noteId;
+  final bool kept;
 
   const AxtRecord({
     required this.id,
@@ -151,12 +191,37 @@ class AxtRecord {
     required this.type,
     required this.result,
     this.draft,
+    this.kind = AxtRecordKind.none,
+    this.noteId,
+    this.kept = false,
   });
 
-  /// Whether it can be taken: a `Note`, `Task` or `Appointment` that
-  /// came in whole.
-  bool get taken => draft != null;
+  /// Whether it becomes a new Note when taken: a `Note`, `Task` or
+  /// `Appointment` that came in whole, under an id no Note was taken
+  /// from.
+  bool get taken => kind == AxtRecordKind.newRecord;
+
+  /// Whether taking it updates or deletes the Note it was taken as,
+  /// unless the user changed that Note since ([kept]).
+  bool get changes =>
+      kind == AxtRecordKind.update || kind == AxtRecordKind.deletion;
+
+  AxtRecord _as(AxtRecordKind kind, {String? noteId, bool kept = false}) =>
+      AxtRecord(
+        id: id,
+        version: version,
+        type: type,
+        result: result,
+        draft: draft,
+        kind: kind,
+        noteId: noteId,
+        kept: kept,
+      );
 }
+
+/// A Note taken from a record: its id, where it came from, and the entry
+/// of the user's own Devices that says so last.
+typedef _Taken = ({String noteId, AxtFrom from, Entry entry});
 
 /// What an AXT file holds, checked as a whole and read, nothing taken
 /// yet: its [sender], the key that signed it, as hexadecimal text, with
@@ -178,17 +243,25 @@ class AxtFile {
     required this.records,
   });
 
-  /// The records that can be taken, in the file's order.
+  /// The records that become new Notes when taken, in the file's order.
   List<AxtRecord> get taken => [
     for (final r in records)
       if (r.taken) r,
   ];
 
-  /// The records that cannot, in the file's order: of another type, a
-  /// deletion, or one the library refused.
+  /// The records that update or delete a Note taken before, in the
+  /// file's order, those the user changed since among them ([AxtRecord.kept]).
+  List<AxtRecord> get changes => [
+    for (final r in records)
+      if (r.changes) r,
+  ];
+
+  /// The others, in the file's order: of another type, a deletion of
+  /// a record never taken, one the library refused, one that may not
+  /// change the Note taken under its id, or one no later than it.
   List<AxtRecord> get notTaken => [
     for (final r in records)
-      if (!r.taken) r,
+      if (!r.taken && !r.changes) r,
   ];
 }
 
@@ -506,24 +579,140 @@ class AxtFiles {
       shortFingerprint: preview.shortFingerprint,
       appName: preview.appName,
       fromOwnDevice: store.writtenByOwn(deviceIdFromKey(key)),
-      records: read.values.toList(),
+      records: _classified(preview.sender, read.values.toList()),
     );
   }
 
-  /// Takes the records of [file] whose ids are among [ids] and can be
-  /// taken, in the file's order, all in one batch: each a new Note of
-  /// this Device's, captured now, filed into the Area or Topic [place] or
-  /// left in Unsorted with null, with its Reminder or Routine written,
-  /// not spawned, its first Occurrence Done when the record says so, its
-  /// Heads-ups, and where it came from ([AxtFrom]). Returns the new
-  /// Notes' ids. Throws an [ArgumentError] for a place that is no Area
-  /// or Topic and a [StateError] where this Device may not write there,
-  /// or may not make Reminders and Routines there, before anything is
-  /// written.
+  /// [records] of a file of [sender], each with what it is to the Notes
+  /// taken before ([AxtRecordKind]): the Note taken under its id from the
+  /// same sender, by the [AxtFrom] the user's own Devices wrote last,
+  /// the one of the highest version where two were, the first by id
+  /// where they tie. A record from another sender under an id taken
+  /// may change nothing.
+  List<AxtRecord> _classified(String sender, List<AxtRecord> records) {
+    final own = <String, bool>{};
+    bool isOwn(String device) =>
+        own.putIfAbsent(device, () => store.writtenByOwn(device));
+    final taken = _takenByRecord(isOwn);
+    return [
+      for (final r in records) _classify(r, sender, taken[r.id] ?? [], isOwn),
+    ];
+  }
+
+  /// Every Note taken from an AXT file, by the record id it came from,
+  /// in the order of the Notes' ids.
+  Map<String, List<_Taken>> _takenByRecord(bool Function(String) isOwn) {
+    final ids = {
+      for (final (entity, _, device) in store.writersOf([AxtKeys.from]))
+        if (isOwn(device)) entity,
+    }.toList()..sort();
+    final histories = store.loggedHistoriesOf(ids);
+    final byRecord = <String, List<_Taken>>{};
+    for (final id in ids) {
+      Entry? held;
+      for (final e in histories[id] ?? const <Entry>[]) {
+        if (e.field != AxtKeys.from || !isOwn(e.device)) continue;
+        if (held == null || Store.latestWins(e, held) > 0) held = e;
+      }
+      if (held == null) continue;
+      if (AxtFrom.parse(held.value) case final from?) {
+        (byRecord[from.id] ??= []).add((noteId: id, from: from, entry: held));
+      }
+    }
+    return byRecord;
+  }
+
+  AxtRecord _classify(
+    AxtRecord r,
+    String sender,
+    List<_Taken> taken,
+    bool Function(String) isOwn,
+  ) {
+    if (taken.isEmpty) {
+      return r._as(
+        r.draft == null ? AxtRecordKind.none : AxtRecordKind.newRecord,
+      );
+    }
+    _Taken? target;
+    for (final t in taken) {
+      if (t.from.sender != sender) continue;
+      if (target == null || t.from.version > target.from.version) target = t;
+    }
+    if (target == null) {
+      return r._as(AxtRecordKind.refused, noteId: taken.first.noteId);
+    }
+    final noteId = target.noteId;
+    final deletion =
+        r.type == null &&
+        (r.result == Outcome.applied.code ||
+            r.result == Outcome.withdrawn.code);
+    final data = r.draft != null && r.type == target.from.type;
+    if (!deletion && !data) return r._as(AxtRecordKind.refused, noteId: noteId);
+    if (r.version <= target.from.version) {
+      return r._as(AxtRecordKind.stale, noteId: noteId);
+    }
+    return r._as(
+      deletion ? AxtRecordKind.deletion : AxtRecordKind.update,
+      noteId: noteId,
+      kept: _changedSince(target, isOwn),
+    );
+  }
+
+  /// Whether the user changed the Note [taken] since it was taken or
+  /// last updated: an entry of one of their own Devices after the
+  /// [AxtFrom] that says so, on the Note, on a Routine, Reminder or
+  /// Section that ever was the Note's, on their Heads-ups, or on a Note
+  /// ever merged into it. What another person's Device wrote is no
+  /// change of the user's.
+  bool _changedSince(_Taken taken, bool Function(String) isOwn) {
+    final noteId = taken.noteId;
+    final linked = {
+      ...store.everWith(RoutineKeys.note, noteId),
+      ...store.everWith(NoteKeys.merged, noteId),
+    };
+    final entities = {
+      noteId,
+      ...linked,
+      for (final id in linked) HeadsUpKeys.of(id),
+    };
+    for (final MapEntry(key: entity, value: entries)
+        in store.loggedHistoriesOf(entities).entries) {
+      for (final e in entries) {
+        if (entity == noteId && e.field == AxtKeys.from) continue;
+        if (!isOwn(e.device)) continue;
+        if (Store.latestWins(e, taken.entry) > 0) return true;
+      }
+    }
+    return false;
+  }
+
+  /// Takes the records of [file] whose ids are among [ids], in the file's
+  /// order, all in one batch, each as it is to the Notes taken before
+  /// now, whatever [file] said when it was read ([AxtRecordKind]):
+  ///
+  /// - a new one becomes a new Note of this Device's, captured now, filed
+  ///   into the Area or Topic [place] or left in Unsorted with null, with
+  ///   its Reminder or Routine written, not spawned, its first Occurrence
+  ///   Done when the record says so, its Heads-ups, and where it came
+  ///   from ([AxtFrom]);
+  /// - an update rewrites the text of the Note taken from it and its
+  ///   Reminder or Routine to the record's, bringing it back from the
+  ///   trash a deletion put it in;
+  /// - a deletion moves that Note to the trash with its Reminders and
+  ///   Routines;
+  /// - one whose Note the user changed since ([AxtRecord.kept]), one
+  ///   refused and one stale change nothing.
+  ///
+  /// An update or a deletion keeps the record's version in [AxtFrom],
+  /// written last. Returns the new Notes' ids. Throws an [ArgumentError]
+  /// for a place that is no Area or Topic and a [StateError] where this
+  /// Device may not write there, may not make Reminders and Routines
+  /// there, or may not change a Note to update or delete, before
+  /// anything is written.
   List<String> take(AxtFile file, Iterable<String> ids, {String? place}) {
     final chosen = ids.toSet();
     final records = [
-      for (final r in file.taken)
+      for (final r in _classified(file.sender, file.records))
         if (chosen.contains(r.id)) r,
     ];
     if (place != null && !Places(store).isPlace(place)) {
@@ -533,9 +722,23 @@ class AxtFiles {
       throw StateError('no role in the Shared Area of $place');
     }
     final area = place == null ? null : store.areaOf(place);
-    if (records.any((r) => r.draft?.schedule != null) &&
+    if (records.any((r) => r.taken && r.draft?.schedule != null) &&
         !store.mayManage(area)) {
       throw StateError('not a Manager of the Area of $place');
+    }
+    for (final r in records) {
+      if (!r.changes || r.kept) continue;
+      final noteId = r.noteId;
+      if (noteId == null) continue;
+      if (!store.mayChange(noteId)) {
+        throw StateError('$noteId may not be changed here');
+      }
+      final schedules =
+          (r.kind == AxtRecordKind.update && r.draft?.schedule != null) ||
+          _routinesOf(noteId).isNotEmpty;
+      if (schedules && !store.mayManage(store.areaOf(noteId))) {
+        throw StateError('not a Manager of the Area of $noteId');
+      }
     }
     final notes = Notes(store);
     return store.batch(() {
@@ -543,30 +746,146 @@ class AxtFiles {
       for (final record in records) {
         final draft = record.draft;
         final type = record.type;
-        if (draft == null || type == null) continue;
-        final note = notes.capture(
-          draft.text,
-          format: draft.format,
-          place: place,
-        );
-        store.append(
-          note.id,
-          AxtKeys.from,
-          AxtFrom(
-            sender: file.sender,
-            id: record.id,
-            type: type,
-            version: record.version,
-          ).encode(),
-        );
-        if (draft.schedule case final schedule?) {
-          _writeRoutine(note.id, schedule, draft);
+        final noteId = record.noteId;
+        switch (record.kind) {
+          case AxtRecordKind.newRecord when draft != null && type != null:
+            final note = notes.capture(
+              draft.text,
+              format: draft.format,
+              place: place,
+            );
+            if (draft.schedule case final schedule?) {
+              _writeRoutine(note.id, schedule, draft);
+            }
+            // Last, so that what the record wrote lies before it and is
+            // no change of the user's.
+            store.append(
+              note.id,
+              AxtKeys.from,
+              AxtFrom(
+                sender: file.sender,
+                id: record.id,
+                type: type,
+                version: record.version,
+              ).encode(),
+            );
+            made.add(note.id);
+          case AxtRecordKind.update
+              when !record.kept && draft != null && noteId != null:
+            _update(noteId, draft, record.version);
+          case AxtRecordKind.deletion when !record.kept && noteId != null:
+            _delete(noteId, record.version);
+          default:
+            break;
         }
-        made.add(note.id);
       }
       return made;
     });
   }
+
+  /// The Reminders and Routines of the Note [noteId] not in the trash,
+  /// by id, found by what ever named the Note rather than by reading
+  /// every Routine.
+  List<Routine> _routinesOf(String noteId) {
+    final routines = Routines(store);
+    return [
+      for (final id
+          in store.everWith(RoutineKeys.note, noteId).toList()..sort())
+        if (routines.byId(id) case final r?
+            when r.noteId == noteId && !r.isTrashed)
+          r,
+    ];
+  }
+
+  /// Rewrites the Note [noteId] to [draft], the record of [version]: its
+  /// text when it differs, its first Reminder or Routine to the record's
+  /// schedule, Heads-ups and first Occurrence Done or not, one written
+  /// where it had none, every other one in the trash.
+  void _update(String noteId, AxtNoteDraft draft, int version) {
+    final notes = Notes(store);
+    final routines = Routines(store);
+    final note = notes.byId(noteId);
+    final from = this.from(noteId);
+    if (note == null || from == null) return;
+    if (note.isTrashed) routines.restoreNote(noteId);
+    final text = draft.text.trim();
+    final format = switch (note.textFormat) {
+      TextFormats.markdown || TextFormats.code => note.textFormat,
+      _ => draft.format,
+    };
+    if (text.isNotEmpty &&
+        (note.shownText.trim() != text || note.textFormat != format)) {
+      notes.edit(noteId, text, format: draft.format);
+    }
+    final live = _routinesOf(noteId);
+    final schedule = draft.schedule;
+    if (schedule == null) {
+      for (final r in live) {
+        routines.trash(r.id);
+      }
+    } else if (live.isEmpty) {
+      _writeRoutine(noteId, schedule, draft);
+    } else {
+      final routine = live.first;
+      routines
+        ..reschedule(routine.id, schedule)
+        ..setHeadsUps(routine.id, draft.headsUps);
+      final first = schedule.next(schedule.start, 1).firstOrNull;
+      if (first != null) {
+        final doneAt = routine.doneAt(first);
+        if (draft.done && doneAt == null) {
+          store.append(
+            routine.id,
+            RoutineKeys.done(first),
+            (draft.doneAt ?? store.clock()).toUtc().toIso8601String(),
+          );
+        } else if (!draft.done && doneAt != null) {
+          store.append(routine.id, RoutineKeys.done(first), null);
+        }
+      }
+      for (final other in live.skip(1)) {
+        routines.trash(other.id);
+      }
+    }
+    _bump(noteId, from, version);
+  }
+
+  /// Moves the Note [noteId] to the trash with its Reminders and
+  /// Routines, as [Routines.trashNote] does, for the record's deletion of
+  /// [version]; one in the trash already stays there.
+  void _delete(String noteId, int version) {
+    final notes = Notes(store);
+    final note = notes.byId(noteId);
+    final from = this.from(noteId);
+    if (note == null || from == null) return;
+    if (!note.isTrashed) {
+      final live = _routinesOf(noteId);
+      notes.trash(noteId);
+      // The same moment as the Note's, so both are purged together.
+      final at =
+          store.current(noteId, NoteKeys.trashed) ??
+          store.clock().toUtc().toIso8601String();
+      for (final r in live) {
+        store
+          ..append(r.id, RoutineKeys.trashed, at)
+          ..append(r.id, RoutineKeys.trashedWith, noteId);
+      }
+    }
+    _bump(noteId, from, version);
+  }
+
+  /// The [AxtFrom] of the Note [noteId] at [version], written last, so
+  /// that what the record changed lies before it.
+  void _bump(String noteId, AxtFrom from, int version) => store.append(
+    noteId,
+    AxtKeys.from,
+    AxtFrom(
+      sender: from.sender,
+      id: from.id,
+      type: from.type,
+      version: version,
+    ).encode(),
+  );
 
   /// A Reminder or Routine of the Note [noteId] on [schedule], written,
   /// not spawned, as a Sent Item's is.
