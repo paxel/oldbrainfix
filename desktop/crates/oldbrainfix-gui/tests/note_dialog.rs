@@ -300,8 +300,9 @@ fn ctrl_n_file_new_note_and_plus_open_the_quick_note_and_no_list_has_a_capture_f
     assert!(harness.state().quick_note_open());
     click(&mut harness, "Close");
     assert!(!harness.state().quick_note_open());
-    // The Agenda's "+".
+    // The Agenda's "+", its Quick note (obf-1141).
     click(&mut harness, "New Note");
+    click(&mut harness, "Quick note");
     assert!(harness.state().quick_note_open());
     Ok(())
 }
@@ -548,9 +549,11 @@ fn plus_offers_the_six_kinds_where_the_list_is_and_a_topic_in_an_area() -> TestR
         .find(|n| n.text == "Descale the kettle")
         .ok_or("the Note")?;
     assert_eq!(kettle.place.as_deref(), Some(household.as_str()));
-    // Unsorted's "+" opens the quick note at once.
+    // Unsorted's "+" offers the quick note and the Note dialog
+    // (obf-1141).
     let mut harness = window(&store, Selection::Unsorted);
     click(&mut harness, "New Note");
+    click(&mut harness, "Quick note");
     assert!(harness.state().quick_note_open());
     Ok(())
 }
@@ -654,6 +657,74 @@ fn a_new_note_left_empty_in_an_area_leaves_nothing() -> TestResult {
     assert!(harness.state().note_open());
     harness.state_mut().flush();
     assert_eq!(Notes::new(&store).all()?.len(), 1);
+    Ok(())
+}
+
+/// The entries of the menu "+" opened, top to bottom.
+fn menu_entries(harness: &Harness<'_, App>) -> Vec<String> {
+    let mut entries: Vec<(f32, String)> = harness
+        .query_all_by_role(Role::Button)
+        .filter_map(|n| {
+            let label = n.accesskit_node().label()?;
+            ["Quick note", "Editor"]
+                .contains(&label.as_str())
+                .then(|| (n.rect().min.y, label))
+        })
+        .collect();
+    entries.sort_by(|a, b| a.0.total_cmp(&b.0));
+    entries.into_iter().map(|(_, label)| label).collect()
+}
+
+#[test]
+fn the_agendas_and_unsorteds_plus_offer_the_quick_note_and_the_editor() -> TestResult {
+    let (store, _) = store()?;
+    for selection in [Selection::Agenda, Selection::Unsorted] {
+        let mut harness = window(&store, selection.clone());
+        click(&mut harness, "New Note");
+        assert_eq!(
+            menu_entries(&harness),
+            ["Quick note", "Editor"],
+            "{selection:?}"
+        );
+        click(&mut harness, "Editor");
+        assert!(!harness.state().quick_note_open(), "{selection:?}");
+        let id = harness
+            .state()
+            .selected_note()
+            .ok_or("the Note dialog")?
+            .to_string();
+        // An empty Unsorted Note, nudged in 1 h as Open in the editor
+        // nudges, the cursor in its text, no "Add a part".
+        let made = Notes::new(&store).by_id(&id)?.ok_or("the Note")?;
+        assert!(made.is_unsorted());
+        assert_eq!(made.text, "");
+        let hour = oldbrainfix_core::dart_iso(store.now() + Duration::hours(1));
+        let nudge = store.current(&id, "nudge")?.ok_or("a Nudge")?;
+        assert!(nudge <= hour, "{nudge} {hour}");
+        assert!(!shows(&harness, "Add a part"));
+        harness.run();
+        let focused = harness.get_by(|n| n.is_focused());
+        assert_eq!(focused.accesskit_node().role(), Role::MultilineTextInput);
+        // Left empty, it makes nothing.
+        harness.key_press(Key::Escape);
+        harness.run();
+        assert!(!harness.state().note_open());
+        assert!(Notes::new(&store).all()?.is_empty(), "{selection:?}");
+        // Typed, it is kept.
+        click(&mut harness, "New Note");
+        click(&mut harness, "Editor");
+        harness.run();
+        typed(&mut harness, "Call the dentist");
+        harness.key_press(Key::Escape);
+        harness.run();
+        let dentist = Notes::new(&store)
+            .all()?
+            .into_iter()
+            .find(|n| n.text == "Call the dentist")
+            .ok_or("the Note")?;
+        assert!(dentist.is_unsorted());
+        Notes::new(&store).discard(&dentist.id)?;
+    }
     Ok(())
 }
 

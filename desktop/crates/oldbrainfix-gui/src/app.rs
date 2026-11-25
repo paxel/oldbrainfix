@@ -1467,10 +1467,15 @@ enum Announcer {
 
 /// What "+" at the top of a list makes (#161), as the phone's
 /// `NewKind`: a Note through the quick note, a Checklist, a Shopping
-/// List, a Tally, a Session or a Frog, and in an Area a Topic.
+/// List, a Tally, a Session or a Frog, and in an Area a Topic; on the
+/// Agenda and in Unsorted the quick note or an empty Note in the Note
+/// dialog (obf-1141).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NewKind {
     Note,
+    /// "Editor" of the Agenda's and Unsorted's "+" (obf-1141): an empty
+    /// Note in the Note dialog.
+    Editor,
     Checklist,
     Shopping,
     Tally,
@@ -8755,7 +8760,7 @@ impl App {
                 self.capture_focus = true;
             }
             Action::NewNoteHere => match self.list_place() {
-                Some(place) => self.new_note_in(&place)?,
+                Some(place) => self.new_note_in(Some(&place))?,
                 None => return self.act(Action::NewNote),
             },
             Action::CloseQuickNote => {
@@ -11716,8 +11721,10 @@ impl App {
     /// Opens the Note dialog on a new, empty Note filed into `place`, the
     /// Area or Topic shown (obf-1140): someone who sorted wants the full
     /// editor there, not the quick note. No Nudge, as for any sorted Note;
-    /// left as it was made, it goes again.
-    fn new_note_in(&mut self, place: &str) -> oldbrainfix_core::Result<()> {
+    /// without a place, by the Agenda's and Unsorted's "Editor"
+    /// (obf-1141), Unsorted and nudged in 1 h, as the quick note's Open in
+    /// the editor does. Left as it was made, it goes again.
+    fn new_note_in(&mut self, place: Option<&str>) -> oldbrainfix_core::Result<()> {
         // One dialog at a time: the quick note and the Note open are kept
         // and closed.
         if self.quick_open {
@@ -11725,7 +11732,8 @@ impl App {
         }
         self.leave_note()?;
         let mark = self.store.current_seq()?;
-        let id = Notes::new(&self.store).capture("", Some(place), None)?.id;
+        let nudge = place.is_none().then(Notes::default_nudge);
+        let id = Notes::new(&self.store).capture("", place, nudge)?.id;
         self.act(Action::SelectNote(id.clone()))?;
         self.made_open = Some(id.clone());
         self.edit_wanted = Some(id.clone());
@@ -11890,6 +11898,7 @@ impl App {
         let place = self.list_place();
         match kind {
             NewKind::Note => self.act(Action::NewNoteHere)?,
+            NewKind::Editor => self.new_note_in(place.as_deref())?,
             NewKind::Checklist | NewKind::Shopping | NewKind::Frog => {
                 self.dialog = Some(Dialog::NewKind {
                     kind,
@@ -17614,7 +17623,8 @@ impl App {
     /// person filter keeps (obf-1070); nothing in the trash.
     fn new_kinds(&self) -> Option<Vec<NewKind>> {
         match &self.selection {
-            Selection::Unsorted => Some(vec![NewKind::Note]),
+            // The quick note or the Note dialog (obf-1141).
+            Selection::Unsorted => Some(vec![NewKind::Note, NewKind::Editor]),
             Selection::All | Selection::Place(_) => {
                 let mut kinds = vec![NewKind::Note, NewKind::Checklist, NewKind::Shopping];
                 if !self.view.advanced {
@@ -19347,9 +19357,10 @@ impl App {
             ui.heading(RichText::new(t.agenda_title()).color(text));
             // As the phone's bar, without its Calendar (UI laws, "The
             // Agenda's bar").
-            // "+" captures, as the phone's Agenda's does (#146).
-            if add_button(ui, &t, &[NewKind::Note], None).is_some() {
-                actions.push(Action::NewNote);
+            // "+" captures, as the phone's Agenda's does (#146): in the
+            // quick note or the Note dialog (obf-1141).
+            if let Some(kind) = add_button(ui, &t, &[NewKind::Note, NewKind::Editor], None) {
+                actions.push(Action::Add(kind));
             }
             // Room for the buttons at the end: 24 wide and 8 apart, and
             // New Session only in Advanced (#197, #246); then Quiet today,
@@ -25730,9 +25741,9 @@ fn band_search(
     (field, cleared)
 }
 
-/// "+" at the top of a list (#146, #161): with one kind it makes that at
-/// once, with more its menu offers them, Note first, each with its icon
-/// and words; the kind picked. In a list's band, of `band`'s sizes, it
+/// "+" at the top of a list (#146, #161): its menu offers `kinds`, Note
+/// first, each with its icon and words; on the Agenda and in Unsorted
+/// "Quick note" and "Editor" (obf-1141). The kind picked. In a list's band, of `band`'s sizes, it
 /// reads "+ New Note" in a button's frame (obf-1067); the Agenda's is
 /// the icon alone.
 fn add_button(
@@ -25753,18 +25764,25 @@ fn add_button(
         }
         None => sized_icon_button(ui, (icons::ADD, label, text), (24.0, 20.0)),
     };
-    if let [kind] = kinds {
-        let add = button(ui, t.menu_new_note());
-        spotlight::anchor(ui, "add", add.rect);
-        return add.clicked().then_some(*kind);
-    }
-    let add = button(ui, t.add_here());
+    // The Agenda's and Unsorted's "+" capture (obf-1141): "New Note",
+    // its menu "Quick note" and "Editor".
+    let captures = kinds.contains(&NewKind::Editor);
+    let add = button(
+        ui,
+        if captures {
+            t.menu_new_note()
+        } else {
+            t.add_here()
+        },
+    );
     spotlight::anchor(ui, "add", add.rect);
     let mut picked = None;
     egui::Popup::menu(&add).show(|ui| {
         for kind in kinds {
             let (icon, label) = match kind {
+                NewKind::Note if captures => (icons::NEW_NOTE, t.settings_quick_note()),
                 NewKind::Note => (icons::NEW_NOTE, t.add_fan_note()),
+                NewKind::Editor => (icons::EDIT, t.capture_fan_editor()),
                 NewKind::Checklist => (icons::CHECKLIST, t.checklist_heading()),
                 NewKind::Shopping => (icons::SHOPPING_CART, t.shopping_heading()),
                 NewKind::Tally => (icons::TALLY, t.tally_heading()),
