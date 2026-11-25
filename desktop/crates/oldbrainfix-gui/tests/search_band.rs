@@ -154,6 +154,55 @@ fn the_settings_scroll_under_their_searchs_line() -> TestResult {
     Ok(())
 }
 
+/// The text field a screen reader names `name`.
+fn named<'a>(harness: &'a Harness<'_, App>, name: &'a str) -> egui_kittest::Node<'a> {
+    harness
+        .query_all_by(|n| n.role() == Role::TextInput && n.label().as_deref() == Some(name))
+        .next()
+        .unwrap_or_else(|| panic!("no field {name:?}"))
+}
+
+/// Where a text shape reading `words` lies inside `within`, if one does.
+fn text_in(harness: &Harness<'_, App>, words: &str, within: Rect) -> Option<Rect> {
+    drawn(harness).iter().find_map(|(_, shape)| match shape {
+        Shape::Text(text) if text.galley.text() == words => {
+            let at = text.visual_bounding_rect();
+            within.contains_rect(at).then_some(at)
+        }
+        _ => None,
+    })
+}
+
+#[test]
+fn the_settings_search_is_the_list_bands_field() -> TestResult {
+    let (store, _) = store()?;
+    let mut app = App::new(store, "en");
+    app.select(Selection::Unsorted);
+    app.open(Page::Settings);
+    let mut harness = window(app);
+    let t = *harness.state().t();
+    let hint = t.settings_search_hint();
+    // As tall as the band's buttons (obf-1127), the magnifier inside it.
+    let at = field(&harness, hint);
+    assert!((at.height() - 36.0).abs() <= 1.0, "the field {at:?}");
+    let glass = oldbrainfix_gui::icons::SEARCH.to_string();
+    let magnifier =
+        text_in(&harness, &glass, at).unwrap_or_else(|| panic!("no magnifier in {at:?}"));
+    assert!(
+        magnifier.center().x < at.left() + 30.0,
+        "the magnifier {magnifier:?}"
+    );
+    // ✕ inside it while something is typed.
+    named(&harness, hint).click();
+    harness.run_steps(4);
+    named(&harness, hint).type_text("login");
+    harness.run_steps(8);
+    assert_eq!(field(&harness, hint), at, "the field moved as it filled");
+    let clear = harness.get_by_label(t.clear_search()).rect();
+    assert!(at.contains_rect(clear), "✕ {clear:?} outside {at:?}");
+    Ok(())
+}
+
 #[test]
 fn the_cards_of_a_list_scroll_under_its_searchs_line() -> TestResult {
     let (store, _) = store()?;

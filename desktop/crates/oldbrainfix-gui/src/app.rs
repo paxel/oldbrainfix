@@ -17332,16 +17332,6 @@ impl App {
         if place.is_some() {
             beside += sizes.row + gap;
         }
-        // The typed text at a card's text size (obf-1063); the margin
-        // makes the field as tall as the row (egui's single line takes no
-        // height of its own), the magnifier and ✕ inside it.
-        let font = FontId::proportional(theme::content(ui, BAND_FIELD_TEXT));
-        let line = ui.fonts_mut(|f| f.row_height(&font));
-        let inner = line.max(sizes.glyph);
-        let margin = egui::Margin::symmetric(
-            ((sizes.row - sizes.glyph) / 2.0).round() as i8,
-            ((sizes.row - inner) / 2.0).round() as i8,
-        );
         let layout = egui::Layout::left_to_right(egui::Align::Center).with_main_wrap(true);
         let room = egui::vec2(ui.available_width(), sizes.row);
         ui.allocate_ui_with_layout(room, layout, |ui| {
@@ -17351,31 +17341,9 @@ impl App {
             } else {
                 ui.available_width()
             };
-            let (glass, cross) = (Id::new("search glass"), Id::new("search cross"));
-            let icon = egui::Vec2::splat(sizes.glyph);
-            let output = TextEdit::singleline(&mut self.query)
-                .id(Id::new("search"))
-                .font(font.clone())
-                .hint_text(RichText::new(hint).font(font))
-                .text_color(text)
-                .margin(margin)
-                .prefix(egui::Atom::custom(glass, icon))
-                // Its room kept while empty, so nothing moves as it fills.
-                .suffix(egui::Atom::custom(cross, icon))
-                .desired_width(width.max(0.0))
-                .show(ui);
-            let shown = &output.response;
-            let field = &shown.response;
-            if let Some(at) = shown.rect(glass) {
-                icons::paint(
-                    ui.painter(),
-                    at,
-                    icons::SEARCH,
-                    ui.visuals().weak_text_color(),
-                );
-            }
+            let search = (Id::new("search"), hint);
+            let (field, cleared) = band_search(ui, &t, &mut self.query, search, width, sizes);
             spotlight::anchor(ui, "search", field.rect);
-            text_menu::show(ui, &t, field, &self.query);
             // Edit ▸ Find: after the field, so the menu's click does
             // not take it out again.
             if std::mem::take(&mut self.search_focus) {
@@ -17384,30 +17352,10 @@ impl App {
             if field.changed() {
                 actions.push(Action::Search);
             }
-            // ✕ over the field's right end, as tall as the field, while
-            // something is typed; under its own id, so the menus after
-            // the field keep theirs and stay open while the search
-            // changes.
-            if !self.query.is_empty()
-                && let Some(at) = shown.rect(cross)
-            {
-                let room = field.rect.right() - at.right();
-                let target = egui::Rect::from_min_max(
-                    egui::pos2(at.left() - room, field.rect.top()),
-                    field.rect.max,
-                )
-                .shrink(2.0);
-                let label = t.clear_search();
-                let clear = ui.interact(target, Id::new("search clear"), Sense::click());
-                clear.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, label));
-                theme::icon_button_back(ui, &clear, target);
-                icons::paint(ui.painter(), at, icons::CLOSE, text);
-                if clear.on_hover_text(label).clicked() {
-                    self.query.clear();
-                    // The cursor back in the field, to type anew.
-                    self.search_focus = true;
-                    actions.push(Action::Search);
-                }
+            if cleared {
+                // The cursor back in the field, to type anew.
+                self.search_focus = true;
+                actions.push(Action::Search);
             }
             // Every Note list but the trash has its compact/detailed switch.
             if switch && compact_button(ui, tones, &t, self.view.compact, sizes) {
@@ -20169,28 +20117,18 @@ impl App {
         self.settings_find |= finds;
         let searched = self.settings_query.clone();
         // On its band, so the cards scroll under its line (obf-1088).
+        // The list band's field (obf-1127), across the band.
         theme::search_band(ui, |ui| {
-            ui.horizontal(|ui| {
-                icons::show(ui, icons::SEARCH, 20.0, weak);
-                let field = ui.add(
-                    TextEdit::singleline(&mut self.settings_query)
-                        .id(Id::new("settings search"))
-                        .hint_text(t.settings_search_hint())
-                        .text_color(text)
-                        .desired_width(ui.available_width() - 32.0),
-                );
-                spotlight::anchor(ui, "settings-search", field.rect);
-                name_field(ui, &field, t.settings_search_hint());
-                text_menu::show(ui, &t, &field, &self.settings_query);
-                if std::mem::take(&mut self.settings_find) {
-                    field.request_focus();
-                }
-                if !self.settings_query.is_empty()
-                    && icon_button(ui, icons::CLOSE, t.clear_search(), text).clicked()
-                {
-                    self.settings_query.clear();
-                }
-            });
+            let sizes = BandSizes::of(ui);
+            let search = (Id::new("settings search"), t.settings_search_hint());
+            let width = ui.available_width();
+            let query = &mut self.settings_query;
+            let (field, cleared) = band_search(ui, &t, query, search, width, sizes);
+            spotlight::anchor(ui, "settings-search", field.rect);
+            name_field(ui, &field, t.settings_search_hint());
+            if std::mem::take(&mut self.settings_find) || cleared {
+                field.request_focus();
+            }
         });
         let typed = self.settings_query.trim().to_string();
         let query = settings_search::query_of(&typed);
@@ -25621,6 +25559,79 @@ impl BandSizes {
             title: theme::TITLE * factor,
         }
     }
+}
+
+/// The band's search field (obf-1063, obf-1127) under `search`'s id
+/// with its hint, `width` wide: as tall as the band's row, the typed
+/// text at a card's text size, the magnifier inside it at the left and,
+/// while something is typed, ✕ inside it at the right. The field, and
+/// whether ✕ emptied it.
+fn band_search(
+    ui: &mut Ui,
+    t: &L10n,
+    query: &mut String,
+    (id, hint): (Id, &str),
+    width: f32,
+    sizes: BandSizes,
+) -> (egui::Response, bool) {
+    let text = ui.visuals().text_color();
+    // The margin makes the field as tall as the row (egui's single line
+    // takes no height of its own).
+    let font = FontId::proportional(theme::content(ui, BAND_FIELD_TEXT));
+    let line = ui.fonts_mut(|f| f.row_height(&font));
+    let inner = line.max(sizes.glyph);
+    let margin = egui::Margin::symmetric(
+        ((sizes.row - sizes.glyph) / 2.0).round() as i8,
+        ((sizes.row - inner) / 2.0).round() as i8,
+    );
+    let (glass, cross) = (id.with("glass"), id.with("cross"));
+    let icon = egui::Vec2::splat(sizes.glyph);
+    let output = TextEdit::singleline(query)
+        .id(id)
+        .font(font.clone())
+        .hint_text(RichText::new(hint).font(font))
+        .text_color(text)
+        .margin(margin)
+        .prefix(egui::Atom::custom(glass, icon))
+        // Its room kept while empty, so nothing moves as it fills.
+        .suffix(egui::Atom::custom(cross, icon))
+        .desired_width(width.max(0.0))
+        .show(ui);
+    let shown = &output.response;
+    let field = shown.response.clone();
+    if let Some(at) = shown.rect(glass) {
+        icons::paint(
+            ui.painter(),
+            at,
+            icons::SEARCH,
+            ui.visuals().weak_text_color(),
+        );
+    }
+    text_menu::show(ui, t, &field, query);
+    // ✕ over the field's right end, as tall as the field, while
+    // something is typed; under its own id, so the menus after the
+    // field keep theirs and stay open while the search changes.
+    let mut cleared = false;
+    if !query.is_empty()
+        && let Some(at) = shown.rect(cross)
+    {
+        let room = field.rect.right() - at.right();
+        let target = egui::Rect::from_min_max(
+            egui::pos2(at.left() - room, field.rect.top()),
+            field.rect.max,
+        )
+        .shrink(2.0);
+        let label = t.clear_search();
+        let clear = ui.interact(target, id.with("clear"), Sense::click());
+        clear.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, label));
+        theme::icon_button_back(ui, &clear, target);
+        icons::paint(ui.painter(), at, icons::CLOSE, text);
+        if clear.on_hover_text(label).clicked() {
+            query.clear();
+            cleared = true;
+        }
+    }
+    (field, cleared)
 }
 
 /// "+" at the top of a list (#146, #161): with one kind it makes that at
