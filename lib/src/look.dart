@@ -387,6 +387,11 @@ ThemeData lookTheme(
   );
 }
 
+/// The heading of a card or a section, 16 medium, the one style every
+/// such heading takes (UI laws, "Spacing and type", obf-1124).
+TextStyle? sectionHeading(BuildContext context) =>
+    Theme.of(context).textTheme.titleMedium;
+
 /// The Device's theme choice as Flutter's theme mode.
 ThemeMode themeModeOf(ThemeChoice choice) => switch (choice) {
   ThemeChoice.system => ThemeMode.system,

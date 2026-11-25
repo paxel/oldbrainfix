@@ -240,10 +240,7 @@ class _NamedPlaceDialogState extends State<_NamedPlaceDialog> {
               onSubmitted: (_) => _done(),
             ),
             const SizedBox(height: 16),
-            Text(
-              t.radiusHeading,
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
+            Text(t.radiusHeading, style: sectionHeading(context)),
             const SizedBox(height: 8),
             ChoiceChips<double>(
               value: _radius,

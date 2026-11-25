@@ -12,6 +12,7 @@ import 'auto_sync.dart';
 import 'bundle_platform.dart';
 import 'failure_dialog.dart';
 import 'l10n.dart';
+import 'look.dart';
 import 'merge_into_screen.dart';
 import 'page_bar.dart';
 import 'system_bars.dart';
@@ -817,7 +818,7 @@ class _AskScreenState extends State<AskScreen> {
         ),
       ),
       const SizedBox(height: 16),
-      Text(t.phoneAskConsentWhat(name), style: theme.textTheme.titleSmall),
+      Text(t.phoneAskConsentWhat(name), style: sectionHeading(context)),
       item(t.phoneAskConsentQuestion),
       item(t.phoneAskConsentNames),
       item(t.phoneAskConsentRoutines),

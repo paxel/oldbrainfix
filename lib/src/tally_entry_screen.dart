@@ -4,6 +4,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'l10n.dart';
 import 'leave_saves.dart';
+import 'look.dart';
 import 'note_editor_screen.dart';
 import 'page_bar.dart';
 import 'system_bars.dart';
@@ -422,7 +423,7 @@ class _TallyEntryScreenState extends State<TallyEntryScreen> {
               Expanded(
                 child: Text(
                   t.tallySet(index + 1),
-                  style: Theme.of(context).textTheme.titleSmall,
+                  style: sectionHeading(context),
                 ),
               ),
               if (index > 0)

@@ -131,7 +131,7 @@ class _ConflictCard extends StatelessWidget {
                 shopping
                     ? t.conflictShoppingLineText
                     : conflictLabel(t, conflict),
-                style: Theme.of(context).textTheme.titleSmall,
+                style: sectionHeading(context),
               ),
               if (note != null) Text(note),
               if (!conflict.resolvable)

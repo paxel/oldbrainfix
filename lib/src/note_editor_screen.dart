@@ -2191,10 +2191,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 children: [
                   formats(context),
                   const SizedBox(height: 16),
-                  Text(
-                    t.codeLanguage,
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
+                  Text(t.codeLanguage, style: sectionHeading(context)),
                   // A language this Device does not know is kept: none
                   // is marked until another is picked.
                   RadioColumn<String>(
@@ -2874,10 +2871,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               Semantics(
                 container: true,
                 header: true,
-                child: Text(
-                  heading,
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
+                child: Text(heading, style: sectionHeading(context)),
               ),
               const SizedBox(height: 8),
               Wrap(spacing: 8, runSpacing: 8, children: children),
@@ -4587,7 +4581,7 @@ class EditorPanel extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (heading case final heading?) ...[
-              Text(heading, style: Theme.of(context).textTheme.titleSmall),
+              Text(heading, style: sectionHeading(context)),
               const SizedBox(height: 8),
             ],
             child,

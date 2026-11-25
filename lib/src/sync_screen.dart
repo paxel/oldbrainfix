@@ -340,7 +340,7 @@ class _SyncScreenState extends State<SyncScreen> {
     final folder = widget.store.syncFolder;
     return [
       const SizedBox(height: 16),
-      Text(t.folderTitle, style: Theme.of(context).textTheme.titleSmall),
+      Text(t.folderTitle, style: sectionHeading(context)),
       Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Text(t.folderIntro),
@@ -448,7 +448,7 @@ class _SyncScreenState extends State<SyncScreen> {
     final chosen = _paired.any((d) => d.id == _bundleFor) ? _bundleFor : null;
     return [
       const SizedBox(height: 16),
-      Text(t.bundleTitle, style: Theme.of(context).textTheme.titleSmall),
+      Text(t.bundleTitle, style: sectionHeading(context)),
       Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Text(t.bundleIntro),
@@ -600,7 +600,7 @@ class _SyncScreenState extends State<SyncScreen> {
       onTap: () => _openConflicts(Navigator.of(context)),
     ),
     const SizedBox(height: 8),
-    Text(t.pairedDevicesTitle, style: Theme.of(context).textTheme.titleSmall),
+    Text(t.pairedDevicesTitle, style: sectionHeading(context)),
     Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Text(_paired.isEmpty ? t.pairedNone : t.syncAutoIntro),

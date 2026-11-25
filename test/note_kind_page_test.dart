@@ -151,11 +151,16 @@ void main() {
         tester.getTopLeft(key('note-badges')).dy + page.position.pixels,
         greaterThanOrEqualTo(contentEnd),
       );
+      // Measured on the page too: a long content may take the badges
+      // out of the list once the Section is in view.
+      final badgesEnd =
+          tester.getBottomLeft(key('note-badges')).dy + page.position.pixels;
       final section = notes.sections(id).single.id;
       await reveal(tester, key('section-text:$section'));
       expect(
-        tester.getTopLeft(key('section-text:$section')).dy,
-        greaterThan(tester.getBottomLeft(key('note-badges')).dy),
+        tester.getTopLeft(key('section-text:$section')).dy +
+            page.position.pixels,
+        greaterThan(badgesEnd),
       );
       // In no box, under a tear line (#307).
       expect(

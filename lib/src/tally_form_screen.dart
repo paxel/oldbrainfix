@@ -428,10 +428,7 @@ class _TallyFormScreenState extends State<TallyFormScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    Text(
-                      t.tallyFields,
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
+                    Text(t.tallyFields, style: sectionHeading(context)),
                     const SizedBox(height: 8),
                     for (final (index, field) in _fields.indexed)
                       _fieldRow(t, index, field),

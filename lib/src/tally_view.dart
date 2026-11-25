@@ -322,7 +322,7 @@ class _TallySetupState extends State<TallySetup> with ReloadsOnLogChange {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(t.tallyFields, style: Theme.of(context).textTheme.titleSmall),
+            Text(t.tallyFields, style: sectionHeading(context)),
             const SizedBox(height: 8),
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
@@ -642,7 +642,7 @@ class _CardTallyState extends State<CardTally> {
   /// A heading of a part of the card, a setting's or a chart's.
   Widget _heading(String text) => Padding(
     padding: const EdgeInsets.only(top: 16, bottom: 4),
-    child: Text(text, style: Theme.of(context).textTheme.titleSmall),
+    child: Text(text, style: sectionHeading(context)),
   );
 
   @override

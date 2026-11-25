@@ -536,7 +536,7 @@ class _CardSessionState extends State<CardSession> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(t.sessionPool, style: text.titleSmall),
+          Text(t.sessionPool, style: sectionHeading(context)),
           for (final (i, note) in _pool.indexed)
             Padding(
               key: ValueKey('card-session-pool-$i'),
@@ -566,12 +566,12 @@ class _CardSessionState extends State<CardSession> {
           ),
           if (_today.isNotEmpty) ...[
             const SizedBox(height: 12),
-            Text(t.agendaToday, style: text.titleSmall),
+            Text(t.agendaToday, style: sectionHeading(context)),
             for (final today in _today) _occurrence(today, locale, decimal),
           ],
           if (_weeks.isNotEmpty) ...[
             const SizedBox(height: 12),
-            Text(t.sessionHistory, style: text.titleSmall),
+            Text(t.sessionHistory, style: sectionHeading(context)),
             for (final (i, week) in _weeks.indexed)
               Padding(
                 padding: const EdgeInsets.only(top: 2),
@@ -587,7 +587,7 @@ class _CardSessionState extends State<CardSession> {
               ),
           ],
           const SizedBox(height: 12),
-          Text(t.sessionRuns, style: text.titleSmall),
+          Text(t.sessionRuns, style: sectionHeading(context)),
           SessionRuns(
             notes: widget.notes,
             noteId: widget.noteId,

@@ -214,6 +214,17 @@ void main() {
       ),
     );
     expect(find.bySemanticsLabel('Add'), findsOneWidget);
+    // A section's heading, 16 medium (obf-1124).
+    final heading = tester
+        .widget<Text>(
+          find.descendant(
+            of: key('editor-group-add'),
+            matching: find.text('Add'),
+          ),
+        )
+        .style;
+    expect(heading?.fontSize, 16);
+    expect(heading?.fontWeight, FontWeight.w500);
     semantics.dispose();
   });
 }

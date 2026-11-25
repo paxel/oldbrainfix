@@ -410,6 +410,10 @@ void main() {
       matching: find.byType(RadioListTile<ConflictVersion?>),
     );
     expect(rows, findsNWidgets(2));
+    // Its heading is a card's, 16 medium (obf-1124).
+    final heading = tester.widget<Text>(find.text('Note text')).style;
+    expect(heading?.fontSize, 16);
+    expect(heading?.fontWeight, FontWeight.w500);
     expect(
       find.descendant(of: card, matching: find.byType(OutlinedButton)),
       findsNothing,

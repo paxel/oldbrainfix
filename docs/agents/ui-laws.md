@@ -155,7 +155,8 @@ There are three kinds, and an action takes the first that fits.
   `titleLarge`, desktop `BandSizes::title`). A dialog's heading is
   Material's dialog title on the phone and 18 strong on the desktop
   (`.size(18.0).strong()`). A card's or section's heading is 16
-  medium (phone `titleMedium`), on the desktop strong. Labels and
+  medium (phone `titleMedium`, through `sectionHeading` in `look.dart`,
+  obf-1124), on the desktop strong. Labels and
   buttons are 14 (phone `labelLarge` / `bodyMedium`, desktop egui's
   body and button text styles, `theme::LABEL`). A caption, meta line
   or hint is 12 in the weak colour (phone `bodySmall`, desktop

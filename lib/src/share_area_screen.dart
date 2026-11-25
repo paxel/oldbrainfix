@@ -349,7 +349,7 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
           // Roles are chosen only in Advanced (#197); in Simple the
           // person joins as a Member.
           if (_advanced) ...[
-            Text(t.roleHeading, style: Theme.of(context).textTheme.titleSmall),
+            Text(t.roleHeading, style: sectionHeading(context)),
             RadioGroup<AreaRole>(
               groupValue: _role,
               onChanged: (role) {
@@ -436,10 +436,7 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
           ),
           if (canSend) ...[
             const SizedBox(height: 24),
-            Text(
-              t.shareAfarHeading,
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
+            Text(t.shareAfarHeading, style: sectionHeading(context)),
             const SizedBox(height: 8),
             Text(_afar.isEmpty ? t.shareAfarNobody : t.shareAfarIntro),
             if (_afar.isNotEmpty) ...[

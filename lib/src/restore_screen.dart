@@ -10,6 +10,7 @@ import 'backup_screen.dart';
 import 'bundle_platform.dart';
 import 'failure_dialog.dart';
 import 'l10n.dart';
+import 'look.dart';
 import 'page_bar.dart';
 import 'pairing_platform.dart';
 import 'photo_platform.dart';
@@ -375,7 +376,7 @@ class _BackupUnlockFormState extends State<BackupUnlockForm> {
       children: [
         Text(
           t.restoreFile(when.format(widget.header.created.toLocal())),
-          style: Theme.of(context).textTheme.titleSmall,
+          style: sectionHeading(context),
         ),
         const SizedBox(height: 16),
         TextField(

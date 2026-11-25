@@ -220,7 +220,7 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
       key: const ValueKey('session-pool'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(t.sessionPool, style: Theme.of(context).textTheme.titleSmall),
+        Text(t.sessionPool, style: sectionHeading(context)),
         const SizedBox(height: 8),
         Text(t.sessionPoolExplain),
         SessionPoolTags(draft: _draft, onChanged: () => setState(() {})),
