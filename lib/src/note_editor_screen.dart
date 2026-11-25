@@ -69,13 +69,15 @@ import 'voice_recorder.dart';
 /// in a new Line of a list after its open ones (#161, #276). With [find]
 /// it opens with its find bar finding the search's words, at the place
 /// the search found (obf-1047). [made] says the Note is being made
-/// (obf-1072).
+/// (obf-1072). With [typeText] the cursor starts in its text, the
+/// keyboard up (obf-1140).
 Future<void> openNote(
   BuildContext context,
   Notes notes,
   Places places,
   Note note, {
   bool typeLines = false,
+  bool typeText = false,
   UnsortedShown? sorting,
   NoteFind? find,
   bool made = false,
@@ -87,6 +89,7 @@ Future<void> openNote(
       drafts: DraftsScope.of(context),
       noteId: note.id,
       typeLines: typeLines,
+      typeText: typeText,
       sorting: sorting,
       find: find,
       made: made,
@@ -687,6 +690,10 @@ class NoteEditorScreen extends StatefulWidget {
   /// (#276).
   final bool typeLines;
 
+  /// Whether the cursor starts in the Note's text, the keyboard up: a
+  /// Note just made by the "+" of an Area or a Topic (obf-1140).
+  final bool typeText;
+
   /// The Unsorted Notes of the list the Note was opened from (#313): once
   /// a step here sorts it, the editor shows the next of them, and the
   /// Agenda once none is left. Null where it was opened from anywhere
@@ -698,7 +705,8 @@ class NoteEditorScreen extends StatefulWidget {
   final NoteFind? find;
 
   /// Whether the Note is being made: opened from the quick note's Open in
-  /// the editor or a list's "+" (obf-1072). Such a Note has no "Add a
+  /// the editor, a list's "+" (obf-1072) or the "+" of an Area or a
+  /// Topic (obf-1140). Such a Note has no "Add a
   /// part"; adding a part is for an existing Note, opened again.
   final bool made;
 
@@ -709,6 +717,7 @@ class NoteEditorScreen extends StatefulWidget {
     required this.drafts,
     required this.noteId,
     this.typeLines = false,
+    this.typeText = false,
     this.sorting,
     this.find,
     this.made = false,
@@ -4283,6 +4292,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                     controller: _text,
                     twoRows: _twoRows,
                     readOnly: !editable,
+                    autofocus: widget.typeText && editable,
                     // ☐ goes in at the cursor; a tap on a box ticks it,
                     // also where the text is only read (ADR 0035).
                     boxes: true,

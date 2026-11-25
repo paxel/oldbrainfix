@@ -95,6 +95,10 @@ void main() {
     await tap(tester, find.text('Create'));
   }
 
+  /// The text field of the Note editor.
+  Finder noteText() =>
+      find.descendant(of: key('note-text'), matching: find.byType(TextField));
+
   /// The only Note there is, which must exist.
   Note only() => notes.all().single;
 
@@ -196,13 +200,48 @@ void main() {
       testWidgets('Note captures one filed there', (tester) async {
         await openPage(tester, page);
         await pick(tester, NewKind.note);
-        await tester.enterText(find.byType(TextField), 'nees mor sauce');
+        // In an Area or a Topic the full editor opens, not the quick note
+        // (obf-1140).
+        final sorted = page != _Page.all;
+        expect(
+          find.byType(NoteEditorScreen),
+          sorted ? findsOneWidget : findsNothing,
+        );
+        expect(key('captureSave'), findsNothing);
+        await tester.enterText(
+          sorted ? noteText() : find.byType(TextField),
+          'nees mor sauce',
+        );
         // Leaving by Back saves, with a Nudge where it stays Unsorted;
         // the quick note has no back arrow on Android (#352).
         await backFromCapture(tester);
+        expect(find.byType(NoteEditorScreen), findsNothing);
         expect(only().text, 'nees mor sauce');
         expect(only().place, placeOf(page));
+        expect(only().nudge, sorted ? isNull : isNotNull);
+        expect(find.text('nees mor sauce'), findsOneWidget);
       });
+
+      if (page != _Page.all) {
+        testWidgets('Note opens the editor typing, without Add a part, and '
+            'left empty makes nothing', (tester) async {
+          await openPage(tester, page);
+          await pick(tester, NewKind.note);
+          final typing = tester.widget<EditableText>(
+            find.descendant(
+              of: key('note-text'),
+              matching: find.byType(EditableText),
+            ),
+          );
+          expect(typing.focusNode.hasFocus, isTrue);
+          expect(tester.testTextInput.isVisible, isTrue);
+          expect(key('editor-add-part'), findsNothing);
+          expect(only().place, placeOf(page));
+          await backFromCapture(tester);
+          expect(find.byType(NoteEditorScreen), findsNothing);
+          expect(notes.all(), isEmpty);
+        });
+      }
 
       testWidgets('Checklist takes its name, then its Lines in place', (
         tester,

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -5,8 +7,10 @@ import 'announcements.dart';
 import 'areas_screen.dart';
 import 'capture_fan.dart';
 import 'capture_screen.dart';
+import 'context_platform.dart';
 import 'frogs_screen.dart';
 import 'l10n.dart';
+import 'location.dart';
 import 'note_editor_screen.dart';
 import 'session_form_screen.dart';
 import 'tally_form_screen.dart';
@@ -70,7 +74,8 @@ FanEntry _describe(BuildContext context, NewKind kind) {
 }
 
 /// Makes a new [kind] filed into [place], Unsorted where it is null, each
-/// on its own form: the Note through Capture; a Checklist or a Shopping
+/// on its own form: the Note through Capture, in an Area or a Topic in
+/// the full editor ([editNew]); a Checklist or a Shopping
 /// List from its name, then its editor with the Lines typed in place; a
 /// Tally or a Session on its one page; a Frog from its name. Leaving a
 /// form without its Create or Save makes nothing. [onChanged] runs once
@@ -87,6 +92,8 @@ Future<String?> makeNew(
   final t = context.t;
   final store = notes.store;
   switch (kind) {
+    case NewKind.note when place != null:
+      return editNew(context, notes, places, place, onChanged: onChanged);
     case NewKind.note:
       String? made;
       await captureNote(
@@ -149,6 +156,56 @@ Future<String?> makeNew(
     case NewKind.topic:
       return null;
   }
+}
+
+/// Opens the Note editor on a new Note filed into the Area or Topic
+/// [place] (obf-1140): who is already there has taken the time to sort
+/// and gets the full editor, not the quick note. Sorted, the Note has no
+/// Nudge; its location and the rest of its Capture Context are attached
+/// as they arrive, without asking. Left with nothing in it, the Note goes
+/// again, as the quick note saves nothing for an empty text. [onChanged]
+/// runs once the editor was left, and again when more of its Capture
+/// Context arrived. Returns the id of the Note made, null when it went.
+Future<String?> editNew(
+  BuildContext context,
+  Notes notes,
+  Places places,
+  String place, {
+  required VoidCallback onChanged,
+}) async {
+  final here = currentIfGranted(LocationScope.of(context));
+  final extras = currentExtras(notes.store, ContextScope.of(context));
+  final note = notes.capture('', place: place);
+  for (final attached in [
+    attachLocation(notes, note.id, here),
+    attachExtras(notes, note.id, extras),
+  ]) {
+    unawaited(attached.then((attached) => attached ? onChanged() : null));
+  }
+  await openNote(context, notes, places, note, made: true, typeText: true);
+  final empty = _leftEmpty(notes, note.id);
+  if (empty) notes.discard(note.id);
+  onChanged();
+  // Gone also where the editor poured it into a Shopping List.
+  return empty || notes.byId(note.id) == null ? null : note.id;
+}
+
+/// Whether the Note [noteId] was left with nothing in it: no text, still
+/// a plain Note, without photo, recording, file or Section, nothing
+/// spawned from it, not in the trash and not merged.
+bool _leftEmpty(Notes notes, String noteId) {
+  final note = notes.byId(noteId);
+  return note != null &&
+      note.text.trim().isEmpty &&
+      note.photos.isEmpty &&
+      note.recordings.isEmpty &&
+      note.attachments.isEmpty &&
+      !note.spawned &&
+      !note.isTrashed &&
+      !note.isMerged &&
+      NoteKinds(notes.store).of(noteId) == NoteKind.plain &&
+      notes.sections(noteId).isEmpty &&
+      notes.store.mayChange(noteId);
 }
 
 /// When the Note [made] by "+" is one [filter], the person filter of the

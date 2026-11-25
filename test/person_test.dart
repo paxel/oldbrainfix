@@ -639,13 +639,18 @@ void main() {
         });
       }
 
-      testWidgets('a Note captured by "+" ▸ Note is said the same', (
-        tester,
-      ) async {
+      testWidgets('a Note made by "+" ▸ Note is said the same', (tester) async {
         await open(tester, 'Household', [benId]);
         await tap(tester, find.byTooltip('Add here'));
         await tap(tester, find.byKey(const ValueKey('addFan-note')));
-        await tester.enterText(find.byType(TextField), 'Ann buys eggs');
+        // The Note editor (obf-1140); Back saves.
+        await tester.enterText(
+          find.descendant(
+            of: find.byKey(const ValueKey('note-text')),
+            matching: find.byType(TextField),
+          ),
+          'Ann buys eggs',
+        );
         await backFromCapture(tester);
         expect(Notes(ann).all().map((n) => n.text), contains('Ann buys eggs'));
         expect(announcements.visible, 'Made, hidden by the filter');

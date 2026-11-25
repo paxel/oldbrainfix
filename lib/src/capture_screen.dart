@@ -204,8 +204,9 @@ void announceUntranscribable(
 /// the App Lock, as the editor shows the Areas, and not while there is
 /// nothing to save.
 ///
-/// Opened from an Area's or Topic's "+" the Note is filed there: sorted,
-/// it needs no Nudge, and one Save takes the three buttons' place.
+/// Given a [place] the Note is filed there: sorted, it needs no Nudge,
+/// and one Save takes the three buttons' place. The "+" of an Area or a
+/// Topic opens the full editor instead (obf-1140).
 ///
 /// An entry point that starts with something opens this screen with it
 /// shown above the text: [startPhoto] takes a photo into the Note,

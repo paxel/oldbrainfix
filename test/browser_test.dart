@@ -11,6 +11,12 @@ import 'package:oldbrainfix/src/nudge_screen.dart';
 import 'package:oldbrainfix/src/agenda_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+/// The text field of the Note editor.
+final editorText = find.descendant(
+  of: find.byKey(const ValueKey('note-text')),
+  matching: find.byType(TextField),
+);
+
 void main() {
   late Store store;
   late Places places;
@@ -297,8 +303,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('addFan-note')));
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), 'nees mor sauce');
-      await tester.tap(find.byKey(const ValueKey('captureSave')));
+      // The full editor, not the quick note (obf-1140); Back saves.
+      await tester.enterText(editorText, 'nees mor sauce');
+      await tester.pageBack();
       await tester.pumpAndSettle();
 
       expect(cardTexts(tester), ['nees mor sauce']);
@@ -326,8 +333,8 @@ void main() {
 
       await tester.tap(note);
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), 'nees mor sauce');
-      await tester.tap(find.byKey(const ValueKey('captureSave')));
+      await tester.enterText(editorText, 'nees mor sauce');
+      await tester.pageBack();
       await tester.pumpAndSettle();
       expect(cardTexts(tester), ['nees mor sauce']);
       expect(notes.all().single.place, home.id);
