@@ -1954,8 +1954,17 @@ fn sharing_frames(
         }),
         // Packs (#165): the Household's tree, and Lena's Pack opened.
         ("send-pack", plain, |harness, _, texts| {
+            // Under the Area menu's Export ▸ (obf-1145).
+            let export = format!("{} ⏵", harness.state().t().desk_area_export());
             let pack = harness.state().t().export_as_pack().to_string();
-            area_menu(harness, texts.household, &pack)
+            area_menu(harness, texts.household, &export)?;
+            harness
+                .query_all_by_label(&pack)
+                .last()
+                .ok_or_else(|| format!("the entry {pack}"))?
+                .click();
+            harness.run();
+            Ok(())
         }),
         ("open-pack", plain, |harness, people, _| {
             let (_, path) = people.pack.as_ref().ok_or("Lena's Pack")?;

@@ -25,6 +25,7 @@ pub mod ask_view;
 pub mod attachment_view;
 pub mod auto_sync;
 pub mod autostart;
+pub mod axt_view;
 pub mod background;
 pub mod backup_view;
 pub mod backups;

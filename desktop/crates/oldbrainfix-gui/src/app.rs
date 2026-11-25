@@ -117,6 +117,7 @@ use crate::ask_view::{self, AskAsked, AskFields, AskPanel, AskSetting};
 use crate::attachment_view::{self, HeldFile};
 use crate::auto_sync::Syncing;
 use crate::autostart::Autostart;
+use crate::axt_view::{self, AxtOf};
 use crate::background;
 use crate::backup_view::{
     self, BackupAction, BackupNotes, BackupNotesAction, Passphrase, Welcome, WelcomeAction,
@@ -633,16 +634,20 @@ enum PackDid {
     ),
     /// The Notes ticked on a Backup opened added (#285).
     BackupAdded(oldbrainfix_core::Result<oldbrainfix_core::PackAdded>),
+    /// An AXT file saved (obf-1145).
+    AxtSaved(std::result::Result<(), String>),
 }
 
 /// What a Pack's work off the window's thread is doing: opening a Pack,
 /// which the line under the menu bar says, saving one, which greys
-/// Save…, or reading a Backup opened (#285), which its page shows.
+/// Save…, or reading a Backup opened (#285), which its page shows; or
+/// saving an AXT file (obf-1145).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum PackWork {
     Opening,
     Saving,
     Backup,
+    AxtSaving,
 }
 
 /// The file at `path` as far as it may be a Pack (#165).
@@ -2025,6 +2030,9 @@ enum Action {
     SaveAsMarkdown(String),
     /// Export as Pack… on the Area, Topic or Note (#165): its tree.
     ExportPack(String),
+    /// Export as AXT file… (obf-1145): the Notes, or those of the Area or
+    /// Topic, saved as one AXT file where the user says.
+    ExportAxt(AxtOf),
     /// Save…, Add, "Add … to People" or Cancel in a Pack's dialog.
     Pack(PackAsk),
     /// Mail, a save or the Notes tick on the Send feedback page (#214).
@@ -2597,6 +2605,8 @@ pub struct App {
     card_saver: FileSaver,
     /// Asks where to save a Pack and which one to open (#165).
     pack_saver: FileSaver,
+    /// Asks where to save an AXT file (obf-1145).
+    axt_saver: FileSaver,
     /// Asks where to save the text of Send feedback (#214).
     feedback_saver: FileSaver,
     /// What Send feedback says of this computer, and its page's state
@@ -2893,6 +2903,13 @@ fn pack_dialog(title: &str) -> rfd::FileDialog {
     rfd::FileDialog::new()
         .set_title(title)
         .add_filter(oldbrainfix_core::APP_NAME, &[packs::EXTENSION])
+}
+
+/// The dialogs' filter for AXT files (obf-1145).
+fn axt_dialog(title: &str) -> rfd::FileDialog {
+    rfd::FileDialog::new()
+        .set_title(title)
+        .add_filter("AXT", &[axt_view::EXTENSION])
 }
 
 /// The open dialog's filter for a Markdown file (obf-1056).
@@ -3216,6 +3233,7 @@ impl App {
             item_saver: Box::new(|title, name| item_dialog(title).set_file_name(name).save_file()),
             card_saver: Box::new(|title, name| card_dialog(title).set_file_name(name).save_file()),
             pack_saver: Box::new(|title, name| pack_dialog(title).set_file_name(name).save_file()),
+            axt_saver: Box::new(|title, name| axt_dialog(title).set_file_name(name).save_file()),
             feedback_saver: Box::new(|title, name| {
                 rfd::FileDialog::new()
                     .set_title(title)
@@ -4092,6 +4110,11 @@ impl App {
     /// tests and the guide's frames.
     pub fn set_feedback_facts(&mut self, facts: FeedbackFacts) {
         self.feedback_facts = facts;
+    }
+
+    /// Hands in the dialog asking where to save an AXT file (obf-1145).
+    pub fn set_axt_saver(&mut self, saver: FileSaver) {
+        self.axt_saver = saver;
     }
 
     /// Hands in the dialog asking which Pack to open (#165).
@@ -5033,6 +5056,7 @@ impl App {
             PackDid::Saved(saved, true) => self.feedback_saved(saved),
             PackDid::BackupOpened(path, opened) => self.backup_notes_opened(&path, opened),
             PackDid::BackupAdded(added) => self.backup_notes_added(added),
+            PackDid::AxtSaved(saved) => self.axt_saved(saved),
         }
     }
 
@@ -5085,6 +5109,71 @@ impl App {
             worked: pack_view::Worked::default(),
         });
         Ok(())
+    }
+
+    /// Export as AXT file… (obf-1145): asks where to save the file of
+    /// `of`, proposed under the Note's or the place's name as the phone
+    /// names it, several Notes under the day's, and writes it off the
+    /// window's thread; with no Note there, the trash and merged ones
+    /// left out, it says so at the top and asks nothing.
+    fn export_axt(&mut self, of: AxtOf) -> oldbrainfix_core::Result<()> {
+        let t = self.t;
+        let notes = Notes::new(&self.store);
+        let (ids, title) = match of {
+            AxtOf::Notes(ids) => {
+                let mut going = Vec::new();
+                for id in ids {
+                    if let Some(note) = notes.by_id(&id)?
+                        && !note.is_trashed()
+                        && !note.is_merged()
+                    {
+                        going.push(note);
+                    }
+                }
+                let title = match going.as_slice() {
+                    [note] => Some(axt_view::note_title(note)),
+                    _ => None,
+                };
+                (going.into_iter().map(|n| n.id).collect(), title)
+            }
+            AxtOf::Place(place) => {
+                let title = match (self.view.area(&place), self.view.topic(&place)) {
+                    (Some(area), _) => Some(area_name(&t, area)),
+                    (None, Some(topic)) => Some(topic_name(&t, topic)),
+                    (None, None) => None,
+                };
+                (axt_view::notes_of(&self.store, &place)?, title)
+            }
+        };
+        if ids.is_empty() {
+            self.notice = Some(t.axt_no_notes().to_string());
+            return Ok(());
+        }
+        let day = Day::today(self.store.now(), &*self.wall);
+        let name = axt_view::file_name(title.as_deref(), day);
+        let Some(mut path) = (self.axt_saver)(t.desk_axt_save_title(), &name) else {
+            return Ok(());
+        };
+        if path.extension().is_none_or(|e| e != axt_view::EXTENSION) {
+            path.set_extension(axt_view::EXTENSION);
+        }
+        self.pack_aside(PackWork::AxtSaving, move |store| {
+            PackDid::AxtSaved(axt_view::write_file(store, &ids, &path))
+        });
+        Ok(())
+    }
+
+    /// An AXT file saved says nothing; a failure is announced.
+    fn axt_saved(&mut self, written: std::result::Result<(), String>) {
+        let t = self.t;
+        if let Err(e) = written {
+            self.announce_failure(
+                t.desk_axt_not_saved(),
+                t.desk_axt_not_saved_title(),
+                (t.axt_not_written_cause(), t.nothing_lost_fix()),
+                format!("axt: {e}"),
+            );
+        }
     }
 
     /// What was asked in a Pack's dialog (#165).
@@ -10047,6 +10136,10 @@ impl App {
                 let area = self.view.area(&from).map(|a| a.id.clone());
                 self.unless_hidden(done, area.as_deref(), Action::ExportPack(from))?;
             }
+            Action::ExportAxt(of) => {
+                self.save_text()?;
+                self.export_axt(of)?;
+            }
             Action::Pack(asked) => self.pack_action(asked)?,
             Action::Feedback(asked) => self.feedback_action(asked)?,
             Action::OpenPack => {
@@ -14791,11 +14884,20 @@ impl App {
                                 }
                             });
                         }
-                        // Copies of what anyone may read (#165).
-                        let pack = RichText::new(t.export_as_pack()).color(text);
-                        if ui.button(pack).clicked() {
-                            picked = Some(Action::ExportPack(area.id.clone()));
-                        }
+                        // Copies of what anyone may read (#165), and its
+                        // Notes for another app (obf-1145), under one
+                        // entry: the menu keeps to seven.
+                        let export = RichText::new(t.desk_area_export()).color(text);
+                        ui.menu_button(export, |ui| {
+                            let pack = RichText::new(t.export_as_pack()).color(text);
+                            if ui.button(pack).clicked() {
+                                picked = Some(Action::ExportPack(area.id.clone()));
+                            }
+                            let axt = RichText::new(t.export_as_axt()).color(text);
+                            if ui.button(axt).clicked() {
+                                picked = Some(Action::ExportAxt(AxtOf::Place(area.id.clone())));
+                            }
+                        });
                         // In no Shared Area, or to take the mark off (#267).
                         if let Some(asked) = hidden_entry(ui, &t, &self.view, &area.id) {
                             picked = Some(asked);
@@ -14827,6 +14929,9 @@ impl App {
                                 items.push((t.rename(), Action::Rename(topic.id.clone())));
                             }
                             items.push((t.export_as_pack(), Action::ExportPack(topic.id.clone())));
+                            // Its Notes for another app (obf-1145).
+                            let axt = Action::ExportAxt(AxtOf::Place(topic.id.clone()));
+                            items.push((t.export_as_axt(), axt));
                             if manages {
                                 items.push((t.delete(), Action::Delete(topic.id.clone())));
                             }
@@ -17278,6 +17383,9 @@ impl App {
                         }
                         Action::TrashNotes(_) => Action::TrashNotes(along()),
                         Action::RestoreNotes(_) => Action::RestoreNotes(along()),
+                        Action::ExportAxt(AxtOf::Notes(_)) => {
+                            Action::ExportAxt(AxtOf::Notes(along()))
+                        }
                         other => other,
                     });
                 } else if let Some(tag) = clicks.tag {
@@ -17567,6 +17675,13 @@ impl App {
                 acts,
                 Action::ExportPack(id.clone()),
             )];
+            // Its Notes for another app (obf-1145).
+            let axt = [(
+                t.export_as_axt(),
+                None,
+                acts,
+                Action::ExportAxt(AxtOf::Place(id.clone())),
+            )];
             if !place.area {
                 let rename = [(
                     t.rename(),
@@ -17577,6 +17692,7 @@ impl App {
                 menu_entries(ui, rename, actions);
                 // Copies of what anyone may read (#165).
                 menu_entries(ui, pack, actions);
+                menu_entries(ui, axt, actions);
                 ui.separator();
                 menu_entries(ui, delete, actions);
                 return;
@@ -17623,8 +17739,15 @@ impl App {
                     menu_entries(ui, items, actions);
                 });
             });
-            // Copies of what anyone may read (#165).
-            menu_entries(ui, pack, actions);
+            // Copies of what anyone may read (#165), and its Notes for
+            // another app (obf-1145), under one entry: the menu keeps to
+            // seven.
+            ui.add_enabled_ui(acts, |ui| {
+                ui.menu_button(RichText::new(t.desk_area_export()).color(text), |ui| {
+                    menu_entries(ui, pack, actions);
+                    menu_entries(ui, axt, actions);
+                });
+            });
             // An Area's own mark (#267), greyed where the right-click
             // leaves it out: an Area shared unmarked.
             let on = self.view.hidden_areas.contains(id);
@@ -18597,6 +18720,10 @@ impl App {
                         let pack = Some(pack_view::PACK_ICON);
                         if group_button(ui, pack, t.export_as_pack()).clicked() {
                             actions.push(Action::ExportPack(note_id.clone()));
+                        }
+                        // For another app (obf-1145).
+                        if group_button(ui, None, t.export_as_axt()).clicked() {
+                            actions.push(Action::ExportAxt(AxtOf::Notes(vec![note_id.clone()])));
                         }
                     };
                     groups.push(ActionGroup::new("share", t.share(), draw));
@@ -27976,6 +28103,10 @@ fn note_card(
             }
             if entry(ui, t.export_as_pack()) {
                 picked = Some(Action::ExportPack(note.id.clone()));
+            }
+            // For another app, with the cards selected along (obf-1145).
+            if entry(ui, t.export_as_axt()) {
+                picked = Some(Action::ExportAxt(AxtOf::Notes(one())));
             }
         });
         let unchecks = menu.is_some_and(|m| m.uncheck_all);

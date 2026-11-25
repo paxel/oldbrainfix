@@ -104,12 +104,16 @@ fn sub(harness: &mut Harness<'_, App>, label: &str) {
     harness.run();
 }
 
-/// Opens the menu of the sidebar's Area or Topic `name` and picks `entry`.
+/// Opens the menu of the sidebar's Area or Topic `name` and picks `entry`,
+/// an Area's under Export ▸ (obf-1145).
 fn place_menu(harness: &mut Harness<'_, App>, name: &str, entry: &str) {
     harness
         .get_by_role_and_label(Role::Button, name)
         .click_secondary();
     harness.run();
+    if name == "Health" {
+        sub(harness, "Export");
+    }
     click(harness, entry);
 }
 

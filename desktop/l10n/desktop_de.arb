@@ -582,5 +582,9 @@
   "deskImportFilledIn": "{count, plural, =1{1 Notiz kam in den Bereich {area}.} other{{count} Notizen kamen in den Bereich {area}.}}",
   "deskImportAlready": "{count, plural, =1{1 wurde schon früher importiert und bleibt weg.} other{{count} wurden schon früher importiert und bleiben weg.}}",
   "deskImportNothingNew": "Nichts Neues zu importieren.",
-  "deskImportNothingNewDetails": "Nichts Neues: {count} schon importiert."
+  "deskImportNothingNewDetails": "Nichts Neues: {count} schon importiert.",
+  "deskAreaExport": "Exportieren",
+  "deskAxtSaveTitle": "Die AXT-Datei speichern",
+  "deskAxtNotSaved": "Die AXT-Datei wurde nicht gespeichert.",
+  "deskAxtNotSavedTitle": "AXT-Datei nicht gespeichert"
 }

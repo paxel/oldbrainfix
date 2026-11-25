@@ -746,6 +746,11 @@ There are three kinds, and an action takes the first that fits.
   sit on the bar, the size over the tree. A Pack opened shows the same
   tree, all ticked, under who it is from; its ticks ("Add my Profile",
   "Claim as mine") go below their text.
+- **"Export as AXT file…"** (obf-1145, ADR 0056) stands right after each
+  "Export as Pack…" and in the bar of a selection of Notes: the Notes of
+  the Note, the selection, the Topic or the Area go at once as an AXT
+  file named after it (`<title>.axt`), nothing asked, to the share
+  sheet; with no Note in it nothing is written and the top says so.
 - **"Open a Backup…"** (#285) is on the Backups page, in a card of its
   own ("Take Notes back"), set up or not, and on the desktop also in the
   File menu, its page then alone, without the way back to Backups. It
@@ -1605,7 +1610,8 @@ There are three kinds, and an action takes the first that fits.
   as in the desktop's Note dialog: **This Note**, the row of badges
   under the text; at the page's end, after all the Note holds, **Add**
   ("+", Voice, Photo, Gallery, Paste, Attach a file…, Add a part),
-  **Share** (Send to a person, Share to an app, Export as Pack…) and
+  **Share** (Send to a person, Share to an app, Export as Pack…, Export
+  as AXT file…, obf-1145) and
   **Tidy** (Merge into…, Add to a Shopping List, Move to trash, the
   last filled on the error colour, obf-1099). Each group is a small heading, read as a
   heading, over its compact buttons side by side, wrapping; a group
@@ -1767,8 +1773,8 @@ There are three kinds, and an action takes the first that fits.
   choices in a menu of their own) and Back to a plain Note; **Add**
   Remind me…, in Advanced Frog and Session… (compact card), Add a part
   and a Tally's Add entry; **Share** Send to a person, Share to an app,
-  Copy text, Export as Pack…, Add to calendar and Share as calendar
-  file; **Tidy** Merge into… (compact card), Add to a Shopping List,
+  Copy text, Export as Pack…, Export as AXT file… (obf-1145), Add to
+  calendar and Share as calendar file; **Tidy** Merge into… (compact card), Add to a Shopping List,
   Uncheck all, Move to trash, which asks nothing and is undone at the
   top (#268), and Remove photo, keep text and its kin, one per photo,
   recording or file. A group past seven entries shows six and More…,
@@ -1796,7 +1802,9 @@ There are three kinds, and an action takes the first that fits.
   (ADR 0013); only the box ticks, a tap and a long press on the card
   still do what they do. While it selects the bar's title says how many
   are ticked ("3 selected") and its buttons are, in this order, Stop
-  selecting, File into…, Merge into…, Importance and Move to trash, in
+  selecting, File into…, Merge into…, Importance, Export as AXT file…
+  (obf-1145; a single Note names the file, several go under the day's
+  name) and Move to trash, in
   the Trash Stop selecting and Restore, each greyed while none is
   ticked. File into… opens the picker of #272, marking the place when
   all of them sit in one; Merge into… opens the Note picker with every
@@ -2501,13 +2509,14 @@ There are three kinds, and an action takes the first that fits.
   ⋮ last in its list band's second row ("More for this Area" to a
   screen reader) offer New Topic (in Advanced), **Name, colour and
   icon…** (F2), **Share with people…**, Move ▸ (Move up with Alt+Up,
-  Move down with Alt+Down), Export as Pack…, the switch Hidden from AI
+  Move down with Alt+Down), Export ▸ (Export as Pack… and Export as AXT
+  file…, obf-1145), the switch Hidden from AI
   (#267) and Delete, seven entries. The right-click leaves out what this
   Device may not do there, the band's ⋮ greys it, and greys all of it
   while a dialog lies over the list, the Note dialog included, so that
   none acts on a place behind it; its keys rest there too. A Topic's
   right-click and band ⋮ ("More for this Topic") offer Rename (F2),
-  Export as Pack… and Delete. F2 rests in a text field and while a menu
+  Export as Pack…, Export as AXT file… (obf-1145) and Delete. F2 rests in a text field and while a menu
   is open. Name, colour and icon… is one dialog: the name, the colours
   and the icons, each marked as it is picked, kept with Save or Enter
   and dropped with Cancel. Share with people… is offered to whoever
@@ -2706,6 +2715,16 @@ There are three kinds, and an action takes the first that fits.
   stands beside its words; Save… saves the file where the user says, in
   place of Share…; "Add … to People" takes the person in and keeps the
   dialog open.
+- **Export as AXT file… saves where the user says on the desktop**
+  (obf-1145): in place of the phone's share sheet the system's save
+  dialog asks, the file proposed under the Note's, the Topic's or the
+  Area's name as the phone names it (`Buy milk.axt`), several cards
+  selected under the day's (`oldbrainfix-notes-2026-11-25.axt`), and it
+  is written beside the window. Backing out writes nothing and says
+  nothing; a failure says "The AXT file was not saved." at the top, why
+  behind the click; with no Note there the top says so and nothing is
+  asked. It asks nothing about Hidden from AI, as Copy text and Save as
+  Markdown… do not.
 - **A custom Heads-up is a small dialog over the Routine editor**
   (obf-1087): "Custom heads-up" with "How long before" over a number
   field, "From 1 to 720." small under it for hours, the units as a
@@ -2744,7 +2763,7 @@ There are three kinds, and an action takes the first that fits.
   end, after the Note's files, Sections and Linked from, **Add** ("+"
   with Remind me…, Frog and Session…, Voice, Paste, Attach a file…, Add
   a part), **Share** (Send to a person, Copy text, Save as Markdown…,
-  Export as Pack…) and
+  Export as Pack…, Export as AXT file…, obf-1145) and
   **Tidy** (Merge into…, Add to a Shopping List, Move to trash in the
   error colour). Each group is a small strong heading, read as a
   heading, over its compact buttons side by side, wrapping; the groups
@@ -2776,7 +2795,7 @@ There are three kinds, and an action takes the first that fits.
   in Advanced Frog while the Note has no open Frog and Session… on a
   plain Note, Attach a file… and Add a part, which opens the Note dialog
   with its Amend box), **Share ▸** (Send to a person, Copy text, Save as
-  Markdown…, Export as Pack…) and **Tidy ▸** (Merge into…, a Checklist's
+  Markdown…, Export as Pack…, Export as AXT file…, obf-1145) and **Tidy ▸** (Merge into…, a Checklist's
   Uncheck all, Move to trash in the error colour), each entry only where
   this Device may do it and a group without one left out. Voice, Paste
   and Add to a Shopping List act on the Note open and stay in the
@@ -2784,7 +2803,8 @@ There are three kinds, and an action takes the first that fits.
 - **A selection is acted on from a card's right-click** (#273, Q656):
   File into…, Importance ▸, Merge into… (on an Unsorted Note's card
   picked as a capture picks its Note, #308) and Move to trash, each only
-  on a card this Device may change; a card in the Trash has no ⋮, and
+  on a card this Device may change, and Share ▸ Export as AXT file…,
+  which writes the cards selected into one file (obf-1145); a card in the Trash has no ⋮, and
   its right-click offers Restore alone. Remind me…, Frog and Session…
   (#281) are only for who may set them up (ADR 0013) and for that card
   alone, selected or not. On a selected card each acts on all

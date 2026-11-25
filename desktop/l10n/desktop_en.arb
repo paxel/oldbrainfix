@@ -1118,5 +1118,13 @@
   "deskImportNothingNew": "Nothing new to import.",
   "@deskImportNothingNew": {"description": "Announced at the top on the desktop when an Import that filled in an earlier one found nothing missing (obf-1078); no Area is made. Says no count."},
   "deskImportNothingNewDetails": "Nothing new: {count} already imported.",
-  "@deskImportNothingNewDetails": {"description": "Behind 'deskImportNothingNew' on the desktop (obf-1078): how many items the earlier Import made already.", "placeholders": {"count": {"type": "int"}}}
+  "@deskImportNothingNewDetails": {"description": "Behind 'deskImportNothingNew' on the desktop (obf-1078): how many items the earlier Import made already.", "placeholders": {"count": {"type": "int"}}},
+  "deskAreaExport": "Export",
+  "@deskAreaExport": {"description": "The submenu of an Area's menu on the desktop, in the sidebar's right-click and the band's ⋮ (obf-1145): Export as Pack… and Export as AXT file…, so the menu keeps to seven entries."},
+  "deskAxtSaveTitle": "Save the AXT file",
+  "@deskAxtSaveTitle": {"description": "Title of the desktop's save dialog after Export as AXT file… (obf-1145)."},
+  "deskAxtNotSaved": "The AXT file was not saved.",
+  "@deskAxtNotSaved": {"description": "Announced at the top of the desktop when the AXT file could not be written; the click opens the dialog with the cause and the fix (obf-1145)."},
+  "deskAxtNotSavedTitle": "AXT file not saved",
+  "@deskAxtNotSavedTitle": {"description": "Title of the dialog behind 'deskAxtNotSaved'."}
 }
