@@ -49,6 +49,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Handy und dem Desktop folgen Knöpfe, Chips und Kopfstreifen einem Entwurf: umrandete Knöpfe sind getönt, Löschen ist rot, Chips sind Pillen. ([obf-1081](https://github.com/paxel/oldbrainfix/issues/394))
 - Aktionen heißen in beiden Apps gleich, und die Menüs einer Karte, eines Bereichs, einer Tabellenspalte, Datei und Ansicht stehen in kurzen Untermenüs. ([obf-1014](https://github.com/paxel/oldbrainfix/issues/321))
 - Auf dem Handy stehen die Importe nicht mehr in den Einstellungen, sondern unter Importieren … im ⋮ der Bereichsliste. ([obf-1096](https://github.com/paxel/oldbrainfix/issues/409))
+- In einem Bereich oder Thema öffnet „+“ ▸ Notiz den vollen Editor mit einer dort einsortierten Notiz statt der Schnellnotiz. ([obf-1140](https://github.com/paxel/oldbrainfix/issues/456))
 - Die Benachrichtigung einer Erinnerung oder Routine öffnet auf Handy und Desktop die Agenda bei ihrer markierten Fälligkeit; „Feedback senden“ kann die zuletzt angetippten Benachrichtigungen mitschicken. ([obf-1039](https://github.com/paxel/oldbrainfix/issues/349))
 
 ### Behoben

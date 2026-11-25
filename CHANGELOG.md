@@ -50,6 +50,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the phone and the desktop, buttons, chips and header bands follow one design: outlined buttons are tonal, deleting is red, chips are pills. ([obf-1081](https://github.com/paxel/oldbrainfix/issues/394))
 - Actions have one name in both apps; the menus of a card, an Area, a table column, File and View are grouped into short submenus. ([obf-1014](https://github.com/paxel/oldbrainfix/issues/321))
 - On the phone, the Imports moved from the Settings to Import… in the Areas list's ⋮. ([obf-1096](https://github.com/paxel/oldbrainfix/issues/409))
+- In an Area or a Topic, "+" ▸ Note opens the full editor on a Note filed there, not the quick note. ([obf-1140](https://github.com/paxel/oldbrainfix/issues/456))
 - A Reminder's or Routine's notification opens the Agenda at its Occurrence, marked, on the phone and the desktop; Send feedback can include the last taps. ([obf-1039](https://github.com/paxel/oldbrainfix/issues/349))
 
 ### Fixed
