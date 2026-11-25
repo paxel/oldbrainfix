@@ -304,82 +304,82 @@ class _TallyFormScreenState extends State<TallyFormScreen> {
     final unit = shownUnit(field.unit(_system), _system);
     final target = field.targetText.trim();
     final error = TextStyle(color: Theme.of(context).colorScheme.error);
-    return EditorPanel(
+    // One field of the Fields group in the page's one card (obf-1118),
+    // a line above all but the first.
+    return Column(
       key: ValueKey('tally-form-field-$index'),
-      heading: index == 0 ? t.tallyFields : null,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          TextField(
-            key: ValueKey('tally-form-field-name-$index'),
-            controller: field.name,
-            focusNode: field.focus,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: InputDecoration(
-              labelText: t.tallyFieldName,
-              hintText: t.tallyFieldNameHint,
-              errorText: index == 0 && _fieldsMissing
-                  ? t.tallyFieldsMissing
-                  : null,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (index > 0) const Divider(height: 32),
+        TextField(
+          key: ValueKey('tally-form-field-name-$index'),
+          controller: field.name,
+          focusNode: field.focus,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: InputDecoration(
+            labelText: t.tallyFieldName,
+            hintText: t.tallyFieldNameHint,
+            errorText: index == 0 && _fieldsMissing
+                ? t.tallyFieldsMissing
+                : null,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            SettingBadge(
+              key: ValueKey('tally-form-kind-$index'),
+              setting: t.tallyFieldKind,
+              icon: Icons.check_box_outlined,
+              value: field.check
+                  ? t.tallyFieldKindCheck
+                  : t.tallyFieldKindNumber,
+              onTap: (_) => _editKind(field),
+            ),
+            if (!field.check)
+              SettingBadge(
+                key: ValueKey('tally-form-rule-$index'),
+                setting: t.tallyRule,
+                icon: Icons.functions,
+                value: field.rule == TallyRule.sum
+                    ? t.tallyRuleSumShort
+                    : t.tallyRuleMaxShort,
+                valueIcon: tallyRuleIcon(field.rule),
+                onTap: (_) => _editRule(field),
+              ),
+            if (!field.check)
+              SettingBadge(
+                key: ValueKey('tally-form-unit-$index'),
+                setting: t.tallyUnit,
+                icon: Icons.straighten,
+                value: unit.isEmpty ? t.tallyNoUnit : unit,
+                onTap: (_) => _editUnit(field),
+              ),
+            SettingBadge(
+              key: ValueKey('tally-form-target-$index'),
+              setting: t.tallyTargetBadge,
+              icon: Icons.flag_outlined,
+              value: target.isEmpty
+                  ? t.tallyNoTarget
+                  : unit.isEmpty
+                  ? target
+                  : '$target $unit',
+              onTap: (_) => _editTarget(field),
+            ),
+          ],
+        ),
+        if (field.targetInvalid)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              t.tallyNotANumber,
+              key: ValueKey('tally-form-target-error-$index'),
+              style: error,
             ),
           ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              SettingBadge(
-                key: ValueKey('tally-form-kind-$index'),
-                setting: t.tallyFieldKind,
-                icon: Icons.check_box_outlined,
-                value: field.check
-                    ? t.tallyFieldKindCheck
-                    : t.tallyFieldKindNumber,
-                onTap: (_) => _editKind(field),
-              ),
-              if (!field.check)
-                SettingBadge(
-                  key: ValueKey('tally-form-rule-$index'),
-                  setting: t.tallyRule,
-                  icon: Icons.functions,
-                  value: field.rule == TallyRule.sum
-                      ? t.tallyRuleSumShort
-                      : t.tallyRuleMaxShort,
-                  valueIcon: tallyRuleIcon(field.rule),
-                  onTap: (_) => _editRule(field),
-                ),
-              if (!field.check)
-                SettingBadge(
-                  key: ValueKey('tally-form-unit-$index'),
-                  setting: t.tallyUnit,
-                  icon: Icons.straighten,
-                  value: unit.isEmpty ? t.tallyNoUnit : unit,
-                  onTap: (_) => _editUnit(field),
-                ),
-              SettingBadge(
-                key: ValueKey('tally-form-target-$index'),
-                setting: t.tallyTargetBadge,
-                icon: Icons.flag_outlined,
-                value: target.isEmpty
-                    ? t.tallyNoTarget
-                    : unit.isEmpty
-                    ? target
-                    : '$target $unit',
-                onTap: (_) => _editTarget(field),
-              ),
-            ],
-          ),
-          if (field.targetInvalid)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                t.tallyNotANumber,
-                key: ValueKey('tally-form-target-error-$index'),
-                style: error,
-              ),
-            ),
-        ],
-      ),
+      ],
     );
   }
 
@@ -410,28 +410,42 @@ class _TallyFormScreenState extends State<TallyFormScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // One card for the page, its fields in headed groups
+              // (obf-1118).
               EditorPanel(
-                child: TextField(
-                  key: const ValueKey('tally-form-name'),
-                  controller: _name,
-                  focusNode: _nameFocus,
-                  autofocus: true,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: InputDecoration(
-                    labelText: t.kindName,
-                    errorText: _nameMissing ? t.kindNameMissing : null,
-                  ),
-                ),
-              ),
-              for (final (index, field) in _fields.indexed)
-                _fieldRow(t, index, field),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: OutlinedButton.icon(
-                  key: const ValueKey('tally-form-add-field'),
-                  onPressed: _addField,
-                  icon: const Icon(Icons.add),
-                  label: Text(t.tallyAddField),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextField(
+                      key: const ValueKey('tally-form-name'),
+                      controller: _name,
+                      focusNode: _nameFocus,
+                      autofocus: true,
+                      textCapitalization: TextCapitalization.sentences,
+                      decoration: InputDecoration(
+                        labelText: t.kindName,
+                        errorText: _nameMissing ? t.kindNameMissing : null,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      t.tallyFields,
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 8),
+                    for (final (index, field) in _fields.indexed)
+                      _fieldRow(t, index, field),
+                    const SizedBox(height: 16),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: OutlinedButton.icon(
+                        key: const ValueKey('tally-form-add-field'),
+                        onPressed: _addField,
+                        icon: const Icon(Icons.add),
+                        label: Text(t.tallyAddField),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],

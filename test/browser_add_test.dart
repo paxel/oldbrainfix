@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/browser_add.dart';
 import 'package:oldbrainfix/src/line_editing.dart';
+import 'package:oldbrainfix/src/look.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix/src/session_form_screen.dart';
@@ -423,12 +424,33 @@ void main() {
   });
 
   group('the New Session page', () {
+    /// The page [page] is one card that holds [parts] (obf-1118).
+    void oneCard(WidgetTester tester, Type page, List<String> parts) {
+      final cards = find.descendant(
+        of: find.byType(page),
+        matching: find.byType(Embossed),
+      );
+      expect(cards, findsOneWidget, reason: '$page');
+      for (final part in parts) {
+        expect(
+          find.descendant(of: cards, matching: key(part), skipOffstage: false),
+          findsOneWidget,
+          reason: part,
+        );
+      }
+    }
+
     testWidgets('makes a new Tally inside its pool, ticked, on one page', (
       tester,
     ) async {
       await openPage(tester, _Page.area);
       await pick(tester, NewKind.session);
       await tester.enterText(key('session-form-name'), 'Morning');
+      oneCard(tester, SessionFormScreen, [
+        'session-form-name',
+        'session-pool',
+        'session-form-count',
+      ]);
       // Without a Tally it says what is missing.
       await tap(tester, key('session-form-save'));
       expect(key('session-pool-error'), findsOneWidget);
@@ -437,6 +459,11 @@ void main() {
       expectAccentRow(tester, key('session-new-tally'), 'New Tally');
       await tap(tester, key('session-new-tally'));
       expect(find.byType(TallyFormScreen), findsOneWidget);
+      oneCard(tester, TallyFormScreen, [
+        'tally-form-name',
+        'tally-form-field-0',
+        'tally-form-add-field',
+      ]);
       await fillTally(tester, 'Push-ups', [
         (name: 'Times', unit: '', target: '20', chip: null),
       ]);
