@@ -351,6 +351,11 @@ pub fn install(ctx: &Context) {
     text_styles(ctx);
 }
 
+/// The size of content, a Note's or Section's text, a Line, what is
+/// typed (UI laws, "Text sizes", obf-1122), before the text size grows
+/// it through [`content`].
+pub const CONTENT: f32 = 16.0;
+
 /// The size of a label's and a button's words (UI laws, "Spacing and
 /// type", obf-1081), before the text size: egui's body and button text.
 pub const LABEL: f32 = 14.0;

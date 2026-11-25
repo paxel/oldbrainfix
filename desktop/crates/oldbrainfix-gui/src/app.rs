@@ -17934,7 +17934,7 @@ impl App {
                                         boxes: look,
                                         ticks: (section_ticks, &section_ticked),
                                         name: t.section_text_field_name(),
-                                        look: (18.0, text),
+                                        look: (theme::CONTENT, text),
                                         hint: None,
                                     };
                                     let state = (
@@ -17950,7 +17950,7 @@ impl App {
                                     // formatted.
                                     ui.style_mut().interaction.selectable_labels = true;
                                     let all = (0, section.text.len());
-                                    let shown = (None, text);
+                                    let shown = (Some(theme::CONTENT), text);
                                     let spots = read_text::shown(ui, |ui| {
                                         text_marks_view::formatted_label(
                                             ui,
@@ -18078,7 +18078,7 @@ impl App {
                             let all = (0, note.text.len());
                             // A Code text moves sideways (#213).
                             if note.text_format == text_format::CODE {
-                                let look = (Some(18.0), text);
+                                let look = (Some(theme::CONTENT), text);
                                 read_text::shown(ui, |ui| {
                                     text_marks_view::code_text_label(
                                         ui,
@@ -18095,7 +18095,7 @@ impl App {
                                     ui,
                                     (&note.text, &note.text_format, boxes),
                                     all,
-                                    (Some(18.0), text),
+                                    (Some(theme::CONTENT), text),
                                     false,
                                 )
                             });
@@ -18151,7 +18151,7 @@ impl App {
                             boxes,
                             ticks: (ticks, &ticked),
                             name: t.note_text_field_name(),
-                            look: (18.0, text),
+                            look: (theme::CONTENT, text),
                             hint: None,
                         };
                         let state = (&mut *edited, &mut *editing, &mut *focus, &mut *select);
@@ -26723,8 +26723,8 @@ fn finding_text(
     Some(at(said, finding.start))
 }
 
-/// The size of a Note's text as the Note dialog and the reading view show
-/// it, before the Device's text size (#326).
+/// The size of a Note's text as the reading view shows it, before the
+/// Device's text size (#326).
 pub(crate) const READ_SIZE: f32 = 18.0;
 
 /// What [`read_part`] draws, the text of a Note or Section: its id, its

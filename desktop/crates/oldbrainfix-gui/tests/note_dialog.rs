@@ -183,6 +183,46 @@ fn a_card_opens_its_note_in_a_dialog_which_esc_closes_keeping_the_text() -> Test
     Ok(())
 }
 
+/// The sizes `words` are drawn at, wherever they are drawn.
+fn sizes_of(harness: &Harness<'_, App>, words: &str) -> Vec<f32> {
+    fn flat(shape: &egui::Shape, words: &str, into: &mut Vec<f32>) {
+        match shape {
+            egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| flat(s, words, into)),
+            egui::Shape::Text(text) if text.galley.text() == words => into.extend(
+                text.galley
+                    .job
+                    .sections
+                    .iter()
+                    .map(|s| s.format.font_id.size),
+            ),
+            _ => {}
+        }
+    }
+    let mut sizes = Vec::new();
+    for clipped in &harness.output().shapes {
+        flat(&clipped.shape, words, &mut sizes);
+    }
+    sizes
+}
+
+#[test]
+fn the_note_dialogs_text_is_content_16_as_on_the_card() -> TestResult {
+    let (store, _) = store()?;
+    let milk = Notes::new(&store).capture("Milk", None, None)?.id;
+    let mut harness = window(&store, Selection::All);
+    harness.state_mut().select_note(&milk);
+    harness.run();
+    assert!(harness.state().note_open());
+    // The card's and the dialog's field's.
+    let sizes = sizes_of(&harness, "Milk");
+    assert!(sizes.len() >= 2, "drawn at {sizes:?}");
+    assert!(
+        sizes.iter().all(|s| (s - 16.0).abs() < 0.01),
+        "drawn at {sizes:?}"
+    );
+    Ok(())
+}
+
 #[test]
 fn the_menu_bar_stays_at_hand_over_the_note_dialog() -> TestResult {
     let (store, household) = store()?;
