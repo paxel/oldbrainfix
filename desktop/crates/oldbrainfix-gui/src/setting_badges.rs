@@ -57,6 +57,10 @@ pub fn switch_icon(on: bool) -> char {
     }
 }
 
+/// How far the ▾ after a value that picks among values stands from its
+/// words (obf-1116).
+pub const ARROW_GAP: f32 = 4.0;
+
 /// The badge of `setting` with its `value`, `None` for one that only
 /// adds, such as "+": `icon` on its tinted part, in `colour` or the
 /// accent. It answers clicks while `active`.
@@ -86,8 +90,10 @@ pub fn badge(
     } else {
         0.0
     };
+    // The room between the value's words and its ▾ (obf-1116).
+    let gap = if arrow > 0.0 { ARROW_GAP } else { 0.0 };
     let value_width = match (&galley, value) {
-        (Some(g), _) => g.size().x + arrow + 2.0 * pad,
+        (Some(g), _) => g.size().x + gap + arrow + 2.0 * pad,
         (None, Some(BadgeValue::Icon(..))) => value_icon + 2.0 * pad,
         (None, _) => 0.0,
     };
@@ -133,7 +139,7 @@ pub fn badge(
             let end = at.x + galley.size().x;
             painter.galley(at, galley, text);
             if arrow > 0.0 {
-                let at = egui::pos2(end + arrow / 2.0, rect.center().y);
+                let at = egui::pos2(end + gap + arrow / 2.0, rect.center().y);
                 let square = egui::Rect::from_center_size(at, egui::vec2(arrow, arrow));
                 icons::paint(painter, square, icons::ARROW_DROP_DOWN, text);
             }

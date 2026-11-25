@@ -15,6 +15,7 @@ use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::TextSize;
 use oldbrainfix_gui::design::{self, Chip};
 use oldbrainfix_gui::l10n::L10n;
+use oldbrainfix_gui::setting_badges::{self, BadgeValue};
 use oldbrainfix_gui::theme::{self, ButtonKind, LIGHT};
 use oldbrainfix_gui::{App, capture_choices, icons};
 
@@ -249,4 +250,36 @@ fn a_framed_icon_button_wears_the_outlined_buttons_frame_and_its_name() {
         .weak_bg_fill;
     let (fill, _) = frame(&harness, at).unwrap_or_else(|| panic!("no frame under the pointer"));
     assert_eq!(fill, hovered);
+}
+
+#[test]
+fn a_setting_badges_drop_down_mark_stands_4_after_its_value() {
+    let t = L10n::new("en");
+    let harness = harness(TextSize::Normal, move |ui| {
+        ui.add_space(40.0);
+        let tones = theme::tones(ui.visuals());
+        setting_badges::badge(
+            ui,
+            (&t, tones),
+            (icons::NOTE, None),
+            "Kind",
+            Some(BadgeValue::Choice("Plain Note")),
+            true,
+        );
+    });
+    let shapes = drawn(&harness);
+    let text = |words: &str| {
+        shapes.iter().find_map(|shape| match shape {
+            Shape::Text(text) if text.galley.text() == words => Some(text.clone()),
+            _ => None,
+        })
+    };
+    let value = text("Plain Note").unwrap_or_else(|| panic!("no value"));
+    let mark = text(&icons::ARROW_DROP_DOWN.to_string()).unwrap_or_else(|| panic!("no ▾"));
+    let end = value.pos.x + value.galley.size().x;
+    assert!(
+        near(mark.pos.x - end, setting_badges::ARROW_GAP),
+        "{} {end}",
+        mark.pos.x
+    );
 }

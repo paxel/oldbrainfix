@@ -53,6 +53,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 ### Behoben
 
+- Auf dem Desktop steht hinter dem Wert einer Notiz-Einstellung wieder ein Aufklapp-Pfeil statt eines Roboterkopfs. ([obf-1116](https://github.com/paxel/oldbrainfix/issues/432))
 - Auf dem Handy bleibt die Linie unter der Leiste einer Liste, wenn ihr Suchstreifen weggescrollt ist. ([obf-1129](https://github.com/paxel/oldbrainfix/issues/445))
 - Auf dem Handy ist ein Konflikt eine Karte wie die anderen, auch im dunklen Modus, und jede Fassung eine Zeile zum Wählen. ([obf-1119](https://github.com/paxel/oldbrainfix/issues/435))
 - Auf dem Handy sehen Neue Strichliste, Notizen dieser Person, Änderungen schicken und Konflikte nicht mehr wie bloßer Text aus, sondern antippbar. ([obf-1108](https://github.com/paxel/oldbrainfix/issues/424))

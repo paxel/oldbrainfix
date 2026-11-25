@@ -195,8 +195,10 @@ pub const SESSION_LEAST: char = '\u{f04c6}';
 /// one unfolded, `expand_less`.
 pub const EXPAND_MORE: char = '\u{e246}';
 /// `arrow_drop_down`, the ▾ after a badge's value in words whose click
-/// picks among values, such as the kind (#310).
-pub const ARROW_DROP_DOWN: char = '\u{e5c5}';
+/// picks among values, such as the kind (#310): Flutter's codepoint, as
+/// the bundled font has it, not the older font's `e5c5`, which here is
+/// `smart_toy` (obf-1116).
+pub const ARROW_DROP_DOWN: char = '\u{e098}';
 /// The kinds of an Attachment (#267), as on the phone: a PDF, a text
 /// document, a table, plain text or Markdown, any other file.
 pub const FILE_PDF: char = '\u{f2a4}';

@@ -54,6 +54,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 
 ### Fixed
 
+- On the desktop, the mark after a Note setting's value is a drop-down arrow again, not a robot face. ([obf-1116](https://github.com/paxel/oldbrainfix/issues/432))
 - On the phone, the line under a list's bar stays once its search band has scrolled away. ([obf-1129](https://github.com/paxel/oldbrainfix/issues/445))
 - On the phone, a Conflict is a card like the others, also in dark mode, and each version is a row to pick. ([obf-1119](https://github.com/paxel/oldbrainfix/issues/435))
 - On the phone, New Tally, Their Notes, Send changes and Conflicts no longer look like plain text but like something to tap. ([obf-1108](https://github.com/paxel/oldbrainfix/issues/424))
