@@ -915,6 +915,11 @@ impl RoutineEditor {
             .id_salt("routine")
             .auto_shrink([false, false])
             .show(ui, |ui| {
+                // The bar's width as room on the right, so the bar,
+                // hovered and wide too, never draws over a card's edge
+                // (obf-1120).
+                let bar = ui.spacing().scroll.bar_width;
+                ui.set_max_width((ui.available_width() - bar).max(0.0));
                 ui.spacing_mut().item_spacing.y = 16.0;
                 ui.add_space(4.0);
                 ui.horizontal(|ui| {
