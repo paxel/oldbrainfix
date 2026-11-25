@@ -72,6 +72,10 @@ pub const UNIMPORTANT_OPACITY: f32 = 0.55;
 pub struct TextTones {
     /// Plain text, also on a marked row.
     pub text: Color32,
+    /// Strong text, a heading's (obf-1126): set off from plain text,
+    /// darker in light and brighter in dark, as egui's strong is only a
+    /// colour.
+    pub strong: Color32,
     /// Text that matters less: hints, times, explanations.
     pub weak: Color32,
     /// Links and text in the accent; the accent itself is for marks and
@@ -83,6 +87,7 @@ pub struct TextTones {
 
 pub const LIGHT_TEXT: TextTones = TextTones {
     text: Color32::from_gray(60),
+    strong: Color32::from_gray(15),
     weak: Color32::from_gray(90),
     link: argb(0xFF00695C),
     error: argb(0xFFA8231C),
@@ -91,6 +96,7 @@ pub const LIGHT_TEXT: TextTones = TextTones {
 
 pub const DARK_TEXT: TextTones = TextTones {
     text: Color32::from_gray(220),
+    strong: Color32::WHITE,
     weak: Color32::from_gray(180),
     link: argb(0xFF80CBC4),
     error: argb(0xFFFFB4AB),
@@ -337,6 +343,9 @@ pub fn visuals(dark: bool) -> Visuals {
     v.selection.bg_fill = t.accent.gamma_multiply(SELECTION_TINT);
     v.selection.stroke = Stroke::new(1.0, t.accent);
     paint_buttons(&mut v, button_tones(dark, ButtonKind::Secondary));
+    // egui reads strong text's colour from a pressed widget's (obf-1126);
+    // a pressed button's words take it too, readable on its fill.
+    v.widgets.active.fg_stroke.color = x.strong;
     v
 }
 

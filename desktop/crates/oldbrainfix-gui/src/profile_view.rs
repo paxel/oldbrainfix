@@ -345,7 +345,7 @@ pub fn header(
         });
     });
     ui.add_space(8.0);
-    ui.label(RichText::new(t.profile_name()).strong().color(text));
+    ui.label(RichText::new(t.profile_name()).strong());
     let field = ui.add(
         TextEdit::singleline(&mut view.name)
             .id(Id::new("profile name"))
@@ -370,7 +370,7 @@ pub fn header(
 pub fn card_section(ui: &mut Ui, t: &L10n, saved: bool, actions: &mut Vec<ProfileAction>) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
-    ui.label(RichText::new(t.profile_card_title()).strong().color(text));
+    ui.label(RichText::new(t.profile_card_title()).strong());
     ui.label(
         RichText::new(t.profile_card_send_detail())
             .small()
@@ -511,7 +511,7 @@ pub fn question_form(
                 avatar(ui, view, profile, 56.0, name);
                 ui.add_space(12.0);
                 ui.vertical(|ui| {
-                    ui.label(RichText::new(name).strong().color(text));
+                    ui.label(RichText::new(name).strong());
                     ui.label(RichText::new(code).monospace().color(text));
                     ui.label(
                         RichText::new(place)

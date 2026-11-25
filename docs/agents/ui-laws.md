@@ -161,7 +161,10 @@ There are three kinds, and an action takes the first that fits.
   Material's dialog title on the phone and 18 strong on the desktop
   (`design::dialog_title`, obf-1125). A card's or section's heading is 16
   medium (phone `titleMedium`, through `sectionHeading` in `look.dart`,
-  obf-1124), on the desktop strong. Labels and
+  obf-1124), on the desktop strong. Strong text on the desktop is set
+  off by the theme's strong tone (`TextTones::strong`, darker than the
+  text in light, brighter in dark) and carries no colour of its own,
+  which would win over it (obf-1126). Labels and
   buttons are 14 (phone `labelLarge` / `bodyMedium`, desktop egui's
   body and button text styles, `theme::LABEL`). A caption, meta line
   or hint is 12 in the weak colour (phone `bodySmall`, desktop

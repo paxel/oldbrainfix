@@ -169,7 +169,7 @@ pub fn picker(ui: &mut Ui, t: &L10n, picker: &mut Picker, focus: bool) -> Option
                 let Some(first) = shown.next() else {
                     continue;
                 };
-                ui.label(RichText::new(heading).strong().color(text));
+                ui.label(RichText::new(heading).strong());
                 for target in std::iter::once(first).chain(shown) {
                     let row = ui
                         .selectable_label(false, RichText::new(&target.label).color(text))

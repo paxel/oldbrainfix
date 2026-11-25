@@ -433,7 +433,7 @@ impl CapturePopup {
                         picked = Some(Notes::default_nudge());
                     }
                 } else {
-                    ui.label(RichText::new(t.nudge_heading()).strong().color(text));
+                    ui.label(RichText::new(t.nudge_heading()).strong());
                     ui.horizontal(|ui| {
                         let labels = [t.snooze10(), t.snooze30(), t.snooze60()];
                         for (label, nudge_in) in

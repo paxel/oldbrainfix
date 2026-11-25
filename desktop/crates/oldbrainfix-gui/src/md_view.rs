@@ -573,7 +573,7 @@ impl Viewer {
             }
             ui.add_space(8.0);
             let name = self.title("");
-            ui.label(RichText::new(name).strong().color(text));
+            ui.label(RichText::new(name).strong());
             ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
                 let more = icon_button(ui, icons::MORE_VERT, t.desk_markdown_more(), text);
                 egui::Popup::menu(&more).show(|ui| {

@@ -383,7 +383,7 @@ fn thread(
                 }
                 embossed(ui, tones, false, None, |ui| {
                     ui.horizontal_wrapped(|ui| {
-                        ui.label(RichText::new(&exchange.question).strong().color(text));
+                        ui.label(RichText::new(&exchange.question).strong());
                         let edit = egui::Button::new(RichText::new(t.edit()).color(text));
                         if ui.add_enabled(!asking, edit).clicked() {
                             asked.push(AskAsked::Edit(at));
@@ -397,7 +397,7 @@ fn thread(
             }
             if let Some(question) = &panel.asking {
                 embossed(ui, tones, false, None, |ui| {
-                    ui.label(RichText::new(question).strong().color(text));
+                    ui.label(RichText::new(question).strong());
                     ui.horizontal(|ui| {
                         ui.spinner();
                         let status = match panel.read {
@@ -409,7 +409,7 @@ fn thread(
                 });
             } else if let Some(failed) = &panel.failed {
                 embossed(ui, tones, false, None, |ui| {
-                    ui.label(RichText::new(&failed.question).strong().color(text));
+                    ui.label(RichText::new(&failed.question).strong());
                     ui.label(RichText::new(&failed.cause).color(error));
                     ui.label(RichText::new(&failed.fix).color(text));
                     if ui
@@ -599,7 +599,7 @@ pub fn settings_card(
     let weak = ui.visuals().weak_text_color();
     let mut changed = None;
     embossed(ui, tones, false, None, |ui| {
-        let title = ui.label(RichText::new(t.ask_settings_title()).strong().color(text));
+        let title = ui.label(RichText::new(t.ask_settings_title()).strong());
         if at {
             title.scroll_to_me_animation(
                 Some(egui::Align::TOP),

@@ -434,15 +434,11 @@ impl SyncHost {
                         .unwrap_or_default();
                     let name = display_name(t, &choice.profile.name).to_string();
                     embossed(ui, tones, true, None, |ui| {
-                        ui.label(
-                            RichText::new(t.invite_confirm_title(&area))
-                                .strong()
-                                .color(text),
-                        );
+                        ui.label(RichText::new(t.invite_confirm_title(&area)).strong());
                         ui.horizontal(|ui| {
                             person_picture(ui, &mut self.pictures, &choice.profile, 56.0, &name);
                             ui.vertical(|ui| {
-                                ui.label(RichText::new(&name).strong().color(text));
+                                ui.label(RichText::new(&name).strong());
                                 ui.label(
                                     RichText::new(format!(
                                         "{}: {}",
@@ -485,11 +481,7 @@ impl SyncHost {
                         AreaRole::Member => t.role_member(),
                     };
                     embossed(ui, tones, true, None, |ui| {
-                        ui.label(
-                            RichText::new(t.inviting_banner(&area, role))
-                                .strong()
-                                .color(text),
-                        );
+                        ui.label(RichText::new(t.inviting_banner(&area, role)).strong());
                         if ui
                             .button(RichText::new(t.stop_inviting()).color(text))
                             .clicked()
@@ -516,25 +508,21 @@ impl SyncHost {
                         } else {
                             t.shared_with_you(who, &area)
                         };
-                        ui.label(RichText::new(said).strong().color(text));
+                        ui.label(RichText::new(said).strong());
                     }
                     if self.refused > 0 {
                         ui.label(RichText::new(t.sync_refused(self.refused as i64)).color(error));
                     }
                     // The Conflicts are listed in the Sync dialog.
                     if self.found > 0 && !pair {
-                        ui.label(
-                            RichText::new(t.sync_conflicts_below(self.found as i64))
-                                .strong()
-                                .color(text),
-                        );
+                        ui.label(RichText::new(t.sync_conflicts_below(self.found as i64)).strong());
                     }
                 }
                 if pair {
                     return;
                 }
                 embossed(ui, tones, false, None, |ui| {
-                    ui.label(RichText::new(t.conflicts_title()).strong().color(text));
+                    ui.label(RichText::new(t.conflicts_title()).strong());
                     if self.conflicts.is_empty() {
                         ui.label(RichText::new(t.conflicts_none()).color(weak));
                     } else {
@@ -542,11 +530,7 @@ impl SyncHost {
                     }
                     for conflict in &self.conflicts {
                         ui.add_space(4.0);
-                        ui.label(
-                            RichText::new(conflict_heading(t, store, conflict))
-                                .strong()
-                                .color(text),
-                        );
+                        ui.label(RichText::new(conflict_heading(t, store, conflict)).strong());
                         if let Some(note) = conflict_note(store, conflict) {
                             ui.label(RichText::new(note).color(text));
                         }
@@ -593,7 +577,7 @@ impl SyncHost {
                     action = Some(asked);
                 }
                 embossed(ui, tones, false, None, |ui| {
-                    ui.label(RichText::new(t.paired_devices_title()).strong().color(text));
+                    ui.label(RichText::new(t.paired_devices_title()).strong());
                     let devices = store.paired_devices().unwrap_or_default();
                     if devices.is_empty() {
                         ui.label(RichText::new(t.paired_none()).color(weak));
@@ -667,11 +651,7 @@ impl SyncHost {
         };
         let mut action = None;
         embossed(ui, tones, true, None, |ui| {
-            ui.label(
-                RichText::new(t.sync_trust_question(&who))
-                    .strong()
-                    .color(text),
-            );
+            ui.label(RichText::new(t.sync_trust_question(&who)).strong());
             ui.horizontal(|ui| {
                 if ui
                     .button(RichText::new(t.sync_trust()).color(text))
@@ -710,15 +690,9 @@ impl SyncHost {
                 qr(ui, &host.pair_code(false), qrcode::EcLevel::M, 240.0, None);
                 let typed = host.pair_code(true);
                 for line in pair_code_lines(&typed) {
-                    ui.label(
-                        RichText::new(line)
-                            .monospace()
-                            .strong()
-                            .size(20.0)
-                            .color(text),
-                    );
+                    ui.label(RichText::new(line).monospace().strong().size(20.0));
                 }
-                ui.label(RichText::new(t.sync_pin(host.pin())).strong().color(text));
+                ui.label(RichText::new(t.sync_pin(host.pin())).strong());
                 ui.label(
                     RichText::new(format!("{}:{}", host.address(), host.port()))
                         .small()
@@ -744,7 +718,7 @@ impl SyncHost {
         let joining = self.joining.is_some();
         let mut asked = false;
         embossed(ui, tones, false, None, |ui| {
-            ui.label(RichText::new(t.sync_join_title()).strong().color(text));
+            ui.label(RichText::new(t.sync_join_title()).strong());
             ui.label(RichText::new(t.sync_type_code_intro()).small().color(weak));
             let label = ui.label(RichText::new(t.sync_code_label()).color(text));
             let field = ui
@@ -836,7 +810,7 @@ fn folder_section(
     let error = ui.visuals().error_fg_color;
     let mut action = None;
     embossed(ui, tones, false, None, |ui| {
-        ui.label(RichText::new(t.folder_title()).strong().color(text));
+        ui.label(RichText::new(t.folder_title()).strong());
         ui.label(RichText::new(t.folder_intro()).small().color(weak));
         match store.sync_folder().ok().flatten() {
             None => {
@@ -906,7 +880,7 @@ fn bundle_section(
         }
     };
     embossed(ui, tones, false, None, |ui| {
-        ui.label(RichText::new(t.bundle_title()).strong().color(text));
+        ui.label(RichText::new(t.bundle_title()).strong());
         ui.label(RichText::new(t.bundle_intro()).small().color(weak));
         // Device names are the user's own: radio buttons, as on the
         // phone (UI laws, "Dialogs and pages"), Everything last.

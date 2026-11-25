@@ -52,6 +52,7 @@ fn every_text_is_readable_on_the_ground_the_marks_and_the_cards() {
     for (name, t, x, _) in both() {
         let texts = [
             ("text", x.text),
+            ("strong", x.strong),
             ("weak", x.weak),
             ("link", x.link),
             ("error", x.error),
@@ -95,6 +96,30 @@ fn the_visuals_draw_with_the_readable_tones() {
         assert_eq!(v.error_fg_color, x.error, "{name}");
         assert_eq!(v.warn_fg_color, x.warn, "{name}");
         assert!(v.override_text_color.is_none(), "{name}");
+    }
+}
+
+#[test]
+fn strong_text_is_set_off_from_plain_text() {
+    for (name, _, x, v) in both() {
+        assert_eq!(v.strong_text_color(), x.strong, "{name}");
+        let ratio = contrast(x.strong, x.text);
+        assert!(ratio >= 1.3, "{name} strong against plain text: {ratio:.2}");
+        // Further from the ground than plain text, not nearer.
+        let darker = x.strong.r() < x.text.r();
+        assert_eq!(darker, name == "light", "{name}");
+    }
+}
+
+#[test]
+fn a_pressed_buttons_words_in_the_strong_tone_stay_readable() {
+    for (name, _, x, _) in both() {
+        let b = button_tones(name == "dark", ButtonKind::Secondary);
+        let ratio = contrast(x.strong, b.pressed);
+        assert!(
+            ratio >= 4.5,
+            "{name} strong on a pressed button: {ratio:.2}"
+        );
     }
 }
 
@@ -197,7 +222,9 @@ fn every_button_draws_rounded_filled_and_outlined_in_the_secondary_tones() {
             assert_eq!(s.weak_bg_fill, fill, "{name} {state}");
             assert_eq!(s.bg_stroke, stroke, "{name} {state}");
             assert_eq!(s.corner_radius, CornerRadius::same(BUTTON_RADIUS), "{name}");
-            assert_eq!(s.fg_stroke.color, x.text, "{name} {state} text");
+            // Pressed, in the strong tone egui reads from it (obf-1126).
+            let words = if state == "pressed" { x.strong } else { x.text };
+            assert_eq!(s.fg_stroke.color, words, "{name} {state} text");
         }
     }
 }

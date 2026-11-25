@@ -330,7 +330,7 @@ impl FileIntoPicker {
         } else {
             t.new_area()
         };
-        ui.label(RichText::new(heading).strong().color(text));
+        ui.label(RichText::new(heading).strong());
         let field = ui.add(
             TextEdit::singleline(&mut naming.name)
                 .id(Id::new("file into name"))

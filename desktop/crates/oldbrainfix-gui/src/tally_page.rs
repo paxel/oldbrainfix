@@ -294,7 +294,7 @@ impl TallyPage {
                     }
                 });
                 embossed(ui, tones, false, None, |ui| {
-                    let label = ui.label(RichText::new(t.kind_name()).strong().color(text));
+                    let label = ui.label(RichText::new(t.kind_name()).strong());
                     let field = ui
                         .add(
                             TextEdit::singleline(&mut self.name)
@@ -312,12 +312,11 @@ impl TallyPage {
                         ui.label(RichText::new(t.kind_name_missing()).color(error));
                     }
                 });
-                ui.label(RichText::new(t.tally_fields()).strong().color(text));
+                ui.label(RichText::new(t.tally_fields()).strong());
                 for (index, field) in self.fields.iter_mut().enumerate() {
                     embossed(ui, tones, false, None, |ui| {
                         ui.spacing_mut().item_spacing.y = 8.0;
-                        let label =
-                            ui.label(RichText::new(t.tally_field_name()).strong().color(text));
+                        let label = ui.label(RichText::new(t.tally_field_name()).strong());
                         let id = field_id(field.key);
                         let typed = ui
                             .add(

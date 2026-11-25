@@ -113,9 +113,8 @@ pub fn card(
     form: &mut Passphrase,
     actions: &mut Vec<BackupAction>,
 ) {
-    let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
-    ui.label(RichText::new(t.backups_title()).strong().color(text));
+    ui.label(RichText::new(t.backups_title()).strong());
     ui.label(RichText::new(t.backups_intro()).small().color(weak));
     own_backups(ui, t, store, wall, form, actions);
 }
@@ -125,7 +124,7 @@ pub fn card(
 pub fn notes_card(ui: &mut Ui, t: &L10n) -> bool {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
-    ui.label(RichText::new(t.backup_open_title()).strong().color(text));
+    ui.label(RichText::new(t.backup_open_title()).strong());
     ui.label(RichText::new(t.backup_open_intro()).small().color(weak));
     ui.button(RichText::new(t.backup_open()).color(text))
         .clicked()
@@ -176,7 +175,7 @@ fn own_backups(
         }
         return;
     }
-    ui.label(RichText::new(t.backup_sheet_title()).strong().color(text));
+    ui.label(RichText::new(t.backup_sheet_title()).strong());
     ui.label(RichText::new(t.backup_sheet_intro()).small().color(weak));
     if ui
         .button(RichText::new(t.backup_sheet_save()).color(text))
@@ -184,7 +183,7 @@ fn own_backups(
     {
         actions.push(BackupAction::SaveSheet);
     }
-    ui.label(RichText::new(t.backup_folder_title()).strong().color(text));
+    ui.label(RichText::new(t.backup_folder_title()).strong());
     let folder = store.backup_folder().ok().flatten();
     let shown = match &folder {
         Some(path) => t.backup_folder_chosen(path),
@@ -303,13 +302,12 @@ impl Welcome {
 
 /// The text, then its button below it (UI laws, "Dialogs and pages").
 fn choice(ui: &mut Ui, detail: &str, label: &str) -> bool {
-    let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     ui.add_space(8.0);
     ui.label(RichText::new(detail).color(weak));
     ui.add_sized(
         [ui.available_width(), 32.0],
-        egui::Button::new(RichText::new(label).strong().color(text)),
+        egui::Button::new(RichText::new(label).strong()),
     )
     .clicked()
 }
@@ -361,7 +359,7 @@ pub fn welcome(
     ui.label(RichText::new(t.restore_intro()).small().color(weak));
     ui.add_space(8.0);
     let made = wall(header.created).format("%Y-%m-%d %H:%M").to_string();
-    ui.label(RichText::new(t.restore_file(&made)).strong().color(text));
+    ui.label(RichText::new(t.restore_file(&made)).strong());
     if ui
         .button(RichText::new(t.restore_pick()).color(text))
         .clicked()
@@ -545,7 +543,7 @@ pub fn notes_page(
         None => state.header.created,
     };
     let made = wall(created).format("%Y-%m-%d %H:%M").to_string();
-    ui.label(RichText::new(t.restore_file(&made)).strong().color(text));
+    ui.label(RichText::new(t.restore_file(&made)).strong());
     let Some(opened) = &state.opened else {
         ui.label(RichText::new(t.backup_open_unlock_intro()).color(weak));
         ui.add_space(4.0);

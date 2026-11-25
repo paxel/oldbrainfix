@@ -14535,7 +14535,7 @@ impl App {
                 }
                 ui.add_space(12.0);
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new(t.areas_title()).strong().color(text));
+                    ui.label(RichText::new(t.areas_title()).strong());
                     // "+" at the right end of the heading.
                     ui.add_space((ui.available_width() - 28.0).max(0.0));
                     if icon_button(ui, icons::ADD, t.new_area(), text).clicked() {
@@ -16345,8 +16345,7 @@ impl App {
                         let stored = note.code_language.as_deref().filter(|l| !l.is_empty());
                         let grammars = text_marks_view::grammars(ui.ctx());
                         let shows = grammars.by_scope(stored).map(|g| g.scope.as_str());
-                        let text = ui.visuals().text_color();
-                        ui.label(RichText::new(t.code_language()).strong().color(text));
+                        ui.label(RichText::new(t.code_language()).strong());
                         let mut language = shows;
                         let options = std::iter::once((None, t.code_language_none().to_string()))
                             .chain(
@@ -16805,7 +16804,7 @@ impl App {
                     t.capture_keys_hint()
                 }
             } else {
-                ui.label(RichText::new(t.nudge_heading()).strong().color(text));
+                ui.label(RichText::new(t.nudge_heading()).strong());
                 let nudges = ui.horizontal(|ui| {
                     let labels = [t.snooze10(), t.snooze30(), t.snooze60()];
                     for (label, nudge_in) in labels.into_iter().zip(capture_choices::nudge_times())
@@ -17603,11 +17602,10 @@ impl App {
         let t = &self.t;
         let text = ui.visuals().text_color();
         let filter = &self.people;
-        let label = RichText::new(t.person_filter())
-            .size(sizes.words)
-            .color(text);
+        let label = RichText::new(t.person_filter()).size(sizes.words);
+        // Strong in the theme's strong tone (obf-1126).
         let label = if filter.is_everyone() {
-            label
+            label.color(text)
         } else {
             label.strong()
         };
@@ -18234,8 +18232,7 @@ impl App {
                 // A Session's past runs (#264), under its settings.
                 if session_setup.is_some() {
                     embossed(ui, tones, false, None, |ui| {
-                        let text = ui.visuals().text_color();
-                        ui.label(RichText::new(t.session_runs()).strong().color(text));
+                        ui.label(RichText::new(t.session_runs()).strong());
                         session_view::draw_runs(ui, &t, &self.view.session_runs, None);
                     });
                 }
@@ -19417,12 +19414,7 @@ impl App {
                     actions.push(Action::Select(Selection::AreaOffersWaiting));
                 }
             }
-            ui.label(
-                RichText::new(t.agenda_today())
-                    .strong()
-                    .size(16.0)
-                    .color(text),
-            );
+            ui.label(RichText::new(t.agenda_today()).strong().size(16.0));
             if agenda.today.is_empty() && agenda.shopping.is_empty() && agenda.checklists.is_empty()
             {
                 ui.label(RichText::new(t.nothing_today()).color(ui.visuals().weak_text_color()));
@@ -19467,12 +19459,7 @@ impl App {
             ui.add_space(24.0);
             ui.scope(|ui| {
                 ui.multiply_opacity(TOMORROW_OPACITY);
-                ui.label(
-                    RichText::new(t.agenda_tomorrow())
-                        .strong()
-                        .size(16.0)
-                        .color(text),
-                );
+                ui.label(RichText::new(t.agenda_tomorrow()).strong().size(16.0));
                 // Only today's empty day tells how to capture.
                 if agenda.tomorrow.is_empty() {
                     ui.label(
@@ -19489,12 +19476,7 @@ impl App {
                 ui.add_space(4.0);
                 ui.scope(|ui| {
                     ui.multiply_opacity(TOMORROW_OPACITY);
-                    ui.label(
-                        RichText::new(agenda_day_text(&t, *day))
-                            .strong()
-                            .size(16.0)
-                            .color(text),
-                    );
+                    ui.label(RichText::new(agenda_day_text(&t, *day)).strong().size(16.0));
                     if rows.is_empty() {
                         ui.label(
                             RichText::new(t.nothing_planned())
@@ -20242,7 +20224,7 @@ impl App {
             .take()
             .and_then(|(s, frames)| (frames > 1).then_some((s, frames - 1)));
         let heading = |ui: &mut Ui, words: &str, slug: &str| {
-            let shown = ui.label(RichText::new(words).strong().color(text));
+            let shown = ui.label(RichText::new(words).strong());
             if section.as_deref() == Some(slug) {
                 shown.scroll_to_me_animation(
                     Some(egui::Align::TOP),
@@ -20711,7 +20693,7 @@ impl App {
             if own_grammars {
                 found = true;
                 embossed(ui, tones, false, None, |ui| {
-                    ui.label(RichText::new(t.grammars_title()).strong().color(text));
+                    ui.label(RichText::new(t.grammars_title()).strong());
                     ui.label(RichText::new(t.grammars_hint()).small().color(weak));
                     for grammar in &grammars.added {
                         let under = match Grammars::built_in().by_scope(Some(&grammar.scope)) {
@@ -20779,7 +20761,7 @@ impl App {
         let text = ui.visuals().text_color();
         let weak = ui.visuals().weak_text_color();
         embossed(ui, tones, false, None, |ui| {
-            ui.label(RichText::new(t.routines_heading()).strong().color(text));
+            ui.label(RichText::new(t.routines_heading()).strong());
             for (routine, note) in &self.view.trashed_routines {
                 ui.horizontal_wrapped(|ui| {
                     let what = row_title(&t, note.as_ref());
@@ -20807,7 +20789,7 @@ impl App {
         embossed(ui, tones, false, None, |ui| {
             ui.horizontal(|ui| {
                 frogs_view::frog_mark(ui, 16.0, text);
-                ui.label(RichText::new(t.frogs_title()).strong().color(text));
+                ui.label(RichText::new(t.frogs_title()).strong());
             });
             for (frog, note, manages) in &self.view.trashed_frogs {
                 ui.horizontal_wrapped(|ui| {
@@ -20857,7 +20839,7 @@ impl App {
                         let text = ui.visuals().text_color();
                         if count > 1 {
                             let many = self.t.notes_count(count as i64);
-                            ui.label(RichText::new(many).strong().color(text));
+                            ui.label(RichText::new(many).strong());
                         }
                         ui.label(RichText::new(placed.note.visible_text()).color(text));
                     });
@@ -21246,7 +21228,7 @@ fn note_change(
             let says = |ui: &mut Ui, said: RichText| {
                 read_text::label(ui, egui::Label::new(said).wrap());
             };
-            says(ui, RichText::new(&row.title).strong().color(text));
+            says(ui, RichText::new(&row.title).strong());
             says(ui, RichText::new(&row.said).small().color(weak));
             if let Some(before) = &row.before {
                 says(
@@ -21969,7 +21951,7 @@ fn share_form(
     // Roles are chosen only in Advanced (#197); in Simple the person
     // joins as a Member.
     if advanced {
-        ui.label(RichText::new(t.role_heading()).strong().color(text));
+        ui.label(RichText::new(t.role_heading()).strong());
         for (choice, label, detail) in [
             (AreaRole::Member, t.role_member(), t.role_member_detail()),
             (AreaRole::Manager, t.role_manager(), t.role_manager_detail()),
@@ -21987,7 +21969,7 @@ fn share_form(
         }
     });
     ui.separator();
-    ui.label(RichText::new(t.share_afar_heading()).strong().color(text));
+    ui.label(RichText::new(t.share_afar_heading()).strong());
     let intro = if afar {
         t.share_afar_intro()
     } else {
@@ -22138,7 +22120,7 @@ fn area_offer_form(
             actions.push(Action::OpenPerson(held.sender.id.clone()));
         }
         ui.add_space(8.0);
-        ui.add(egui::Label::new(RichText::new(&line).strong().size(18.0).color(text)).wrap());
+        ui.add(egui::Label::new(RichText::new(&line).strong().size(18.0)).wrap());
     });
     let code = &held.code;
     let trust = if compared == Compared::Match {
@@ -22455,7 +22437,7 @@ fn sent_item_form(
         .max_height(360.0)
         .show(ui, |ui| {
             if let Some(changes) = &opened.changes {
-                ui.label(RichText::new(t.sent_item_changes()).strong().color(text));
+                ui.label(RichText::new(t.sent_item_changes()).strong());
                 let mut line = |said: String| {
                     ui.label(RichText::new(said).color(text));
                 };
@@ -22548,7 +22530,7 @@ fn sent_item_form(
                 checklist_view::preview(ui, (t, tones), lines);
             }
             if !item.routines.is_empty() {
-                ui.label(RichText::new(t.routines_heading()).strong().color(text));
+                ui.label(RichText::new(t.routines_heading()).strong());
                 for r in &item.routines {
                     ui.label(RichText::new(schedule_text(t, &r.schedule)).color(text));
                 }
@@ -22661,7 +22643,7 @@ fn held_sent_item_form(ui: &mut Ui, t: &L10n, held: &HeldSentItem, actions: &mut
         ui.add_sized([ui.available_width(), 32.0], egui::Button::new(label))
             .clicked()
     };
-    if wide(ui, RichText::new(t.sent_item_show()).strong().color(text)) {
+    if wide(ui, RichText::new(t.sent_item_show()).strong()) {
         actions.push(Action::ShowSent);
     }
     ui.horizontal(|ui| {
@@ -22707,7 +22689,7 @@ fn people_form(
 ) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
-    ui.label(RichText::new(t.people_title()).strong().color(text));
+    ui.label(RichText::new(t.people_title()).strong());
     ui.label(RichText::new(t.people_intro()).small().color(weak));
     for person in people {
         let own = Some(person.id.as_str()) == mine;
@@ -22781,7 +22763,7 @@ fn area_look_form(
         actions.push(Action::SaveName);
     }
     ui.add_space(8.0);
-    ui.label(RichText::new(t.colour_heading()).strong().color(text));
+    ui.label(RichText::new(t.colour_heading()).strong());
     ui.horizontal_wrapped(|ui| {
         let none = look.colour.is_none();
         if ui
@@ -22805,7 +22787,7 @@ fn area_look_form(
             }
         }
     });
-    ui.label(RichText::new(t.icon_heading()).strong().color(text));
+    ui.label(RichText::new(t.icon_heading()).strong());
     ui.horizontal_wrapped(|ui| {
         let none = look.icon.is_none();
         if ui
@@ -22994,11 +22976,7 @@ fn quick_capture_card(
 ) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
-    ui.label(
-        RichText::new(t.quick_capture_heading())
-            .strong()
-            .color(text),
-    );
+    ui.label(RichText::new(t.quick_capture_heading()).strong());
     let mut chord = None;
     ui.horizontal(|ui| {
         ui.label(RichText::new(t.hotkey_label()).color(text));
@@ -23089,7 +23067,7 @@ fn quick_note_card(
 ) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
-    ui.label(RichText::new(t.settings_quick_note()).strong().color(text));
+    ui.label(RichText::new(t.settings_quick_note()).strong());
     if shows[0] {
         ui.label(
             RichText::new(t.settings_quick_note_detail_device())
@@ -23842,7 +23820,7 @@ fn agenda_row(
             let body = ui.vertical(|ui| {
                 ui.set_max_width(width);
                 ui.spacing_mut().item_spacing.y = 2.0;
-                ui.label(RichText::new(&time).strong().color(text));
+                ui.label(RichText::new(&time).strong());
                 let mut line = RichText::new(&title)
                     .size(theme::content(ui, 16.0))
                     .color(text);
@@ -24209,12 +24187,7 @@ fn missed_card(
     embossed(ui, tones, true, None, |ui| {
         ui.horizontal(|ui| {
             icons::show(ui, icons::HISTORY, 20.0, error);
-            ui.label(
-                RichText::new(t.missed_title())
-                    .strong()
-                    .size(16.0)
-                    .color(text),
-            );
+            ui.label(RichText::new(t.missed_title()).strong().size(16.0));
             ui.add_space((ui.available_width() - 64.0).max(0.0));
             if ui
                 .button(RichText::new(t.missed_seen()).color(text))
@@ -24251,10 +24224,13 @@ fn missed_card(
                                 m.occurrence,
                             ));
                         }
-                        let mut when = RichText::new(when).color(text);
-                        if marked.is_some_and(|(_, o)| o == m.occurrence) {
-                            when = when.strong();
-                        }
+                        let when = RichText::new(when);
+                        // Strong in the theme's strong tone (obf-1126).
+                        let when = if marked.is_some_and(|(_, o)| o == m.occurrence) {
+                            when.strong()
+                        } else {
+                            when.color(text)
+                        };
                         ui.label(when);
                     });
                 }
@@ -24857,8 +24833,7 @@ fn action_groups(ui: &mut Ui, of: &str, groups: Vec<ActionGroup<'_>>, actions: &
 
 /// A group's heading (obf-1073), small and strong, read as a heading.
 fn group_heading(ui: &mut Ui, heading: &str) {
-    let text = ui.visuals().text_color();
-    let shown = ui.label(RichText::new(heading).strong().color(text));
+    let shown = ui.label(RichText::new(heading).strong());
     ui.ctx().accesskit_node_builder(shown.id, |node| {
         node.set_role(egui::accesskit::Role::Heading);
     });

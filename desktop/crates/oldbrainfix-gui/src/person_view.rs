@@ -214,7 +214,7 @@ pub fn form(
         actions.push(PersonAction::TheirNotes);
     }
     ui.separator();
-    ui.label(RichText::new(t.person_for_me()).strong().color(text));
+    ui.label(RichText::new(t.person_for_me()).strong());
     ui.label(RichText::new(t.person_for_me_detail()).small().color(weak));
     // Saved by a newer version of the app: shown, not changed here (ADR
     // 0034).

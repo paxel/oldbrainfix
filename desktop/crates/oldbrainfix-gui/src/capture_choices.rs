@@ -446,7 +446,7 @@ pub fn shopping_picker(
         }
         return None;
     }
-    ui.label(RichText::new(t.add_to_shopping_list()).strong().color(text));
+    ui.label(RichText::new(t.add_to_shopping_list()).strong());
     let mut picked = None;
     for (id, title) in lists {
         let on = current == Some(id.as_str());

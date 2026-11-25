@@ -107,13 +107,8 @@ pub fn export_form(
     asked: &mut Option<PackAsk>,
 ) {
     heading(ui, t.pack_export_title());
-    let text = ui.visuals().text_color();
     let (_, size) = worked.of(pack, ticks);
-    ui.label(
-        RichText::new(t.pack_size(&size_text(t, size)))
-            .strong()
-            .color(text),
-    );
+    ui.label(RichText::new(t.pack_size(&size_text(t, size))).strong());
     tick_buttons(ui, t, pack, ticks);
     tree(ui, t, pack, ticks, &BTreeSet::new());
     ui.separator();
@@ -151,7 +146,7 @@ pub fn import_form(
         let said = t.pack_from(name);
         ui.horizontal(|ui| {
             profile_view::person_picture(ui, pictures, from, 40.0, &t.author_picture(name));
-            ui.label(RichText::new(&said).strong().color(text));
+            ui.label(RichText::new(&said).strong());
         });
         if !opened.from_kept
             && ui
@@ -288,7 +283,7 @@ fn row(
                 } else {
                     14.0
                 };
-                ui.label(RichText::new(name).size(size).strong().color(text));
+                ui.label(RichText::new(name).size(size).strong());
             });
             for child in &item.children {
                 row(

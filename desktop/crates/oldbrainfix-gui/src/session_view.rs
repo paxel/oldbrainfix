@@ -72,7 +72,7 @@ pub fn draw_runs(ui: &mut Ui, t: &L10n, shown: &[RunShown], limit: Option<usize>
     }
     let count = limit.map_or(shown.len(), |l| l.min(shown.len()));
     for run in shown.iter().take(count) {
-        ui.label(RichText::new(&run.when).strong().color(text));
+        ui.label(RichText::new(&run.when).strong());
         for (name, done) in &run.picks {
             ui.horizontal(|ui| {
                 let icon = if *done {
@@ -249,7 +249,7 @@ pub fn card(ui: &mut Ui, t: &L10n, shown: &SessionCardShown, actions: &mut Vec<S
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     ui.style_mut().interaction.selectable_labels = false;
-    ui.label(RichText::new(t.session_pool()).strong().color(text));
+    ui.label(RichText::new(t.session_pool()).strong());
     for name in &shown.pool {
         ui.horizontal(|ui| {
             icons::show(ui, icons::TALLY, 18.0, text);
@@ -259,7 +259,7 @@ pub fn card(ui: &mut Ui, t: &L10n, shown: &SessionCardShown, actions: &mut Vec<S
     ui.label(RichText::new(&shown.setup).small().color(weak));
     if !shown.today.is_empty() {
         ui.add_space(4.0);
-        ui.label(RichText::new(t.agenda_today()).strong().color(text));
+        ui.label(RichText::new(t.agenda_today()).strong());
         for (time, picks_shown) in &shown.today {
             ui.label(RichText::new(time).color(text));
             ui.scope(|ui| picks(ui, t, picks_shown, actions));
@@ -267,13 +267,13 @@ pub fn card(ui: &mut Ui, t: &L10n, shown: &SessionCardShown, actions: &mut Vec<S
     }
     if !shown.weeks.is_empty() {
         ui.add_space(4.0);
-        ui.label(RichText::new(t.session_history()).strong().color(text));
+        ui.label(RichText::new(t.session_history()).strong());
         for week in &shown.weeks {
             ui.label(RichText::new(week).color(text));
         }
     }
     ui.add_space(4.0);
-    ui.label(RichText::new(t.session_runs()).strong().color(text));
+    ui.label(RichText::new(t.session_runs()).strong());
     draw_runs(ui, t, &shown.runs, Some(CARD_RUNS));
 }
 

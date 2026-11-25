@@ -381,13 +381,12 @@ pub fn setup(
     shown: &TallyShown,
     actions: &mut Vec<TallyAction>,
 ) {
-    let text = ui.visuals().text_color();
     let tally = &shown.tally;
     let system = shown.system;
     let decimal = decimal_sign(t);
     // In the card of its name, which heads it (obf-1071).
     ui.scope(|ui| {
-        ui.label(RichText::new(t.tally_fields()).strong().color(text));
+        ui.label(RichText::new(t.tally_fields()).strong());
         badge_row(ui, |ui| {
             let bar = Text(period_label(t, tally.bar));
             let look = (t, tones);
@@ -424,7 +423,7 @@ pub fn setup(
         ui.add_space(8.0);
         for field in &tally.fields {
             let changes = shown.changeable.contains(&field.id);
-            let name = RichText::new(&field.name).strong().color(text);
+            let name = RichText::new(&field.name).strong();
             if !changes {
                 ui.label(name);
             } else if ui.add(egui::Button::new(name).frame(false)).clicked() {
@@ -498,7 +497,7 @@ pub fn card(ui: &mut Ui, t: &L10n, shown: &TallyShown, actions: &mut Vec<TallyAc
     let system = shown.system;
     let heading = |ui: &mut Ui, words: &str| {
         ui.add_space(4.0);
-        ui.label(RichText::new(words).strong().color(text));
+        ui.label(RichText::new(words).strong());
     };
     ui.vertical(|ui| {
         ui.spacing_mut().item_spacing.y = 6.0;
@@ -1111,7 +1110,7 @@ impl FieldForm {
                 ui.add_space(4.0);
                 intent = page_bar(ui, t, heading, false);
                 embossed(ui, tones, false, None, |ui| {
-                    let label = ui.label(RichText::new(t.tally_field_name()).strong().color(text));
+                    let label = ui.label(RichText::new(t.tally_field_name()).strong());
                     let field = ui
                         .add(
                             TextEdit::singleline(&mut self.name)
@@ -1132,7 +1131,7 @@ impl FieldForm {
                 let new = self.field.is_none();
                 if new || self.check {
                     embossed(ui, tones, false, None, |ui| {
-                        ui.label(RichText::new(t.tally_field_kind()).strong().color(text));
+                        ui.label(RichText::new(t.tally_field_kind()).strong());
                         if new {
                             let options = [
                                 (false, t.tally_field_kind_number().to_string()),
@@ -1151,7 +1150,7 @@ impl FieldForm {
                 if !self.check {
                     embossed(ui, tones, false, None, |ui| {
                         ui.spacing_mut().item_spacing.y = 6.0;
-                        let label = ui.label(RichText::new(t.tally_unit()).strong().color(text));
+                        let label = ui.label(RichText::new(t.tally_unit()).strong());
                         if fixed.is_some() {
                             ui.label(RichText::new(t.tally_unit_fixed()).small().color(weak));
                         }
@@ -1206,7 +1205,7 @@ impl FieldForm {
                 }
                 if !self.counts_sets {
                     embossed(ui, tones, false, None, |ui| {
-                        let label = ui.label(RichText::new(t.tally_target()).strong().color(text));
+                        let label = ui.label(RichText::new(t.tally_target()).strong());
                         ui.horizontal(|ui| {
                             let unit = if self.check {
                                 String::new()
@@ -1235,7 +1234,7 @@ impl FieldForm {
                 }
                 if !self.counts_sets && !self.check {
                     embossed(ui, tones, false, None, |ui| {
-                        ui.label(RichText::new(t.tally_rule()).strong().color(text));
+                        ui.label(RichText::new(t.tally_rule()).strong());
                         let options = [
                             (TallyRule::Sum, t.tally_rule_sum().to_string()),
                             (TallyRule::Max, t.tally_rule_max().to_string()),
@@ -1657,7 +1656,7 @@ impl EntryForm {
                     if in_sets {
                         ui.horizontal(|ui| {
                             let words = t.tally_set(i as i64 + 1);
-                            ui.label(RichText::new(words).strong().color(text));
+                            ui.label(RichText::new(words).strong());
                             if i > 0 {
                                 let remove = t.tally_remove_set(i as i64 + 1);
                                 if icon_button(ui, icons::REMOVE, &remove, text).clicked() {
@@ -1669,7 +1668,7 @@ impl EntryForm {
                     for (field, typed) in self.fields.iter().zip(set.iter_mut()) {
                         let key = value_key(i, &field.id);
                         embossed(ui, tones, false, None, |ui| {
-                            let label = ui.label(RichText::new(&field.name).strong().color(text));
+                            let label = ui.label(RichText::new(&field.name).strong());
                             ui.horizontal(|ui| {
                                 let id = if i == 0 {
                                     Id::new(("tally value", &field.id))
@@ -1730,13 +1729,12 @@ impl EntryForm {
                 }
                 if self.pick.is_none() {
                     embossed(ui, tones, false, None, |ui| {
-                        let label =
-                            ui.label(RichText::new(t.tally_entry_date()).strong().color(text));
+                        let label = ui.label(RichText::new(t.tally_entry_date()).strong());
                         self.day_editor(ui, t, (label.id, focus.as_deref() == Some(DAY_FIELD)));
                     });
                 }
                 embossed(ui, tones, false, None, |ui| {
-                    let label = ui.label(RichText::new(t.tally_entry_line()).strong().color(text));
+                    let label = ui.label(RichText::new(t.tally_entry_line()).strong());
                     let field = ui
                         .add(
                             TextEdit::singleline(&mut self.line)
@@ -1766,7 +1764,7 @@ impl EntryForm {
                 self.day = self.day.add_days(-1);
                 moved = true;
             }
-            ui.label(RichText::new(day_text(t, self.day)).strong().color(text));
+            ui.label(RichText::new(day_text(t, self.day)).strong());
             if icon_button(ui, icons::NEXT, t.day_after(), text).clicked() {
                 self.day = self.day.add_days(1);
                 moved = true;

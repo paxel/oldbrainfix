@@ -650,7 +650,7 @@ pub fn port_card(ui: &mut Ui, t: &L10n, tones: Tones, shown: PortShown<'_>) -> O
     let weak = ui.visuals().weak_text_color();
     let mut asked = None;
     embossed(ui, tones, false, None, |ui| {
-        let title = ui.label(RichText::new(t.ai_port_title()).strong().color(text));
+        let title = ui.label(RichText::new(t.ai_port_title()).strong());
         if shown.at {
             title.scroll_to_me_animation(
                 Some(egui::Align::TOP),
@@ -771,10 +771,10 @@ pub fn review_page(
         ui.spacing_mut().item_spacing.y = 12.0;
         for (kind, items) in &shown.groups {
             ui.add_space(4.0);
-            ui.label(RichText::new(kind_label(t, *kind)).strong().color(text));
+            ui.label(RichText::new(kind_label(t, *kind)).strong());
             for item in items {
                 let content = |ui: &mut Ui| {
-                    ui.label(RichText::new(&item.title).strong().color(text));
+                    ui.label(RichText::new(&item.title).strong());
                     for change in &item.changes {
                         change_rows(ui, t, change);
                     }

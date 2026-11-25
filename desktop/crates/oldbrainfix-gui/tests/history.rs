@@ -255,3 +255,39 @@ fn a_history_of_no_routine_goes_back() -> TestResult {
     assert_eq!(*harness.state().selection(), Selection::AllRoutines);
     Ok(())
 }
+
+/// The colours the galleys of `words` are drawn in.
+fn colours_of(harness: &Harness<'_, App>, words: &str) -> Vec<egui::Color32> {
+    fn flat(shape: &egui::Shape, words: &str, into: &mut Vec<egui::Color32>) {
+        match shape {
+            egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| flat(s, words, into)),
+            egui::Shape::Text(text) if text.galley.text() == words => {
+                into.extend(text.galley.job.sections.iter().map(|s| s.format.color));
+            }
+            _ => {}
+        }
+    }
+    let mut colours = Vec::new();
+    for clipped in &harness.output().shapes {
+        flat(&clipped.shape, words, &mut colours);
+    }
+    colours
+}
+
+#[test]
+fn a_cards_heading_is_in_the_strong_tone_set_off_from_the_text() -> TestResult {
+    let (store, pills) = store()?;
+    let mut app = App::new(store, "en");
+    app.select(Selection::History(pills.id.clone()));
+    let harness = window(app);
+    let visuals = harness.ctx.global_style().visuals.clone();
+    assert_ne!(visuals.strong_text_color(), visuals.text_color());
+    // The Streak's heading (obf-1126).
+    let colours = colours_of(&harness, "Streak");
+    assert!(!colours.is_empty(), "no Streak heading");
+    assert!(
+        colours.iter().all(|c| *c == visuals.strong_text_color()),
+        "drawn in {colours:?}"
+    );
+    Ok(())
+}

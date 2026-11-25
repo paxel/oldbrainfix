@@ -266,7 +266,7 @@ impl SessionDraft {
         let weak = ui.visuals().weak_text_color();
         let mut intent = self.pool_panel(ui, t, tones, None);
         embossed(ui, tones, false, None, |ui| {
-            ui.label(RichText::new(t.session_count()).strong().color(text));
+            ui.label(RichText::new(t.session_count()).strong());
             stepper(ui, t, &mut self.count, (1, Some(MAX_COUNT)), None);
         });
         embossed(ui, tones, false, None, |ui| {
@@ -286,7 +286,7 @@ impl SessionDraft {
             }
         });
         embossed(ui, tones, false, None, |ui| {
-            ui.label(RichText::new(t.session_rule()).strong().color(text));
+            ui.label(RichText::new(t.session_rule()).strong());
             self.rules(ui, t);
         });
         intent
@@ -310,7 +310,7 @@ impl SessionDraft {
         let before = (self.pool(), self.count);
         let intent = self.pool_panel(ui, t, tones, Some(changes));
         embossed(ui, tones, false, None, |ui| {
-            ui.label(RichText::new(t.session_count()).strong().color(text));
+            ui.label(RichText::new(t.session_count()).strong());
             if changes {
                 stepper(ui, t, &mut self.count, (1, Some(MAX_COUNT)), None);
             } else {
@@ -335,7 +335,7 @@ impl SessionDraft {
         let error = ui.visuals().error_fg_color;
         let changes = page.unwrap_or(true);
         embossed(ui, tones, false, None, |ui| {
-            ui.label(RichText::new(t.session_pool()).strong().color(text));
+            ui.label(RichText::new(t.session_pool()).strong());
             ui.label(RichText::new(t.session_pool_explain()).color(text));
             if self.order.is_empty() && !self.new_tally {
                 ui.label(RichText::new(t.session_pool_none_desk()).color(weak));

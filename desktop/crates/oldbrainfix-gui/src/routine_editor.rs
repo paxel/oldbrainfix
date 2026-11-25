@@ -934,7 +934,7 @@ impl RoutineEditor {
                 });
                 embossed(ui, tones, false, None, |ui| {
                     if self.named {
-                        let label = ui.label(RichText::new(t.kind_name()).strong().color(text));
+                        let label = ui.label(RichText::new(t.kind_name()).strong());
                         let field = ui
                             .add(
                                 TextEdit::singleline(&mut self.text)
@@ -968,7 +968,7 @@ impl RoutineEditor {
                         self.take_first_focus(ui, &field);
                         return;
                     }
-                    ui.label(RichText::new(t.from_note()).strong().color(text));
+                    ui.label(RichText::new(t.from_note()).strong());
                     if let Some(captured) = &self.capture {
                         let shown = if captured.is_empty() {
                             t.note_being_captured()
@@ -1088,7 +1088,7 @@ impl RoutineEditor {
             });
         });
         let next = embossed(ui, tones, false, None, |ui| {
-            ui.label(RichText::new(t.next_occurrences()).strong().color(text));
+            ui.label(RichText::new(t.next_occurrences()).strong());
             if self.schedule.is_some() && self.next.is_empty() {
                 ui.label(RichText::new(t.never_due()).color(text));
             }
@@ -1114,7 +1114,7 @@ impl RoutineEditor {
     /// schedule, and "Custom…" at the end (obf-1087).
     fn heads_ups_editor(&mut self, ui: &mut Ui, t: &L10n) {
         let text = ui.visuals().text_color();
-        ui.label(RichText::new(t.heads_ups_heading()).strong().color(text));
+        ui.label(RichText::new(t.heads_ups_heading()).strong());
         let mut removed = None;
         for minutes in self.kept_heads_ups().into_iter().rev() {
             // Its own id: every ✕ says the same.
@@ -1175,11 +1175,7 @@ impl RoutineEditor {
         self.sentence_typing = typing;
         self.show_sentence(t, typing);
         let simple = !self.advanced;
-        let label = ui.label(
-            RichText::new(t.schedule_sentence_label())
-                .strong()
-                .color(text),
-        );
+        let label = ui.label(RichText::new(t.schedule_sentence_label()).strong());
         let unknown = self.sentence_unknown.clone();
         let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, wrap: f32| {
             let typed = typed.as_str();
@@ -1545,14 +1541,14 @@ impl RoutineEditor {
     ) -> bool {
         let mut changed = false;
         let text = ui.visuals().text_color();
-        ui.label(RichText::new(t.times_heading()).strong().color(text));
+        ui.label(RichText::new(t.times_heading()).strong());
         ui.horizontal_wrapped(|ui| {
             if self.times.is_empty() {
                 design::chip(ui, false, t.all_day());
             }
             let mut removed = None;
             for time in &self.times {
-                ui.label(RichText::new(clock_text(*time)).strong().color(text));
+                ui.label(RichText::new(clock_text(*time)).strong());
                 let label = t.remove_time(&clock_text(*time));
                 if icon_button(ui, icons::CLOSE, &label, text).clicked() {
                     removed = Some(*time);
@@ -1608,7 +1604,7 @@ impl RoutineEditor {
         let weak = ui.visuals().weak_text_color();
         let own = self.renag;
         let device = self.device_renag;
-        ui.label(RichText::new(t.renag_heading()).strong().color(text));
+        ui.label(RichText::new(t.renag_heading()).strong());
         ui.label(RichText::new(t.renag_summary(own.unwrap_or(device))).color(text));
         ui.label(RichText::new(t.renag_explain()).small().color(weak));
         // A value set elsewhere stays pickable.
@@ -1630,7 +1626,7 @@ impl RoutineEditor {
     fn escalation_editor(&mut self, ui: &mut Ui, t: &L10n) {
         let text = ui.visuals().text_color();
         let weak = ui.visuals().weak_text_color();
-        ui.label(RichText::new(t.escalation_heading()).strong().color(text));
+        ui.label(RichText::new(t.escalation_heading()).strong());
         let summary = match self.escalation {
             None => t.escalation_off().to_string(),
             Some(after) => t.escalation_summary(after),
@@ -1679,7 +1675,7 @@ pub(crate) fn stepper(
             *value -= 1;
             changed = true;
         }
-        ui.label(RichText::new(value.to_string()).strong().color(text));
+        ui.label(RichText::new(value.to_string()).strong());
         if max.is_none_or(|max| *value < max)
             && design::framed_icon_button(ui, icons::ADD, t.more()).clicked()
         {

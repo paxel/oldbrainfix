@@ -128,7 +128,7 @@ pub fn page(
             }
             for job in jobs {
                 card(ui, tones, |ui| {
-                    ui.label(RichText::new(&job.what).strong().color(text));
+                    ui.label(RichText::new(&job.what).strong());
                     if let Some(far) = &job.far {
                         ui.label(RichText::new(far).color(text));
                     }
@@ -160,10 +160,10 @@ pub fn page(
                 return;
             }
             ui.add_space(8.0);
-            ui.label(RichText::new(t.running_stopped()).strong().color(text));
+            ui.label(RichText::new(t.running_stopped()).strong());
             for job in ended {
                 card(ui, tones, |ui| {
-                    ui.label(RichText::new(&job.what).strong().color(text));
+                    ui.label(RichText::new(&job.what).strong());
                     ui.label(RichText::new(&job.said).color(text));
                     if job.goes_on
                         && ui

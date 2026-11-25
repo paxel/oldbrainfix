@@ -111,7 +111,7 @@ pub fn heading(ui: &mut Ui, t: &L10n, actions: &mut Vec<FrogAction>) {
     let line = ui.horizontal(|ui| {
         ui.style_mut().interaction.selectable_labels = false;
         frog_mark(ui, 18.0, text);
-        ui.label(RichText::new(label).strong().size(16.0).color(text));
+        ui.label(RichText::new(label).strong().size(16.0));
         icons::show(ui, icons::NEXT, 20.0, text);
     });
     let open = ui

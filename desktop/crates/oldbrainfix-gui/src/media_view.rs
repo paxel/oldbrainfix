@@ -799,7 +799,7 @@ pub fn speech_card(ui: &mut Ui, t: &L10n, model: &SpeechModel) -> Option<Speech>
     let weak = ui.visuals().weak_text_color();
     let error = ui.visuals().error_fg_color;
     let mut asked = None;
-    ui.label(RichText::new(t.speech_model_title()).strong().color(text));
+    ui.label(RichText::new(t.speech_model_title()).strong());
     ui.label(RichText::new(t.speech_model_intro()).color(weak));
     ui.label(
         RichText::new(t.speech_model_source_models())
@@ -853,7 +853,7 @@ pub fn speech_card(ui: &mut Ui, t: &L10n, model: &SpeechModel) -> Option<Speech>
     }
     let idle = !matches!(status, Status::Fetching { .. });
     let chosen = model.chosen();
-    ui.label(RichText::new(t.speech_model_choice()).strong().color(text));
+    ui.label(RichText::new(t.speech_model_choice()).strong());
     for (option, title, detail) in [
         (
             WhisperModel::Base,

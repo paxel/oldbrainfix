@@ -60,7 +60,7 @@ pub fn starter_set(
 ) {
     let text = ui.visuals().text_color();
     ui.heading(RichText::new(t.starter_set_title()).color(text));
-    ui.label(RichText::new(t.features()).strong().color(text));
+    ui.label(RichText::new(t.features()).strong());
     features_choice(ui, t, advanced);
     ui.add_space(8.0);
     ui.label(RichText::new(t.starter_set_intro()).color(text));
@@ -68,7 +68,7 @@ pub fn starter_set(
         ui.add_space(8.0);
         let mut on = picked.contains(area.slug);
         let name = offered_area_name(t, Some(area.slug), area.name);
-        if theme::checkbox(ui, &mut on, RichText::new(name).strong().color(text)).changed() {
+        if theme::checkbox(ui, &mut on, RichText::new(name).strong()).changed() {
             tick_area(picked, area.slug, on);
         }
         for topic in topics {
