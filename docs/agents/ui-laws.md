@@ -766,6 +766,19 @@ There are three kinds, and an action takes the first that fits.
   many at the top and closes the page; greyed while nothing is ticked.
   A file that does not read, and a place refused, are announced at the
   top with why.
+- **A later AXT file of the same sender changes what was taken**
+  (obf-1147, ADR 0056): on the same page each update says "Updates
+  “Dentist”" and each deletion "Moves “Dentist” to the trash" under its
+  line, by the Note it changes, ticked as the new records are; one whose
+  Note the user changed since is greyed and cannot be ticked, its line
+  ending "· Kept your change". A record refused under the id of a Note
+  taken ("May not change “Dentist”") and one no newer than it
+  ("“Dentist” has this already") are named under "Not taken". The place
+  shows only while the file holds a new record. "Take it" says "1
+  record taken" when changes were among them, and "Nothing changed:
+  these records were taken before." when it wrote nothing, as for the
+  same file taken twice; a Note this Device may not change is refused at
+  the top with why, nothing written, and the page stays.
 - **"Open a Backup…"** (#285) is on the Backups page, in a card of its
   own ("Take Notes back"), set up or not, and on the desktop also in the
   File menu, its page then alone, without the way back to Backups. It
@@ -2741,7 +2754,19 @@ There are three kinds, and an action takes the first that fits.
   holds what the phone's page holds; under "Take them into" the places
   are a column of radio buttons, Unsorted first and picked, then each
   Area and its Topics ("Health / Running"), and Cancel takes nothing. A
-  refused "Take it" keeps the dialog and its ticks. The app is offered
+  refused "Take it" keeps the dialog and its ticks. A later file of the
+  same sender (obf-1147) lists its updates and deletions among the
+  records to take, ticked, each with the Note it changes under it
+  ("Updates “Dentist”", "Moves “Dentist” to the trash"); one whose Note
+  the user changed since is greyed and unticked with "Kept your
+  change"; one that may not change its Note, and one the Note has
+  already, stand greyed under "Not taken" with why ("May not change
+  “Dentist”", "“Dentist” has this already"), so the same file opened
+  again takes nothing. "Take it" passes the ticked changes along, says
+  "n records taken" when changes were among them, and "Nothing
+  changed: these records were taken before." when it made and changed
+  nothing; refused, the top says that this Device may not put them
+  there or may not change a Note they update. The app is offered
   for `.axt` (`application/vnd.axt`) under "Open with", never as its
   default: on Linux the launcher's MimeType with a mime type of its own
   (`io.github.paxel.oldbrainfix.xml`, by the ending only), on macOS the

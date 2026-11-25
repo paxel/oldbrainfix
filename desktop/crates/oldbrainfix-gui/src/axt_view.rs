@@ -10,10 +10,10 @@
 //! cannot named and greyed, the place they go to, Unsorted first, and
 //! "Take it" ([`Store::axt_take`]).
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 
 use egui::{RichText, Ui};
-use oldbrainfix_core::axt::AxtFile;
+use oldbrainfix_core::axt::{AxtFile, AxtRecord, AxtRecordKind};
 use oldbrainfix_core::{Area, Day, Note, Notes, Places, Result, Store, Topic};
 
 use crate::design;
@@ -143,25 +143,61 @@ pub fn looks_like_axt(path: &std::path::Path) -> bool {
 
 /// An AXT file opened, as its dialog shows it: the records ticked, by
 /// id, and the place picked, 0 for Unsorted, else one of `places` after
-/// it, each an Area or a Topic with its name.
+/// it, each an Area or a Topic with its name; `names` names each Note a
+/// record changes, or may not change (obf-1147), by its id.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AxtOpened {
     pub file: AxtFile,
     pub ticks: BTreeSet<String>,
     pub place: usize,
     pub places: Vec<(String, String)>,
+    pub names: HashMap<String, String>,
+}
+
+/// Whether `record` can be ticked: a new one, or an update or deletion
+/// of a Note the user did not change since (obf-1147).
+fn tickable(record: &AxtRecord) -> bool {
+    record.taken() || (record.changes() && !record.kept)
 }
 
 impl AxtOpened {
-    /// `file` with every record it can take ticked, into Unsorted.
-    pub fn new(file: AxtFile, places: Vec<(String, String)>) -> AxtOpened {
-        let ticks = file.taken().iter().map(|r| r.id.clone()).collect();
+    /// `file` with every record it can take ticked, its updates and
+    /// deletions too but those the user's change keeps, into Unsorted.
+    pub fn new(
+        file: AxtFile,
+        places: Vec<(String, String)>,
+        names: HashMap<String, String>,
+    ) -> AxtOpened {
+        let ticks = file
+            .records
+            .iter()
+            .filter(|r| tickable(r))
+            .map(|r| r.id.clone())
+            .collect();
         AxtOpened {
             file,
             ticks,
             place: 0,
             places,
+            names,
         }
+    }
+
+    /// Whether the records ticked change a Note taken before (obf-1147).
+    pub fn picks_changes(&self) -> bool {
+        self.file
+            .changes()
+            .iter()
+            .any(|r| !r.kept && self.ticks.contains(&r.id))
+    }
+
+    /// How many updates and deletions are ticked.
+    pub fn changes_picked(&self) -> usize {
+        self.file
+            .changes()
+            .iter()
+            .filter(|r| !r.kept && self.ticks.contains(&r.id))
+            .count()
     }
 
     /// The Area or Topic picked; `None` for Unsorted.
@@ -170,13 +206,13 @@ impl AxtOpened {
         self.places.get(at).map(|(id, _)| id.as_str())
     }
 
-    /// The ids of the records ticked that it can take, in the file's
-    /// order.
+    /// The ids of the records ticked that it can take, updates and
+    /// deletions among them, in the file's order.
     pub fn picked(&self) -> Vec<String> {
         self.file
-            .taken()
+            .records
             .iter()
-            .filter(|r| self.ticks.contains(&r.id))
+            .filter(|r| tickable(r) && self.ticks.contains(&r.id))
             .map(|r| r.id.clone())
             .collect()
     }
@@ -243,7 +279,12 @@ pub fn opened_form(ui: &mut Ui, t: &L10n, opened: &mut AxtOpened, asked: &mut Op
     let key = t.axt_key(&file.short_fingerprint);
     ui.label(RichText::new(key).small().color(weak));
     ui.separator();
-    let all: Vec<String> = file.taken().iter().map(|r| r.id.clone()).collect();
+    let all: Vec<String> = file
+        .records
+        .iter()
+        .filter(|r| tickable(r))
+        .map(|r| r.id.clone())
+        .collect();
     ui.horizontal(|ui| {
         if ui
             .button(RichText::new(t.pack_tick_all()).color(text))
@@ -270,36 +311,45 @@ pub fn opened_form(ui: &mut Ui, t: &L10n, opened: &mut AxtOpened, asked: &mut Op
                 ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
                 // Each record once, in the file's order, so none drops
                 // out of the list.
-                let (taken, not_taken): (Vec<_>, Vec<_>) =
-                    opened.file.records.iter().partition(|r| r.taken());
+                // The new ones and the changes to Notes taken before
+                // (obf-1147), a change the user's own keeps greyed.
+                let (taken, not_taken): (Vec<_>, Vec<_>) = opened
+                    .file
+                    .records
+                    .iter()
+                    .partition(|r| r.taken() || r.changes());
                 if taken.is_empty() {
                     ui.label(RichText::new(t.axt_nothing_to_take()).color(text));
                 }
+                let names = &opened.names;
                 for record in taken {
-                    let mut on = opened.ticks.contains(&record.id);
-                    let label = RichText::new(record_label(t, record)).color(text);
-                    if theme::checkbox(ui, &mut on, label).changed() {
+                    let may = tickable(record);
+                    let mut on = may && opened.ticks.contains(&record.id);
+                    let label = RichText::new(record_label(t, record, names)).color(text);
+                    let tick = ui.add_enabled_ui(may, |ui| theme::checkbox(ui, &mut on, label));
+                    if tick.inner.changed() {
                         if on {
                             opened.ticks.insert(record.id.clone());
                         } else {
                             opened.ticks.remove(&record.id);
                         }
                     }
-                    // Its type and its Reminder or Routine under its
-                    // words, past the box.
-                    ui.horizontal(|ui| {
-                        ui.add_space(26.0);
-                        let under = RichText::new(record_detail(t, record)).small().color(weak);
-                        ui.label(under);
-                    });
+                    // Its type and its Reminder or Routine, or the Note it
+                    // changes, under its words, past the box.
+                    under(ui, &record_detail(t, record, names), weak);
                 }
                 if !not_taken.is_empty() {
                     ui.add_space(8.0);
                     ui.label(RichText::new(t.axt_not_taken_heading()).strong());
                     for record in not_taken {
                         let mut off = false;
-                        let label = RichText::new(record_label(t, record)).color(text);
+                        let label = RichText::new(record_label(t, record, names)).color(text);
                         ui.add_enabled_ui(false, |ui| theme::checkbox(ui, &mut off, label));
+                        // Why a record of a Note taken before changes
+                        // nothing (obf-1147).
+                        if let Some(why) = not_taken_detail(t, record, names) {
+                            under(ui, &why, weak);
+                        }
                     }
                 }
             });
@@ -333,9 +383,28 @@ pub fn opened_form(ui: &mut Ui, t: &L10n, opened: &mut AxtOpened, asked: &mut Op
     pack_view::nothing_ticked(ui, t, picked);
 }
 
+/// A small weak line under a record's words, past its box.
+fn under(ui: &mut Ui, words: &str, weak: egui::Color32) {
+    ui.horizontal(|ui| {
+        ui.add_space(26.0);
+        ui.label(RichText::new(words).small().color(weak));
+    });
+}
+
+/// The name of the Note `record` changes or may not change, empty when it
+/// names none.
+fn note_name<'a>(record: &AxtRecord, names: &'a HashMap<String, String>) -> &'a str {
+    record
+        .note_id
+        .as_ref()
+        .and_then(|id| names.get(id))
+        .map_or("", String::as_str)
+}
+
 /// What a record is called in the dialog: the first line of the Note it
-/// makes, else its type's name, else that it has none.
-fn record_label(t: &L10n, record: &oldbrainfix_core::axt::AxtRecord) -> String {
+/// makes, else, for a deletion, the Note it changes, else its type's
+/// name, else that it has none.
+fn record_label(t: &L10n, record: &AxtRecord, names: &HashMap<String, String>) -> String {
     let first = record
         .draft
         .as_ref()
@@ -353,6 +422,10 @@ fn record_label(t: &L10n, record: &oldbrainfix_core::axt::AxtRecord) -> String {
     if !first.is_empty() {
         return first;
     }
+    let name = note_name(record, names);
+    if !name.is_empty() {
+        return name.to_string();
+    }
     match &record.type_name {
         Some(name) => name.clone(),
         None => t.axt_no_type().to_string(),
@@ -360,9 +433,23 @@ fn record_label(t: &L10n, record: &oldbrainfix_core::axt::AxtRecord) -> String {
 }
 
 /// What stands under a record to take: its type, and the Reminder or
-/// Routine it brings.
-fn record_detail(t: &L10n, record: &oldbrainfix_core::axt::AxtRecord) -> String {
+/// Routine it brings; for an update or a deletion the Note it changes,
+/// and that the user's change was kept where it was (obf-1147).
+fn record_detail(t: &L10n, record: &AxtRecord, names: &HashMap<String, String>) -> String {
     use oldbrainfix_core::axt::types;
+    let name = note_name(record, names);
+    let change = match record.kind {
+        AxtRecordKind::Update => Some(t.axt_updates(name)),
+        AxtRecordKind::Deletion => Some(t.axt_deletes(name)),
+        _ => None,
+    };
+    if let Some(change) = change {
+        return if record.kept {
+            format!("{change} · {}", t.axt_kept_change())
+        } else {
+            change
+        };
+    }
     let kind = match record.type_name.as_deref() {
         Some(types::TASK) => t.axt_type_task(),
         Some(types::APPOINTMENT) => t.axt_type_appointment(),
@@ -372,4 +459,36 @@ fn record_detail(t: &L10n, record: &oldbrainfix_core::axt::AxtRecord) -> String 
         Some(schedule) => format!("{kind} · {}", schedule_text(t, schedule)),
         None => kind.to_string(),
     }
+}
+
+/// Why a record under "Not taken" changes nothing of the Note taken
+/// under its id (obf-1147): it may not, or that Note has it already.
+fn not_taken_detail(
+    t: &L10n,
+    record: &AxtRecord,
+    names: &HashMap<String, String>,
+) -> Option<String> {
+    let name = note_name(record, names);
+    match record.kind {
+        AxtRecordKind::Refused => Some(t.axt_refused_record(name)),
+        AxtRecordKind::Stale => Some(t.axt_stale_record(name)),
+        _ => None,
+    }
+}
+
+/// The names of the Notes the records of `file` change or may not change
+/// (obf-1147), by id, as `name` calls each.
+pub fn note_names(
+    store: &Store,
+    file: &AxtFile,
+    name: impl Fn(Option<&Note>) -> String,
+) -> Result<HashMap<String, String>> {
+    let notes = Notes::new(store);
+    let mut names = HashMap::new();
+    for id in file.records.iter().filter_map(|r| r.note_id.as_ref()) {
+        if !names.contains_key(id) {
+            names.insert(id.clone(), name(notes.by_id(id)?.as_ref()));
+        }
+    }
+    Ok(names)
 }

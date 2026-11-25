@@ -5248,7 +5248,10 @@ impl App {
         let shown = read.and_then(|file| {
             let places = axt_view::places_for(&t, &self.store, &self.view.areas, &file)
                 .map_err(|e| e.to_string())?;
-            Ok(AxtOpened::new(file, places))
+            // The Notes its later records change (obf-1147).
+            let names = axt_view::note_names(&self.store, &file, |n| row_title(&t, n))
+                .map_err(|e| e.to_string())?;
+            Ok(AxtOpened::new(file, places, names))
         });
         match shown {
             Ok(opened) => self.dialog = Some(Dialog::AxtOpened(Box::new(opened))),
@@ -5262,28 +5265,46 @@ impl App {
     }
 
     /// Take it (obf-1146): the records ticked become Notes where picked,
-    /// the dialog closed, how many announced; refused, nothing is written
-    /// and the dialog stays as it is, why behind the click.
+    /// and update or delete the Notes taken from them before (obf-1147),
+    /// the dialog closed, how many announced, or that nothing changed when
+    /// all of it was taken before; refused, nothing is written and the
+    /// dialog stays as it is, why behind the click.
     fn take_axt(&mut self) -> oldbrainfix_core::Result<()> {
         let Some(Dialog::AxtOpened(opened)) = &self.dialog else {
             return Ok(());
         };
         let t = self.t;
         let picked = opened.picked();
+        let (changes, changed) = (opened.picks_changes(), opened.changes_picked());
+        let before = self.store.current_seq().ok();
         match self
             .store
             .axt_take(&opened.file, &picked, opened.place_id())
         {
             Ok(made) => {
                 self.dialog = None;
-                self.notice = Some(t.axt_taken(made.len() as i64));
+                let wrote = before.is_none_or(|b| self.store.current_seq().ok() != Some(b));
+                self.notice = Some(if made.is_empty() && !wrote {
+                    t.axt_nothing_changed().to_string()
+                } else if changes {
+                    t.axt_records_taken((made.len() + changed) as i64)
+                } else {
+                    t.axt_taken(made.len() as i64)
+                });
             }
-            Err(e) => self.announce_failure(
-                t.axt_not_taken(),
-                t.axt_not_taken_title(),
-                (t.axt_place_refused(), t.axt_pick_another_fix()),
-                format!("axt take: {e}"),
-            ),
+            Err(e) => {
+                let cause = if changes {
+                    t.axt_change_refused()
+                } else {
+                    t.axt_place_refused()
+                };
+                self.announce_failure(
+                    t.axt_not_taken(),
+                    t.axt_not_taken_title(),
+                    (cause, t.axt_pick_another_fix()),
+                    format!("axt take: {e}"),
+                );
+            }
         }
         Ok(())
     }
