@@ -4,8 +4,9 @@
 //! Note in a dialog, one at a time, which Esc, its cross and back close,
 //! keeping what was typed, the menu bar at hand over it and Tab kept off
 //! the list beneath; Ctrl+N, File ▸
-//! New Note and "+" open the quick note, and no list has a capture
-//! field; each setting is a badge read as "setting: value" whose small
+//! New Note and "+" open the quick note, in an Area or a Topic the Note
+//! dialog on a new Note filed there, which goes again left empty
+//! (obf-1140), and no list has a capture field; each setting is a badge read as "setting: value" whose small
 //! editor changes it; "+" makes a Note, a Checklist, a Shopping List, a
 //! Tally, a Session or a Frog where the list is, and the last card of a
 //! list scrolls fully clear of the window's edge (#158); a captured
@@ -530,14 +531,17 @@ fn plus_offers_the_six_kinds_where_the_list_is_and_a_topic_in_an_area() -> TestR
         assert!(shows(&harness, label), "{label}");
     }
     assert!(!shows(&harness, "New Topic"));
-    // Note opens the quick note, filed where the list is.
+    // Note opens the Note dialog on a Note filed where the list is
+    // (obf-1140).
     let mut harness = window(&store, Selection::Place(household.clone()));
     harness.get_by_label("Add here").click();
     harness.run();
     click(&mut harness, "Note");
-    assert!(harness.state().quick_note_open());
+    assert!(!harness.state().quick_note_open());
+    assert!(harness.state().note_open());
     typed(&mut harness, "Descale the kettle");
-    click(&mut harness, "Save");
+    harness.state_mut().close_note();
+    harness.run();
     let kettle = Notes::new(&store)
         .all()?
         .into_iter()
@@ -548,6 +552,124 @@ fn plus_offers_the_six_kinds_where_the_list_is_and_a_topic_in_an_area() -> TestR
     let mut harness = window(&store, Selection::Unsorted);
     click(&mut harness, "New Note");
     assert!(harness.state().quick_note_open());
+    Ok(())
+}
+
+/// Opens the Note dialog by `how` over `harness`: 0 "+ New Note ▸ Note",
+/// 1 File ▸ New Note, 2 Ctrl+N.
+fn new_note_by(harness: &mut Harness<'_, App>, how: usize) {
+    match how {
+        0 => {
+            harness.get_by_label("Add here").click();
+            harness.run();
+            click(harness, "Note");
+        }
+        1 => {
+            bar(harness, "File").click();
+            harness.run();
+            last(harness, "New Note Ctrl+N").click();
+            harness.run();
+        }
+        _ => {
+            harness.key_press_modifiers(Modifiers::COMMAND, Key::N);
+            harness.run();
+        }
+    }
+    // The cursor waits in its text from the frame after it opened.
+    harness.run();
+}
+
+#[test]
+fn in_an_area_or_a_topic_new_note_opens_the_note_dialog_on_a_note_filed_there() -> TestResult {
+    let (store, household) = store()?;
+    let kitchen = Places::new(&store).add_topic(&household, "Kitchen")?.id;
+    for place in [household.clone(), kitchen.clone()] {
+        for how in 0..3 {
+            let mut harness = window(&store, Selection::Place(place.clone()));
+            new_note_by(&mut harness, how);
+            assert!(!harness.state().quick_note_open(), "{how}");
+            let id = harness
+                .state()
+                .selected_note()
+                .ok_or("the Note dialog")?
+                .to_string();
+            let made = Notes::new(&store).by_id(&id)?.ok_or("the Note")?;
+            assert_eq!(made.place.as_deref(), Some(place.as_str()), "{how}");
+            // Sorted, it needs no Nudge; just made, no "Add a part".
+            assert_eq!(store.current(&id, "nudge")?, None);
+            assert!(!shows(&harness, "Add a part"), "{how}");
+            // Its text has the keyboard; what is typed is kept.
+            let focused = harness.get_by(|n| n.is_focused());
+            assert_eq!(focused.accesskit_node().role(), Role::MultilineTextInput);
+            let words = format!("Descale the kettle {how}");
+            typed(&mut harness, &words);
+            harness.key_press(Key::Escape);
+            harness.run();
+            assert!(!harness.state().note_open());
+            assert_eq!(text_of(&store, &id)?, words);
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn a_new_note_left_empty_in_an_area_leaves_nothing() -> TestResult {
+    let (store, household) = store()?;
+    let mut harness = window(&store, Selection::Place(household.clone()));
+    for how in 0..3 {
+        new_note_by(&mut harness, how);
+        assert!(harness.state().note_open(), "{how}");
+        harness.key_press(Key::Escape);
+        harness.run();
+        assert!(!harness.state().note_open(), "{how}");
+    }
+    // Ctrl+N twice over the dialog piles none up either.
+    new_note_by(&mut harness, 2);
+    new_note_by(&mut harness, 2);
+    assert!(harness.state().note_open());
+    harness.state_mut().close_note();
+    harness.run();
+    assert!(Notes::new(&store).all()?.is_empty());
+    // Typed and wiped out again, it goes too; a Checklist made of it
+    // stays, though it holds no word.
+    new_note_by(&mut harness, 2);
+    typed(&mut harness, "x");
+    harness.key_press(Key::Backspace);
+    harness.run();
+    harness.state_mut().close_note();
+    harness.run();
+    assert!(Notes::new(&store).all()?.is_empty());
+    new_note_by(&mut harness, 2);
+    let id = harness
+        .state()
+        .selected_note()
+        .ok_or("the Note dialog")?
+        .to_string();
+    Checklists::new(&store).make(&id)?;
+    harness.state_mut().close_note();
+    harness.run();
+    assert_eq!(Notes::new(&store).all()?.len(), 1);
+    // Open as the window closes, it goes with it.
+    new_note_by(&mut harness, 2);
+    assert!(harness.state().note_open());
+    harness.state_mut().flush();
+    assert_eq!(Notes::new(&store).all()?.len(), 1);
+    Ok(())
+}
+
+#[test]
+fn new_note_keeps_the_quick_note_on_the_agenda_unsorted_and_all_notes() -> TestResult {
+    let (store, _) = store()?;
+    for selection in [Selection::Agenda, Selection::Unsorted, Selection::All] {
+        // All Notes' "+ New Note ▸ Note" too.
+        let first = if selection == Selection::All { 0 } else { 1 };
+        for how in first..3 {
+            let mut harness = window(&store, selection.clone());
+            new_note_by(&mut harness, how);
+            assert!(harness.state().quick_note_open(), "{selection:?} {how}");
+            assert!(!harness.state().note_open(), "{selection:?} {how}");
+        }
+    }
     Ok(())
 }
 

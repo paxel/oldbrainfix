@@ -1568,9 +1568,13 @@ enum Action {
     ClosePage,
     /// Abort or Go on on the page Running (obf-1078).
     Running(running::Act),
-    /// File ▸ New Note (Ctrl+N) and "+": the quick note's dialog
-    /// (#146), the cursor in its field.
+    /// The Agenda's and Unsorted's "+" and the files dropped: the quick
+    /// note's dialog (#146), the cursor in its field.
     NewNote,
+    /// File ▸ New Note (Ctrl+N) and "+ New Note ▸ Note": in an Area or a
+    /// Topic the Note dialog on a new Note filed there, the cursor in its
+    /// text (obf-1140); elsewhere the quick note, as [`Action::NewNote`].
+    NewNoteHere,
     /// Closes the quick note's dialog, keeping what is typed with a
     /// Nudge in 1 h, as leaving it does.
     CloseQuickNote,
@@ -2332,6 +2336,10 @@ pub struct App {
     /// quick note's "Open in the editor": no "Add a part" until it is
     /// opened again (obf-1072).
     made_open: Option<String>,
+    /// The Note "+ New Note ▸ Note", File ▸ New Note or Ctrl+N made empty
+    /// in an Area or a Topic and opened in the dialog (obf-1140), and the
+    /// log's mark before it was made: left as it was made, it goes.
+    blank: Option<(String, i64)>,
     dialog: Option<Dialog>,
     /// Whether the dialog's text field is to take the keyboard, once, as
     /// it opens.
@@ -3088,6 +3096,7 @@ impl App {
             amend_select: None,
             amend_open: false,
             made_open: None,
+            blank: None,
             dialog: None,
             focus: false,
             editor: None,
@@ -7493,6 +7502,13 @@ impl App {
         }
         self.apply(Action::LeaveLines);
         self.apply(Action::SaveText);
+        // A Note "+" made and left empty goes with the window (obf-1140).
+        let blank = self.blank.as_ref().is_some_and(|(id, mark)| {
+            self.selected_note.as_ref() == Some(id) && self.is_blank(id, *mark).unwrap_or(false)
+        });
+        if blank {
+            self.apply(Action::CloseNote);
+        }
     }
 
     /// Installs the look and the fonts. Cheap enough to call every frame.
@@ -8738,6 +8754,10 @@ impl App {
                 self.quick_open = true;
                 self.capture_focus = true;
             }
+            Action::NewNoteHere => match self.list_place() {
+                Some(place) => self.new_note_in(&place)?,
+                None => return self.act(Action::NewNote),
+            },
             Action::CloseQuickNote => {
                 // Leaving keeps what is typed, as on the phone; a failed
                 // save leaves it open, so nothing is lost.
@@ -11584,6 +11604,8 @@ impl App {
             return Ok(());
         }
         if self.selected_note.as_deref() == Some(id) {
+            // Taken into a window of its own, a Note just made stays.
+            self.blank = None;
             self.leave_note()?;
         }
         self.windows_opened += 1;
@@ -11662,9 +11684,9 @@ impl App {
     /// Closes the Note dialog, keeping what was typed into it: its text,
     /// its Lines and a Section typed into Amend (#146).
     fn leave_note(&mut self) -> oldbrainfix_core::Result<()> {
-        if self.selected_note.is_none() {
+        let Some(left) = self.selected_note.clone() else {
             return Ok(());
-        }
+        };
         self.note_paste_empty = false;
         // A recording running goes onto the Note first (#352).
         self.end_recording()?;
@@ -11680,7 +11702,77 @@ impl App {
         self.start_lines = false;
         // Leaving the Note closes its find bar (obf-1047).
         self.find = None;
+        // A Note "+" made goes when nothing came of it; kept, the top
+        // says so where the person filter hides it (obf-1070).
+        if let Some((blank, mark)) = self.blank.take()
+            && blank == left
+            && !self.drop_if_blank(&blank, mark)?
+        {
+            self.say_if_filter_hides(&blank)?;
+        }
         Ok(())
+    }
+
+    /// Opens the Note dialog on a new, empty Note filed into `place`, the
+    /// Area or Topic shown (obf-1140): someone who sorted wants the full
+    /// editor there, not the quick note. No Nudge, as for any sorted Note;
+    /// left as it was made, it goes again.
+    fn new_note_in(&mut self, place: &str) -> oldbrainfix_core::Result<()> {
+        // One dialog at a time: the quick note and the Note open are kept
+        // and closed.
+        if self.quick_open {
+            self.act(Action::CloseQuickNote)?;
+        }
+        self.leave_note()?;
+        let mark = self.store.current_seq()?;
+        let id = Notes::new(&self.store).capture("", Some(place), None)?.id;
+        self.act(Action::SelectNote(id.clone()))?;
+        self.made_open = Some(id.clone());
+        self.edit_wanted = Some(id.clone());
+        self.blank = Some((id, mark));
+        Ok(())
+    }
+
+    /// Removes the Note `id` made empty by [`App::new_note_in`] after the
+    /// log's mark `mark` when nothing came of it ([`App::is_blank`]);
+    /// whether it went.
+    fn drop_if_blank(&mut self, id: &str, mark: i64) -> oldbrainfix_core::Result<bool> {
+        let blank = self.is_blank(id, mark)?;
+        if blank {
+            Notes::new(&self.store).discard(id)?;
+        }
+        Ok(blank)
+    }
+
+    /// Whether nothing came of the Note `id` made empty after the log's
+    /// mark `mark`, as on the phone: no text, still a plain Note, without
+    /// photo, recording, file or Section, nothing spawned from it, not in
+    /// the trash and not merged, this Device's to change; and nothing
+    /// written since names it, such as a Frog. Anything else keeps it.
+    fn is_blank(&self, id: &str, mark: i64) -> oldbrainfix_core::Result<bool> {
+        let notes = Notes::new(&self.store);
+        let Some(note) = notes.by_id(id)? else {
+            return Ok(false);
+        };
+        let empty = note.text.trim().is_empty()
+            && note.photos.is_empty()
+            && note.recordings.is_empty()
+            && note.attachments.is_empty()
+            && !note.spawned
+            && !note.is_trashed()
+            && !note.is_merged();
+        if !empty
+            || NoteKind::of(&self.store, id)? != NoteKind::Plain
+            || !notes.sections(id)?.is_empty()
+            || !self.store.may_change(id)?
+        {
+            return Ok(false);
+        }
+        let named = |e: &oldbrainfix_core::Entry| {
+            e.entity != id
+                && (e.entity.contains(id) || e.value.as_deref().is_some_and(|v| v.contains(id)))
+        };
+        Ok(!self.store.entries_after(mark)?.iter().any(named))
     }
 
     /// Whether the find bar of the Note open is open (obf-1047).
@@ -11790,14 +11882,14 @@ impl App {
         Ok(())
     }
 
-    /// Makes `kind` as "+" asked, each on its own form: the Note through
-    /// the quick note; a Checklist, a Shopping List or a Frog from its
+    /// Makes `kind` as "+" asked, each on its own form: the Note in the
+    /// Note dialog (obf-1140); a Checklist, a Shopping List or a Frog from its
     /// name; a Tally or a Session on its one page; a Topic as the Area
     /// adds one (#161).
     fn add(&mut self, kind: NewKind) -> oldbrainfix_core::Result<()> {
         let place = self.list_place();
         match kind {
-            NewKind::Note => self.act(Action::NewNote)?,
+            NewKind::Note => self.act(Action::NewNoteHere)?,
             NewKind::Checklist | NewKind::Shopping | NewKind::Frog => {
                 self.dialog = Some(Dialog::NewKind {
                     kind,
@@ -13568,7 +13660,7 @@ impl App {
                     actions.push(Action::ClearCards);
                 }
                 if i.consume_key(Modifiers::COMMAND, Key::N) {
-                    actions.push(Action::NewNote);
+                    actions.push(Action::NewNoteHere);
                 }
                 if i.consume_key(Modifiers::COMMAND, Key::F) {
                     actions.push(Action::Find);
@@ -14260,6 +14352,7 @@ impl App {
                 | Action::OpenPage(_)
                 | Action::PageInto(_)
                 | Action::NewNote
+                | Action::NewNoteHere
                 | Action::OpenAsk
                 | Action::Back
                 | Action::Forward => self.for_main.push(action),
@@ -15621,7 +15714,7 @@ impl App {
             // dialog's.
             ui.menu_button(RichText::new(t.menu_file()).color(text), |ui| {
                 let items = [
-                    (t.menu_new_note(), keys(Key::N), true, Action::NewNote),
+                    (t.menu_new_note(), keys(Key::N), true, Action::NewNoteHere),
                     (t.settings_quick_note(), None, true, Action::QuickNote),
                     (t.menu_import(), None, true, Action::AskImport),
                 ];
@@ -16656,9 +16749,11 @@ impl App {
         self.quick_open
     }
 
-    /// File ▸ New Note: the quick note's dialog, as Ctrl+N opens it.
+    /// File ▸ New Note, as Ctrl+N opens it: the quick note's dialog, in
+    /// an Area or a Topic the Note dialog on a new Note filed there
+    /// (obf-1140).
     pub fn new_note(&mut self) {
-        self.apply(Action::NewNote);
+        self.apply(Action::NewNoteHere);
     }
 
     /// Closes the Note dialog, keeping what was typed, as Esc does.
@@ -16705,8 +16800,9 @@ impl App {
     /// typed or held, the Nudge times, Ctrl+Enter taking the 1 h one and
     /// Ctrl+1 to 3 each of them (#277), and under them Open in the editor
     /// (#352, obf-1080), which saves the Note and opens it in the Note
-    /// dialog; a Note filed by a list's "+", or where the Nudge buttons
-    /// are switched off, gets one Save instead of the Nudge times,
+    /// dialog; a Note filed where it is opened, by files dropped onto an
+    /// Area or a Topic (obf-1140), or where the Nudge buttons are
+    /// switched off, gets one Save instead of the Nudge times,
     /// nudging only an Unsorted Note. What the files
     /// dropped, File ▸ Attach file… and Ctrl+V brought shows above the
     /// text; everything else is the Note dialog's.

@@ -645,8 +645,20 @@ fn says_hidden(harness: &Harness<'_, App>) -> bool {
 fn plus(harness: &mut Harness<'_, App>, kind: &str, text: &str) {
     press(harness, Role::Button, "Add here");
     click(harness, kind);
+    // The Note dialog's text takes the keyboard a frame after it opened.
+    harness.run();
     harness.get_by(|n| n.is_focused()).type_text(text);
     harness.run();
+}
+
+/// "+" ▸ Note, which opens the Note dialog in an Area (obf-1140), `text`
+/// typed into it and the dialog closed again, as Esc closes it.
+fn plus_note(harness: &mut Harness<'_, App>, text: &str) {
+    plus(harness, "Note", text);
+    assert!(harness.state().note_open());
+    harness.key_press(egui::Key::Escape);
+    harness.run();
+    assert!(!harness.state().note_open());
 }
 
 fn note_named(store: &Store, text: &str) -> Result<String, Box<dyn std::error::Error>> {
@@ -664,8 +676,7 @@ fn plus_stays_under_the_filter_and_show_clears_it_for_the_note_made() -> TestRes
     let (_, theirs) = two_notes(&shared)?;
     let mut harness = only_ben(&shared.area, shared.ann);
     assert_eq!(harness.state().shown_notes(), vec![theirs]);
-    plus(&mut harness, "Note", "Ann waters the plants");
-    click(&mut harness, "Save");
+    plus_note(&mut harness, "Ann waters the plants");
     assert!(!harness.state().quick_note_open());
     let made = note_named(harness.state().store(), "Ann waters the plants")?;
     assert!(!harness.state().shown_notes().contains(&made));
@@ -686,8 +697,7 @@ fn a_note_made_that_the_filter_keeps_says_nothing() -> TestResult {
     press(&mut harness, Role::CheckBox, "Me");
     harness.key_press(egui::Key::Escape);
     harness.run();
-    plus(&mut harness, "Note", "Ann waters the plants");
-    click(&mut harness, "Save");
+    plus_note(&mut harness, "Ann waters the plants");
     let made = note_named(harness.state().store(), "Ann waters the plants")?;
     assert!(harness.state().shown_notes().contains(&made));
     assert!(!says_hidden(&harness));
@@ -730,8 +740,7 @@ fn another_list_shown_drops_the_word_of_the_note_hidden() -> TestResult {
     two_notes(&shared)?;
     let area = shared.area.clone();
     let mut harness = only_ben(&area, shared.ann);
-    plus(&mut harness, "Note", "Ann waters the plants");
-    click(&mut harness, "Save");
+    plus_note(&mut harness, "Ann waters the plants");
     assert!(says_hidden(&harness));
     harness.state_mut().select(Selection::Unsorted);
     harness.run();
@@ -743,19 +752,26 @@ fn another_list_shown_drops_the_word_of_the_note_hidden() -> TestResult {
 }
 
 #[test]
-fn a_hidden_note_opened_in_the_editor_opens_and_says_so_once_closed() -> TestResult {
+fn a_hidden_note_made_in_the_note_dialog_opens_and_says_so_once_closed() -> TestResult {
     let shared = shared()?;
     two_notes(&shared)?;
     let mut harness = only_ben(&shared.area, shared.ann);
+    // "+" ▸ Note opens the Note dialog in an Area (obf-1140).
     plus(&mut harness, "Note", "Ann waters the plants");
-    click(&mut harness, "Open in the editor");
-    let made = note_named(harness.state().store(), "Ann waters the plants")?;
     assert!(harness.state().note_open());
-    assert_eq!(harness.state().selected_note(), Some(made.as_str()));
+    let made = harness
+        .state()
+        .selected_note()
+        .ok_or("the Note dialog")?
+        .to_string();
     assert!(!says_hidden(&harness));
     harness.key_press(egui::Key::Escape);
     harness.run();
     assert!(!harness.state().note_open());
+    assert_eq!(
+        note_named(harness.state().store(), "Ann waters the plants")?,
+        made
+    );
     assert!(says_hidden(&harness));
     Ok(())
 }

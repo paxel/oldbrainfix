@@ -299,8 +299,18 @@ fn without_the_nudge_buttons_one_save_nudges_in_an_hour() -> TestResult {
 #[test]
 fn a_filed_capture_shows_save_instead_of_the_nudge_buttons() -> TestResult {
     let (store, household) = store()?;
-    // In the window, inside an Area, it goes there.
+    // A file dropped onto an Area opens the quick note there (obf-1140),
+    // and the Note goes there.
+    let dir = tempfile::tempdir()?;
+    let list = dir.path().join("list.txt");
+    std::fs::write(&list, "Washers")?;
     let mut harness = window(&store, Selection::Place(household.clone()));
+    harness.input_mut().dropped_files = vec![egui::DroppedFile {
+        path: Some(list),
+        ..Default::default()
+    }];
+    harness.run();
+    assert!(harness.state().quick_note_open());
     type_in_window(&mut harness, "Fix the tap");
     assert!(!shows(&harness, "10 min"));
     assert!(shows(&harness, OPEN));
@@ -364,14 +374,12 @@ fn open_in_the_editor_in_the_window_saves_unsorted_and_opens_the_note_dialog() -
     assert_eq!(harness.state().selection(), &Selection::Agenda);
     let focused = harness.get_by(|n| n.is_focused());
     assert_eq!(focused.value().as_deref(), Some("Call the plumber"));
-    // Inside an Area it is filed there and needs no Nudge.
+    // Inside an Area New Note opens the Note dialog itself (obf-1140).
     let mut harness = window(&store, Selection::Place(household.clone()));
-    type_in_window(&mut harness, "Fix the tap");
-    click(&mut harness, OPEN);
-    let tap = note(&store, "Fix the tap")?.ok_or("the Note")?;
-    assert_eq!(tap.place.as_deref(), Some(household.as_str()));
-    assert_eq!(nudge(&store, &tap.id)?, None);
-    assert_eq!(harness.state().selected_note(), Some(tap.id.as_str()));
+    harness.state_mut().new_note();
+    harness.run();
+    assert!(!harness.state().quick_note_open());
+    assert!(harness.state().note_open());
     Ok(())
 }
 

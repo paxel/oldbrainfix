@@ -416,18 +416,21 @@ fn a_typed_thought_is_captured_with_the_nudge_picked() -> TestResult {
         Some(dart_iso(now + Duration::minutes(30)))
     );
 
-    // Inside a Topic the Note is filed there, sorted: one Save instead
-    // of the Nudge times, and Ctrl+Enter saves it without a Nudge (#113).
+    // Inside a Topic Ctrl+N opens the Note dialog on a Note filed there,
+    // sorted, without a Nudge (#113, obf-1140); Esc keeps what is typed.
     harness.get_by_label("Kitchen").click();
     harness.run();
     harness.key_press_modifiers(Modifiers::COMMAND, Key::N);
     harness.run();
-    typing(&harness).type_text("  Buy descaler ");
+    harness.run();
+    assert!(!harness.state().quick_note_open());
+    assert!(harness.state().note_open());
+    typing(&harness).type_text("Buy descaler");
     harness.run();
     assert!(harness.query_by_label("30 min").is_none());
-    assert!(harness.query_by_label("Ctrl+Enter saves it.").is_some());
-    harness.key_press_modifiers(Modifiers::COMMAND, Key::Enter);
+    harness.key_press(Key::Escape);
     harness.run();
+    assert!(!harness.state().note_open());
     let descaler = find(harness.state(), "Buy descaler")?;
     assert_eq!(descaler.place, Some(place(harness.state(), "Kitchen")?));
     assert_eq!(nudge(&harness, &descaler.id)?, None);
