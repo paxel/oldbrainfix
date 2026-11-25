@@ -118,7 +118,9 @@ pub fn heading(ui: &mut Ui, t: &L10n, actions: &mut Vec<FrogAction>) {
         .interact(line.response.rect, Id::new("frogs heading"), Sense::click())
         .on_hover_cursor(egui::CursorIcon::PointingHand);
     open.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, label));
+    // A row, no button to mark (obf-1143).
     if open.clicked() {
+        crate::design::no_tap_mark(ui.ctx());
         actions.push(FrogAction::OpenView);
     }
 }
@@ -182,7 +184,9 @@ pub fn frog_row(
                 )
                 .on_hover_cursor(egui::CursorIcon::PointingHand);
             open.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, &title));
+            // A row, no button to mark (obf-1143).
             if open.clicked() {
+                crate::design::no_tap_mark(ui.ctx());
                 actions.push(FrogAction::OpenNote(shown.note.id.clone()));
             }
             if shown.manages {

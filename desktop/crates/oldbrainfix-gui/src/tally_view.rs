@@ -640,7 +640,9 @@ fn entry_row(
         )
         .on_hover_cursor(egui::CursorIcon::PointingHand);
     open.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, &label));
+    // A row, no button to mark (obf-1143).
     if open.clicked() {
+        crate::design::no_tap_mark(ui.ctx());
         actions.push(TallyAction::EditEntry(entry.id.clone()));
     }
     open.context_menu(|ui| {

@@ -2203,6 +2203,9 @@ enum Setting {
     AiOn(bool),
     /// Whether the screens show their tips, "Show tips" (obf-1060).
     Tips(bool),
+    /// Whether each button clicked shows the green "!", "Show button
+    /// clicks" (obf-1143).
+    TapMarks(bool),
     /// After how many seconds of a pause a recording ends on its own;
     /// `None` ignores pauses (obf-1053).
     RecordingPause(Option<u32>),
@@ -2341,6 +2344,9 @@ pub struct App {
     /// quick note's "Open in the editor": no "Add a part" until it is
     /// opened again (obf-1072).
     made_open: Option<String>,
+    /// Whether each button clicked shows the green "!" (obf-1143), "Show
+    /// button clicks" in the Settings; read once and kept as it changes.
+    tap_marks: bool,
     /// The Note "+ New Note ▸ Note", File ▸ New Note or Ctrl+N made empty
     /// in an Area or a Topic and opened in the dialog (obf-1140), and the
     /// log's mark before it was made: left as it was made, it goes.
@@ -3047,6 +3053,8 @@ impl App {
         // As they were left on this computer (#278).
         let sidebar = window_sizes::sidebar_width(&store).unwrap_or(window_sizes::DEFAULT_SIDEBAR);
         let note_kept = window_sizes::note_dialog_size(&store);
+        // On unless switched off on this computer (obf-1143).
+        let tap_marks = design::tap_marks_on(&store);
         let mut app = App {
             store,
             wall: Arc::new(local_wall),
@@ -3101,6 +3109,7 @@ impl App {
             amend_select: None,
             amend_open: false,
             made_open: None,
+            tap_marks,
             blank: None,
             dialog: None,
             focus: false,
@@ -12285,6 +12294,10 @@ impl App {
                 settings.set_tips_on(on)?;
                 self.spotlights.set_tips(on);
             }
+            Setting::TapMarks(on) => {
+                design::set_tap_marks_setting(&self.store, on)?;
+                self.tap_marks = on;
+            }
             Setting::RecordingPause(seconds) => settings.set_recording_pause_seconds(seconds)?,
         }
         Ok(())
@@ -13931,6 +13944,10 @@ impl App {
                 None => ui.ctx().open_url(egui::OpenUrl::new_tab(url)),
             }
         }
+        // The green "!" of each button clicked (obf-1143), over it all,
+        // as this computer's setting has it.
+        design::set_tap_marks_on(ui.ctx(), self.tap_marks);
+        design::tap_marks(ui);
     }
 
     /// Draws each Note window (#287) as a viewport of this window's, with
@@ -13955,7 +13972,13 @@ impl App {
             let builder = window.app.note_window_builder(window.size);
             let app = &mut window.app;
             let shown = ctx.show_viewport_immediate(window.viewport, builder, |ui, class| {
-                app.note_window_frame(ui, class)
+                let shown = app.note_window_frame(ui, class);
+                // A window of its own marks its clicks itself (obf-1143);
+                // embedded, the main window's do.
+                if class != egui::ViewportClass::EmbeddedWindow {
+                    design::tap_marks(ui);
+                }
+                shown
             });
             self.lend(&mut window.app);
             asked.append(&mut window.app.for_main);
@@ -14030,12 +14053,13 @@ impl App {
             let builder = note_window::viewport(&title, viewer.size, false);
             let (open, mut wanted) =
                 ctx.show_viewport_immediate(viewer.viewport, builder, |ui, class| {
-                    viewer.frame(
-                        ui,
-                        &t,
-                        importing,
-                        class != egui::ViewportClass::EmbeddedWindow,
-                    )
+                    let native = class != egui::ViewportClass::EmbeddedWindow;
+                    let asked = viewer.frame(ui, &t, importing, native);
+                    // Its clicks marked as the Note windows' (obf-1143).
+                    if native {
+                        design::tap_marks(ui);
+                    }
+                    asked
                 });
             asked.append(&mut wanted);
             open
@@ -16177,7 +16201,7 @@ impl App {
             .corner_radius(theme::CARD_RADIUS)
             .inner_margin(Margin::same(16));
         let mut resized = None;
-        egui::Area::new(Id::new("note dialog"))
+        egui::Area::new(Id::new(design::NOTE_DIALOG))
             .order(egui::Order::Foreground)
             .fixed_pos(under.min)
             .constrain(false)
@@ -20309,6 +20333,7 @@ impl App {
                         t.text_size_larger(),
                         t.text_size_largest(),
                     ],
+                    &[t.tap_marks(), t.tap_marks_detail()],
                 ],
             );
             if shows.contains(&true) {
@@ -20372,6 +20397,16 @@ impl App {
                                 .small()
                                 .color(weak),
                         );
+                    }
+                    // The green "!" of each button clicked (obf-1143).
+                    if shows[4] {
+                        let mut on = self.tap_marks;
+                        if theme::checkbox(ui, &mut on, RichText::new(t.tap_marks()).color(text))
+                            .changed()
+                        {
+                            actions.push(Action::Setting(Setting::TapMarks(on)));
+                        }
+                        ui.label(RichText::new(t.tap_marks_detail()).small().color(weak));
                     }
                 });
             }
@@ -27703,6 +27738,10 @@ fn note_card(
     };
     let label = note.shown_name();
     resp.widget_info(|| WidgetInfo::selected(WidgetType::Button, true, chosen, &label));
+    // A card is no button to mark (obf-1143).
+    if resp.clicked() {
+        design::no_tap_mark(ui.ctx());
+    }
     // The author's picture and Edit lie over the card: registered after
     // it, so they take the click.
     let author = author_rect

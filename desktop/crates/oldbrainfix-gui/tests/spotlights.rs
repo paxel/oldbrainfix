@@ -106,6 +106,19 @@ fn click(harness: &mut Harness<'_, App>, label: &str) -> TestResult {
     Ok(())
 }
 
+/// A screen reader's click on the button `label`: one below the fold of
+/// the Settings, such as Show tips again under This computer's rows
+/// (obf-1143), which a pointer would miss.
+fn press(harness: &mut Harness<'_, App>, label: &str) -> TestResult {
+    harness
+        .get_all_by_role_and_label(Role::Button, label)
+        .last()
+        .ok_or(format!("no {label}"))?
+        .click_accesskit();
+    harness.run();
+    Ok(())
+}
+
 /// A click at `at`, away from every button.
 fn click_at(harness: &mut Harness<'_, App>, at: Pos2) {
     harness.hover_at(at);
@@ -378,7 +391,7 @@ fn show_tips_again_in_the_settings_brings_them_back_on_the_next_visit() -> TestR
     harness.run();
     assert_eq!(harness.state().spotlight_showing(), Some("settings-search"));
     click(&mut harness, "Skip")?;
-    click(&mut harness, "Show tips again")?;
+    press(&mut harness, "Show tips again")?;
     assert_eq!(
         harness.state().notice(),
         Some("Each screen shows its tips again.")
@@ -473,7 +486,7 @@ fn no_more_tips_switches_them_off_at_once_and_show_tips_again_on() -> TestResult
     harness.run_steps(4);
     assert_eq!(harness.state().spotlight_showing(), None);
     assert!(!switch_on(&harness)?);
-    click(&mut harness, "Show tips again")?;
+    press(&mut harness, "Show tips again")?;
     assert!(switch_on(&harness)?);
     assert!(DeviceSettings::new(&store).tips_on()?);
     harness.state_mut().close_page();

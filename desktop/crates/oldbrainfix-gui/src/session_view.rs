@@ -391,6 +391,10 @@ fn picks(ui: &mut Ui, t: &L10n, shown: &PicksShown, actions: &mut Vec<SessionAct
         };
         let mut open = ui.interact(line.response.rect, id, sense);
         open.widget_info(|| WidgetInfo::labeled(WidgetType::Button, opens, words));
+        // A row, no button to mark (obf-1143).
+        if open.clicked() {
+            crate::design::no_tap_mark(ui.ctx());
+        }
         if opens {
             open = open.on_hover_cursor(egui::CursorIcon::PointingHand);
         }

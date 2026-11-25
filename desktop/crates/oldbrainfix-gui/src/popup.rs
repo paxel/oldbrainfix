@@ -318,8 +318,15 @@ impl CapturePopup {
     }
 
     /// Draws the popup into `ui`, the whole of its window, and does what
-    /// was asked in it.
+    /// was asked in it; each button clicked shows its green "!"
+    /// (obf-1143).
     pub fn show(&mut self, ui: &mut Ui) -> Outcome {
+        let outcome = self.show_content(ui);
+        crate::design::tap_marks(ui);
+        outcome
+    }
+
+    fn show_content(&mut self, ui: &mut Ui) -> Outcome {
         let t = self.t;
         let tones = theme::tones(ui.visuals());
         let text = ui.visuals().text_color();

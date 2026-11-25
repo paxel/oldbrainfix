@@ -135,6 +135,10 @@ impl<'a> Chip<'a> {
             Some(on) => WidgetInfo::selected(self.typ, enabled, on, said),
             None => WidgetInfo::labeled(self.typ, enabled, said),
         });
+        // A chip is no button to mark (obf-1143), as on the phone.
+        if resp.clicked() {
+            no_tap_mark(ui.ctx());
+        }
         let on = self.on.unwrap_or(false);
         if ui.is_rect_visible(rect) {
             let radius = CornerRadius::from(rect.height() / 2.0);
@@ -414,4 +418,151 @@ pub const GROUP_GAP: f32 = 24.0;
 /// puts between two items in it counted in.
 pub fn group_gap(ui: &mut Ui) {
     ui.add_space((GROUP_GAP - ui.spacing().item_spacing.y).max(0.0));
+}
+
+/// The local setting that holds "Show button taps" off (obf-1143),
+/// "true" then, under the phone's key; nothing kept is on, the default.
+pub const TAP_MARKS_OFF: &str = "tapMarksOff";
+
+/// How long a click's mark shows (obf-1143), in seconds.
+pub const TAP_MARK_SHOWS: f64 = 0.9;
+
+/// How high a click's mark is (obf-1143), as the phone's: 56.
+pub const TAP_MARK_SIZE: f32 = 56.0;
+
+/// The green of a click's mark (obf-1143), the phone's
+/// `Colors.green.shade600`.
+pub const TAP_MARK_GREEN: Color32 = Color32::from_rgb(0x43, 0xA0, 0x47);
+
+/// How often a mark is drawn anew while it shows: about 30 a second.
+const TAP_MARK_FRAME: f32 = 1.0 / 30.0;
+
+/// The marks still showing in one viewport, each where its click was
+/// and when, in egui time.
+#[derive(Debug, Clone, Default)]
+struct TapMarks(Vec<(egui::Pos2, f64)>);
+
+/// Whether the clicks of buttons show their mark (obf-1143), for every
+/// viewport: the window keeps it as this Device's setting says.
+pub fn set_tap_marks_on(ctx: &egui::Context, on: bool) {
+    ctx.data_mut(|d| d.insert_temp(Id::new("tap marks off"), !on));
+}
+
+/// Whether the widget clicked in this pass lies in a menu, a context
+/// menu or another popup (obf-1143): a layer over the window that is no
+/// dialog. Its entries are no buttons to mark, as on the phone.
+fn in_a_menu(ctx: &egui::Context) -> bool {
+    let Some(clicked) = ctx.interaction_snapshot(|s| s.clicked) else {
+        return false;
+    };
+    let Some(layer) = ctx.read_response(clicked).map(|r| r.layer_id) else {
+        return false;
+    };
+    layer.order == egui::Order::Foreground
+        && layer.id != Id::new(NOTE_DIALOG)
+        && ctx.memory(|m| m.top_modal_layer()) != Some(layer)
+}
+
+/// The id of the Note dialog's layer, which lies over the window as a
+/// menu does but is a dialog (obf-1143).
+pub const NOTE_DIALOG: &str = "note dialog";
+
+/// Says the click of this pass is a card's, a row's or a chip's, not a
+/// button's (obf-1143): each is a button to a screen reader, but its
+/// click shows no mark, as on the phone.
+pub fn no_tap_mark(ctx: &egui::Context) {
+    let pass = ctx.cumulative_pass_nr();
+    ctx.data_mut(|d| d.insert_temp(Id::new("no tap mark"), pass));
+}
+
+/// Whether this Device's setting has the marks on (obf-1143).
+pub fn tap_marks_on(store: &oldbrainfix_core::Store) -> bool {
+    store.local_setting(TAP_MARKS_OFF).ok().flatten().as_deref() != Some("true")
+}
+
+/// Keeps `on` as this Device's setting (obf-1143), as the phone keeps it.
+pub fn set_tap_marks_setting(
+    store: &oldbrainfix_core::Store,
+    on: bool,
+) -> oldbrainfix_core::Result<()> {
+    if on {
+        store.remove_local_setting(TAP_MARKS_OFF)
+    } else {
+        store.set_local_setting(TAP_MARKS_OFF, "true")
+    }
+}
+
+/// The green "!" that says a button took a click (obf-1143), as
+/// cat(a)log's paw and the phone's mark: for each button of any kind
+/// clicked with the pointer in this pass of `ui`'s viewport, a mark 56
+/// high above the pointer, growing and fading out over 0.9 s, silent,
+/// over every dialog and menu; none for a card, a row, a chip or a menu's
+/// entry, nor for a screen reader's or the keyboard's click; nothing
+/// while switched off. Called once
+/// a viewport's widgets are all drawn. The desktop reads no "remove
+/// animations" setting, so it always grows and fades.
+pub fn tap_marks(ui: &Ui) {
+    let ctx = ui.ctx();
+    let key = Id::new(("tap marks", ctx.viewport_id()));
+    let now = ctx.input(|i| i.time);
+    let mut marks: TapMarks = ctx.data(|d| d.get_temp(key)).unwrap_or_default();
+    marks.0.retain(|(_, born)| now - born < TAP_MARK_SHOWS);
+    let off = ctx
+        .data(|d| d.get_temp::<bool>(Id::new("tap marks off")))
+        .unwrap_or(false);
+    if off {
+        marks.0.clear();
+    } else if let Some(at) = ctx
+        .input(|i| i.pointer.any_click().then(|| i.pointer.interact_pos()))
+        .flatten()
+    {
+        let card = ctx.data(|d| d.get_temp::<u64>(Id::new("no tap mark")))
+            == Some(ctx.cumulative_pass_nr());
+        let clicked = !card
+            && !in_a_menu(ctx)
+            && ctx.output(|o| {
+                o.events.iter().any(|e| match e {
+                    egui::output::OutputEvent::Clicked(info) => info.typ == WidgetType::Button,
+                    _ => false,
+                })
+            });
+        if clicked {
+            marks.0.push((at, now));
+        }
+    }
+    if !marks.0.is_empty() {
+        let screen = ctx.content_rect();
+        let painter = ctx.layer_painter(egui::LayerId::new(
+            egui::Order::Tooltip,
+            Id::new("tap marks"),
+        ));
+        for (at, born) in &marks.0 {
+            let t = (((now - born) / TAP_MARK_SHOWS) as f32).clamp(0.0, 1.0);
+            // Growing as Flutter's easeOut, fading as its easeIn.
+            let grow = 1.0 - (1.0 - t).powi(3);
+            let size = TAP_MARK_SIZE * (0.6 + 0.8 * grow);
+            let alpha = 1.0 - t * t;
+            // Above the pointer, as the phone's above the finger, kept
+            // inside the window.
+            let half = TAP_MARK_SIZE * 0.7;
+            let centre = egui::pos2(
+                at.x.clamp(screen.left() + half, screen.right() - half),
+                (at.y - TAP_MARK_SIZE * 1.1).max(screen.top() + half),
+            );
+            // Material's priority_high, the phone's glyph.
+            let rect = egui::Rect::from_center_size(centre, egui::vec2(size, size));
+            icons::paint(
+                &painter,
+                rect,
+                icons::IMPORTANCE_HIGH,
+                TAP_MARK_GREEN.gamma_multiply(alpha),
+            );
+        }
+        // A frame from now: egui takes a frame's time off what is asked,
+        // and less than that is at once, which would keep a window that
+        // draws slowly drawing without a pause.
+        let frame = ctx.input(|i| i.predicted_dt);
+        ctx.request_repaint_after_secs(TAP_MARK_FRAME + frame);
+    }
+    ctx.data_mut(|d| d.insert_temp(key, marks));
 }
