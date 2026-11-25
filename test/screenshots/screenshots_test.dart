@@ -2297,11 +2297,14 @@ void main() {
             if (open) await _tap(tester, finder);
           }
 
-          /// Sync, opened from the Profile page, scrolled to [finder].
+          /// Sync, opened from the Profile page, scrolled to [finder], then
+          /// on to [top] standing at the top of the page under its bar, so
+          /// no row is cut by the bar (obf-1136).
           Future<void> openSync(
             WidgetTester tester,
             AppLocalizations t, [
             Finder? finder,
+            Finder? top,
           ]) async {
             await onProfile(tester, t, find.byKey(const ValueKey('sync')));
             expect(find.byType(SyncScreen), findsOneWidget);
@@ -2312,6 +2315,26 @@ void main() {
               scrollable: notesList.last,
             );
             await tester.pumpAndSettle();
+            if (top == null) return;
+            // Above what was looked for, [top] may not be built yet.
+            await tester.scrollUntilVisible(
+              top,
+              -100,
+              scrollable: notesList.last,
+            );
+            await Scrollable.ensureVisible(tester.element(top));
+            await tester.pumpAndSettle();
+            // At the list's end it may stand lower, by at most the room
+            // above a section.
+            final under =
+                tester.getTopLeft(top).dy -
+                tester.getTopLeft(notesList.last).dy;
+            expect(
+              under,
+              inInclusiveRange(0, 16),
+              reason: 'the row starts at the top, not under the bar',
+            );
+            expect(finder.hitTestable(), findsOneWidget);
           }
 
           /// The share page of [slug]'s Area, opened from its ⋮.
@@ -2476,6 +2499,7 @@ void main() {
               tester,
               t,
               find.byKey(const ValueKey('pick-folder')),
+              find.byKey(const ValueKey('conflicts')),
             );
           });
 
@@ -2485,6 +2509,7 @@ void main() {
               tester,
               t,
               find.byKey(const ValueKey('import-bundle')),
+              find.byKey(const ValueKey('conflicts')),
             );
           });
 
@@ -2872,14 +2897,14 @@ void main() {
               // Shown while Ask is switched on (#333).
               ..askOn = true;
             final t = await sharingApp(tester, seeded);
+            // The computer's name and its switch above the field, under
+            // the heading of the Paired Devices.
             await openSync(
               tester,
               t,
               find.byKey(const ValueKey('address-device:guide-desk')),
+              find.text(t.pairedDevicesTitle),
             );
-            // The computer's name and its switch above the field.
-            await tester.drag(notesList.last, const Offset(0, 260));
-            await tester.pumpAndSettle();
             expect(find.byKey(const ValueKey('hand-address')), findsOne);
           });
 
@@ -2902,6 +2927,7 @@ void main() {
               tester,
               t,
               find.byKey(const ValueKey('pick-folder')),
+              find.byKey(const ValueKey('conflicts')),
             );
           }
 
