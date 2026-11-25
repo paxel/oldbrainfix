@@ -27209,10 +27209,9 @@ fn note_card(
         let text = ui.visuals().text_color();
         let weak = ui.visuals().weak_text_color();
         let card = embossed(ui, tones, important, colour, |ui| {
-            if important {
-                // Room for the marker on the right.
-                ui.set_max_width(ui.available_width() - 36.0);
-            }
+            // Room for the Important marker right of the buttons
+            // (obf-1139); the card's width is set, so its row keeps it.
+            let marker = if important { 36.0 } else { 0.0 };
             // The card's buttons stand in a column of their own on the
             // right, its first row (#330): in front of them a place for
             // the check mark of a card selected along, kept while it is
@@ -27224,7 +27223,7 @@ fn note_card(
                 .count();
             let buttons = count as f32 * 24.0 + (count - 1) as f32 * gap;
             ui.horizontal_top(|ui| {
-                let width = (ui.available_width() - buttons - gap).max(0.0);
+                let width = (ui.available_width() - buttons - gap - marker).max(0.0);
                 ui.vertical(|ui| {
                     ui.set_width(width);
                     // Another person's Note shows their picture (ADR
