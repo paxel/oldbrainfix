@@ -832,6 +832,45 @@ fn only_a_photo_or_recording_with_a_text_offers_its_removal() -> TestResult {
     Ok(())
 }
 
+/// The sizes `words` are drawn at, wherever they are drawn.
+fn sizes_of(harness: &Harness<'_, App>, words: &str) -> Vec<f32> {
+    fn flat(shape: &egui::Shape, words: &str, into: &mut Vec<f32>) {
+        match shape {
+            egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| flat(s, words, into)),
+            egui::Shape::Text(text) if text.galley.text() == words => into.extend(
+                text.galley
+                    .job
+                    .sections
+                    .iter()
+                    .map(|s| s.format.font_id.size),
+            ),
+            _ => {}
+        }
+    }
+    let mut sizes = Vec::new();
+    for clipped in &harness.output().shapes {
+        flat(&clipped.shape, words, &mut sizes);
+    }
+    sizes
+}
+
+#[test]
+fn a_photo_text_reads_at_content_size() -> TestResult {
+    let store = media_store()?;
+    let devices: Shared = Rc::default();
+    let mut harness = window(store, &devices);
+    harness.state_mut().select_note(SHED);
+    harness.run();
+    // Under its photo in the Note dialog (obf-1123).
+    let sizes = sizes_of(&harness, "Spare key under the pot");
+    assert!(!sizes.is_empty(), "not drawn");
+    assert!(
+        sizes.iter().all(|s| (s - 16.0).abs() < 0.01),
+        "drawn at {sizes:?}"
+    );
+    Ok(())
+}
+
 #[test]
 fn removing_a_photo_asks_once_and_puts_its_words_into_the_text() -> TestResult {
     let store = media_store()?;

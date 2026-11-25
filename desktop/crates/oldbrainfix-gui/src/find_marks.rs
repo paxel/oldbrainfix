@@ -369,10 +369,12 @@ pub fn said_text(
 }
 
 /// Draws a text of a recording, photo or file as [`said_text`] lays it
-/// out, selecting to be copied while `selects`, and brings it into view
-/// while it holds the current place to be revealed.
+/// out, at content size grown by the text size (obf-1123), selecting to
+/// be copied while `selects`, and brings it into view while it holds the
+/// current place to be revealed.
 pub fn said_label(ui: &mut Ui, said: &str, colour: Color32, selects: bool) -> egui::Response {
-    let (shown, current) = said_text(ui, said, (None, colour));
+    let size = crate::theme::content(ui, crate::theme::CONTENT);
+    let (shown, current) = said_text(ui, said, (Some(size), colour));
     let label = egui::Label::new(shown);
     let response = if selects {
         crate::read_text::shown(ui, |ui| crate::read_text::label(ui, label))
