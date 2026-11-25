@@ -21,6 +21,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the phone, a Running page lists the background jobs with Abort, opened from the moving line or ⋮. ([obf-1078](https://github.com/paxel/oldbrainfix/issues/391))
 - "Empty the trash now" on the Trash page deletes everything in it for good at once, after one question naming the counts. ([obf-1095](https://github.com/paxel/oldbrainfix/issues/408))
 - The Agenda's "+" offers Editor beside the quick note, for an empty Note in the full editor. ([obf-1141](https://github.com/paxel/oldbrainfix/issues/457))
+- A button tap shows a green "!" above the finger or pointer for a moment; a switch in the Settings turns it off. ([obf-1143](https://github.com/paxel/oldbrainfix/issues/459))
 - Importing the same folder, Google Keep export or Markdown file again offers to fill in only what is missing, on Android and the desktop. ([obf-1078](https://github.com/paxel/oldbrainfix/issues/391))
 
 ### Changed

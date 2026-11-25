@@ -249,6 +249,16 @@ There are three kinds, and an action takes the first that fits.
   the frame that shows it. A notification tapped while the app runs
   opens what it is about within the 500 ms (obf-1039). On the phone and
   on the desktop.
+- **A button tap shows a green "!"** (obf-1143), as cat(a)log's paw:
+  every tap of a button of any kind, filled, outlined, text and icon
+  buttons and the "+", shows a green "!" 56 high above the finger, on
+  the desktop above the pointer, growing and fading out over 0.9 s,
+  silent, drawn over dialogs too, taking no touch and saying nothing to
+  a screen reader. With the system's "remove animations" it stands still
+  and goes after 0.9 s, on the phone; the desktop reads no such setting.
+  A switch in Settings ▸ Look (on the desktop Settings ▸ This computer)
+  turns it off on that Device; it is on from the start. Cards, rows, chips, switches and
+  menu entries are no buttons and show none.
 
 ### Announcements
 
@@ -1394,6 +1404,11 @@ There are three kinds, and an action takes the first that fits.
 
 ### Gestures
 
+- **The green "!" comes with the buttons' ink** (obf-1143): every
+  button of the look's theme, and each "+" and fan entry through
+  TapMarked, marks a tap once it is a tap, not a press that became a
+  scroll. "Show button taps" in Settings ▸ Look, under Fat fingers,
+  switches it off on this phone; tests and screenshots start without it.
 - **Tap is the primary action.** On a list row it opens the thing; on a
   checkbox it checks. **A tap on a Note card switches that card** between
   its compact and its detailed view, in place (#189); in "merge into…" it
@@ -3074,6 +3089,20 @@ There are three kinds, and an action takes the first that fits.
   or Dark, kept on this computer. The question marks move in parallax
   as on the phone, but the desktop reads no "remove animations"
   setting yet, so its parallax never stops.
+- **On the desktop the green "!" comes with a pointer's click**
+  (obf-1143): a button clicked with the mouse, of egui's own or the
+  design set's, the "+" and icon buttons among them, shows Material's
+  priority_high in green above the pointer, 1.6 times its height above
+  the click as on the phone, kept inside the window, over the Note
+  dialog, the modal dialogs and the menus, in the Note windows, the
+  Markdown viewers and the capture popup too. A card, a row (a Frog's,
+  a Tally entry's, a Session's pick), a chip, a checkbox, a switch and
+  a menu's entry show none, nor does a click by the keyboard or a
+  screen reader, which has no pointer to stand above. As the parallax,
+  it always grows and fades, the desktop reading no "remove
+  animations". "Show button taps", the phone's words, is a switch in
+  Settings ▸ This computer, the desktop having no Look card, after Text
+  size; it is kept on this computer only, as the phone keeps it.
 
 ### Notifications
 

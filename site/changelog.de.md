@@ -20,6 +20,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Handy listet eine Seite „Im Hintergrund“ die laufenden Arbeiten mit Abbrechen, geöffnet über die wandernde Linie oder ⋮. ([obf-1078](https://github.com/paxel/oldbrainfix/issues/391))
 - „Papierkorb jetzt leeren“ auf der Seite Papierkorb löscht nach einer Frage mit den Anzahlen sofort alles darin endgültig. ([obf-1095](https://github.com/paxel/oldbrainfix/issues/408))
 - Das „+“ der Agenda bietet neben der Schnellnotiz „Editor“ an, für eine leere Notiz im vollen Editor. ([obf-1141](https://github.com/paxel/oldbrainfix/issues/457))
+- Ein Tippen auf einen Knopf zeigt kurz ein grünes „!“ über Finger oder Zeiger; ein Schalter in den Einstellungen schaltet es ab. ([obf-1143](https://github.com/paxel/oldbrainfix/issues/459))
 - Wird derselbe Ordner, Google-Keep-Export oder dieselbe Markdown-Datei noch einmal importiert, bieten Android und Desktop an, nur das Fehlende zu ergänzen. ([obf-1078](https://github.com/paxel/oldbrainfix/issues/391))
 
 ### Geändert
