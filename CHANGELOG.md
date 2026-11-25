@@ -7,7 +7,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 
 ### Added
 
-- On a tablet or an iPad from 700 dp wide, the app shows the desktop's layout: a sidebar beside the list, a Note as a dialog. ([obf-1148](https://github.com/paxel/oldbrainfix/issues/464))
+- On tablets and iPads from 700 dp wide, the app shows the desktop's layout: a sidebar beside the list, a Note as a dialog. ([obf-1148](https://github.com/paxel/oldbrainfix/issues/464))
 
 ---
 
