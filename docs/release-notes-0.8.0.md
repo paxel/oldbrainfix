@@ -4,7 +4,7 @@ Paste source for the Google Play Console and App Store Connect: the release's Wh
 
 ## Summary
 
-Version 0.8.0. Live: 0.7.2 in both stores. Every text here describes the `## [0.8.0]` section of the changelog against 0.7.2. The phone texts leave out what only the desktop got: the Markdown viewer, the desktop's header band, its menus, Quiet today as a button, the AI port's line and review, and its own Running page. The biggest changes for a phone are the find bar and the places a search lists, Undo and Redo in the Note editor, tables (sorting, selecting cells, the table's ⋮, readable at the text size), the quick note (Transcribing…, the Transcript in its text, Open in the editor), the Note editor's four named groups, a Running page with Abort, a custom Heads-up length, a recording that ends after a pause, a switch for the tips, and Backups that bring back the settings. The listing blocks are the files in `fastlane/metadata/`, word for word; 0.8.0 brings no listing edit. Frames: see the two screenshot tables.
+Version 0.8.0. Live: 0.7.2 in both stores. Every text here describes the `## [0.8.0]` section of the changelog against 0.7.2. The phone texts leave out what only the desktop got: the Markdown viewer, the desktop's header band, its menus, Quiet today as a button, the AI port's line and review, and its own Running page. The biggest changes for a phone are the find bar and the places a search lists, Undo and Redo in the Note editor, tables (sorting, selecting cells, the table's ⋮, readable at the text size), the quick note (Transcribing…, the Transcript in its text, Open in the editor), the Note editor's four named groups, a Running page with Abort, a custom Heads-up length, a recording that ends after a pause, a switch for the tips, and Backups that bring back the settings; then Empty the trash now, a Reminder's notification that opens the Agenda at its row, the Imports in the Areas list's ⋮, a card's ⋮ in four groups, one name for each action and one look for buttons and chips. Filling in an earlier Import works on Android only, since the iPhone's pickers hand no stable place, so it stays out of the shared texts. The listing blocks are the files in `fastlane/metadata/`, word for word; 0.8.0 brings no listing edit. Frames: see the two screenshot tables.
 
 - [Play Kit](https://claude.ai/artifact/Ds5iewxVwTLoPwAWFbpWiJ)
 - [App Store Kit](https://claude.ai/artifact/PvZUte3cRrwyoHg2feLj1T)
@@ -24,37 +24,41 @@ The same text is the in-app What's new Note on every platform.
 <!-- block id=play_notes_en limit=500 lang=en title="Release notes, en-US" where="Internal testing release" -->
 ```
 Added
-• Find in a Note: every match highlighted.
+• Find in a Note, matches highlighted.
 • Search lists where each Note matches.
 • Undo and Redo in the Note editor.
-• Tables: sort, select cells, move or delete.
+• Tables: sort, select, move.
 • A custom Heads-up length.
-• A recording can end after a pause.
+• Recordings end after a pause.
 • A Running page with Abort.
+• Empty the trash now.
 Changed
 • Search ignores accents and umlauts.
-• The quick note takes its Transcript.
-• The Note's buttons stand in four groups.
+• Quick notes take their Transcript.
+• Note buttons in four groups.
 • A Backup brings back the settings.
+• A reminder opens the Agenda at its row.
 Fixed
-• Search bars no longer cut off the list.
+• Search bars cut off nothing.
 ```
 
 <!-- block id=play_notes_de limit=500 lang=de title="Versionshinweise, de-DE" where="Internal testing release" -->
 ```
 Neu
-• In der Notiz suchen: Treffer markiert.
+• In der Notiz suchen.
 • Die Suche zeigt, wo jede Notiz passt.
 • Rückgängig und Wiederholen im Editor.
-• Tabellen sortieren, Zellen wählen.
+• Tabellen sortieren, wählen.
 • Vorwarnungen mit eigener Länge.
-• Aufnahmen können nach einer Pause enden.
+• Aufnahmen enden nach Pausen.
 • „Im Hintergrund“ mit Abbrechen.
+• Papierkorb jetzt leeren.
 Geändert
 • Suche übergeht Akzente und Umlaute.
-• Die Schnellnotiz übernimmt ihr Transkript.
+• Schnellnotiz mit Transkript.
 • Notiz-Knöpfe in vier Gruppen.
-• Eine Sicherung bringt Einstellungen zurück.
+• Sicherungen mit Einstellungen.
+• Erinnerungen öffnen die Agenda.
 Behoben
 • Suchleisten schneiden nichts mehr ab.
 ```
@@ -73,7 +77,9 @@ The quick note shows "Transcribing…" after a recording and puts the Transcript
 
 A Heads-up can have a length of your own, in minutes, hours, days or weeks. A Note without text is named by its Transcript or Photo Text on cards, the Agenda, the calendar and notifications. The most used tags sit under the search of the Areas list. A Running page, from the moving line or ⋮, shows what runs in the background and stops it. A Backup now brings back the iPhone's settings and offers the speech model chosen before. Tips can be switched off.
 
-Search bars no longer cut off what scrolls under them.
+The Trash has "Empty the trash now", which deletes everything in it for good after one question. A Reminder's or Routine's notification opens the Agenda with its row marked. Import has moved from the Settings to the ⋮ of the Areas list, a card's ⋮ holds Edit and four groups, and buttons, chips and headings share one look.
+
+Search bars no longer cut off what scrolls under them, and the Conflicts page and the Hidden from AI entry look like the rest of the app.
 ```
 
 <!-- block id=appstore_whatsnew_de limit=4000 lang=de title="Neue Funktionen, Deutsch" where="Version information" -->
@@ -88,7 +94,9 @@ Die Schnellnotiz zeigt nach einer Aufnahme „Wird transkribiert …“ und setz
 
 Eine Vorwarnung kann eine eigene Länge haben, in Minuten, Stunden, Tagen oder Wochen. Eine Notiz ohne Text heißt nach ihrem Transkript oder Fototext, auf Karten, in der Agenda, im Kalender und in Benachrichtigungen. Die meistgenutzten #Wörter stehen unter der Suche der Bereiche. Eine Seite „Im Hintergrund“, über die wandernde Linie oder ⋮, zeigt, was gerade läuft, und hält es an. Eine Sicherung bringt jetzt die Einstellungen des iPhones zurück und bietet das vorher gewählte Sprachmodell an. Tipps lassen sich abschalten.
 
-Suchleisten schneiden nicht mehr ab, was darunter scrollt.
+Der Papierkorb hat „Papierkorb jetzt leeren“, das nach einer Frage alles darin endgültig löscht. Die Benachrichtigung einer Erinnerung oder Routine öffnet die Agenda mit ihrer Zeile markiert. Importieren steht jetzt im ⋮ der Bereiche statt in den Einstellungen, das ⋮ einer Karte hält Bearbeiten und vier Gruppen, und Knöpfe, Chips und Überschriften sehen überall gleich aus.
+
+Suchleisten schneiden nicht mehr ab, was darunter scrollt, und die Konflikte und „Vor KI verborgen“ sehen aus wie der Rest der App.
 ```
 
 ## Tester notes
@@ -102,8 +110,11 @@ What to test
 • Record a voice Note in the quick note: "Transcribing…" shows, then the Transcript lands in the text. Set Settings ▸ Capture ▸ End a recording after a pause to 3 s and stay quiet after speaking.
 • Make a Backup, reinstall or use a second phone, restore it: the theme, text size and other settings come back, and the speech model is offered.
 • Tap the moving line while an Import runs: the Running page shows it; Abort keeps the Notes made so far.
+• Android: import a folder, then the same folder again from the Areas list's ⋮ ▸ Import…: it asks to fill in the first Import and adds only what is missing.
+• Trash a few Notes, open the Trash, ⋮ ▸ Empty the trash now: the question names the counts, and Delete for good empties it.
+• Let a Reminder ring and tap its notification: the Agenda opens with its row marked.
 Known
-• Importing the same file again after an Abort adds every Note again, not only the missing ones; no need to report it.
+• On the iPhone, importing the same folder or zip again makes a new Area; only Android offers to fill in.
 ```
 
 ## Play: listing
