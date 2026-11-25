@@ -613,6 +613,8 @@ fn add_a_line_starts_a_new_line_at_the_end_of_a_checklist_before_the_struck_ones
         };
         let stored = lines(&store)?;
         let mut harness = dialog(&store, &elsewhere, &id);
+        // A text button with its plus, in the accent (obf-1112).
+        assert!(in_accent(&harness, "Add a Line"), "{kind}");
         // Left unused, the new Line goes.
         click(&mut harness, "Add a Line")?;
         // While it waits, no second one.
@@ -679,4 +681,22 @@ fn a_description_added_undoes_back_to_add_a_description() -> TestResult {
     assert!(shows(&harness, "for the trip"));
     assert!(!shows(&harness, "Add a description"));
     Ok(())
+}
+
+/// Whether the words `label` are drawn in the accent's text colour, as a
+/// text button's (obf-1112).
+fn in_accent(harness: &Harness<'_, App>, label: &str) -> bool {
+    fn flat(shape: &egui::Shape, label: &str, accent: egui::Color32) -> bool {
+        match shape {
+            egui::Shape::Vec(shapes) => shapes.iter().any(|s| flat(s, label, accent)),
+            egui::Shape::Text(text) => text.galley.text() == label && text.fallback_color == accent,
+            _ => false,
+        }
+    }
+    let accent = harness.ctx.global_style().visuals.hyperlink_color;
+    harness
+        .output()
+        .shapes
+        .iter()
+        .any(|clipped| flat(&clipped.shape, label, accent))
 }

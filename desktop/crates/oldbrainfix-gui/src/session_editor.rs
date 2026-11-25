@@ -344,14 +344,11 @@ impl SessionDraft {
                 self.pool_rows(ui, t, page);
             }
             // Making one stays inside the list, on this page (#161).
-            if self.new_tally && changes {
-                let made = ui.horizontal(|ui| {
-                    icons::show(ui, icons::ADD, 20.0, text);
-                    ui.button(RichText::new(t.new_tally()).color(text))
-                });
-                if made.inner.clicked() {
-                    intent = Some(SessionIntent::NewTally);
-                }
+            if self.new_tally
+                && changes
+                && design::text_button(ui, icons::ADD, t.new_tally()).clicked()
+            {
+                intent = Some(SessionIntent::NewTally);
             }
             let ordered = match page {
                 None => self.order.len(),

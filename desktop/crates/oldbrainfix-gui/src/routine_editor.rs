@@ -1657,8 +1657,9 @@ impl RoutineEditor {
     }
 }
 
-/// A number from `min` to `max` with a minus and a plus button, and its
-/// `unit` after it; whether it changed.
+/// A number from `min` to `max` with a minus and a plus button, each in
+/// a frame ([`design::framed_icon_button`], obf-1112), and its `unit`
+/// after it; whether it changed.
 pub(crate) fn stepper(
     ui: &mut Ui,
     t: &L10n,
@@ -1669,13 +1670,13 @@ pub(crate) fn stepper(
     let text = ui.visuals().text_color();
     let mut changed = false;
     ui.horizontal(|ui| {
-        if *value > min && icon_button(ui, icons::REMOVE, t.fewer(), text).clicked() {
+        if *value > min && design::framed_icon_button(ui, icons::REMOVE, t.fewer()).clicked() {
             *value -= 1;
             changed = true;
         }
         ui.label(RichText::new(value.to_string()).strong().color(text));
         if max.is_none_or(|max| *value < max)
-            && icon_button(ui, icons::ADD, t.more(), text).clicked()
+            && design::framed_icon_button(ui, icons::ADD, t.more()).clicked()
         {
             *value += 1;
             changed = true;

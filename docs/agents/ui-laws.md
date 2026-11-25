@@ -68,7 +68,9 @@ There are three kinds, and an action takes the first that fits.
 - Icon-only buttons (⋮, the pencil, the view button, the format bar)
   get a rounded ground under the pointer and the ring while focused
   (desktop `theme::icon_button_back`, phone `IconButton`), and they
-  always have a tooltip and a screen-reader label. Menu entries stay
+  always have a tooltip and a screen-reader label. On the desktop the
+  count stepper's − and + wear the outlined kind's frame in place of
+  that ground (`design::framed_icon_button`, obf-1112). Menu entries stay
   flat, links stay links, and badges keep their own look (#192).
 - **The setting badge is a block of its own** (#160, obf-1117): a
   Note's setting in the Note editor and the Note dialog is a split box

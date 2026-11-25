@@ -902,7 +902,8 @@ pub enum FieldOf {
     Shopping,
 }
 
-/// "Add a Line" under the Lines of `listed` (obf-1071), as the phone's:
+/// "Add a Line" under the Lines of `listed` (obf-1071), as the phone's, a
+/// text button with its plus (obf-1112):
 /// a click puts the cursor into a new empty row at the end, on a
 /// Shopping List before the struck Lines. Nothing where this Device may not add
 /// Lines, nor while an empty new row waits to be typed in. Only on
@@ -917,13 +918,7 @@ pub fn add_line(ui: &mut Ui, t: &L10n, lines: &mut TypedLines, listed: Listed) {
     {
         return;
     }
-    let weak = ui.visuals().weak_text_color();
-    let asked = ui.horizontal(|ui| {
-        crate::icons::show(ui, crate::icons::ADD, 20.0, weak);
-        let words = egui::RichText::new(t.desk_add_line()).color(weak);
-        ui.add(egui::Button::new(words).frame(false))
-    });
-    if !asked.inner.clicked() {
+    if !crate::design::text_button(ui, crate::icons::ADD, t.desk_add_line()).clicked() {
         return;
     }
     match listed {

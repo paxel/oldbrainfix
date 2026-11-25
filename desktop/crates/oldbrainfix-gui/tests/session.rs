@@ -441,6 +441,8 @@ fn the_note_editor_makes_a_session_saying_what_to_fix() -> TestResult {
     add_menu(&mut harness, &t);
     click_button(&mut harness, t.spawn_session());
     assert!(shows(&harness, t.new_session()));
+    // The stepper's + in a frame (obf-1112).
+    assert!(framed(&harness, t.more()));
     // Every day, All day, by default.
     assert!(shows(&harness, t.all_day()));
     // Rolling by default, one a time, the weekdays folded.
@@ -591,6 +593,8 @@ fn the_kind_badge_makes_a_plain_note_a_session_and_back() -> TestResult {
     );
     assert!(shows(&harness, t.session_pool()));
     assert!(shows(&harness, t.new_tally()));
+    // A text button with its plus (obf-1112).
+    assert!(in_accent(&harness, t.new_tally()));
     assert!(!shows(&harness, t.all_day()));
     assert!(!shows(&harness, t.next_occurrences()));
     // Without a Tally it says so and makes nothing.
@@ -1202,4 +1206,57 @@ fn with_checked_items_hidden_a_pick_with_its_entry_leaves_and_then_the_heading()
     assert_eq!(headings(&harness), 6);
     assert!(!shows(&harness, "Wall sit 30 times"));
     Ok(())
+}
+
+/// Whether the words `label` are drawn in the accent's text colour, as a
+/// text button's (obf-1112).
+fn in_accent(harness: &Harness<'_, App>, label: &str) -> bool {
+    fn flat(shape: &egui::Shape, label: &str, accent: egui::Color32) -> bool {
+        match shape {
+            egui::Shape::Vec(shapes) => shapes.iter().any(|s| flat(s, label, accent)),
+            egui::Shape::Text(text) => text.galley.text() == label && text.fallback_color == accent,
+            _ => false,
+        }
+    }
+    let accent = harness.ctx.global_style().visuals.hyperlink_color;
+    harness
+        .output()
+        .shapes
+        .iter()
+        .any(|clipped| flat(&clipped.shape, label, accent))
+}
+
+/// Whether the first button `label` lies in the frame of an idle egui
+/// button: its tonal fill and its outline.
+fn framed(harness: &Harness<'_, App>, label: &str) -> bool {
+    fn flat(shape: &egui::Shape, at: egui::Rect, look: egui::style::WidgetVisuals) -> bool {
+        match shape {
+            egui::Shape::Vec(shapes) => shapes.iter().any(|s| flat(s, at, look)),
+            egui::Shape::Rect(r) => {
+                r.fill == look.weak_bg_fill
+                    && r.stroke == look.bg_stroke
+                    && r.rect.expand(0.5).contains_rect(at)
+                    && at.expand(look.expansion + 0.5).contains_rect(r.rect)
+            }
+            _ => false,
+        }
+    }
+    let Some(node) = harness
+        .query_all_by_role_and_label(Role::Button, label)
+        .next()
+    else {
+        return false;
+    };
+    let scale = harness.ctx.pixels_per_point();
+    let px = node.rect();
+    let at = egui::Rect::from_min_max(
+        (px.min.to_vec2() / scale).to_pos2(),
+        (px.max.to_vec2() / scale).to_pos2(),
+    );
+    let look = harness.ctx.global_style().visuals.widgets.inactive;
+    harness
+        .output()
+        .shapes
+        .iter()
+        .any(|clipped| flat(&clipped.shape, at, look))
 }

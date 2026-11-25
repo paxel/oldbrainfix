@@ -477,14 +477,8 @@ pub fn setup(
             });
             ui.add_space(8.0);
         }
-        if shown.defines {
-            let add = ui.horizontal(|ui| {
-                icons::show(ui, icons::ADD, 20.0, text);
-                ui.button(RichText::new(t.tally_add_field()).color(text))
-            });
-            if add.inner.clicked() {
-                actions.push(TallyAction::OpenField(None));
-            }
+        if shown.defines && design::text_button(ui, icons::ADD, t.tally_add_field()).clicked() {
+            actions.push(TallyAction::OpenField(None));
         }
     });
 }
@@ -508,14 +502,8 @@ pub fn card(ui: &mut Ui, t: &L10n, shown: &TallyShown, actions: &mut Vec<TallyAc
     };
     ui.vertical(|ui| {
         ui.spacing_mut().item_spacing.y = 6.0;
-        if shown.adds {
-            let add = ui.horizontal(|ui| {
-                icons::show(ui, icons::ADD, 20.0, text);
-                ui.button(RichText::new(t.add_tally_entry()).color(text))
-            });
-            if add.inner.clicked() {
-                actions.push(TallyAction::AddEntry);
-            }
+        if shown.adds && design::text_button(ui, icons::ADD, t.add_tally_entry()).clicked() {
+            actions.push(TallyAction::AddEntry);
         }
         if shown.shared {
             heading(ui, t.tally_show_entries());
@@ -1735,14 +1723,11 @@ impl EntryForm {
                 if let Some(i) = removed {
                     self.sets.remove(i);
                 }
-                if self.counts_in_sets && !self.fields.is_empty() {
-                    let add = ui.horizontal(|ui| {
-                        icons::show(ui, icons::ADD, 20.0, text);
-                        ui.button(RichText::new(t.tally_add_set()).color(text))
-                    });
-                    if add.inner.clicked() {
-                        self.add_set();
-                    }
+                if self.counts_in_sets
+                    && !self.fields.is_empty()
+                    && design::text_button(ui, icons::ADD, t.tally_add_set()).clicked()
+                {
+                    self.add_set();
                 }
                 if self.pick.is_none() {
                     embossed(ui, tones, false, None, |ui| {

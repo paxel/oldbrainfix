@@ -206,6 +206,8 @@ fn make_it_a_tally_asks_for_a_name_and_saves_the_first_field() -> TestResult {
     assert!(shows(&harness, "Unit: times"));
     assert!(shows(&harness, "Target: 20 times"));
     assert!(shows(&harness, "Add field"));
+    // A text button with its plus (obf-1112).
+    assert!(in_accent(&harness, "Add field"));
     assert!(!shows(&harness, "Make it a Tally"));
     // Its chart, its entries and "Add entry" are the card's, once each.
     assert_eq!(harness.query_all_by_label("Add entry").count(), 1);
@@ -367,6 +369,8 @@ fn add_entry_prefills_the_targets_and_one_click_saves_them() -> TestResult {
     // On the detailed card, clicked with the pointer: the card leaves the
     // click to it (#190).
     let mut harness = window(&store, None);
+    // A text button with its plus (obf-1112).
+    assert!(in_accent(&harness, "Add entry"));
     harness
         .get_by_role_and_label(Role::Button, "Add entry")
         .click();
@@ -776,6 +780,7 @@ fn add_set_starts_with_the_set_before_and_each_field_totals_its_sets_by_its_rule
     assert!(shows(&harness, "Set 1"));
     type_into(&mut harness, "Weight", "60");
     type_into(&mut harness, "Reps", "10");
+    assert!(in_accent(&harness, "Add set"));
     click_button(&mut harness, "Add set");
     assert!(shows(&harness, "Set 2"));
     // The new set starts with the values of the one before.
@@ -964,4 +969,22 @@ fn in_a_shared_area_the_own_entries_show_until_everyones_are_picked() -> TestRes
     assert!(!shows_part(&harness, "Ann's"));
     assert!(shows_part(&harness, "Ben's"));
     Ok(())
+}
+
+/// Whether the words `label` are drawn in the accent's text colour, as a
+/// text button's (obf-1112).
+fn in_accent(harness: &Harness<'_, App>, label: &str) -> bool {
+    fn flat(shape: &egui::Shape, label: &str, accent: egui::Color32) -> bool {
+        match shape {
+            egui::Shape::Vec(shapes) => shapes.iter().any(|s| flat(s, label, accent)),
+            egui::Shape::Text(text) => text.galley.text() == label && text.fallback_color == accent,
+            _ => false,
+        }
+    }
+    let accent = harness.ctx.global_style().visuals.hyperlink_color;
+    harness
+        .output()
+        .shapes
+        .iter()
+        .any(|clipped| flat(&clipped.shape, label, accent))
 }

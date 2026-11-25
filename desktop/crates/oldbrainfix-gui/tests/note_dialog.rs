@@ -656,6 +656,8 @@ fn a_tally_with_its_fields_takes_one_page_and_one_save_in_their_order() -> TestR
         typed(&mut harness, name);
     }
     // A row left without a name is dropped.
+    // "Add field" a text button with its plus (obf-1112).
+    assert!(in_accent(&harness, "Add field"));
     click(&mut harness, "Add field");
     // The first field's unit, typed with suggestions; its rule follows.
     harness
@@ -1328,4 +1330,22 @@ fn the_group_headings_are_in_german_too() -> TestResult {
         assert!(names.iter().any(|n| n == name), "{names:?}");
     }
     Ok(())
+}
+
+/// Whether the words `label` are drawn in the accent's text colour, as a
+/// text button's (obf-1112).
+fn in_accent(harness: &Harness<'_, App>, label: &str) -> bool {
+    fn flat(shape: &egui::Shape, label: &str, accent: egui::Color32) -> bool {
+        match shape {
+            egui::Shape::Vec(shapes) => shapes.iter().any(|s| flat(s, label, accent)),
+            egui::Shape::Text(text) => text.galley.text() == label && text.fallback_color == accent,
+            _ => false,
+        }
+    }
+    let accent = harness.ctx.global_style().visuals.hyperlink_color;
+    harness
+        .output()
+        .shapes
+        .iter()
+        .any(|clipped| flat(&clipped.shape, label, accent))
 }

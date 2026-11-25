@@ -399,11 +399,7 @@ impl TallyPage {
                         }
                     });
                 }
-                let add = ui.horizontal(|ui| {
-                    icons::show(ui, icons::ADD, 20.0, text);
-                    ui.button(RichText::new(t.tally_add_field()).color(text))
-                });
-                if add.inner.clicked() {
+                if design::text_button(ui, icons::ADD, t.tally_add_field()).clicked() {
                     self.next += 1;
                     let field = FieldDraft::new(self.next);
                     self.focus = Some(field_id(field.key));

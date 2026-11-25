@@ -220,3 +220,33 @@ fn open_in_the_editor_wears_the_outlined_buttons_tonal_fill() {
     });
     assert!(fill, "the tonal fill under {at:?}");
 }
+
+#[test]
+fn a_framed_icon_button_wears_the_outlined_buttons_frame_and_its_name() {
+    let mut harness = harness(TextSize::Normal, |ui| {
+        ui.add_space(40.0);
+        design::framed_icon_button(ui, icons::ADD, "More");
+    });
+    let at = rect(&harness, Role::Button, "More");
+    assert!(near(at.width(), at.height()), "square {at:?}");
+    let look = harness.ctx.global_style().visuals.widgets.inactive;
+    let (fill, round) = frame(&harness, at).unwrap_or_else(|| panic!("no frame while idle"));
+    assert_eq!(fill, look.weak_bg_fill);
+    assert_eq!(round, look.corner_radius);
+    let outlined = drawn(&harness).into_iter().any(|shape| match shape {
+        Shape::Rect(r) => r.stroke == look.bg_stroke && r.stroke.width > 0.0,
+        _ => false,
+    });
+    assert!(outlined, "its outline");
+    harness.get_by_label("More").hover();
+    harness.run_steps(2);
+    let hovered = harness
+        .ctx
+        .global_style()
+        .visuals
+        .widgets
+        .hovered
+        .weak_bg_fill;
+    let (fill, _) = frame(&harness, at).unwrap_or_else(|| panic!("no frame under the pointer"));
+    assert_eq!(fill, hovered);
+}

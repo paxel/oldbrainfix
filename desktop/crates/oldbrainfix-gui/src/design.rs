@@ -4,7 +4,8 @@
 //! [`crate::theme::primary`], [`crate::theme::main_action`] and
 //! [`crate::theme::destructive`]; every other button egui draws wears the
 //! outlined one's tonal fill and outline, but Cancel and Close in a
-//! dialog's action row, which are [`row_button`]s.
+//! dialog's action row, which are [`row_button`]s, and the
+//! [`framed_icon_button`] takes that frame for an icon alone.
 
 use egui::{Color32, CornerRadius, Id, Response, Sense, Ui, WidgetInfo, WidgetType};
 
@@ -267,6 +268,41 @@ pub fn text_button_at(
     let (placed, resp) = lay(ui, Some(icon), words, Placing::At(rect, id));
     placed.answer(ui, &resp);
     resp.on_hover_cursor(egui::CursorIcon::PointingHand)
+}
+
+/// An icon-only button in the outlined button's frame (UI laws,
+/// "Buttons", obf-1112), as the count stepper's − and +: a square as
+/// high as a button with words, `icon` in its middle in the text's
+/// colour, the tonal fill and the outline of its state, the ring while
+/// it has the keyboard; `label` to a screen reader and in its tooltip.
+pub fn framed_icon_button(ui: &mut Ui, icon: char, label: &str) -> Response {
+    let glyph = egui::TextStyle::Button.resolve(ui.style()).size * 1.25;
+    let side = glyph + ui.spacing().button_padding.y * 2.0;
+    let side = side.max(ui.spacing().interact_size.y);
+    let (rect, resp) = ui.allocate_exact_size(egui::vec2(side, side), Sense::click());
+    resp.widget_info(|| WidgetInfo::labeled(WidgetType::Button, ui.is_enabled(), label));
+    if ui.is_rect_visible(rect) {
+        // The frame egui's button paints, for this state.
+        let look = *ui.style().visuals.widgets.state(resp.widget_state());
+        let frame = rect.expand(look.expansion);
+        let painter = ui.painter();
+        painter.rect(
+            frame,
+            look.corner_radius,
+            look.weak_bg_fill,
+            look.bg_stroke,
+            egui::StrokeKind::Inside,
+        );
+        let at = egui::Rect::from_center_size(rect.center(), egui::vec2(glyph, glyph));
+        let colour = if ui.is_enabled() {
+            ui.visuals().text_color()
+        } else {
+            ui.visuals().weak_text_color()
+        };
+        icons::paint(painter, at, icon, colour);
+    }
+    resp.on_hover_text(label)
+        .on_hover_cursor(egui::CursorIcon::PointingHand)
 }
 
 /// How much room the [`text_button`] of `words` takes.
