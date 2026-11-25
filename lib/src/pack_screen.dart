@@ -14,7 +14,7 @@ import 'failure_dialog.dart';
 import 'frogs_screen.dart' show FrogIcon;
 import 'hidden_from_ai_view.dart';
 import 'l10n.dart';
-import 'look.dart' show ControlBelow;
+import 'look.dart' show ControlBelow, StartCheckbox;
 import 'note_editor_screen.dart' show kindIcon;
 import 'page_bar.dart';
 import 'profile.dart';
@@ -253,10 +253,10 @@ class _TickBelow extends StatelessWidget {
       padding: EdgeInsets.zero,
       title: Text(title),
       subtitle: Text(subtitle),
-      control: Checkbox(
-        key: tickKey,
+      control: StartCheckbox(
+        boxKey: tickKey,
         value: value,
-        onChanged: (on) => onChanged(on ?? false),
+        onChanged: onChanged,
       ),
     ),
   );

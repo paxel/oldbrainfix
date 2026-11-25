@@ -13,7 +13,7 @@ import 'bundle_platform.dart';
 import 'crash_guard.dart';
 import 'failure_dialog.dart';
 import 'l10n.dart';
-import 'look.dart' show ControlBelow;
+import 'look.dart' show ControlBelow, StartCheckbox;
 import 'notification_taps.dart';
 import 'pack_screen.dart';
 import 'page_bar.dart';
@@ -376,10 +376,10 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
         padding: const EdgeInsets.symmetric(vertical: 4),
         title: Text(title),
         subtitle: detail == null ? null : Text(detail),
-        control: Checkbox(
-          key: ValueKey('feedback-$key'),
+        control: StartCheckbox(
+          boxKey: ValueKey('feedback-$key'),
           value: value,
-          onChanged: onChanged == null ? null : (on) => onChanged(on ?? false),
+          onChanged: onChanged,
         ),
       ),
     );

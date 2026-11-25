@@ -351,6 +351,13 @@ void main() {
       expect(find.byKey(const ValueKey('pack-add-person')), findsOneWidget);
       final claim = find.byKey(const ValueKey('pack-claim'));
       expect(tester.widget<Checkbox>(claim).value, isTrue);
+      // The box's edge under the text's start (obf-1134).
+      await tester.ensureVisible(claim);
+      await tester.pumpAndSettle();
+      expect(
+        tester.getCenter(claim).dx - Checkbox.width / 2,
+        tester.getTopLeft(find.text('Claim as mine')).dx,
+      );
       final pack = store.openPack(annsPack(profile: true)).pack;
       for (final key in pack.allKeys()) {
         expect(ticked(tester, key), isTrue, reason: key);

@@ -338,6 +338,25 @@ void main() {
       expect(preview(tester), isNot(contains('Notification taps')));
     });
 
+    testWidgets('each box\'s edge lines up with the start of its text '
+        '(obf-1134)', (tester) async {
+      final t = await open(tester);
+      for (final (key, title) in [
+        ('version', t.feedbackVersion),
+        ('crash', t.feedbackCrash),
+        ('notes', t.feedbackNotes),
+      ]) {
+        final box = find.byKey(ValueKey('feedback-$key'));
+        await tester.ensureVisible(box);
+        await tester.pumpAndSettle();
+        expect(
+          tester.getCenter(box).dx - Checkbox.width / 2,
+          tester.getTopLeft(find.text(title)).dx,
+          reason: key,
+        );
+      }
+    });
+
     testWidgets('without notification taps kept their tick is greyed', (
       tester,
     ) async {

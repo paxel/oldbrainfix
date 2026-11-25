@@ -586,6 +586,48 @@ class ControlBelow extends StatelessWidget {
   }
 }
 
+/// A checkbox as a [ControlBelow]'s control: pulled to the start by the
+/// tap room around its box, so the box's edge lines up with the text
+/// above it and not 15 in from it (UI laws, "Design system": rows align
+/// on one grid, obf-1134). Its tap room stays as large.
+class StartCheckbox extends StatelessWidget {
+  /// The checkbox's own key, for finding and tapping it.
+  final Key? boxKey;
+  final bool value;
+  final ValueChanged<bool>? onChanged;
+
+  const StartCheckbox({
+    super.key,
+    this.boxKey,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final boxTheme = theme.checkboxTheme;
+    // The checkbox's own size, as Material lays it out.
+    final room =
+        switch (boxTheme.materialTapTargetSize ?? theme.materialTapTargetSize) {
+          MaterialTapTargetSize.padded => kMinInteractiveDimension,
+          MaterialTapTargetSize.shrinkWrap => kMinInteractiveDimension - 8,
+        } +
+        (boxTheme.visualDensity ?? theme.visualDensity).baseSizeAdjustment.dx;
+    final inset = (room - Checkbox.width) / 2;
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    final changed = onChanged;
+    return Transform.translate(
+      offset: Offset(rtl ? inset : -inset, 0),
+      child: Checkbox(
+        key: boxKey,
+        value: value,
+        onChanged: changed == null ? null : (on) => changed(on ?? false),
+      ),
+    );
+  }
+}
+
 /// A [ControlBelow] with a switch: its text is the switch's semantic
 /// label, as in a [SwitchListTile]. Only the switch toggles; the row
 /// around it does not (UI laws, "Gestures").
