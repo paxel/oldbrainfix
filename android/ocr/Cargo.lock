@@ -500,7 +500,7 @@ dependencies = [
 
 [[package]]
 name = "oldbrainfix-pdf"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "crc32fast",
  "flate2",
