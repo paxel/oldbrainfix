@@ -238,11 +238,18 @@ pub struct CheckedCard {
     pub id: String,
 }
 
-/// The card `text` holds, a link or the card alone, checked as opening
-/// one checks it, as the Dart core's `checkProfileCard`; none when it is
-/// none or its signatures do not hold. Nothing is kept.
+/// The card alone `text`, `<payload>.<signature>`, as a Pack carries it,
+/// checked as opening a card file checks it, as the Dart core's
+/// `checkProfileCard`; none when it is none or its signatures do not
+/// hold. It carries the picture, so it is read at any length, not cut at
+/// a link's [`MAX_CHARS`] (obf-1142). Nothing is kept.
 pub fn check_profile_card(text: &str) -> Option<CheckedCard> {
-    read_card(text).map(|card| CheckedCard {
+    let mut parts = text.split('.');
+    let card = match (parts.next(), parts.next(), parts.next()) {
+        (Some(payload), Some(sig), None) => check_card(payload, sig),
+        _ => None,
+    };
+    card.map(|card| CheckedCard {
         profile: card.profile,
         key: card.key,
         id: card.id,

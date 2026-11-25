@@ -53,6 +53,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 ### Behoben
 
+- Ein Paket mit „Mein Profil beifügen“ und Profilbild lässt sich wieder öffnen, beim Absender und bei den Empfängern. ([obf-1142](https://github.com/paxel/oldbrainfix/issues/458))
 - Auf dem Handy ist „Vor KI verborgen“ im ⋮ einer Karte und im Menü eines Bereichs eine Zeile, der Schalter am Ende. ([obf-1135](https://github.com/paxel/oldbrainfix/issues/451))
 - Auf dem Desktop steht hinter dem Wert einer Notiz-Einstellung ein Aufklapp-Pfeil statt eines Roboterkopfs. ([obf-1116](https://github.com/paxel/oldbrainfix/issues/432))
 - Auf dem Handy bleibt die Linie unter der Leiste einer Liste, wenn ihr Suchstreifen weggescrollt ist. ([obf-1129](https://github.com/paxel/oldbrainfix/issues/445))

@@ -54,6 +54,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 
 ### Fixed
 
+- A Pack made with "Add my Profile" and a Profile picture opens again, for its maker and its receivers. ([obf-1142](https://github.com/paxel/oldbrainfix/issues/458))
 - On the phone, Hidden from AI in a card's ⋮ and an Area's menu is one line, its switch at the end. ([obf-1135](https://github.com/paxel/oldbrainfix/issues/451))
 - On the desktop, the mark after a Note setting's value is a drop-down arrow, not a robot face. ([obf-1116](https://github.com/paxel/oldbrainfix/issues/432))
 - On the phone, the line under a list's bar stays once its search band has scrolled away. ([obf-1129](https://github.com/paxel/oldbrainfix/issues/445))

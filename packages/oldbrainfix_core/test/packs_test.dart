@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:isolate';
 import 'dart:typed_data';
 
+import 'package:image/image.dart' as img;
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'package:test/test.dart';
 
@@ -630,6 +631,32 @@ void main() {
       final plain = ann.writePack(pack, pack.allKeys());
       expect(jsonDecode(utf8.decode(plain)), isNot(contains('sig')));
       expect(ben.openPack(plain).from, isNull);
+    });
+
+    test('"Add my Profile" with a Profile picture opens for its maker and '
+        'its receiver (obf-1142): the card is longer than a link\'s', () {
+      final image = img.Image(width: 600, height: 600);
+      for (final p in image) {
+        p
+          ..r = (p.x * 7 + p.y * 13) % 256
+          ..g = (p.x * p.y) % 256
+          ..b = (p.x ^ p.y) % 256;
+      }
+      ann.setOwnProfilePicture(squareProfilePicture(img.encodePng(image)));
+      final card = ann.profileCardText();
+      expect(card!.length, greaterThan(profileCardMaxChars));
+      final h = health();
+      final pack = ann.packOf(h.plain);
+      final signed = ann.writePack(pack, pack.allKeys(), addProfile: true);
+      expect(ann.openPack(signed).from, isNull);
+      final opened = ben.openPack(signed);
+      expect(opened.from!.name, 'Ann');
+      expect(opened.from!.picture, isNotNull);
+      // Changed after it was made, it is still refused.
+      final changed = utf8.encode(
+        utf8.decode(signed).replaceFirst('Drink water', 'Drink wine'),
+      );
+      expect(() => ben.openPack(changed), throwsA(isA<NotAPack>()));
     });
 
     test('a blocked sender\'s Pack is refused; a later format needs an '

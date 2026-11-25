@@ -171,13 +171,18 @@ typedef CheckedProfileCard = ({
   String id,
 });
 
-/// The card [text] holds, a link or the card alone, checked as opening
-/// one checks it; null when it is none or its signatures do not hold.
-/// Nothing is kept.
-CheckedProfileCard? checkProfileCard(String text) => switch (_readCard(text)) {
-  final card? => (profile: card.profile, key: card.key, id: card.id),
-  null => null,
-};
+/// The card alone [text], `<payload>.<signature>`, as a Pack carries it
+/// ([profileCardText]), checked as opening a card file checks it; null
+/// when it is none or its signatures do not hold. It carries the
+/// picture, so it is read at any length, not cut at a link's
+/// [profileCardMaxChars] (obf-1142). Nothing is kept.
+CheckedProfileCard? checkProfileCard(String text) {
+  final parts = text.split('.');
+  return switch (parts.length == 2 ? _checkCard(parts[0], parts[1]) : null) {
+    final card? => (profile: card.profile, key: card.key, id: card.id),
+    null => null,
+  };
+}
 
 /// The card [text] holds ([_cardParts]), checked ([_checkCard]).
 _Card? _readCard(String text) {
