@@ -1316,6 +1316,51 @@ fn a_reappear_time_is_set_and_read_as_a_count_and_a_unit() -> TestResult {
 }
 
 #[test]
+fn a_note_from_an_axt_file_names_where_it_came_from_and_only_as_its_own_devices_wrote_it()
+-> TestResult {
+    use crate::axt::{AxtFrom, keys};
+    use crate::{OwnProfile, SigningKey};
+    let person = |seed: u8, name: &str| -> Made<Store> {
+        let key = move || Ok(SigningKey::from_seed([seed; 32]));
+        let store = Store::in_memory(crate::store::tests::ticking(), key)?;
+        OwnProfile::new(&store).apply_defaults(name, None)?;
+        Ok(store)
+    };
+    let ann = person(1, "Ann")?;
+    let ben = person(2, "Ben")?;
+    let cy = person(3, "Cy")?;
+    let note = Notes::new(&ann).capture("Dentist", None, None)?;
+    let file = ann.axt_write(std::slice::from_ref(&note.id))?;
+    let wall = |t: DateTime<Utc>| t.naive_utc();
+    let opened = ben.axt_read(&file, &wall)?.map_err(|_| "no AXT file")?;
+    let ids: Vec<String> = opened.records.iter().map(|r| r.id.clone()).collect();
+    let taken = ben.axt_take(&opened, &ids, None)?.remove(0);
+    let plain = Notes::new(&ben).capture("Milk", None, None)?.id;
+    let forged = AxtFrom {
+        sender: "ab".repeat(32),
+        id: "3e4f5a6b-7c8d-4e9f-a0b1-c2d3e4f5a6b7".into(),
+        type_name: crate::axt::types::NOTE.into(),
+        version: 1,
+    }
+    .encode();
+    ben.insert(&cy.append(&plain, keys::FROM, Some(&forged), None)?.wire())?;
+    let task = ben.open_ai_task()?;
+    let read = |id: &str| json_of(&call(&ben, &task, "read_note", &json!({"id": id}))?);
+    let record = &opened.records[0];
+    assert_eq!(
+        read(&taken)?.get("axtFrom"),
+        Some(&json!({
+            "id": record.id,
+            "sender": opened.sender,
+            "type": crate::axt::types::NOTE,
+            "version": record.version,
+        }))
+    );
+    assert_eq!(read(&plain)?.get("axtFrom"), None);
+    Ok(())
+}
+
+#[test]
 fn a_note_from_a_pack_names_its_sender_while_it_keeps_the_badge() -> TestResult {
     use crate::{OwnProfile, SigningKey};
     let person = |seed: u8, name: &str| -> Made<Store> {

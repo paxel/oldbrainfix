@@ -181,7 +181,7 @@ pub fn tools() -> Vec<Value> {
         ),
         tool(
             "read_note",
-            "Reads one Note in full: its text and its format (textFormat, as list_notes names it) with a Code text's language (codeLanguage: a grammar's scope as list_code_languages names it, or null), Sections, Transcripts of its recordings, Photo Texts, photos, attached files (attachments: each file's hash, name, media type, size, pages when counted, and its Attachment Text, the text read out of it, cut after 4000 characters with its whole length in textLength; textState says read, empty when none was found, waiting while it is still to be read, fromComputer while the user's computer is still to read it, removed when the user removed it, or none for a kind of file without text; fileRemoved marks a file the user removed while its text stays), Capture Context, Boxes, Routines and Reminders with each Session's pool, count and picking rule, and its kind with its parts: for every kind but a plain Note its name (the text's first line, shown as its title) and description (the rest of the text, shown small under the name), a Tally's fields, a Session's setup (its pool, count, weekday counts and picking rule) with the Routines that run it, the Lines of a Checklist or Shopping List (on a Shopping List also those checked Once today, marked gone, as they stay struck through on the Agenda for the day), how a Shopping List or a Checklist without a Routine shows on the user's own Agenda (agenda: off, count or lines), and its Frogs. A Note copied from a Pack another person sent, kept with its \"From\" badge, names that person under from. A Note an Import made names under importedFrom the path of its file inside the folder or export imported (path) and the Area that Import made (importArea), where a second Import of the same source adds only what is missing; it cannot be changed here.",
+            "Reads one Note in full: its text and its format (textFormat, as list_notes names it) with a Code text's language (codeLanguage: a grammar's scope as list_code_languages names it, or null), Sections, Transcripts of its recordings, Photo Texts, photos, attached files (attachments: each file's hash, name, media type, size, pages when counted, and its Attachment Text, the text read out of it, cut after 4000 characters with its whole length in textLength; textState says read, empty when none was found, waiting while it is still to be read, fromComputer while the user's computer is still to read it, removed when the user removed it, or none for a kind of file without text; fileRemoved marks a file the user removed while its text stays), Capture Context, Boxes, Routines and Reminders with each Session's pool, count and picking rule, and its kind with its parts: for every kind but a plain Note its name (the text's first line, shown as its title) and description (the rest of the text, shown small under the name), a Tally's fields, a Session's setup (its pool, count, weekday counts and picking rule) with the Routines that run it, the Lines of a Checklist or Shopping List (on a Shopping List also those checked Once today, marked gone, as they stay struck through on the Agenda for the day), how a Shopping List or a Checklist without a Routine shows on the user's own Agenda (agenda: off, count or lines), and its Frogs. A Note copied from a Pack another person sent, kept with its \"From\" badge, names that person under from. A Note an Import made names under importedFrom the path of its file inside the folder or export imported (path) and the Area that Import made (importArea), where a second Import of the same source adds only what is missing; it cannot be changed here. A Note taken from an AXT file another app or one of the user's Devices wrote names under axtFrom the key of the app that signed it (sender, hexadecimal), the record's id, its type and the version taken; it cannot be changed here.",
             true,
             json!({"id": id("Note")}),
             &["id"],
@@ -1584,6 +1584,20 @@ impl Store {
                         all.insert(
                             "importedFrom".into(),
                             json!({ "importArea": area, "path": from.path }),
+                        );
+                    }
+                    // Where a Note an AXT file brought came from
+                    // (obf-1144), as the user's own Devices wrote it; read
+                    // only.
+                    if let Some(from) = self.axt_from(id)? {
+                        all.insert(
+                            "axtFrom".into(),
+                            json!({
+                                "id": from.id,
+                                "sender": from.sender,
+                                "type": from.type_name,
+                                "version": from.version,
+                            }),
                         );
                     }
                     all.insert("lines".into(), lines);

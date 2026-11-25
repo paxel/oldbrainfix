@@ -7,6 +7,7 @@ export 'src/app_link.dart';
 export 'src/area_keys.dart';
 export 'src/area_offers.dart';
 export 'src/auto_sync.dart';
+export 'src/axt.dart';
 export 'src/backlinks.dart';
 export 'src/backup.dart';
 export 'src/backup_settings.dart';

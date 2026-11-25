@@ -29,10 +29,10 @@ packages:
     dependency: "direct main"
     description:
       name: archive
-      sha256: "0d58d1fa1fddf6588251ccf2819f3fb3b6d0452c1b2813ac7413a05592bfbefe"
+      sha256: "2fda90592c0afd219c5e285618a98da835cd10df38372666093d25dfe457a2d0"
       url: "https://pub.dev"
     source: hosted
-    version: "4.5.2"
+    version: "4.7.1"
   args:
     dependency: transitive
     description:
@@ -49,6 +49,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.13.1"
+  avro:
+    dependency: transitive
+    description:
+      name: avro
+      sha256: e2d79fca0236369ff7214c8b479dbc80489c1dac89c8b7e29f877832c96024c3
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.3.0"
+  axt_protocol:
+    dependency: "direct main"
+    description:
+      name: axt_protocol
+      sha256: c3eca3638f4da8f95fddaa157170bc2d79473ac8de026641a8775edc0092b954
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.0"
   boolean_selector:
     dependency: transitive
     description:
@@ -117,10 +133,10 @@ packages:
     dependency: "direct main"
     description:
       name: crypto
-      sha256: c8ea0233063ba03258fbcf2ca4d6dadfefe14f02fab57702265467a19f27fadf
+      sha256: e3626ae6270383c9e3a549f34c9e4cd26c09ae6a9adaab2bf4737a00340efdc4
       url: "https://pub.dev"
     source: hosted
-    version: "3.0.7"
+    version: "3.0.8"
   cryptography:
     dependency: "direct main"
     description:
@@ -185,6 +201,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.2.0"
+  http:
+    dependency: transitive
+    description:
+      name: http
+      sha256: "87721a4a50b19c7f1d49001e51409bddc46303966ce89a65af4f4e6004896412"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.6.0"
   http_multi_server:
     dependency: transitive
     description:
@@ -473,6 +497,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.6.21"
+  timezone:
+    dependency: transitive
+    description:
+      name: timezone
+      sha256: "9f4e5a1a0e4fef7dd3424842c0575db01bfb7a11730e8d55753fcd5c5c98767b"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.11.2"
   typed_data:
     dependency: transitive
     description:

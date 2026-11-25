@@ -2,7 +2,7 @@
   "unreadPhone": [
     {
       "noteId": "note:00000000000000000000000000000006",
-      "hash": "429bc7d363ee578c467ea5a34365e9aa2eba47290855dcace061bdf8aeee3986"
+      "hash": "c5438fd1551955a50d7d268278e4f0d9dce14fb42d58c1ed9095657cd77b7f39"
     },
     {
       "noteId": "note:00000000000000000000000000000005",
@@ -12,7 +12,7 @@
   "unreadComputer": [
     {
       "noteId": "note:00000000000000000000000000000006",
-      "hash": "429bc7d363ee578c467ea5a34365e9aa2eba47290855dcace061bdf8aeee3986"
+      "hash": "c5438fd1551955a50d7d268278e4f0d9dce14fb42d58c1ed9095657cd77b7f39"
     },
     {
       "noteId": "note:00000000000000000000000000000005",
@@ -73,7 +73,7 @@
             {
               "key": "n0.d0",
               "kind": "file",
-              "size": 1640,
+              "size": 1712,
               "children": []
             },
             {
@@ -128,7 +128,7 @@
             {
               "key": "n1.d4",
               "kind": "file",
-              "size": 188,
+              "size": 200,
               "children": []
             },
             {
@@ -164,5 +164,5 @@
     "n1.dt2",
     "n1.dt4"
   ],
-  "size": 2054
+  "size": 2138
 }

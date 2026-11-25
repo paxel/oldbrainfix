@@ -79,10 +79,10 @@
           "kind": "other"
         },
         {
-          "hash": "ee7f1c080e5eedd116a33f4c5dbe53806fe40dac2f7890845f48dfffa9e272f6",
+          "hash": "347e8f631b8f267b90b104971601bf42f43ac0324464e02a8b55fcbd1f1e43c2",
           "name": "Empty.docx",
           "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          "size": 140,
+          "size": 149,
           "pages": null,
           "computer": false,
           "kind": "docx"
@@ -100,7 +100,7 @@
       "attachmentTexts": {
         "eaab03fbe06d497a2c9c0c5b6a51eca18fca153e674b3a86001f44b72e51527e": "Rent due\n\n on the first",
         "e745bc10bab62e45b77074b22a7d6cc19dcfd44c4fb1fe55c3529ce5227597b1": "# Notes\nKeys: 2",
-        "ee7f1c080e5eedd116a33f4c5dbe53806fe40dac2f7890845f48dfffa9e272f6": ""
+        "347e8f631b8f267b90b104971601bf42f43ac0324464e02a8b55fcbd1f1e43c2": ""
       },
       "removedAttachments": [],
       "removedAttachmentTexts": [],
@@ -138,21 +138,21 @@
       "wordless": "file",
       "attachments": [
         {
-          "hash": "e2232b413e894c20eb0b54f0f65bbb517d834f9af1d05b590f6ea1d36073ef95",
+          "hash": "65d1bb01f4bb8f88efaac5ccdd7dc0b8b347b077725d02da19332aff0d01dcc1",
           "name": "Brief.odt",
           "type": "application/vnd.oasis.opendocument.text",
-          "size": 331,
+          "size": 349,
           "pages": null,
           "computer": false,
           "kind": "odt"
         }
       ],
       "attachmentTexts": {
-        "e2232b413e894c20eb0b54f0f65bbb517d834f9af1d05b590f6ea1d36073ef95": "Grüße aus Bern  😀 ﬁ"
+        "65d1bb01f4bb8f88efaac5ccdd7dc0b8b347b077725d02da19332aff0d01dcc1": "Grüße aus Bern  😀 ﬁ"
       },
       "removedAttachments": [],
       "removedAttachmentTexts": [],
-      "aloneFile": "e2232b413e894c20eb0b54f0f65bbb517d834f9af1d05b590f6ea1d36073ef95",
+      "aloneFile": "65d1bb01f4bb8f88efaac5ccdd7dc0b8b347b077725d02da19332aff0d01dcc1",
       "wordlessName": "Brief.odt"
     },
     {
@@ -186,10 +186,10 @@
       "wordless": "file",
       "attachments": [
         {
-          "hash": "53e24f787827167c43df3b374f94c2e089a78e3d271450a23a12ed5fa44a9b7a",
+          "hash": "a9992dc9369f7d851e444df60a18b825b9445115974d92e8899577bb7c22ee8b",
           "name": "Costs.xlsx",
           "type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          "size": 1229,
+          "size": 1283,
           "pages": null,
           "computer": false,
           "kind": "xlsx"
@@ -210,7 +210,7 @@
         }
       ],
       "removedAttachmentTexts": [
-        "53e24f787827167c43df3b374f94c2e089a78e3d271450a23a12ed5fa44a9b7a"
+        "a9992dc9369f7d851e444df60a18b825b9445115974d92e8899577bb7c22ee8b"
       ],
       "aloneFile": null,
       "wordlessName": "Costs.xlsx"
@@ -292,10 +292,10 @@
       "wordless": "file",
       "attachments": [
         {
-          "hash": "429bc7d363ee578c467ea5a34365e9aa2eba47290855dcace061bdf8aeee3986",
+          "hash": "c5438fd1551955a50d7d268278e4f0d9dce14fb42d58c1ed9095657cd77b7f39",
           "name": "Plan.ods",
           "type": "application/vnd.oasis.opendocument.spreadsheet",
-          "size": 126,
+          "size": 135,
           "pages": null,
           "computer": false,
           "kind": "ods"
@@ -304,7 +304,7 @@
       "attachmentTexts": {},
       "removedAttachments": [],
       "removedAttachmentTexts": [],
-      "aloneFile": "429bc7d363ee578c467ea5a34365e9aa2eba47290855dcace061bdf8aeee3986",
+      "aloneFile": "c5438fd1551955a50d7d268278e4f0d9dce14fb42d58c1ed9095657cd77b7f39",
       "wordlessName": "Plan.ods"
     },
     {
@@ -401,10 +401,10 @@
         "removedPhotoTexts": [],
         "attachments": [
           {
-            "hash": "429bc7d363ee578c467ea5a34365e9aa2eba47290855dcace061bdf8aeee3986",
+            "hash": "c5438fd1551955a50d7d268278e4f0d9dce14fb42d58c1ed9095657cd77b7f39",
             "name": "Plan.ods",
             "type": "application/vnd.oasis.opendocument.spreadsheet",
-            "size": 126,
+            "size": 135,
             "pages": null,
             "computer": false,
             "kind": "ods"
@@ -432,8 +432,8 @@
       "fileText/e745bc10bab62e45b77074b22a7d6cc19dcfd44c4fb1fe55c3529ce5227597b1"
     ],
     "note:00000000000000000000000000000003": [
-      "file/e2232b413e894c20eb0b54f0f65bbb517d834f9af1d05b590f6ea1d36073ef95",
-      "fileText/e2232b413e894c20eb0b54f0f65bbb517d834f9af1d05b590f6ea1d36073ef95"
+      "file/65d1bb01f4bb8f88efaac5ccdd7dc0b8b347b077725d02da19332aff0d01dcc1",
+      "fileText/65d1bb01f4bb8f88efaac5ccdd7dc0b8b347b077725d02da19332aff0d01dcc1"
     ]
   },
   "shares": {

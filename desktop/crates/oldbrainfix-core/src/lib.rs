@@ -16,6 +16,7 @@ pub mod ai_tools;
 pub mod alarms;
 pub mod app_link;
 pub mod ask;
+pub mod axt;
 pub mod backlinks;
 pub mod backup;
 pub mod backup_settings;

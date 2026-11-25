@@ -10290,3 +10290,178 @@ fn code_is_coloured_as_the_dart_core_colours_it() -> TestResult {
     }
     Ok(())
 }
+
+/// A value of the AXT library as JSON in the form of the Dart library's
+/// generic values: an enum by its symbol, a union by its branch's value.
+fn axt_json(value: &axt_protocol::Value) -> Value {
+    use axt_protocol::Value as V;
+    match value {
+        V::Null => Value::Null,
+        V::Boolean(b) => json!(b),
+        V::Int(i) => json!(i),
+        V::Long(l) => json!(l),
+        V::Float(f) => json!(f),
+        V::Double(d) => json!(d),
+        V::Bytes(b) | V::Fixed(b) => json!(hex::encode(b)),
+        V::String(s) => json!(s),
+        V::Enum { symbol, .. } => json!(symbol),
+        V::Array(items) => Value::Array(items.iter().map(axt_json).collect()),
+        V::Map(entries) => Value::Object(
+            entries
+                .iter()
+                .map(|(k, v)| (k.clone(), axt_json(v)))
+                .collect(),
+        ),
+        V::Record(fields) => Value::Object(
+            fields
+                .iter()
+                .map(|(k, v)| (k.clone(), axt_json(v)))
+                .collect(),
+        ),
+        V::Union { value, .. } => axt_json(value),
+    }
+}
+
+/// An AXT file as the generator's `_axtFileJson` writes it.
+fn axt_file_json(file: &oldbrainfix_core::axt::AxtFile) -> Value {
+    json!({
+        "sender": file.sender,
+        "shortFingerprint": file.short_fingerprint,
+        "appName": file.app_name,
+        "fromOwnDevice": file.from_own_device,
+        "records": file.records.iter().map(|r| json!({
+            "id": r.id,
+            "version": r.version,
+            "type": r.type_name,
+            "result": r.result,
+            "draft": r.draft.as_ref().map(|d| json!({
+                "text": d.text,
+                "format": d.format,
+                "schedule": d.schedule.as_ref().map(|s| json!({
+                    "start": s.start.to_string(),
+                    "times": s.times.iter().map(|t| t.to_string()).collect::<Vec<_>>(),
+                    "rule": s.rule.as_ref().map(|r| r.format()),
+                })),
+                "done": d.done,
+                "doneAt": d.done_at.map(dart_iso),
+                "headsUps": d.heads_ups,
+            })),
+        })).collect::<Vec<_>>(),
+    })
+}
+
+/// AXT files (obf-1144, ADR 0056): Ada's Notes go as the records the
+/// Dart core makes of them; the files of both cores and of another app
+/// read as the Dart core reads them; Ben takes them into the same
+/// entries, and another person's `axtFrom` counts for nothing. With
+/// `UPDATE_AXT=1`, or when it is missing, this writes
+/// `tests/axt/from-rust.axt` again, which the generator then reads.
+#[test]
+fn axt_files_go_as_the_dart_core_writes_reads_and_takes_them() -> TestResult {
+    use oldbrainfix_core::axt::{self, AxtFrom};
+    let dir = fixtures().join("axt");
+    let files = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/axt");
+    let expected = read_json(&dir.join("expected.json"))?;
+    let times = &expected["times"];
+    let clock = held_clock(times["taken"].as_str().ok_or("taken")?)?;
+
+    // Ada's Notes, each the same record, the types and the manifest too.
+    let held = clock.clone();
+    let ada = Store::in_memory(Box::new(move || *held.lock()), || Ok(writer_key()))?;
+    ada.set_local_setting("author", "Ada")?;
+    insert_lines(&ada, &dir.join("sender.jsonl"))?;
+    let fingerprints: serde_json::Map<String, Value> = axt::type_descriptions()?
+        .iter()
+        .map(|d| (d.name().to_string(), json!(hex::encode(d.fingerprint().0))))
+        .collect();
+    assert_eq!(Value::Object(fingerprints), expected["fingerprints"]);
+    assert_eq!(axt_json(&axt::axt_manifest()), expected["manifest"]);
+    let ids: Vec<String> = expected["notes"]
+        .as_array()
+        .ok_or("notes")?
+        .iter()
+        .filter_map(|id| id.as_str().map(str::to_string))
+        .collect();
+    for id in &ids {
+        for type_name in axt::types::TAKEN {
+            assert_eq!(
+                json!(axt::record_id(id, type_name)),
+                expected["ids"][id][type_name],
+                "{id}"
+            );
+        }
+        let record = ada
+            .axt_record_of(id)?
+            .map(|(t, v)| json!({"type": t, "value": axt_json(&v)}));
+        let want = expected["records"].get(id).cloned();
+        assert_eq!(record, want, "{id}");
+    }
+    let ours = files.join("from-rust.axt");
+    if !ours.exists() || std::env::var("UPDATE_AXT").as_deref() == Ok("1") {
+        std::fs::create_dir_all(&files)?;
+        std::fs::write(&ours, ada.axt_write(&ids)?)?;
+    }
+
+    // Ben reads each file as the Dart core does.
+    let held = clock.clone();
+    let mut ben = Store::in_memory(Box::new(move || *held.lock()), || Ok(joiner_key()))?;
+    ben.set_local_setting("author", "Ben")?;
+    let utc = |at: DateTime<Utc>| at.naive_utc();
+    let mut opened = BTreeMap::new();
+    for (name, want) in expected["read"].as_object().ok_or("read")? {
+        let bytes = std::fs::read(files.join(format!("{name}.axt")))?;
+        let file = ben.axt_read(&bytes, &utc)?.map_err(|_| "no AXT file")?;
+        assert_eq!(&axt_file_json(&file), want, "{name}");
+        opened.insert(name.clone(), file);
+    }
+    // The desktop core's file reads to the Notes it was written from, as
+    // the Dart core's does.
+    let records = |name: &str| -> Vec<Value> {
+        expected["read"][name]["records"]
+            .as_array()
+            .map(|r| r.iter().map(|r| r["draft"].clone()).collect())
+            .unwrap_or_default()
+    };
+    assert_eq!(records("from-rust"), records("from-dart"));
+
+    // Ben takes the catalog into Vet and the desktop core's file into
+    // Unsorted, the same entries.
+    counted_ids(&mut ben, 0x2000);
+    let vet = Places::new(&ben).add_area("Vet")?;
+    assert_eq!(json!(vet.id), expected["vet"]);
+    let mark = ben.current_seq()?;
+    let all = |name: &str| -> Vec<String> {
+        opened
+            .get(name)
+            .map(|f| f.records.iter().map(|r| r.id.clone()).collect())
+            .unwrap_or_default()
+    };
+    let catalog = opened.get("catalog").ok_or("catalog")?;
+    let taken_catalog = ben.axt_take(catalog, &all("catalog"), Some(&vet.id))?;
+    let from_rust = opened.get("from-rust").ok_or("from-rust")?;
+    let taken_rust = ben.axt_take(from_rust, &all("from-rust"), None)?;
+    assert_eq!(
+        lines_after(&ben, mark)?,
+        lines_of(&dir.join("taken.jsonl"))?
+    );
+    assert_eq!(json!(taken_catalog), expected["takenCatalog"]);
+    assert_eq!(json!(taken_rust), expected["takenRust"]);
+    let from_of = |ben: &Store| -> Result<Value, Box<dyn std::error::Error>> {
+        let mut from = serde_json::Map::new();
+        for id in taken_catalog.iter().chain(&taken_rust) {
+            from.insert(
+                id.clone(),
+                json!(ben.axt_from(id)?.map(|f: AxtFrom| f.encode())),
+            );
+        }
+        Ok(Value::Object(from))
+    };
+    assert_eq!(from_of(&ben)?, expected["from"]);
+    *clock.lock() = parse_time(times["foreign"].as_str().ok_or("foreign")?)?;
+    let plain = Notes::new(&ben).capture("Milk", None, None)?;
+    assert_eq!(json!(plain.id), expected["plain"]);
+    insert_lines(&ben, &dir.join("foreign.jsonl"))?;
+    assert_eq!(from_of(&ben)?, expected["fromAfterForeign"]);
+    assert_eq!(ben.axt_from(&plain.id)?, None);
+    Ok(())
+}
