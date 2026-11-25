@@ -2418,7 +2418,39 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     ),
   );
 
-  /// The "+" badge's menu at the finger [at]: Remind me…, Frog and
+  /// Where the finger went down on the Add group's "+" last, for its
+  /// menu to open there.
+  Offset? _addAt;
+
+  /// The Add group's "+" (obf-1117): an outlined button, as the others
+  /// of its group are, its words for the screen reader and the tooltip;
+  /// its menu opens at the finger, at its middle for a screen reader's
+  /// tap.
+  Widget _addButton(AppLocalizations t) => Builder(
+    builder: (context) => Listener(
+      onPointerDown: (event) => _addAt = event.position,
+      child: Tooltip(
+        message: t.routineOrReminder,
+        excludeFromSemantics: true,
+        child: OutlinedButton(
+          key: const ValueKey('badge-add'),
+          onPressed: () {
+            final box = context.findRenderObject() as RenderBox?;
+            final at =
+                _addAt ??
+                (box == null
+                    ? Offset.zero
+                    : box.localToGlobal(box.size.center(Offset.zero)));
+            _addAt = null;
+            unawaited(_addMenu(at));
+          },
+          child: Icon(Icons.add, size: 18, semanticLabel: t.routineOrReminder),
+        ),
+      ),
+    ),
+  );
+
+  /// The "+" button's menu at the finger [at]: Remind me…, Frog and
   /// Session, each spawned as the card's menu does; on a Session Note no
   /// Session, as a Routine of it runs it already (#191); no Frog while
   /// one is open (#259); in Simple only Remind me… (#197, #344).
@@ -2723,17 +2755,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     return [
       ?_group(const ValueKey('editor-group-add'), t.add, [
         // In a Shared Area only a Manager sets them up (ADR 0013).
-        if (schedules)
-          Spotlight(
-            id: 'editor-remind',
-            child: SettingBadge(
-              key: const ValueKey('badge-add'),
-              setting: t.routineOrReminder,
-              icon: Icons.add,
-              value: null,
-              onTap: _addMenu,
-            ),
-          ),
+        if (schedules) Spotlight(id: 'editor-remind', child: _addButton(t)),
         if (changes) ...[
           // What the quick note offered before (#352).
           if (VoiceScope.of(context).available)

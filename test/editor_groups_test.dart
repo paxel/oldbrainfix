@@ -189,6 +189,12 @@ void main() {
       findsOneWidget,
     );
     expect(tester.widget(key('editor-merge')), isA<OutlinedButton>());
+    // The Add group's "+" has the outlined button's shape too (obf-1117).
+    expect(tester.widget(key('badge-add')), isA<OutlinedButton>());
+    expect(
+      find.descendant(of: key('badge-add'), matching: find.byIcon(Icons.add)),
+      findsOneWidget,
+    );
     expect(ground('editor-merge').color, isNot(scheme.error));
     expect(find.byIcon(Icons.delete_outline), findsOneWidget);
   });
@@ -200,7 +206,8 @@ void main() {
     await revealInEditor(tester, key('badge-add'));
     expect(
       tester.getSemantics(key('badge-add')),
-      matchesSemantics(
+      // A button as its group's others, which takes the focus too.
+      containsSemantics(
         label: 'Routine, Reminder, Frog or Session',
         isButton: true,
         hasTapAction: true,

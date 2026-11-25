@@ -207,8 +207,19 @@ void main() {
         'its editor (#344)', (tester) async {
       final id = notes.capture('dentist').id;
       await edit(tester, id);
-      await tap(tester, key('badge-add'));
+      await revealInEditor(tester, key('badge-add'));
+      // A finger near the "+"'s left end: the menu opens there (obf-1117).
+      final at =
+          tester.getRect(key('badge-add')).centerLeft + const Offset(4, 0);
+      await tester.tapAt(at);
+      await tester.pumpAndSettle();
       expect(find.byType(BottomSheet), findsNothing);
+      final menu = tester.getTopLeft(
+        find
+            .ancestor(of: key('spawn-remind'), matching: find.byType(Material))
+            .last,
+      );
+      expect((menu.dx - at.dx).abs(), lessThan(16));
       for (final spawn in ['remind', 'frog', 'session']) {
         expect(key('spawn-$spawn'), findsOneWidget, reason: spawn);
       }
