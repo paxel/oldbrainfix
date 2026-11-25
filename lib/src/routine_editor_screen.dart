@@ -945,7 +945,11 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
           ),
         for (final part in schedule) shown(part),
         Spotlight(id: 'routine-heads-ups', child: _headsUpsPanel(t)),
-        shown(_renagPanel(t)),
+        // The panels' gap, as an EditorPanel keeps under it (obf-1130).
+        Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: shown(_renagPanel(t)),
+        ),
         shown(_escalationPanel(t)),
       ],
     );

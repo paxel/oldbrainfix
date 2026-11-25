@@ -132,6 +132,33 @@ void main() {
       }
     });
 
+    testWidgets('stands 16 under the Re-nag panel, as the editor\'s panels '
+        'stand apart (obf-1130)', (tester) async {
+      routines.create('pills', daily([at(20)]));
+      await start(tester);
+      await editSchedule(tester, find.text('pills').first);
+      await openSection(tester);
+      Rect panel(String key) => tester.getRect(
+        find
+            .ancestor(
+              of: find.byKey(ValueKey(key)),
+              matching: find.byType(Embossed),
+            )
+            .first,
+      );
+      expect(panel('escalation').top - panel('renag').bottom, 16);
+      // The gap the panel above it keeps.
+      final headsUps = tester.getRect(
+        find
+            .descendant(
+              of: find.byKey(const ValueKey('headsUps')),
+              matching: find.byType(Embossed),
+            )
+            .first,
+      );
+      expect(panel('renag').top - headsUps.bottom, 16);
+    });
+
     testWidgets('a count outside the choices stays chosen', (tester) async {
       final pills = routines.create('pills', daily([at(20)]));
       routines.setEscalation(pills.id, 4);
