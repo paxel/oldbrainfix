@@ -430,7 +430,7 @@ impl TableView {
                             asked.push(Asked::Close);
                         }
                         ui.add_space(8.0);
-                        ui.label(RichText::new(t.table_title()).size(18.0).color(text));
+                        crate::design::dialog_title(ui, t.table_title());
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             // Its ⋮ at the top right corner, as on every
                             // table drawn (obf-1050): Copy.
@@ -1023,7 +1023,7 @@ pub(crate) fn question(
             } else {
                 t.table_delete_row_question()
             };
-            ui.label(RichText::new(question).size(18.0).color(text));
+            crate::design::dialog_title(ui, question);
             ui.label(RichText::new(t.table_delete_body()).color(text));
             ui.horizontal_wrapped(|ui| {
                 if design::row_button(ui, t.cancel()).clicked() {

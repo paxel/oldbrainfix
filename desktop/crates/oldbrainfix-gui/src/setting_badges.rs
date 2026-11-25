@@ -182,12 +182,11 @@ pub fn badge_dialog(
         .show(ctx, |ui| {
             ui.set_width(340.0);
             ui.spacing_mut().item_spacing.y = 10.0;
-            let text = ui.visuals().text_color();
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 12.0;
                 let (rect, _) = ui.allocate_exact_size(egui::vec2(24.0, 24.0), Sense::hover());
                 icons::paint(ui.painter(), rect, icon, colour.unwrap_or(tones.accent));
-                ui.label(RichText::new(setting).size(18.0).strong().color(text));
+                crate::design::dialog_title(ui, setting);
             });
             content(ui);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {

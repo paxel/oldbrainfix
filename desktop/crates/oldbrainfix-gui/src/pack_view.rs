@@ -182,8 +182,7 @@ pub fn import_form(
 }
 
 fn heading(ui: &mut Ui, title: &str) {
-    let text = ui.visuals().text_color();
-    ui.label(RichText::new(title).size(18.0).strong().color(text));
+    crate::design::dialog_title(ui, title);
 }
 
 /// "Tick all" and "Untick all", in place of the phone's bar.

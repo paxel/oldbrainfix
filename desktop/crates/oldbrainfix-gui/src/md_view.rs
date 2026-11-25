@@ -809,12 +809,7 @@ impl Viewer {
             ui.set_max_width(420.0);
             let text = ui.visuals().text_color();
             let weak = ui.visuals().weak_text_color();
-            ui.label(
-                RichText::new(t.desk_markdown_import_title())
-                    .size(18.0)
-                    .strong()
-                    .color(text),
-            );
+            crate::design::dialog_title(ui, t.desk_markdown_import_title());
             ui.add_space(8.0);
             ui.label(RichText::new(t.desk_markdown_ask_links(count as i64)).color(text));
             ui.label(

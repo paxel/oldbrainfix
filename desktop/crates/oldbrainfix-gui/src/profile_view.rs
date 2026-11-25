@@ -452,7 +452,7 @@ pub fn card_answer(t: &L10n, taken: CardTaken) -> Option<&str> {
 /// card too long for a QR says to send the link instead.
 pub fn qr_page(ui: &mut Ui, t: &L10n, link: &str) {
     let text = ui.visuals().text_color();
-    ui.heading(RichText::new(t.profile_qr_title()).color(text));
+    crate::design::dialog_title(ui, t.profile_qr_title());
     let drawn = ui
         .vertical_centered(|ui| {
             crate::sync_view::qr(
@@ -484,7 +484,7 @@ pub fn question_form(
     actions: &mut Vec<ProfileAction>,
 ) {
     let text = ui.visuals().text_color();
-    ui.heading(RichText::new(t.profile_which_title()).color(text));
+    crate::design::dialog_title(ui, t.profile_which_title());
     ui.label(RichText::new(t.profile_which_text()).color(text));
     let (own_view, other_view) = views;
     let choices = [
@@ -542,7 +542,7 @@ pub fn question_form(
 pub fn square_page(ui: &mut Ui, t: &L10n, square: &mut Square, actions: &mut Vec<ProfileAction>) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
-    ui.heading(RichText::new(t.profile_crop_title()).color(text));
+    crate::design::dialog_title(ui, t.profile_crop_title());
     ui.label(RichText::new(t.profile_crop_hint()).color(weak));
     ui.add_space(8.0);
     let texture = match &square.texture {

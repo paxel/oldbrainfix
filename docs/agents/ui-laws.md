@@ -159,7 +159,7 @@ There are three kinds, and an action takes the first that fits.
   `titleLarge`, desktop egui's heading text style, `ui.heading`, and
   `BandSizes::title`, both `theme::TITLE`, obf-1121). A dialog's heading is
   Material's dialog title on the phone and 18 strong on the desktop
-  (`.size(18.0).strong()`). A card's or section's heading is 16
+  (`design::dialog_title`, obf-1125). A card's or section's heading is 16
   medium (phone `titleMedium`, through `sectionHeading` in `look.dart`,
   obf-1124), on the desktop strong. Labels and
   buttons are 14 (phone `labelLarge` / `bodyMedium`, desktop egui's

@@ -331,7 +331,7 @@ pub fn welcome(
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     if let Some((done, total)) = state.rebuilding {
-        ui.heading(RichText::new(t.vault_rebuild()).color(text));
+        crate::design::dialog_title(ui, t.vault_rebuild());
         ui.horizontal(|ui| {
             ui.add(egui::Spinner::new());
             let said = t.vault_rebuilding(done as i64, total as i64);
@@ -340,7 +340,7 @@ pub fn welcome(
         return;
     }
     let Some((_, header)) = &state.file else {
-        ui.heading(RichText::new(t.first_start_title()).color(text));
+        crate::design::dialog_title(ui, t.first_start_title());
         ui.label(RichText::new(t.first_start_intro()).color(text));
         // Actions, each with what it means; not a choice of value.
         if choice(ui, t.welcome_new_detail(), t.first_start_new()) {
@@ -357,7 +357,7 @@ pub fn welcome(
         }
         return;
     };
-    ui.heading(RichText::new(t.restore_offer()).color(text));
+    crate::design::dialog_title(ui, t.restore_offer());
     ui.label(RichText::new(t.restore_intro()).small().color(weak));
     ui.add_space(8.0);
     let made = wall(header.created).format("%Y-%m-%d %H:%M").to_string();
@@ -538,7 +538,7 @@ pub fn notes_page(
 ) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
-    ui.heading(RichText::new(t.backup_open_page_title()).color(text));
+    crate::design::dialog_title(ui, t.backup_open_page_title());
     ui.add_space(8.0);
     let created = match &state.opened {
         Some(opened) => opened.created,

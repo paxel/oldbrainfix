@@ -817,9 +817,8 @@ impl TallyForm {
 /// The heading of a page and its bar: Save, Cancel and, with `delete`,
 /// Delete, last.
 fn page_bar(ui: &mut Ui, t: &L10n, heading: &str, delete: bool) -> Option<FormIntent> {
-    let text = ui.visuals().text_color();
     let mut intent = None;
-    ui.label(RichText::new(heading).size(18.0).strong().color(text));
+    crate::design::dialog_title(ui, heading);
     ui.horizontal_wrapped(|ui| {
         if theme::main_action(ui, true, t.save()) {
             intent = Some(FormIntent::Save);

@@ -287,3 +287,23 @@ fn a_setting_badges_drop_down_mark_stands_4_after_its_value() {
         mark.pos.x
     );
 }
+
+#[test]
+fn a_dialog_title_is_18_strong_at_every_text_size() {
+    for size in [TextSize::Normal, TextSize::Largest] {
+        let harness = harness(size, |ui| {
+            design::dialog_title(ui, "Pair a Device");
+        });
+        let strong = harness.ctx.global_style().visuals.strong_text_color();
+        let title = drawn(&harness)
+            .into_iter()
+            .find_map(|shape| match shape {
+                Shape::Text(text) if text.galley.text() == "Pair a Device" => Some(text),
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("no title at {size:?}"));
+        let format = &title.galley.job.sections[0].format;
+        assert!(near(format.font_id.size, 18.0), "at {size:?}");
+        assert_eq!(format.color, strong, "at {size:?}");
+    }
+}

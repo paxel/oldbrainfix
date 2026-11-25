@@ -415,7 +415,7 @@ impl SyncHost {
         let weak = ui.visuals().weak_text_color();
         let error = ui.visuals().error_fg_color;
         let heading = if pair { t.menu_pair() } else { t.sync_title() };
-        ui.heading(RichText::new(heading).color(text));
+        crate::design::dialog_title(ui, heading);
         ui.label(RichText::new(t.sync_host_intro()).color(weak));
         ui.add_space(8.0);
         egui::ScrollArea::vertical()

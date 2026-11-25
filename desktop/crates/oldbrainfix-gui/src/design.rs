@@ -199,6 +199,16 @@ pub fn text_button(ui: &mut Ui, icon: char, words: &str) -> Response {
     plain_button(ui, Some(icon), words)
 }
 
+/// A dialog's heading (UI laws, "Text sizes", obf-1125): `words` 18
+/// strong, in the strong text colour; the one style every dialog's
+/// heading has.
+pub fn dialog_title(ui: &mut Ui, words: &str) -> Response {
+    ui.label(egui::RichText::new(words).size(DIALOG_TITLE).strong())
+}
+
+/// The size of a dialog's heading.
+pub const DIALOG_TITLE: f32 = 18.0;
+
 /// Cancel or Close in a dialog's action row (UI laws, "Buttons",
 /// obf-1102): a [`text_button`] without its icon, the one place it goes
 /// without one, as the row shows these are its buttons.

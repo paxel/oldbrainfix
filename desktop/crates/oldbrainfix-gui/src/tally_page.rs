@@ -284,7 +284,7 @@ impl TallyPage {
             .show(ui, |ui| {
                 ui.spacing_mut().item_spacing.y = 16.0;
                 ui.add_space(4.0);
-                ui.label(RichText::new(t.new_tally()).size(18.0).strong().color(text));
+                crate::design::dialog_title(ui, t.new_tally());
                 ui.horizontal_wrapped(|ui| {
                     if theme::main_action(ui, true, t.save()) {
                         intent = Some(PageIntent::Save);

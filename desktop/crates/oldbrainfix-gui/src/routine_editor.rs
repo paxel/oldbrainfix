@@ -923,7 +923,7 @@ impl RoutineEditor {
                 ui.spacing_mut().item_spacing.y = 16.0;
                 ui.add_space(4.0);
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new(heading).size(18.0).strong().color(text));
+                    crate::design::dialog_title(ui, heading);
                     // As in the bar of the phone's editor.
                     if let Some(id) = self.routine.as_ref().filter(|_| self.history) {
                         ui.add_space((ui.available_width() - 28.0).max(0.0));

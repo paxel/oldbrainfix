@@ -13095,9 +13095,8 @@ impl App {
                                     backup_view::welcome(ui, &t, &wall, welcome, &mut asked);
                                     return;
                                 }
-                                let text = ui.visuals().text_color();
                                 let weak = ui.visuals().weak_text_color();
-                                ui.heading(RichText::new(t.first_start_device()).color(text));
+                                design::dialog_title(ui, t.first_start_device());
                                 ui.label(RichText::new(t.first_start_device_detail()).color(weak));
                                 if let Some(action) = sync.pairing(ui, &t, tones) {
                                     synced.push(Action::Sync(action));
@@ -16553,12 +16552,7 @@ impl App {
                 }
                 let text = ui.visuals().text_color();
                 ui.horizontal(|ui| {
-                    ui.label(
-                        RichText::new(t.menu_new_note())
-                            .size(18.0)
-                            .strong()
-                            .color(text),
-                    );
+                    crate::design::dialog_title(ui, t.menu_new_note());
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if icon_button(ui, icons::CLOSE, t.close(), text).clicked() {
                             actions.push(Action::CloseQuickNote);
@@ -19554,7 +19548,7 @@ impl App {
         let profile_newer = self.view.profile_newer;
         let people_newer = &self.view.people_newer;
         let question = self.view.profile_question.is_some();
-        ui.heading(RichText::new(page_title(&t, page)).color(text));
+        design::dialog_title(ui, page_title(&t, page));
         ui.add_space(8.0);
         egui::ScrollArea::vertical()
             .id_salt(("profile", page_title(&t, page)))
@@ -21283,8 +21277,7 @@ fn note_change(
 }
 
 fn title(ui: &mut Ui, title: &str) {
-    let text = ui.visuals().text_color();
-    ui.label(RichText::new(title).size(18.0).strong().color(text));
+    design::dialog_title(ui, title);
 }
 
 /// A dialog's text field, taking the keyboard when `focus` says so.

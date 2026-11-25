@@ -126,7 +126,7 @@ pub fn form(
         person_picture(ui, pictures, &person.theirs, 72.0, &theirs);
         ui.add_space(12.0);
         ui.vertical(|ui| {
-            ui.heading(RichText::new(&theirs).color(text));
+            crate::design::dialog_title(ui, &theirs);
             if let Some(code) = &person.code {
                 ui.horizontal(|ui| {
                     ui.label(RichText::new(t.profile_their_code()).color(weak));
