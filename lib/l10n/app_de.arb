@@ -11,6 +11,7 @@
   "paste": "Einfügen",
   "pasteEmpty": "Nichts zum Einfügen: Die Zwischenablage enthält weder Text noch Bild.",
   "text": "Text",
+  "captureFanEditor": "Editor",
   "captureFanClose": "Schließen",
   "captureLongPressHint": "sofort eine Notiz schreiben",
   "captureLongPressAction": "Sofort eine Notiz schreiben",

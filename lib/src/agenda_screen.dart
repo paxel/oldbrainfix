@@ -25,6 +25,7 @@ import 'browser.dart';
 import 'all_routines_screen.dart';
 import 'calendar_screen.dart';
 import 'card_glance.dart';
+import 'browser_add.dart';
 import 'capture_fan.dart';
 import 'capture_requests.dart';
 import 'capture_screen.dart';
@@ -761,12 +762,27 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
   }
 
   /// Fans out the ways to capture from "+", the ones this Device has,
-  /// and opens the capture screen of the way picked.
+  /// and opens the capture screen of the way picked; Editor opens an
+  /// empty Note in the Note editor (obf-1141).
   Future<void> _capture() async {
-    final fan = captureFanFor(context, _plus);
+    final fan = captureFanFor(context, _plus, editor: true);
     if (fan == null) return;
     final way = await Navigator.of(context).push(fan);
     if (way == null || !mounted) return;
+    if (way == CaptureWay.editor) {
+      final made = await editNew(
+        context,
+        widget.notes,
+        widget.places,
+        null,
+        onChanged: _reloadIfMounted,
+      );
+      if (made == null) return;
+      // Shown on top, as a Note captured here is.
+      _capturedId = made;
+      _reloadIfMounted();
+      return;
+    }
     await captureNote(
       context,
       widget.notes,

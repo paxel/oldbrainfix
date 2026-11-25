@@ -13,6 +13,8 @@
   "pasteEmpty": "Nothing to paste: the clipboard holds no text and no picture.",
   "@pasteEmpty": {"description": "Line above the capture field after Paste found nothing usable on the clipboard."},
   "text": "Text",
+  "captureFanEditor": "Editor",
+  "@captureFanEditor": {"description": "Topmost entry of the Agenda's \"+\" fan (obf-1141): opens an empty Note in the full Note editor instead of the quick note."},
   "captureFanClose": "Close",
   "captureLongPressHint": "write a Note at once",
   "@captureLongPressHint": {"description": "Screen reader hint of the long press on the Agenda's and the lock screen's + (#282): it opens text capture at once, without the fan. Lowercase, as Android reads it after \"Double-tap and hold to\"."},

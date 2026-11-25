@@ -161,7 +161,9 @@ Future<String?> makeNew(
 /// Opens the Note editor on a new Note filed into the Area or Topic
 /// [place] (obf-1140): who is already there has taken the time to sort
 /// and gets the full editor, not the quick note. Sorted, the Note has no
-/// Nudge; its location and the rest of its Capture Context are attached
+/// Nudge; Unsorted where [place] is null, from the Agenda's Editor
+/// (obf-1141), it is nudged in 1 h, as the quick note's Open in the
+/// editor does. Its location and the rest of its Capture Context are attached
 /// as they arrive, without asking. Left with nothing in it, the Note goes
 /// again, as the quick note saves nothing for an empty text. [onChanged]
 /// runs once the editor was left, and again when more of its Capture
@@ -170,12 +172,16 @@ Future<String?> editNew(
   BuildContext context,
   Notes notes,
   Places places,
-  String place, {
+  String? place, {
   required VoidCallback onChanged,
 }) async {
   final here = currentIfGranted(LocationScope.of(context));
   final extras = currentExtras(notes.store, ContextScope.of(context));
-  final note = notes.capture('', place: place);
+  final note = notes.capture(
+    '',
+    place: place,
+    nudgeIn: place == null ? Notes.defaultNudge : null,
+  );
   for (final attached in [
     attachLocation(notes, note.id, here),
     attachExtras(notes, note.id, extras),

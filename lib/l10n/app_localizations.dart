@@ -164,6 +164,12 @@ abstract class AppLocalizations {
   /// **'Text'**
   String get text;
 
+  /// Topmost entry of the Agenda's "+" fan (obf-1141): opens an empty Note in the full Note editor instead of the quick note.
+  ///
+  /// In en, this message translates to:
+  /// **'Editor'**
+  String get captureFanEditor;
+
   /// No description provided for @captureFanClose.
   ///
   /// In en, this message translates to:

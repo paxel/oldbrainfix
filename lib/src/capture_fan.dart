@@ -9,8 +9,9 @@ import 'l10n.dart';
 import 'photo_platform.dart';
 import 'voice_platform.dart';
 
-/// A way the Agenda's "+" fans out to capture a Note.
-enum CaptureWay { text, voice, photo, gallery, paste, file }
+/// A way the Agenda's "+" fans out to capture a Note; [editor] opens an
+/// empty Note in the Note editor (obf-1141).
+enum CaptureWay { text, voice, photo, gallery, paste, file, editor }
 
 /// One entry of a fan: its key, its icon and its words.
 typedef FanEntry = ({Key key, Widget icon, String label});
@@ -204,6 +205,7 @@ class CaptureFanRoute extends FanRoute<CaptureWay> {
       CaptureWay.gallery => (Icons.photo_library_outlined, t.gallery),
       CaptureWay.paste => (Icons.content_paste, t.paste),
       CaptureWay.file => (Icons.attach_file, t.file),
+      CaptureWay.editor => (Icons.edit_outlined, t.captureFanEditor),
     };
     return (
       key: ValueKey('captureFan-${way.name}'),
@@ -214,8 +216,14 @@ class CaptureFanRoute extends FanRoute<CaptureWay> {
 }
 
 /// The fan for the "+" button laid out at [plus], with the ways this
-/// Device has; Text always. Null while [plus] is not laid out.
-CaptureFanRoute? captureFanFor(BuildContext context, GlobalKey plus) {
+/// Device has; Text always, and with [editor] Editor at the top
+/// (obf-1141): the Agenda's, not the lock screen's, as the editor shows
+/// the Areas. Null while [plus] is not laid out.
+CaptureFanRoute? captureFanFor(
+  BuildContext context,
+  GlobalKey plus, {
+  bool editor = false,
+}) {
   final anchor = fanAnchor(context, plus.currentContext);
   if (anchor == null) return null;
   final photos = PhotoScope.of(context);
@@ -228,6 +236,7 @@ CaptureFanRoute? captureFanFor(BuildContext context, GlobalKey plus) {
       if (photos.pickable) CaptureWay.gallery,
       if (photos.pasteable) CaptureWay.paste,
       if (FileScope.of(context).pickable) CaptureWay.file,
+      if (editor) CaptureWay.editor,
     ],
     barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
   );

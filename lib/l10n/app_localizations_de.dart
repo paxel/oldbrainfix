@@ -44,6 +44,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get text => 'Text';
 
   @override
+  String get captureFanEditor => 'Editor';
+
+  @override
   String get captureFanClose => 'Schließen';
 
   @override
