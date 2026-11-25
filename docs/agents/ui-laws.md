@@ -1618,7 +1618,9 @@ There are three kinds, and an action takes the first that fits.
   card on the find bar's tint (tertiary container) in a 3 dp ring of
   the tint's strong colour (tertiary), a Missed Occurrence's line in
   the Missed Summary alike with corners of 8, scrolled a fifth down
-  from the top; one mark at a time, gone once the app goes out of
+  from the top or a little lower, so the heading or row above it starts
+  whole under the bar and a first row of today keeps the Today heading
+  (obf-1137); one mark at a time, gone once the app goes out of
   sight. See Alarms and notifications.
 - **A calendar appointment's row is read only**: no checkbox, the
   calendar's colour down its side, the calendar icon and the calendar's
@@ -2081,9 +2083,9 @@ There are three kinds, and an action takes the first that fits.
   within 500 ms, whether the app was running, in the background or not
   started; Capture and the full-screen alarm stay on top of it, nothing
   typed lost. The Agenda scrolls the row into view, a fifth down from
-  the top, and marks it on the find bar's tint in a ring of its colour
-  (tertiary) until the app goes out of sight or another tap marks
-  another; Done is its box, Snooze and Not today are in its ⋮. One
+  the top or a little lower so nothing is cut by the bar, and marks it
+  on the find bar's tint in a ring of its colour (tertiary) until the
+  app goes out of sight or another tap marks another; Done is its box, Snooze and Not today are in its ⋮. One
   today's rows do not hold is marked where the Agenda lists it: in the
   Missed Summary, as far as its card shows, or on a coming day. One the
   Agenda lists nowhere opens the Agenda with "Already done" or

@@ -1,7 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show RenderAbstractViewport;
+import 'package:flutter/rendering.dart'
+    show RenderAbstractViewport, RenderSliverMultiBoxAdaptor;
 import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -260,6 +261,10 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
 
   /// Finds the marked row, to scroll it into view.
   final _markKey = GlobalKey();
+
+  /// Finds the Today heading, kept in view over a marked row right under
+  /// it (obf-1137).
+  final _todayKey = GlobalKey();
 
   /// Inside the list of the rows, to scroll it while the marked row is
   /// not built yet.
@@ -596,9 +601,10 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
     _ => false,
   };
 
-  /// Scrolls the marked row into view, a fifth down from the top. Not
-  /// built yet, the list goes back to its top and on a screen at a time
-  /// until it is, a frame each.
+  /// Scrolls the marked row into view, a fifth down from the top or less,
+  /// so that the heading or row above it starts whole under the bar
+  /// ([_whole]). Not built yet, the list goes back to its top and on a
+  /// screen at a time until it is, a frame each.
   void _reveal([int tries = 0]) {
     if (!mounted || _marked == null) return;
     final target = _markKey.currentContext?.findRenderObject();
@@ -608,12 +614,13 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
         : null;
     if (position == null) return;
     if (target != null) {
-      final offset = RenderAbstractViewport.maybeOf(target)
-          ?.getOffsetToReveal(target, 0.2)
-          .offset;
-      if (offset != null) {
+      if (RenderAbstractViewport.maybeOf(target) case final viewport?) {
         position.jumpTo(
-          offset.clamp(position.minScrollExtent, position.maxScrollExtent),
+          _whole(
+            viewport,
+            target,
+            position,
+          ).clamp(position.minScrollExtent, position.maxScrollExtent),
         );
       }
       return;
@@ -632,6 +639,48 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
       ..addPostFrameCallback((_) => _reveal(tries + 1))
       // Also where the list did not move, so the next look comes.
       ..ensureVisualUpdate();
+  }
+
+  /// Where the list stops to show [target] (obf-1137): a fifth down from
+  /// the top, moved up to where the last of the list's blocks above that
+  /// starts (a heading, a row, a banner), so none is cut by the bar; the
+  /// list's own top for its first block. A first row of today keeps the
+  /// Today heading over it. Where that leaves [target] cut at the bottom,
+  /// at [target]'s own top.
+  double _whole(
+    RenderAbstractViewport viewport,
+    RenderObject target,
+    ScrollPosition position,
+  ) {
+    final wanted = viewport.getOffsetToReveal(target, 0.2).offset;
+    final own = viewport.getOffsetToReveal(target, 0).offset;
+    var node = target.parent;
+    while (node != null && node is! RenderSliverMultiBoxAdaptor) {
+      node = node.parent;
+    }
+    if (node is! RenderSliverMultiBoxAdaptor) return wanted;
+    double? start;
+    double? first;
+    for (var child = node.firstChild; child != null;) {
+      final top = viewport.getOffsetToReveal(child, 0).offset;
+      if (node.indexOf(child) == 0) first = top;
+      if (top <= wanted && (start == null || top > start)) start = top;
+      child = node.childAfter(child);
+    }
+    if (start == null) {
+      // Nothing above is built: near the top, the list's top.
+      return wanted <= position.minScrollExtent
+          ? position.minScrollExtent
+          : own;
+    }
+    if (_todayKey.currentContext?.findRenderObject()
+        case RenderBox(:final size) && final today) {
+      final heading = viewport.getOffsetToReveal(today, 0).offset;
+      if ((heading + size.height - start).abs() < 1) start = heading;
+    }
+    if (first != null && start <= first) start = position.minScrollExtent;
+    final lowest = viewport.getOffsetToReveal(target, 1).offset;
+    return start < lowest ? own : start;
   }
 
   /// Shows the rows of [days].
@@ -1732,7 +1781,10 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
               // Nothing of the days before their first read is in (#207):
               // no "Nothing planned" that is not so.
               if (_days != null) ...[
-                Spotlight(id: 'agenda-today', child: _Heading(t.agendaToday)),
+                Spotlight(
+                  id: 'agenda-today',
+                  child: _Heading(t.agendaToday, key: _todayKey),
+                ),
                 if (_today.isEmpty)
                   BrowserEmpty(text: t.nothingToday)
                 else
@@ -1760,8 +1812,9 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
                           : null,
                     ),
                 ],
-                // The visible gap between today and tomorrow.
-                const SizedBox(height: 32),
+                // The visible gap between today and tomorrow, as between
+                // the days after (obf-1137).
+                const SizedBox(height: 16),
                 Opacity(
                   opacity: AgendaScreen.tomorrowOpacity,
                   child: Column(
@@ -1948,7 +2001,7 @@ class _CountBanner extends StatelessWidget {
 class _Heading extends StatelessWidget {
   final String text;
 
-  const _Heading(this.text);
+  const _Heading(this.text, {super.key});
 
   @override
   Widget build(BuildContext context) => Padding(

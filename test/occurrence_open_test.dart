@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderSliverMultiBoxAdaptor;
 import 'package:flutter_test/flutter_test.dart';
 
 import 'dart:async';
@@ -207,6 +208,101 @@ void main() {
     }
 
     Finder markedIn(Finder of) => find.descendant(of: of, matching: marked);
+
+    /// The Agenda's list of the days.
+    final agendaList = find
+        .descendant(
+          of: find.byType(AgendaScreen),
+          matching: find.byWidgetPredicate(
+            (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
+          ),
+        )
+        .first;
+
+    /// The Agenda's list stands at its top, or with one of its blocks (a
+    /// heading, a row, a day) starting right under the bar: nothing is cut
+    /// by it (obf-1137).
+    void expectWholeAtTop(WidgetTester tester) {
+      final list = agendaList;
+      final position = tester.state<ScrollableState>(list).position;
+      if (position.pixels == position.minScrollExtent) return;
+      final top = tester.getTopLeft(list).dy;
+      final sliver = tester
+          .renderObjectList(
+            find.descendant(of: list, matching: find.byType(SliverList)),
+          )
+          .first;
+      final tops = <double>[];
+      if (sliver is RenderSliverMultiBoxAdaptor) {
+        for (var child = sliver.firstChild; child != null;) {
+          tops.add(child.localToGlobal(Offset.zero).dy);
+          child = sliver.childAfter(child);
+        }
+      }
+      expect(tops, contains(closeTo(top, 0.01)));
+    }
+
+    /// Fourteen chores today from 10:00, two an hour, made before they
+    /// were due.
+    List<Routine> chores() {
+      final saved = now;
+      now = DateTime(2026, 10, 24, 6);
+      final made = [
+        for (var i = 0; i < 14; i++)
+          routines.create('chore $i', daily(10 + i ~/ 2)),
+      ];
+      now = saved;
+      return made;
+    }
+
+    Future<void> startSmall(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(400, 700);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(OldBrainFixApp(store: store, alarms: alarms));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('one of the first rows of today leaves the Today heading '
+        'whole above it (obf-1137)', (tester) async {
+      final routine = chores()[2];
+      await startSmall(tester);
+      alarms.tapOccurrence((
+        routineId: routine.id,
+        occurrenceKey: '2026-10-24T11:00',
+      ));
+      await tester.pumpAndSettle();
+
+      expect(markedIn(key('row-${routine.id}@2026-10-24T11:00')), findsOne);
+      expectInView(tester);
+      expectWholeAtTop(tester);
+      expect(
+        tester.getTopLeft(find.text('Today')).dy,
+        greaterThanOrEqualTo(tester.getTopLeft(agendaList).dy),
+      );
+    });
+
+    testWidgets('one far down today stands under a whole row, as near a '
+        'fifth down as that allows (obf-1137)', (tester) async {
+      final routine = chores()[11];
+      await startSmall(tester);
+      alarms.tapOccurrence((
+        routineId: routine.id,
+        occurrenceKey: '2026-10-24T15:00',
+      ));
+      await tester.pumpAndSettle();
+
+      final row = key('row-${routine.id}@2026-10-24T15:00');
+      expect(markedIn(row), findsOne);
+      expectInView(tester);
+      expectWholeAtTop(tester);
+      // A fifth down or lower, by less than a row.
+      final list = tester.getRect(agendaList);
+      final shown = tester.getRect(marked);
+      final fifth = 0.2 * (list.height - shown.height);
+      expect(shown.top - list.top, greaterThanOrEqualTo(fifth - 0.01));
+      expect(shown.top - list.top, lessThan(fifth + shown.height + 16));
+    });
 
     testWidgets('a tap opens the Agenda with its row marked, not its Note, '
         'over whatever the app showed (obf-1039)', (tester) async {

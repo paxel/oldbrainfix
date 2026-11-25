@@ -223,6 +223,33 @@ void main() {
       return found;
     }
 
+    testWidgets('tomorrow stands as far under today as each later day '
+        'under the one before (obf-1137)', (tester) async {
+      routines.create('pills', daily([at(20)]));
+      await startTall(tester);
+
+      /// The dimmed block of [day], its heading and rows.
+      Rect block(String day) => tester.getRect(
+        find.ancestor(of: find.text(day), matching: find.byType(Opacity)).first,
+      );
+      final todayEnd = tester
+          .getRect(
+            find
+                .ancestor(
+                  of: find.text('20:00').first,
+                  matching: find.byWidgetPredicate(
+                    (w) => '${w.key}'.contains("'row-"),
+                  ),
+                )
+                .first,
+          )
+          .bottom;
+      final tomorrow = block('Tomorrow');
+      final after = block('Monday, 26 Oct');
+      expect(after.top - tomorrow.bottom, 16);
+      expect(tomorrow.top - todayEnd, after.top - tomorrow.bottom);
+    });
+
     testWidgets('a week: days three to seven under weekday and date, dimmed, '
         'across a month end', (tester) async {
       // 12:00 on Wednesday, 28 October 2026.
