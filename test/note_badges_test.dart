@@ -122,12 +122,7 @@ void main() {
       expect(find.bySemanticsLabel('Area and Topic: Unsorted'), findsOneWidget);
       expect(find.bySemanticsLabel(RegExp(r'^Captured: ')), findsOneWidget);
       expect(find.bySemanticsLabel('Kind: Plain Note'), findsOneWidget);
-      // "+" leads the Add group at the page's end (obf-1073).
-      await revealInEditor(tester, key('badge-add'));
-      expect(
-        find.bySemanticsLabel('Routine, Reminder, Frog or Session'),
-        findsOneWidget,
-      );
+      // Read while it is in view: revealing "+" below may scroll it off.
       expect(
         tester.getSemantics(key('badge-importance')),
         matchesSemantics(
@@ -135,6 +130,12 @@ void main() {
           isButton: true,
           hasTapAction: true,
         ),
+      );
+      // "+" leads the Add group at the page's end (obf-1073).
+      await revealInEditor(tester, key('badge-add'));
+      expect(
+        find.bySemanticsLabel('Routine, Reminder, Frog or Session'),
+        findsOneWidget,
       );
       semantics.dispose();
     });
