@@ -455,7 +455,7 @@ void main() {
           expect(hint, 'Add a Line');
           expect(
             tester.getSemantics(add),
-            containsSemantics(label: 'Add a Line', hasTapAction: true),
+            isSemantics(label: 'Add a Line', hasTapAction: true),
           );
           // Under the Lines.
           final last = key('$prefix-field-$tickets');
