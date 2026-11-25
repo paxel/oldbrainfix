@@ -19,8 +19,8 @@ import 'l10n.dart';
 /// The extension of an AXT file.
 const axtExtension = 'axt';
 
-/// The type an AXT file is shared as: ADR 0056 names none.
-const axtMimeType = 'application/octet-stream';
+/// The type an AXT file is shared as (AXT `spec/envelope.md`, section 9).
+const axtMimeType = 'application/vnd.axt';
 
 /// The characters a file name cannot hold on any system the file may
 /// reach, and those that steer text.
@@ -111,6 +111,11 @@ Future<void> exportAxt(
       await runner.run(store, job, (_, _) {}, stop);
     }
   } on Exception catch (e) {
+    notSent(t.axtNotWrittenCause, t.nothingLostFix, '$e');
+    return;
+  } on Error catch (e) {
+    // What the AXT library refuses as an Error, such as a record it
+    // cannot write, is told at the top as any failure.
     notSent(t.axtNotWrittenCause, t.nothingLostFix, '$e');
     return;
   } finally {

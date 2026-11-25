@@ -271,6 +271,20 @@ void main() {
     expect(await sharedTexts(tester), ['Bike lock code']);
   });
 
+  testWidgets('an Error of the AXT library is announced at the top', (
+    tester,
+  ) async {
+    notes.capture('Bike lock code', place: health.id);
+    await start(tester, runner: _CountingRunner(throws: StateError('no')));
+    await allNotes(tester);
+    await tap(tester, key('note-menu'));
+    await tap(tester, key('note-group-share'));
+    await tap(tester, key('note-axt'));
+
+    expect(files.shared, isEmpty);
+    expect(announcements.visible, 'The AXT file was not shared.');
+  });
+
   testWidgets('no place to write it is announced at the top', (tester) async {
     notes.capture('Bike lock code', place: health.id);
     await start(tester, platform: false);
@@ -323,6 +337,11 @@ void main() {
 class _CountingRunner implements JobRunner {
   var runs = 0;
 
+  /// What the job throws instead of running, as the AXT library may.
+  final Object? throws;
+
+  _CountingRunner({this.throws});
+
   @override
   Future<T> run<T>(
     Store store,
@@ -331,6 +350,7 @@ class _CountingRunner implements JobRunner {
     JobStop stop,
   ) {
     runs++;
+    if (throws case final thrown?) throw thrown;
     return const InlineJobRunner(NoFolders()).run(store, work, progress, stop);
   }
 }
