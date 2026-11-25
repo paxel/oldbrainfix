@@ -6136,6 +6136,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get exportAsPack => 'Export as Pack…';
 
   @override
+  String get exportAsAxt => 'Export as AXT file…';
+
+  @override
+  String get axtNotSent => 'The AXT file was not shared.';
+
+  @override
+  String get axtNotSentTitle => 'AXT file not shared';
+
+  @override
+  String get axtNotWrittenCause => 'The AXT file could not be written.';
+
+  @override
+  String get axtNoNotes => 'There are no Notes here to put in an AXT file.';
+
+  @override
   String get packExportTitle => 'Export as Pack';
 
   @override

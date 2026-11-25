@@ -218,6 +218,9 @@ class NoteActions {
   /// Opens the tree of a Pack exported from the Note (#164).
   final VoidCallback? onExportPack;
 
+  /// Writes the Note as an AXT file and shares it (obf-1145).
+  final VoidCallback? onExportAxt;
+
   /// Removes the Note's "From …" badge (#164), naming [packFrom].
   final VoidCallback? onRemovePackFrom;
   final String? packFrom;
@@ -283,6 +286,7 @@ class NoteActions {
     this.onSend,
     this.onShare,
     this.onExportPack,
+    this.onExportAxt,
     this.onRemovePackFrom,
     this.packFrom,
     this.onCopy,
@@ -1266,6 +1270,8 @@ class _MoreButton extends StatelessWidget {
             item('note-copy', Icons.copy_outlined, t.copyText, copy),
           if (actions.onExportPack case final pack?)
             item('note-pack', Icons.inventory_2_outlined, t.exportAsPack, pack),
+          if (actions.onExportAxt case final axt?)
+            item('note-axt', Icons.upload_file_outlined, t.exportAsAxt, axt),
           if (calendar != null && calendar.add.isNotEmpty)
             item(
               'note-calendar',

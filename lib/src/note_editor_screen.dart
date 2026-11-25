@@ -12,6 +12,7 @@ import 'app_lock.dart';
 import 'area_look.dart';
 import 'areas_screen.dart';
 import 'attachment_views.dart';
+import 'axt_export.dart';
 import 'big_screen.dart';
 import 'box_ids.dart';
 import 'capture_screen.dart' show insertAtCursor, pourIntoShopping;
@@ -421,6 +422,11 @@ NoteActions noteActions(
     onSend: () => unawaited(sendNoteFile(context, notes.store, id)),
     onShare: () => unawaited(shareNoteToApp(context, notes, id)),
     onExportPack: () => unawaited(exportPack(context, notes.store, id)),
+    onExportAxt: () => unawaited(
+      exportAxt(context, notes.store, [
+        id,
+      ], title: axtNoteTitle(notes.store, id)),
+    ),
     packFrom: from == null ? null : profileDisplayName(context.t, from.name),
     onRemovePackFrom: from == null || !placed.changes
         ? null
@@ -2844,6 +2850,20 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             unawaited(exportPack(context, widget.notes.store, widget.noteId));
           },
           icon: Icons.inventory_2_outlined,
+        ),
+        _groupButton(
+          key: const ValueKey('axt-note'),
+          label: t.exportAsAxt,
+          onPressed: () {
+            _saveText();
+            final store = widget.notes.store;
+            unawaited(
+              exportAxt(context, store, [
+                widget.noteId,
+              ], title: axtNoteTitle(store, widget.noteId)),
+            );
+          },
+          icon: Icons.upload_file_outlined,
         ),
       ]),
       ?_group(const ValueKey('editor-group-tidy'), t.editorGroupTidy, [

@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'announcements.dart';
+import 'axt_export.dart';
 import 'file_into_screen.dart';
 import 'hidden_from_ai_view.dart';
 import 'l10n.dart';
@@ -85,6 +88,7 @@ mixin SelectsNotes<T extends StatefulWidget> on State<T> {
     VoidCallback? onFile,
     VoidCallback? onMerge,
     ValueChanged<Importance>? onImportance,
+    VoidCallback? onExportAxt,
     VoidCallback? onTrash,
     VoidCallback? onRestore,
   }) {
@@ -115,6 +119,13 @@ mixin SelectsNotes<T extends StatefulWidget> on State<T> {
         ),
       if (onImportance != null)
         _ImportanceButton(onPicked: any ? onImportance : null),
+      if (onExportAxt != null)
+        BarAction(
+          key: const ValueKey('selection-axt'),
+          icon: Icons.upload_file_outlined,
+          label: t.exportAsAxt,
+          onPressed: any ? onExportAxt : null,
+        ),
       if (onRestore != null)
         BarAction(
           key: const ValueKey('selection-restore'),
@@ -133,8 +144,9 @@ mixin SelectsNotes<T extends StatefulWidget> on State<T> {
   }
 
   /// The bar of a Note list in the lists while it selects: File into…,
-  /// Merge into…, Importance and Move to trash on the ticked Notes of
-  /// [shown]; [reload] runs after each that changed something.
+  /// Merge into…, Importance, Export as AXT file… (obf-1145) and Move to
+  /// trash on the ticked Notes of [shown]; [reload] runs after each that
+  /// changed something.
   List<Widget> noteSelectionActions(
     BuildContext context,
     Notes notes,
@@ -154,6 +166,7 @@ mixin SelectsNotes<T extends StatefulWidget> on State<T> {
         setSelectedImportance(notes, shown, importance);
         reload();
       },
+      onExportAxt: () => exportSelectedAxt(notes.store, shown),
       onTrash: () {
         trashSelected(notes, shown);
         reload();
@@ -260,6 +273,16 @@ mixin SelectsNotes<T extends StatefulWidget> on State<T> {
     if (!mounted || merged == null) return false;
     stopSelecting();
     return true;
+  }
+
+  /// Writes the ticked Notes of [shown], in its order, as an AXT file
+  /// and shares it (obf-1145), and ends the selection. A single Note
+  /// names the file; several go under the day's name ([axtFileName]).
+  void exportSelectedAxt(Store store, Iterable<PlacedNote> shown) {
+    final ids = [for (final note in selectedOf(shown)) note.id];
+    final title = ids.length == 1 ? axtNoteTitle(store, ids.single) : null;
+    unawaited(exportAxt(context, store, ids, title: title));
+    stopSelecting();
   }
 
   /// Sets the Importance of the ticked Notes of [shown] in one batch and

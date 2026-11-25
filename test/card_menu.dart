@@ -23,6 +23,7 @@ String cardGroupOf(String entry) => switch (entry) {
   'note-share' ||
   'note-copy' ||
   'note-pack' ||
+  'note-axt' ||
   'note-calendar' ||
   'note-calendar-file' => 'note-group-share',
   // Merge into…, adding to a Shopping List, Uncheck all, Move to trash

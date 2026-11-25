@@ -10,6 +10,7 @@ import 'announcements.dart';
 import 'app_lock.dart';
 import 'area_deletion.dart';
 import 'area_look.dart';
+import 'axt_export.dart';
 import 'big_screen.dart';
 import 'browser.dart';
 import 'browser_add.dart';
@@ -474,6 +475,12 @@ class _AreasScreenState extends State<AreasScreen>
       case _AreaAction.pack:
         await exportPack(context, widget.places.store, area.id);
         if (!mounted) return;
+      case _AreaAction.axt:
+        final store = widget.places.store;
+        await exportAxt(context, store, [
+          for (final note in Notes(store).inside(area.id)) note.id,
+        ], title: areaName(t, area));
+        if (!mounted) return;
       case _AreaAction.people:
         await Navigator.of(context).push(
           MaterialPageRoute<void>(
@@ -628,6 +635,11 @@ class _AreasScreenState extends State<AreasScreen>
           key: ValueKey('area-pack-${area.id}'),
           value: _AreaAction.pack,
           child: Text(t.exportAsPack),
+        ),
+        PopupMenuItem(
+          key: ValueKey('area-axt-${area.id}'),
+          value: _AreaAction.axt,
+          child: Text(t.exportAsAxt),
         ),
         if (shared)
           PopupMenuItem(value: _AreaAction.people, child: Text(t.peopleTitle)),
@@ -881,9 +893,9 @@ Widget _lifted(Widget row, int _, Animation<double> lift) => AnimatedBuilder(
   child: row,
 );
 
-enum _AreaAction { rename, look, share, pack, people, hideFromAi, delete }
+enum _AreaAction { rename, look, share, pack, axt, people, hideFromAi, delete }
 
-enum _TopicAction { rename, pack, delete }
+enum _TopicAction { rename, pack, axt, delete }
 
 /// The browser's second level, one Area: its Topics and the diary of
 /// its Notes without a Topic, with a search field over its Notes and
@@ -1133,6 +1145,12 @@ class _AreaScreenState extends State<AreaScreen>
       case _TopicAction.pack:
         await exportPack(context, widget.places.store, topic.id);
         if (!mounted) return;
+      case _TopicAction.axt:
+        final store = widget.places.store;
+        await exportAxt(context, store, [
+          for (final note in Notes(store).inside(topic.id)) note.id,
+        ], title: topicName(t, topic));
+        if (!mounted) return;
       case _TopicAction.delete:
         final go = await confirmDeleteTopic(
           context,
@@ -1173,6 +1191,11 @@ class _AreaScreenState extends State<AreaScreen>
                 key: ValueKey('topic-pack-${topic.id}'),
                 value: _TopicAction.pack,
                 child: Text(t.exportAsPack),
+              ),
+              PopupMenuItem(
+                key: ValueKey('topic-axt-${topic.id}'),
+                value: _TopicAction.axt,
+                child: Text(t.exportAsAxt),
               ),
               if (_manages)
                 PopupMenuItem(

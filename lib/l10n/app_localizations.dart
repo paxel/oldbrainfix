@@ -9836,6 +9836,36 @@ abstract class AppLocalizations {
   /// **'Export as Pack…'**
   String get exportAsPack;
 
+  /// The entry beside 'Export as Pack…' on a Note, a selection, a Topic and an Area that writes their Notes as an AXT file, the open format other small apps read, and opens the share sheet (obf-1145).
+  ///
+  /// In en, this message translates to:
+  /// **'Export as AXT file…'**
+  String get exportAsAxt;
+
+  /// Announced when an AXT file could not be written or handed to another app; the tap shows why and what to do.
+  ///
+  /// In en, this message translates to:
+  /// **'The AXT file was not shared.'**
+  String get axtNotSent;
+
+  /// Title of the dialog behind 'axtNotSent'.
+  ///
+  /// In en, this message translates to:
+  /// **'AXT file not shared'**
+  String get axtNotSentTitle;
+
+  /// Why an AXT file was not shared: it could not be written.
+  ///
+  /// In en, this message translates to:
+  /// **'The AXT file could not be written.'**
+  String get axtNotWrittenCause;
+
+  /// Announced when 'Export as AXT file…' is picked on an Area, Topic or selection without a Note.
+  ///
+  /// In en, this message translates to:
+  /// **'There are no Notes here to put in an AXT file.'**
+  String get axtNoNotes;
+
   /// Title of the page where the user ticks what goes into a Pack (#164).
   ///
   /// In en, this message translates to:
