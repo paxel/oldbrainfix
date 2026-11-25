@@ -9,6 +9,7 @@ import 'alarm_sync.dart';
 import 'announcements.dart';
 import 'app_lock.dart';
 import 'areas_screen.dart';
+import 'big_screen.dart';
 import 'browser.dart';
 import 'calendar_screen.dart';
 import 'capture_context_screen.dart';
@@ -278,6 +279,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     unawaited(
       Navigator.of(context).push(
         BrowserRoute<void>(
+          place: const ShownPlace(PlaceKind.areas),
           builder: (_) => AreasScreen(
             notes: Notes(store),
             places: Places(store),

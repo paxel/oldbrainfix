@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
+import 'big_screen.dart';
 import 'spotlight.dart';
 
 /// Which of the app's two first pages shows, the Agenda or the Areas
@@ -38,6 +39,10 @@ class HomePager {
   /// Goes to the Areas list, as the folder does.
   void showAreas() => _show(areas);
 
+  /// Shows the Areas list at once, as the big screen's sidebar does
+  /// (obf-1148).
+  void jumpToAreas() => _jump(areas);
+
   /// Goes back to the Agenda, as back on the Areas list does.
   void showAgenda() => _show(agenda);
 
@@ -66,6 +71,8 @@ class HomePager {
 /// (#258). Both are built from the start and kept, so a swipe builds
 /// neither. Back on the Areas list, by the system or its bar, goes to
 /// the Agenda. On iOS a drag from the left edge moves neither (Q570).
+/// On the big screen the sidebar stands beside them and moves between
+/// them in place of the swipe (obf-1148).
 class HomePages extends StatefulWidget {
   final HomePager pager;
   final Widget agenda;
@@ -158,6 +165,9 @@ class _HomePagesState extends State<HomePages> {
   Widget build(BuildContext context) {
     final pager = widget.pager;
     final still = pager.still = MediaQuery.disableAnimationsOf(context);
+    // On the big screen the sidebar moves between them, no swipe
+    // (obf-1148).
+    final big = BigScreen.of(context);
     final pages = Listener(
       onPointerDown: (_) => _fingers++,
       onPointerUp: (_) => _fingers--,
@@ -177,7 +187,11 @@ class _HomePagesState extends State<HomePages> {
           // With animations off the pages snap in their own physics, which
           // the snapping PageView would otherwise wrap.
           pageSnapping: !still,
-          physics: still ? const _StillPagePhysics() : null,
+          physics: big
+              ? const NeverScrollableScrollPhysics()
+              : still
+              ? const _StillPagePhysics()
+              : null,
           children: [
             _page(HomePager.agenda, widget.agenda),
             _page(HomePager.areas, widget.areas),
@@ -185,7 +199,7 @@ class _HomePagesState extends State<HomePages> {
         ),
       ),
     );
-    return ValueListenableBuilder<int>(
+    final home = ValueListenableBuilder<int>(
       valueListenable: pager.shown,
       builder: (_, shown, child) => PopScope(
         canPop: shown == HomePager.agenda,
@@ -211,6 +225,7 @@ class _HomePagesState extends State<HomePages> {
             )
           : pages,
     );
+    return BesideSidebar(homePage: pager.shown, child: home);
   }
 }
 

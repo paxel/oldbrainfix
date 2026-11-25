@@ -580,6 +580,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get allNotesTitle => 'All Notes';
 
   @override
+  String get sidebarAgenda => 'Agenda';
+
+  @override
   String get newRoutineTooltip => 'New Routine or Reminder';
 
   @override

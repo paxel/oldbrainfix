@@ -291,6 +291,8 @@
   "@nothingPlanned": {"description": "Under the heading of a day after tomorrow on the Agenda when nothing is due that day."},
   "justCaptured": "Just captured",
   "allNotesTitle": "All Notes",
+  "sidebarAgenda": "Agenda",
+  "@sidebarAgenda": {"description": "The Agenda's entry in the sidebar of the big-screen layout (obf-1148)."},
   "newRoutineTooltip": "New Routine or Reminder",
   "routineOrReminder": "Routine, Reminder, Frog or Session",
   "routine": "Routine",

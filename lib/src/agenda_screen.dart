@@ -21,6 +21,7 @@ import 'appointments.dart';
 import 'area_offer_screen.dart';
 import 'areas_screen.dart';
 import 'ask_screen.dart';
+import 'big_screen.dart';
 import 'browser.dart';
 import 'all_routines_screen.dart';
 import 'calendar_screen.dart';
@@ -858,6 +859,7 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
   BrowserRoute<void> _areasRoute(String query) {
     _capturedId = null;
     final route = BrowserRoute<void>(
+      place: const ShownPlace(PlaceKind.areas),
       builder: (_) => AreasScreen(
         notes: widget.notes,
         places: widget.places,
@@ -1605,16 +1607,18 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
             excludeFromSemantics: true,
           ),
           actions: [
-            // The Areas list, first in the bar (#221).
-            Spotlight(
-              id: 'agenda-browse',
-              child: IconButton(
-                key: const ValueKey('browse'),
-                tooltip: t.browseTooltip,
-                onPressed: _browse,
-                icon: const Icon(Icons.folder_outlined),
+            // The Areas list, first in the bar (#221); on the big screen
+            // the sidebar leads there (obf-1148).
+            if (!BigScreen.of(context))
+              Spotlight(
+                id: 'agenda-browse',
+                child: IconButton(
+                  key: const ValueKey('browse'),
+                  tooltip: t.browseTooltip,
+                  onPressed: _browse,
+                  icon: const Icon(Icons.folder_outlined),
+                ),
               ),
-            ),
             // What does not fit goes into ⋮ from the end, the folder
             // and the Profile picture never (UI laws, "The bar").
             // Asking the computer, once Ask is switched on (#333) and

@@ -1058,6 +1058,12 @@ abstract class AppLocalizations {
   /// **'All Notes'**
   String get allNotesTitle;
 
+  /// The Agenda's entry in the sidebar of the big-screen layout (obf-1148).
+  ///
+  /// In en, this message translates to:
+  /// **'Agenda'**
+  String get sidebarAgenda;
+
   /// No description provided for @newRoutineTooltip.
   ///
   /// In en, this message translates to:

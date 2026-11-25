@@ -10,6 +10,7 @@ import 'announcements.dart';
 import 'app_lock.dart';
 import 'areas_screen.dart';
 import 'backup_screen.dart';
+import 'big_screen.dart';
 import 'browser.dart';
 import 'folder_platform.dart';
 import 'frogs_screen.dart';
@@ -125,6 +126,7 @@ class AppLinks {
           trail.choseTopic(topic);
           await Navigator.of(context).push(
             BrowserRoute<void>(
+              place: ShownPlace.topic(topic.id),
               builder: (_) =>
                   TopicScreen(notes: notes, places: places, topicId: topic.id),
             ),
@@ -133,6 +135,7 @@ class AppLinks {
           trail.choseArea(area);
           await Navigator.of(context).push(
             BrowserRoute<void>(
+              place: ShownPlace.area(area.id),
               builder: (_) => AreaScreen(
                 notes: notes,
                 places: places,

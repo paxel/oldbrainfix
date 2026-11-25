@@ -19,6 +19,7 @@ import 'app_lock.dart';
 import 'appointments.dart';
 import 'area_deletion.dart';
 import 'areas_screen.dart';
+import 'big_screen.dart';
 import 'auto_sync.dart';
 import 'browser.dart';
 import 'bundle_platform.dart';
@@ -233,6 +234,12 @@ class OldBrainFixApp extends StatefulWidget {
   /// switches them on.
   final bool tapMarks;
 
+  /// Whether a window from [bigScreenWidth] wide takes the desktop's
+  /// layout, a sidebar beside the list and the Note as a dialog over it
+  /// (obf-1148); only the app `main.dart` starts, so every test and
+  /// screenshot keeps the phone's layout unless it switches it on.
+  final bool bigScreen;
+
   const OldBrainFixApp({
     super.key,
     required this.store,
@@ -272,6 +279,7 @@ class OldBrainFixApp extends StatefulWidget {
     this.help,
     this.spotlights = false,
     this.tapMarks = false,
+    this.bigScreen = false,
   });
 
   @override
@@ -492,6 +500,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
   void _searchTag(BuildContext context, String query) => unawaited(
     Navigator.of(context).push(
       BrowserRoute<void>(
+        place: const ShownPlace(PlaceKind.areas),
         builder: (_) => AreasScreen(
           notes: _notes,
           places: _places,
@@ -506,6 +515,16 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
   /// are on (obf-1143).
   Widget _marked(Widget child) =>
       widget.tapMarks ? TapMarkLayer(marks: _tapMarks, child: child) : child;
+
+  /// [child], the navigator, under the big screen's layout (obf-1148).
+  Widget _big(Widget child) => BigScreenScope(
+    allowed: widget.bigScreen,
+    notes: _notes,
+    places: _places,
+    trail: _trail,
+    pager: _pager,
+    child: child,
+  );
 
   /// [child] under the Spotlights' scope while they are on (obf-1043).
   Widget _spotlit(Widget child) => widget.spotlights
@@ -608,8 +627,9 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
                                                                           running:
                                                                               _running,
                                                                           child: _spotlit(
-                                                                            child ??
-                                                                                const SizedBox.shrink(),
+                                                                            _big(
+                                                                              child ?? const SizedBox.shrink(),
+                                                                            ),
                                                                           ),
                                                                         ),
                                                                       ),

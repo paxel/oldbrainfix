@@ -4,6 +4,10 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 ## [0.9.0]
 
+### Neu
+
+- Auf einem Tablet oder iPad ab 700 dp Breite zeigt die App das Desktop-Layout: eine Seitenleiste neben der Liste, eine Notiz als Dialog. ([obf-1148](https://github.com/paxel/oldbrainfix/issues/464))
+
 ## [0.8.0] - 2026-11-25
 
 ### Neu

@@ -12,6 +12,7 @@ import 'app_lock.dart';
 import 'area_look.dart';
 import 'areas_screen.dart';
 import 'attachment_views.dart';
+import 'big_screen.dart';
 import 'box_ids.dart';
 import 'capture_screen.dart' show insertAtCursor, pourIntoShopping;
 import 'calendar_platform.dart';
@@ -70,7 +71,8 @@ import 'voice_recorder.dart';
 /// it opens with its find bar finding the search's words, at the place
 /// the search found (obf-1047). [made] says the Note is being made
 /// (obf-1072). With [typeText] the cursor starts in its text, the
-/// keyboard up (obf-1140).
+/// keyboard up (obf-1140). On the big screen it opens as a dialog over
+/// the list (obf-1148).
 Future<void> openNote(
   BuildContext context,
   Notes notes,
@@ -82,8 +84,9 @@ Future<void> openNote(
   NoteFind? find,
   bool made = false,
 }) => Navigator.of(context).push(
-  MaterialPageRoute<void>(
-    builder: (_) => NoteEditorScreen(
+  noteRoute(
+    context,
+    (_) => NoteEditorScreen(
       notes: notes,
       places: places,
       drafts: DraftsScope.of(context),
@@ -3075,8 +3078,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     if (next != null) {
       unawaited(
         navigator.pushReplacement(
-          MaterialPageRoute<void>(
-            builder: (_) => NoteEditorScreen(
+          noteRoute(
+            context,
+            (_) => NoteEditorScreen(
               notes: widget.notes,
               places: widget.places,
               drafts: widget.drafts,

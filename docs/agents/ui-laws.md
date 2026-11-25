@@ -2076,6 +2076,44 @@ There are three kinds, and an action takes the first that fits.
   (obf-1088). Pages without a search bar keep their top bar in the
   ground's colour.
 
+### The big screen
+
+- **From 700 dp wide the phone app takes the desktop's layout**
+  (obf-1148), on a tablet, an iPad, and a phone held sideways that wide:
+  **the sidebar** on the left, 240 wide, with the Agenda, Unsorted with
+  its count as the desktop's, All Notes, Frogs, Areas, under it each
+  Area with its Topics, then Tags and the Trash, marking the place
+  shown; **the list** beside it, the phone's own pages, each as it is
+  on the phone with the room left of the window. Below 700 dp nothing
+  of it shows and the phone's layout stands as above. It replaces
+  Navigation's folder and the swipe between the Agenda and the Areas
+  list: the Agenda's bar has no folder, the two pages do not swipe, and
+  the sidebar's Agenda and Areas move between them.
+- **A tap in the sidebar shows its place anew**: the pages over the
+  Agenda or the Areas list close, as the desktop's sidebar shows a
+  place. Areas shows the Areas list, with its search, row of tags, ⋮
+  and "+"; an Area and a Topic open over the Areas list, a Topic over
+  its Area, so back leads up the levels as on the phone; Tags opens the
+  tag tree, and a tag tapped there the Areas list searching for it. The
+  sidebar stays put while the list's pages come and go beside it. Pages
+  that are no place (Settings, Capture, the Routine editor and the like)
+  cover the window as on the phone.
+- **A closed locked Area lists no Topics in the sidebar**, its padlock
+  at the end of its row; a tap asks for the PIN first, as its row in the
+  Areas list does. While the App Lock is locked the sidebar is hidden
+  with the Agenda.
+- **A Note opens as a dialog over the list and the sidebar**, as the
+  desktop's Note dialog: at most 840 wide, 32 from the window's edges,
+  8 from the sides of a window under 700 wide and from the top and
+  bottom of one under 600 high, so a phone held sideways keeps room
+  over its keyboard.
+  Back, its bar's arrow and a tap beside it leave it, keeping what was
+  typed. The editor in it is the phone's.
+- **Turning the screen across 700 dp keeps the place shown**: the same
+  pages stay, the sidebar comes or goes beside them, and a Note open
+  stays open with what was typed, as a dialog or as the page it opened
+  as.
+
 ### Settings
 
 - **Every Settings section is a card with its title on top** (obf-1085,
