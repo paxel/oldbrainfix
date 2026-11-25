@@ -932,90 +932,93 @@ impl RoutineEditor {
                         }
                     }
                 });
+                // One card, its fields in headed groups (obf-1118).
                 embossed(ui, tones, false, None, |ui| {
-                    if self.named {
-                        let label = ui.label(RichText::new(t.kind_name()).strong());
-                        let field = ui
-                            .add(
-                                crate::theme::field(ui, &mut self.text)
-                                    .id(Id::new("routine text"))
-                                    .text_color(text)
-                                    .desired_width(f32::INFINITY),
-                            )
-                            .labelled_by(label.id);
-                        crate::text_menu::show(ui, t, &field, &self.text);
-                        self.take_first_focus(ui, &field);
-                        if self.name_missing {
-                            let error = ui.visuals().error_fg_color;
-                            ui.label(RichText::new(t.kind_name_missing()).color(error));
-                            if field.changed() {
-                                self.name_missing = false;
-                            }
-                        }
-                        return;
-                    }
-                    if !self.from_note {
-                        let field = ui.add(
-                            TextEdit::multiline(&mut self.text)
-                                .id(Id::new("routine text"))
-                                .hint_text(t.routine_what_hint())
-                                .text_color(text)
-                                .desired_rows(1)
-                                .desired_width(f32::INFINITY)
-                                .frame(egui::Frame::NONE),
-                        );
-                        crate::text_menu::show(ui, t, &field, &self.text);
-                        self.take_first_focus(ui, &field);
-                        return;
-                    }
-                    ui.label(RichText::new(t.from_note()).strong());
-                    if let Some(captured) = &self.capture {
-                        let shown = if captured.is_empty() {
-                            t.note_being_captured()
-                        } else {
-                            captured.as_str()
-                        };
-                        ui.horizontal(|ui| {
-                            icons::show(ui, icons::NOTE, 18.0, text);
-                            ui.label(RichText::new(shown).color(text));
-                        });
-                        return;
-                    }
-                    match &self.note {
-                        None => drop(ui.label(RichText::new(t.note_deleted()).color(weak))),
-                        Some(note) if note.is_trashed() => {
-                            ui.label(RichText::new(routine_name(t, Some(note))).color(text));
-                            ui.label(RichText::new(t.note_in_trash()).color(weak));
-                        }
-                        Some(note) => {
-                            let link = ui.horizontal(|ui| {
-                                icons::show(ui, icons::NOTE, 18.0, text);
-                                ui.add(
-                                    egui::Label::new(
-                                        RichText::new(routine_name(t, Some(note))).color(text),
-                                    )
-                                    .sense(egui::Sense::click()),
+                    ui.vertical(|ui| {
+                        if self.named {
+                            let label = ui.label(RichText::new(t.kind_name()).strong());
+                            let field = ui
+                                .add(
+                                    crate::theme::field(ui, &mut self.text)
+                                        .id(Id::new("routine text"))
+                                        .text_color(text)
+                                        .desired_width(f32::INFINITY),
                                 )
+                                .labelled_by(label.id);
+                            crate::text_menu::show(ui, t, &field, &self.text);
+                            self.take_first_focus(ui, &field);
+                            if self.name_missing {
+                                let error = ui.visuals().error_fg_color;
+                                ui.label(RichText::new(t.kind_name_missing()).color(error));
+                                if field.changed() {
+                                    self.name_missing = false;
+                                }
+                            }
+                            return;
+                        }
+                        if !self.from_note {
+                            let field = ui.add(
+                                TextEdit::multiline(&mut self.text)
+                                    .id(Id::new("routine text"))
+                                    .hint_text(t.routine_what_hint())
+                                    .text_color(text)
+                                    .desired_rows(1)
+                                    .desired_width(f32::INFINITY)
+                                    .frame(egui::Frame::NONE),
+                            );
+                            crate::text_menu::show(ui, t, &field, &self.text);
+                            self.take_first_focus(ui, &field);
+                            return;
+                        }
+                        ui.label(RichText::new(t.from_note()).strong());
+                        if let Some(captured) = &self.capture {
+                            let shown = if captured.is_empty() {
+                                t.note_being_captured()
+                            } else {
+                                captured.as_str()
+                            };
+                            ui.horizontal(|ui| {
+                                icons::show(ui, icons::NOTE, 18.0, text);
+                                ui.label(RichText::new(shown).color(text));
                             });
-                            if link
-                                .inner
-                                .on_hover_cursor(egui::CursorIcon::PointingHand)
-                                .clicked()
-                            {
-                                intent = Some(Intent::OpenNote(note.id.clone()));
+                            return;
+                        }
+                        match &self.note {
+                            None => drop(ui.label(RichText::new(t.note_deleted()).color(weak))),
+                            Some(note) if note.is_trashed() => {
+                                ui.label(RichText::new(routine_name(t, Some(note))).color(text));
+                                ui.label(RichText::new(t.note_in_trash()).color(weak));
+                            }
+                            Some(note) => {
+                                let link = ui.horizontal(|ui| {
+                                    icons::show(ui, icons::NOTE, 18.0, text);
+                                    ui.add(
+                                        egui::Label::new(
+                                            RichText::new(routine_name(t, Some(note))).color(text),
+                                        )
+                                        .sense(egui::Sense::click()),
+                                    )
+                                });
+                                if link
+                                    .inner
+                                    .on_hover_cursor(egui::CursorIcon::PointingHand)
+                                    .clicked()
+                                {
+                                    intent = Some(Intent::OpenNote(note.id.clone()));
+                                }
                             }
                         }
+                    });
+                    if let Some(draft) = &mut self.session
+                        && let Some(asked) = draft.show(ui, t)
+                    {
+                        intent = Some(Intent::Session(asked));
+                    }
+                    // Making a Note a Session sets it up alone (#191).
+                    if !self.makes {
+                        changed |= self.schedule_panels(ui, t, (once, shown_now, now));
                     }
                 });
-                if let Some(draft) = &mut self.session
-                    && let Some(asked) = draft.show(ui, t, tones)
-                {
-                    intent = Some(Intent::Session(asked));
-                }
-                // Making a Note a Session sets it up alone (#191).
-                if !self.makes {
-                    changed |= self.schedule_panels(ui, t, tones, (once, shown_now, now));
-                }
                 ui.horizontal(|ui| {
                     if design::row_button(ui, t.cancel()).clicked() {
                         intent = Some(Intent::Close);
@@ -1053,14 +1056,14 @@ impl RoutineEditor {
         &mut self,
         ui: &mut Ui,
         t: &L10n,
-        tones: Tones,
         (once, shown_now, now): (bool, NaiveDateTime, &SentenceNow),
     ) -> bool {
         let text = ui.visuals().text_color();
         let open = !self.locked;
         let mut changed = false;
         ui.add_enabled_ui(open, |ui| {
-            let schedule = embossed(ui, tones, false, None, |ui| {
+            design::group_gap(ui);
+            let schedule = ui.vertical(|ui| {
                 changed |= self.sentence_line(ui, t, now);
                 changed |= self.quick_line(ui, t, now);
                 let mut advanced = self.advanced;
@@ -1082,12 +1085,14 @@ impl RoutineEditor {
                     changed |= self.end_editor(ui, t);
                 }
             });
-            spotlight::anchor(ui, "routine-schedule", schedule.rect);
-            embossed(ui, tones, false, None, |ui| {
+            spotlight::anchor(ui, "routine-schedule", schedule.response.rect);
+            design::group_gap(ui);
+            ui.vertical(|ui| {
                 changed |= self.times_editor(ui, t, once, shown_now);
             });
         });
-        let next = embossed(ui, tones, false, None, |ui| {
+        design::group_gap(ui);
+        let next = ui.vertical(|ui| {
             ui.label(RichText::new(t.next_occurrences()).strong());
             if self.schedule.is_some() && self.next.is_empty() {
                 ui.label(RichText::new(t.never_due()).color(text));
@@ -1097,13 +1102,16 @@ impl RoutineEditor {
                 ui.label(RichText::new(line).color(text));
             }
         });
-        spotlight::anchor(ui, "routine-next", next.rect);
-        let heads_ups = embossed(ui, tones, false, None, |ui| self.heads_ups_editor(ui, t));
-        spotlight::anchor(ui, "routine-heads-ups", heads_ups.rect);
+        spotlight::anchor(ui, "routine-next", next.response.rect);
+        design::group_gap(ui);
+        let heads_ups = ui.vertical(|ui| self.heads_ups_editor(ui, t));
+        spotlight::anchor(ui, "routine-heads-ups", heads_ups.response.rect);
         ui.add_enabled_ui(open, |ui| {
-            let renag = embossed(ui, tones, false, None, |ui| self.renag_editor(ui, t));
-            spotlight::anchor(ui, "routine-renag", renag.rect);
-            embossed(ui, tones, false, None, |ui| self.escalation_editor(ui, t));
+            design::group_gap(ui);
+            let renag = ui.vertical(|ui| self.renag_editor(ui, t));
+            spotlight::anchor(ui, "routine-renag", renag.response.rect);
+            design::group_gap(ui);
+            ui.vertical(|ui| self.escalation_editor(ui, t));
         });
         changed
     }

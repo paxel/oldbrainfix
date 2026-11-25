@@ -405,3 +405,13 @@ fn lay(ui: &mut Ui, icon: Option<char>, words: &str, placing: Placing) -> (Under
         resp,
     )
 }
+
+/// The room between two headed groups of fields in a dialog's one card
+/// (UI laws, "Cards", obf-1118).
+pub const GROUP_GAP: f32 = 24.0;
+
+/// Puts [`GROUP_GAP`] before the next group of a card, the room egui
+/// puts between two items in it counted in.
+pub fn group_gap(ui: &mut Ui) {
+    ui.add_space((GROUP_GAP - ui.spacing().item_spacing.y).max(0.0));
+}

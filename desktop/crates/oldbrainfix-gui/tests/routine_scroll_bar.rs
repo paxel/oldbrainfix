@@ -1,7 +1,8 @@
 //! The Routine dialog's scroll bar (obf-1120), driven headless by
 //! egui_kittest: the scroll area leaves the bar's width as room on the
 //! right, so the bar, hovered and at its widest too, draws beside the
-//! cards and never over their edge.
+//! cards and never over their edge. Its fields stand in headed groups
+//! of one card, not a card each (obf-1118).
 
 // A test may unwrap, expect, panic and index, its helpers too (#229).
 #![allow(
@@ -107,6 +108,66 @@ fn the_bar_draws_beside_the_cards_not_over_them() -> TestResult {
         assert!(
             card.right() <= bar.left() + 0.5,
             "the card {card:?} reaches under the bar {bar:?}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn the_dialogs_groups_share_one_card() -> TestResult {
+    let store = Arc::new(device()?);
+    let note = Notes::new(&store).capture("Water the plants", None, None)?;
+    let at = ClockTime::new(10, 0).ok_or("10:00")?;
+    let rule = oldbrainfix_core::Recurrence::parse("FREQ=DAILY")?;
+    let schedule = Schedule::new(Day::new(2026, 10, 26), &[at], Some(rule)).ok_or("schedule")?;
+    let id = Routines::new(&store).spawn(&note.id, &schedule)?.id;
+    let mut app = App::new(store.clone(), "en");
+    app.set_wall_clock(Arc::new(utc));
+    app.select(Selection::Trash);
+    // Tall enough that nothing scrolls.
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(1280.0, 2400.0))
+        .build_ui_state(
+            |ui, app: &mut App| {
+                App::install(ui.ctx());
+                app.show(ui);
+            },
+            app,
+        );
+    harness.run();
+    harness.state_mut().open_routine(&id);
+    harness.run();
+    let t = oldbrainfix_gui::l10n::L10n::new("en");
+    let scale = harness.ctx.pixels_per_point();
+    let heading = |words: &str| {
+        let px = harness
+            .query_all_by_label(words)
+            .next()
+            .unwrap_or_else(|| panic!("no {words:?}"))
+            .rect();
+        egui::Rect::from_min_max(
+            (px.min.to_vec2() / scale).to_pos2(),
+            (px.max.to_vec2() / scale).to_pos2(),
+        )
+    };
+    let headings = [
+        t.from_note(),
+        t.next_occurrences(),
+        t.heads_ups_heading(),
+        t.renag_heading(),
+        t.escalation_heading(),
+    ]
+    .map(heading);
+    let holding: Vec<egui::Rect> = cards(&harness)
+        .into_iter()
+        .filter(|card| headings.iter().any(|h| card.contains_rect(*h)))
+        .collect();
+    assert_eq!(holding.len(), 1, "the groups lie in {holding:?}");
+    for h in headings {
+        assert!(
+            holding[0].contains_rect(h),
+            "{h:?} outside {:?}",
+            holding[0]
         );
     }
     Ok(())
