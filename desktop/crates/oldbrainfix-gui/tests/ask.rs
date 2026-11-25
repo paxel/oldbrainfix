@@ -1296,6 +1296,48 @@ fn copy_as_text_puts_the_answer_with_its_links_on_the_clipboard_and_html_beside(
 }
 
 #[test]
+fn the_answers_lesser_actions_are_text_buttons_in_the_accent() -> TestResult {
+    let (store, passport) = store()?;
+    let fake = Fake::new(vec![
+        tool_use("read_note", json!({"id": passport})),
+        end_turn("In the blue folder."),
+    ]);
+    let t = L10n::new("en");
+    let mut harness = harness(store, &fake);
+    ask(&mut harness, "Where is my passport?");
+    let accent = harness.ctx.global_style().visuals.hyperlink_color;
+    let mut words = Vec::new();
+    for egui::epaint::ClippedShape { shape, .. } in &harness.output().shapes {
+        flat(shape, &mut words);
+    }
+    // Inside the card, each in the accent's text colour with no frame
+    // (obf-1103), as the design system's text button.
+    for label in [
+        t.copy_text(),
+        t.ask_keep(),
+        t.add_to_note(),
+        t.save_as_markdown(),
+    ] {
+        assert!(
+            words
+                .iter()
+                .any(|(text, colour)| text == label && *colour == accent),
+            "{label} in the accent"
+        );
+    }
+    Ok(())
+}
+
+/// Every text drawn, out of its lists, with its colour.
+fn flat(shape: &egui::Shape, into: &mut Vec<(String, egui::Color32)>) {
+    match shape {
+        egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| flat(s, into)),
+        egui::Shape::Text(text) => into.push((text.galley.text().to_string(), text.fallback_color)),
+        _ => {}
+    }
+}
+
+#[test]
 fn save_as_markdown_writes_the_answer_into_the_file_named_after_the_question() -> TestResult {
     let (store, passport) = store()?;
     let answer = format!("In the [blue folder](oldbrainfix://note/{passport}).");

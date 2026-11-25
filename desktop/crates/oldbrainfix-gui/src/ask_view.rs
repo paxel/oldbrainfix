@@ -25,6 +25,8 @@ use oldbrainfix_core::share::NoteShare;
 use oldbrainfix_core::{markdown, text_format};
 
 use crate::app::{embossed, name_field};
+use crate::design;
+use crate::icons;
 use crate::l10n::L10n;
 use crate::text_marks_view::{self, BoxLook};
 use crate::theme::{self, Tones};
@@ -469,17 +471,15 @@ fn answer_rows(
     }
     // An answer without words has nothing to copy or save.
     let words = !answer.text.trim().is_empty();
+    // Lesser actions inside the card: text buttons with their icons
+    // (obf-1103).
     ui.horizontal_wrapped(|ui| {
-        if words
-            && ui
-                .button(RichText::new(t.copy_text()).color(text))
-                .clicked()
-        {
+        if words && design::text_button(ui, icons::COPY, t.copy_text()).clicked() {
             asked.push(AskAsked::Copy(at));
         }
         match &exchange.kept {
             None => {
-                if ui.button(RichText::new(t.ask_keep()).color(text)).clicked() {
+                if design::text_button(ui, icons::NOTE_ADD, t.ask_keep()).clicked() {
                     asked.push(AskAsked::Keep(at));
                 }
             }
@@ -492,17 +492,10 @@ fn answer_rows(
                 }
             }
         }
-        if ui
-            .button(RichText::new(t.add_to_note()).color(text))
-            .clicked()
-        {
+        if design::text_button(ui, icons::ADD_TO_NOTE, t.add_to_note()).clicked() {
             asked.push(AskAsked::AddToNote(at));
         }
-        if words
-            && ui
-                .button(RichText::new(t.save_as_markdown()).color(text))
-                .clicked()
-        {
+        if words && design::text_button(ui, icons::SAVE_FILE, t.save_as_markdown()).clicked() {
             asked.push(AskAsked::Save(at));
         }
     });

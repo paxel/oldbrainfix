@@ -211,6 +211,14 @@ pub const HIDDEN_FROM_AI: char = '\u{f379}';
 /// `tag`: the sidebar's Tags (#267).
 pub const TAG: char = '\u{e640}';
 pub const EXPAND_LESS: char = '\u{e245}';
+/// The lesser actions of an Ask answer, as the phone draws them (#316,
+/// obf-1103): `copy_outlined` Copy text, `note_add_outlined` Keep as
+/// Note, `call_merge` Add to Note…, and `file_download_outlined` Save
+/// as Markdown…, the desktop's alone.
+pub const COPY: char = '\u{ef7f}';
+pub const NOTE_ADD: char = '\u{f22e}';
+pub const ADD_TO_NOTE: char = '\u{e129}';
+pub const SAVE_FILE: char = '\u{f05b}';
 
 /// How the phone draws each of the core's Area icons.
 pub fn area_icon(key: Option<&str>) -> Option<char> {
