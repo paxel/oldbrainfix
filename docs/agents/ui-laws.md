@@ -298,9 +298,10 @@ There are three kinds, and an action takes the first that fits.
   Photo, Voice, Gallery, Paste, File, the Kind, Add to Note… (there Merge
   into…), Remind me…, File into…, the Frog, the Importance and the format bar, lives
   in the full editor and the Note dialog. An entry point that starts
-  with something, voice, the camera, a picker, the clipboard, a share or
-  a list's "+", still opens the quick note with it: what it brought
-  shows above the text, and Open in the editor takes it on.
+  with something, voice, the camera, a picker, the clipboard or a share,
+  still opens the quick note with it: what it brought shows above the
+  text, and Open in the editor takes it on; an Area's or a Topic's "+"
+  opens the full editor instead (obf-1140).
 - Leaving without tapping a Nudge button means 1 h. The three are
   actions, not a choice of value: a tap saves the Note with that Nudge
   time, so the single-choice law does not apply to them. Where the
@@ -325,9 +326,14 @@ There are three kinds, and an action takes the first that fits.
 - **Everything is saved together** when the user leaves the screen or
   taps a Nudge button, Save or Open in the editor. Nothing is half-saved: for an
   empty Note nothing is saved.
-- **A sorted Note needs no Nudge.** Opened from an Area's or Topic's
-  "+", the quick note files the Note there: the three Nudge buttons
-  become one Save and no Nudge is set; leaving saves too.
+- **A sorted Note needs no Nudge.** From an Area or a Topic a new Note
+  skips the quick note (obf-1140): who is there has taken the time to
+  sort, and its "+" ▸ Note opens the full editor, the phone's Note editor
+  and the desktop's Note dialog, on a new Note filed there without a
+  Nudge. Left with nothing in it, it makes nothing. The widgets, the
+  Agenda's "+", the lock screen, the tray, Quick note and All Notes keep
+  the quick note, and so does a file dropped onto an Area or a Topic on
+  the desktop, which files it there with one Save and no Nudge.
 
 ### Agenda
 
@@ -1382,7 +1388,9 @@ There are three kinds, and an action takes the first that fits.
   the pages still follow the finger, and letting go lands at once.
 - **In an Area, a Topic and All Notes "+" fans out** its kinds (#161),
   each an icon with its words, upward from the button as the Agenda's
-  fan does.
+  fan does. Its Note opens, in an Area or a Topic, the Note editor on a
+  new Note filed there, the cursor in its text and the keyboard up, with
+  no "Add a part" (obf-1140); in All Notes, the quick note.
 
 ### Gestures
 
@@ -1496,6 +1504,15 @@ There are three kinds, and an action takes the first that fits.
   quick entry point (widget, tile, shortcut, also when the phone's key
   or gesture settings or a button-mapper app start it; no code reads a
   key) opens its capture screen directly, with no fan and no screen in between.
+- **The Agenda's fan has Editor at the top** (obf-1141), above File,
+  the entry farthest from "+", with the editor's pencil: it opens an
+  empty Note in the Note editor, the cursor in its text and the keyboard
+  up, with no "Add a part". Left by Back it is kept Unsorted with a
+  Nudge in 1 h, as the quick note's Open in the editor keeps it, and
+  shows on top of the Agenda as a Note captured there does; left with
+  nothing in it, it makes nothing. The lock screen's fan has no Editor,
+  as the editor shows the Areas; the long press on "+" stays text
+  capture.
 - **A Tally's shortcut opens its entry page directly** (#284): "Add to
   home screen" in a Tally's card's ⋮, offered where this Device may add
   entries to it, pins a shortcut named as the Tally (Android's own
@@ -2276,7 +2293,15 @@ There are three kinds, and an action takes the first that fits.
   into view.
 - **On the desktop "+" sits at the end of the list's heading** (#146, #161),
   in a list of Notes last in its band's second row (obf-1064) as "+ New Note" in a button's frame (obf-1067), and opens a menu of the same kinds, Note first, each with its icon and
-  words; the Agenda's and Unsorted's "+" open the quick note at once. The
+  words. The Agenda's "+" and Unsorted's "+ New Note" open a small menu
+  (obf-1141): "Quick note" first, which opens the quick note, then
+  "Editor" with the editor's pencil, which opens the Note dialog on an
+  empty Unsorted Note nudged in 1 h, as the quick note's Open in the
+  editor keeps it, its text taking the keyboard, without "Add a part";
+  left empty, the Note is not kept.
+  An Area's or a Topic's "Note" opens the Note dialog on a new Note
+  filed there, its text taking the keyboard, without "Add a part"; left
+  empty, the Note is not kept (obf-1140). The
   pages open as dialogs over the window; the desktop's Session page is
   the Routine editor's, its name first, the count, rule and schedule as
   its panels.
@@ -2364,7 +2389,8 @@ There are three kinds, and an action takes the first that fits.
   Note's in its card's ⋮ and right-click and in the Note dialog (its
   badges, its buttons and its bar's ⋮, which holds History). Its menus
   keep to seven entries (#321, obf-1014): **File** holds New Note
-  (Ctrl+N), Quick note, Import…, Open ▸ (Markdown file…, Pack…, A
+  (Ctrl+N; the quick note, while an Area or a Topic is shown the Note
+  dialog on a new Note filed there, obf-1140), Quick note, Import…, Open ▸ (Markdown file…, Pack…, A
   Backup…), Export as vault… and Quit; **Edit** Undo, Cut, Copy, Paste,
   Find in Note (Ctrl+F) where it opens the Note's find bar, else Search,
   and Settings…; **View** Go to ▸ (Agenda, Unsorted, All Notes, Frogs,
@@ -2779,8 +2805,13 @@ There are three kinds, and an action takes the first that fits.
 ### Capture
 
 - **On the desktop** the capture popup and the window's quick note
-  dialog, which File ▸ New Note, Ctrl+N and "+" open (#146), are the
-  quick note (#352): the text, then, once something is typed or held,
+  dialog, which File ▸ New Note, Ctrl+N and "Quick note" in the Agenda's
+  and Unsorted's "+" open (#146, obf-1141), are the quick note; while an Area or a Topic is
+  shown, File ▸ New Note and Ctrl+N open the Note dialog on a new Note
+  filed there instead, as its "+ New Note ▸ Note" does (obf-1140), and
+  only files dropped onto it open a quick note that files the Note
+  there, with one Save in place of the Nudge buttons. The
+  quick note holds (#352) the text, then, once something is typed or held,
   the Nudge buttons and under them Open in the editor, nothing else;
   desktop Settings ▸ Quick note keeps only Nudge buttons. Open in the
   editor saves the Note and opens it in the
@@ -2886,8 +2917,8 @@ There are three kinds, and an action takes the first that fits.
 - **The Amend box shows only when asked** (obf-1072, C15): the Note
   dialog and a Note's own window show no format bar, "What's new?" nor
   "Add" on their own. A Note just made and opened there, a
-  Checklist or Shopping List by "+" or a Note by the quick note's "Open
-  in the editor", has no "Add a part" while that dialog stays open;
+  Checklist, a Shopping List or a Note by "+" (obf-1140) or a Note by
+  the quick note's "Open in the editor", has no "Add a part" while that dialog stays open;
   opened again later, it has it. Where this Device may amend the Note,
   **"Add a part"** stands last under Add (obf-1073); a click opens the
   box in its place, above the groups Add, Share and Tidy, its field
