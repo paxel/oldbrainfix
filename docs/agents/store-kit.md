@@ -10,7 +10,7 @@ every release.
 - App Store: the app record for bundle id `io.github.paxel.oldbrainfix`
   (the same id as the Android package), Apple id `6830820925`
   (<https://apps.apple.com/app/id6830820925>, live since 0.5.1), SKU
-  `oldbrainfix`, iOS 26 and newer, iPhone only. The tag
+  `oldbrainfix`, iOS 26 and newer, iPhone and iPad (obf-1149). The tag
   pipeline uploads each build to TestFlight once the Apple secrets exist
   (`docs/agents/ios-release.md`); a manual dispatch with `publish` and
   `submit_app_store` also submits it for App Store review with the
@@ -160,9 +160,10 @@ Sizes, from Apple's
   Face ID (large) size the Dynamic Island (large) ones, so the one set at
   1320 × 2868 covers every iPhone.
 - Up to 10 screenshots per size, PNG or JPEG, no alpha channel.
-- No iPad frames: the app is iPhone only (`TARGETED_DEVICE_FAMILY = 1`
-  for the app and both extensions, #236), so App Store Connect asks for
-  no iPad 13" screenshots.
+- iPad frames: the app runs on the iPhone and the iPad
+  (`TARGETED_DEVICE_FAMILY = "1,2"` for the app and both extensions,
+  obf-1149; iPhone only before, #236), so App Store Connect asks for
+  iPad 13" screenshots as well; the generator draws them with obf-1150.
 - iPhone Duo (1398 × 2034 outer, 2007 × 2853 inner) is required from
   April 2027 for apps built with the iOS 27.1 SDK or later; no frames for
   it yet.

@@ -7,6 +7,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 ### Neu
 
 - Auf einem Tablet oder iPad ab 700 dp Breite zeigt die App das Desktop-Layout: eine Seitenleiste neben der Liste, eine Notiz als Dialog. ([obf-1148](https://github.com/paxel/oldbrainfix/issues/464))
+- Die App läuft auf dem iPad als iPad-App, nicht in iPhone-Größe. ([obf-1149](https://github.com/paxel/oldbrainfix/issues/465))
 
 ## [0.8.0] - 2026-11-25
 
