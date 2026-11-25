@@ -219,6 +219,10 @@ pub const COPY: char = '\u{ef7f}';
 pub const NOTE_ADD: char = '\u{f22e}';
 pub const ADD_TO_NOTE: char = '\u{e129}';
 pub const SAVE_FILE: char = '\u{f05b}';
+/// `notes` and `grid_on`: a table grid's switch to its lines and back,
+/// as the phone's (obf-1111).
+pub const SHOW_LINES: char = '\u{e44c}';
+pub const SHOW_GRID: char = '\u{e2e9}';
 
 /// How the phone draws each of the core's Area icons.
 pub fn area_icon(key: Option<&str>) -> Option<char> {

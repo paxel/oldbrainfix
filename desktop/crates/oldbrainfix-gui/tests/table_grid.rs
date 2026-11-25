@@ -457,9 +457,12 @@ fn show_as_lines_and_show_as_grid_switch_the_tables_view() -> TestResult {
     let mut harness = editor(&store, &note);
     edit_table(&mut harness)?;
     let before = field(&harness)?;
+    // Each a text button, its words in the accent (obf-1111).
+    assert!(in_accent(&harness, "Show as lines"));
     press(&mut harness, "Show as lines")?;
     assert_eq!(buttons(&harness, "Row 1"), 0);
     assert_eq!(buttons(&harness, "Show as table"), 1);
+    assert!(in_accent(&harness, "Show as table"));
     assert_eq!(field(&harness)?, before);
     // Typed into its lines, as text.
     key(&mut harness, Key::ArrowLeft);
@@ -487,6 +490,23 @@ fn show_as_lines_and_show_as_grid_switch_the_tables_view() -> TestResult {
     assert_eq!(buttons(&harness, "Row 1"), 1);
     assert_eq!(table_count(&field(&harness)?), 1);
     Ok(())
+}
+
+/// Whether the words `label` are drawn in the accent's text colour.
+fn in_accent(harness: &Harness<'_, App>, label: &str) -> bool {
+    fn flat(shape: &egui::Shape, label: &str, accent: egui::Color32) -> bool {
+        match shape {
+            egui::Shape::Vec(shapes) => shapes.iter().any(|s| flat(s, label, accent)),
+            egui::Shape::Text(text) => text.galley.text() == label && text.fallback_color == accent,
+            _ => false,
+        }
+    }
+    let accent = harness.ctx.global_style().visuals.hyperlink_color;
+    harness
+        .output()
+        .shapes
+        .iter()
+        .any(|clipped| flat(&clipped.shape, label, accent))
 }
 
 /// How many tables `text` holds, by their delimiter rows.

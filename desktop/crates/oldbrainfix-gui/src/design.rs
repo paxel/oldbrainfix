@@ -6,7 +6,7 @@
 //! outlined one's tonal fill and outline, but Cancel and Close in a
 //! dialog's action row, which are [`row_button`]s.
 
-use egui::{Color32, CornerRadius, Response, Sense, Ui, WidgetInfo, WidgetType};
+use egui::{Color32, CornerRadius, Id, Response, Sense, Ui, WidgetInfo, WidgetType};
 
 use crate::icons;
 use crate::theme;
@@ -207,7 +207,7 @@ pub fn row_button(ui: &mut Ui, words: &str) -> Response {
 
 /// A [`text_button`], with `icon` before its words where there is one.
 fn plain_button(ui: &mut Ui, icon: Option<char>, words: &str) -> Response {
-    let (placed, resp) = lay(ui, icon, words, Sense::click());
+    let (placed, resp) = lay(ui, icon, words, Placing::Laid(Sense::click()));
     placed.answer(ui, &resp);
     resp.on_hover_cursor(egui::CursorIcon::PointingHand)
 }
@@ -217,7 +217,7 @@ fn plain_button(ui: &mut Ui, icon: Option<char>, words: &str) -> Response {
 /// icon and words now, without taking a click; its tint and ring once
 /// [`UnderClick::answer`] has the click's response.
 pub fn text_button_under(ui: &mut Ui, icon: char, words: &str) -> UnderClick {
-    lay(ui, Some(icon), words, Sense::hover()).0
+    lay(ui, Some(icon), words, Placing::Laid(Sense::hover())).0
 }
 
 /// Where a text button lies and the room kept under its words for its
@@ -255,8 +255,44 @@ impl UnderClick {
     }
 }
 
-/// Lays out and draws a text button's icon and words, `sense` its own.
-fn lay(ui: &mut Ui, icon: Option<char>, words: &str, sense: Sense) -> (UnderClick, Response) {
+/// A [`text_button`] at `rect`, which [`text_button_size`] measured,
+/// clicked by `id`: for a place a layout does not reach, as a table
+/// grid's switch to its lines (obf-1111).
+pub fn text_button_at(
+    ui: &mut Ui,
+    (rect, id): (egui::Rect, Id),
+    icon: char,
+    words: &str,
+) -> Response {
+    let (placed, resp) = lay(ui, Some(icon), words, Placing::At(rect, id));
+    placed.answer(ui, &resp);
+    resp.on_hover_cursor(egui::CursorIcon::PointingHand)
+}
+
+/// How much room the [`text_button`] of `words` takes.
+pub fn text_button_size(ui: &Ui, words: &str) -> egui::Vec2 {
+    measure(ui, true, words).size
+}
+
+/// Where a text button goes: laid out with its own sense, or at a
+/// place, clicked by an id.
+enum Placing {
+    Laid(Sense),
+    At(egui::Rect, Id),
+}
+
+/// A text button's words laid out, its room and the parts of it.
+struct Measured {
+    galley: std::sync::Arc<egui::Galley>,
+    colour: Color32,
+    size: egui::Vec2,
+    glyph: f32,
+    before: f32,
+}
+
+/// Lays out a text button's words, with room for an icon where it has
+/// one.
+fn measure(ui: &Ui, icon: bool, words: &str) -> Measured {
     let font = egui::TextStyle::Button.resolve(ui.style());
     let colour = if ui.is_enabled() {
         ui.visuals().hyperlink_color
@@ -269,16 +305,39 @@ fn lay(ui: &mut Ui, icon: Option<char>, words: &str, sense: Sense) -> (UnderClic
     let pad = ui.spacing().button_padding;
     let gap = ui.spacing().icon_spacing;
     let glyph = font.size * 1.25;
-    let before = if icon.is_some() { glyph + gap } else { 0.0 };
+    let before = if icon { glyph + gap } else { 0.0 };
     let inner = egui::vec2(before + galley.size().x, glyph.max(galley.size().y));
     let size = (inner + pad * 2.0).max(egui::vec2(0.0, ui.spacing().interact_size.y));
+    Measured {
+        galley,
+        colour,
+        size,
+        glyph,
+        before,
+    }
+}
+
+/// Lays out and draws a text button's icon and words, placed as `placing`
+/// says.
+fn lay(ui: &mut Ui, icon: Option<char>, words: &str, placing: Placing) -> (UnderClick, Response) {
+    let Measured {
+        galley,
+        colour,
+        size,
+        glyph,
+        before,
+    } = measure(ui, icon.is_some(), words);
     let ground = ui.painter().add(egui::Shape::Noop);
-    let (rect, resp) = ui.allocate_exact_size(size, sense);
-    if sense.senses_click() {
+    let (rect, resp) = match placing {
+        Placing::Laid(sense) => ui.allocate_exact_size(size, sense),
+        Placing::At(rect, id) => (rect, ui.interact(rect, id, Sense::click())),
+    };
+    if resp.sense.senses_click() {
         resp.widget_info(|| WidgetInfo::labeled(WidgetType::Button, ui.is_enabled(), words));
     }
     if ui.is_rect_visible(rect) {
         let painter = ui.painter();
+        let pad = ui.spacing().button_padding;
         let at = egui::Rect::from_min_size(
             egui::pos2(rect.left() + pad.x, rect.center().y - glyph / 2.0),
             egui::vec2(glyph, glyph),

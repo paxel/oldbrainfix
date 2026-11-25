@@ -48,7 +48,9 @@ use oldbrainfix_core::markdown::table::{self, Align, Table, TableCopy};
 use oldbrainfix_core::text_format;
 
 use crate::cell_pick::{self, Span};
+use crate::design;
 use crate::format_bar::{self, Format};
+use crate::icons;
 use crate::l10n::L10n;
 use crate::table_view::{self, Deleting, Op, Sorts};
 use crate::text_marks_view::{
@@ -806,9 +808,9 @@ impl Grids {
         let y = output.galley_pos.y + row.center().y;
         let id = self.id.with(("table show grid", index));
         let words = t.table_show_grid();
-        let size = small_size(ui, words);
+        let size = design::text_button_size(ui, words);
         let rect = Rect::from_center_size(egui::pos2(field.right() - size.x / 2.0, y), size);
-        if small_button(ui, rect, id, words).clicked() {
+        if design::text_button_at(ui, (rect, id), icons::SHOW_GRID, words).clicked() {
             self.state.raw.remove(&index);
             let cursor = field_cursor(ui, self.id).map_or(0, |(a, _)| a);
             let cell = cell_of(text, &table, cursor);
@@ -1043,12 +1045,13 @@ impl Grids {
         drawn.act = act;
         // "Show as lines" in the row of the "+" under the rows' numbers.
         let words = t.table_show_lines();
-        let size = small_size(ui, words);
+        let size = design::text_button_size(ui, words);
         let lines = Rect::from_min_size(
             origin + egui::vec2(NUMBERS + 4.0, bottom + (PLUS - size.y) / 2.0),
             size,
         );
-        let raw = small_button(ui, lines, of.with("show lines"), words).clicked();
+        let at = (lines, of.with("show lines"));
+        let raw = design::text_button_at(ui, at, icons::SHOW_LINES, words).clicked();
         // The columns' borders, which drag them wider or narrower.
         let (top, low) = (origin.y, origin.y + bottom);
         let mut dragged: Option<(usize, f32)> = None;
@@ -1991,36 +1994,6 @@ fn starts(first: f32, sizes: &[f32]) -> Vec<f32> {
 fn menu_open(ui: &Ui, resp: &egui::Response) -> bool {
     let id = Popup::default_response_id(resp);
     Popup::is_id_open(ui.ctx(), id) || Popup::is_id_open(ui.ctx(), id.with("context"))
-}
-
-/// How much room the small button `words` takes.
-fn small_size(ui: &Ui, words: &str) -> Vec2 {
-    let weak = ui.visuals().weak_text_color();
-    let galley =
-        ui.fonts_mut(|f| f.layout_no_wrap(words.to_string(), FontId::proportional(12.0), weak));
-    galley.size() + egui::vec2(12.0, 6.0)
-}
-
-/// A small button of weak words at `rect`, as the grids' switch to their
-/// lines and back.
-fn small_button(ui: &mut Ui, rect: Rect, id: Id, words: &str) -> egui::Response {
-    let resp = ui.interact(rect, id, Sense::click());
-    resp.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, words));
-    if ui.is_rect_visible(rect) {
-        if resp.hovered() {
-            let fill = ui.visuals().widgets.hovered.weak_bg_fill;
-            ui.painter().rect_filled(rect, 6.0, fill);
-        }
-        let weak = ui.visuals().weak_text_color();
-        ui.painter().text(
-            rect.center(),
-            egui::Align2::CENTER_CENTER,
-            words,
-            FontId::proportional(12.0),
-            weak,
-        );
-    }
-    resp.on_hover_cursor(egui::CursorIcon::PointingHand)
 }
 
 #[cfg(test)]
