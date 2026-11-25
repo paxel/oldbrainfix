@@ -116,6 +116,43 @@ fn shows(harness: &Harness<'_, App>, label: &str) -> bool {
     harness.query_all_by_label_contains(label).next().is_some()
 }
 
+/// The sizes and colours `words` are drawn in, wherever they are drawn.
+fn drawn_as(harness: &Harness<'_, App>, words: &str) -> Vec<(f32, egui::Color32)> {
+    fn flat(shape: &egui::Shape, words: &str, into: &mut Vec<(f32, egui::Color32)>) {
+        match shape {
+            egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| flat(s, words, into)),
+            egui::Shape::Text(text) if text.galley.text() == words => into.extend(
+                text.galley
+                    .job
+                    .sections
+                    .iter()
+                    .map(|s| (s.format.font_id.size, s.format.color)),
+            ),
+            _ => {}
+        }
+    }
+    let mut drawn = Vec::new();
+    for clipped in &harness.output().shapes {
+        flat(&clipped.shape, words, &mut drawn);
+    }
+    drawn
+}
+
+#[test]
+fn the_pair_dialogs_heading_is_a_dialog_title_18_strong() -> TestResult {
+    let harness = pair_view(store(1)?)?;
+    let strong = harness.ctx.global_style().visuals.strong_text_color();
+    let drawn = drawn_as(&harness, "Pair a Device");
+    assert!(!drawn.is_empty(), "no heading");
+    assert!(
+        drawn
+            .iter()
+            .all(|(size, colour)| (size - 18.0).abs() < 0.01 && *colour == strong),
+        "drawn as {drawn:?}"
+    );
+    Ok(())
+}
+
 #[test]
 fn the_sync_dialog_hosts_asks_pairs_and_forgets() -> TestResult {
     let desk = store(1)?;
@@ -534,10 +571,19 @@ fn conflicts_an_automatic_sync_brought_are_announced_until_sync_shows() -> TestR
         );
     harness.step();
     assert_eq!(harness.state().arrived_conflicts(), 1);
+    assert!(
+        harness
+            .query_all_by_label_contains("A sync found something changed on both Devices")
+            .next()
+            .is_some(),
+        "the announcement"
+    );
+    // Review beside it, a button (obf-1113), leads to Sync as the
+    // words do.
     harness
-        .query_all_by_label_contains("A sync found something changed on both Devices")
+        .query_all_by_role_and_label(Role::Button, "Review")
         .next()
-        .ok_or("the announcement")?
+        .ok_or("Review")?
         .click_accesskit();
     step_until(&mut harness, |app| app.sync_host().hosting())?;
     harness.step();

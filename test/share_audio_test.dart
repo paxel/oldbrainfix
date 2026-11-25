@@ -12,6 +12,7 @@ import 'package:oldbrainfix/src/speech_platform.dart';
 import 'package:oldbrainfix/src/voice_platform.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'card_menu.dart';
 import 'fake_photos.dart';
 import 'fake_speech.dart';
 import 'fake_voice.dart';
@@ -137,7 +138,9 @@ void main() {
       expect(voice.speed, 1.5);
     });
 
-    testWidgets('can be removed and its Transcript kept', (tester) async {
+    testWidgets('can be removed, its Transcript kept in the text', (
+      tester,
+    ) async {
       speech.transcripts[1] = 'pick up the parcel';
       await start(tester);
       photos.share(SharedItem(recordings: [SharedRecording(message)]));
@@ -147,13 +150,21 @@ void main() {
       final hash = note.recordings.single;
 
       await tap(tester, find.byKey(const ValueKey('note-menu')));
+      await openCardGroup(tester, 'note-remove-');
       await tap(tester, find.byKey(ValueKey('note-remove-$hash')));
       await tap(tester, find.text('Remove'));
 
       final after = notes.byId(note.id)!;
       expect(after.recordings, isEmpty);
-      expect(after.removedRecordings, [hash]);
-      expect(inCard(find.text('pick up the parcel')), findsOneWidget);
+      expect(after.transcripts, isEmpty);
+      expect(after.text, 'pick up the parcel');
+      // The card got shorter: the Agenda may have scrolled past it.
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, 5000));
+      await tester.pumpAndSettle();
+      expect(
+        inCard(find.text('pick up the parcel', findRichText: true)),
+        findsOneWidget,
+      );
     });
   });
 

@@ -55,6 +55,38 @@ enum QuickNoteControl {
 /// The playback speeds of voice recordings offered, 1 being normal speed.
 const playbackSpeeds = [0.5, 0.75, 1.0, 1.5, 2.0];
 
+/// The speech models a Device may name (ADR 0007), as both apps call
+/// them: whisper.cpp's `base` and `small`.
+const speechModelNames = ['base', 'small'];
+
+/// How the speech model in use came onto a Device (obf-1098).
+enum SpeechModelSource {
+  /// Downloaded from Old Brain Fix's own release.
+  download,
+
+  /// Taken from a file the user picked.
+  file,
+}
+
+/// The speech model chosen on a Device, by one of [speechModelNames], and
+/// how it came there (obf-1098).
+typedef SpeechModelChoice = ({String name, SpeechModelSource source});
+
+/// [choice] as a local setting keeps it: `base:download`, `small:file`.
+String _speechModelText(SpeechModelChoice choice) =>
+    '${choice.name}:${choice.source.name}';
+
+/// The choice in [text], written as [_speechModelText] writes it; null
+/// for anything else.
+SpeechModelChoice? _speechModelOf(String? text) {
+  final parts = (text ?? '').split(':');
+  if (parts.length != 2 || !speechModelNames.contains(parts.first)) {
+    return null;
+  }
+  final source = SpeechModelSource.values.asNameMap()[parts.last];
+  return source == null ? null : (name: parts.first, source: source);
+}
+
 /// Settings of this Device, kept as local settings and never synced
 /// (ADR 0008).
 extension DeviceSettings on Store {
@@ -87,6 +119,8 @@ extension DeviceSettings on Store {
   static const _recentlyAddedTo = 'recentlyAddedTo';
   static const _askAllowed = 'askAllowed';
   static const _askOn = 'askOn';
+  static const _speechModel = 'speechModel';
+  static const _speechModelOffer = 'speechModelOffer';
 
   /// How many places filed into File into… shows at its top (#272), and
   /// how many Notes added to Add to Note… shows at its top (#308).
@@ -442,8 +476,8 @@ extension DeviceSettings on Store {
       ShoppingAgenda.read(localSetting(_shoppingAgenda));
 
   /// How fast this Device plays voice recordings: one of
-  /// [playbackSpeeds], normal speed when none was chosen. The one Device
-  /// setting a Backup carries (ADR 0016).
+  /// [playbackSpeeds], normal speed when none was chosen. A Backup
+  /// carries it in a record of its own (ADR 0016, #86).
   double get playbackSpeed => chosenPlaybackSpeed ?? 1;
 
   /// The playback speed chosen on this Device; null when none of
@@ -460,4 +494,30 @@ extension DeviceSettings on Store {
     }
     setLocalSetting(_playbackSpeed, '$speed');
   }
+
+  /// The speech model in use on this Device and how it came, as the app
+  /// keeps it once a model is checked and in use (obf-1098); null while
+  /// there is none. A Backup carries it, never the model's file.
+  SpeechModelChoice? get speechModelChoice =>
+      _speechModelOf(localSetting(_speechModel));
+
+  /// Null once the model is dropped. A name not in [speechModelNames] is
+  /// refused.
+  set speechModelChoice(SpeechModelChoice? choice) {
+    if (choice == null) return removeLocalSetting(_speechModel);
+    if (!speechModelNames.contains(choice.name)) {
+      throw ArgumentError.value(choice.name, 'name', 'not a speech model');
+    }
+    setLocalSetting(_speechModel, _speechModelText(choice));
+  }
+
+  /// The speech model a restored Backup's Device had chosen, while the
+  /// app has not offered it yet (obf-1098): to download once more with
+  /// one tap, or to pick from a file again when it was taken from one.
+  /// Null when there is none to offer.
+  SpeechModelChoice? get speechModelOffer =>
+      _speechModelOf(localSetting(_speechModelOffer));
+
+  /// Forgets the offer, once the user took it or turned it down.
+  void dropSpeechModelOffer() => removeLocalSetting(_speechModelOffer);
 }

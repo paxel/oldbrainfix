@@ -36,12 +36,11 @@ use oldbrainfix_core::{
     WallClock,
 };
 
-use crate::app::embossed;
 use crate::checklist_view::{
     self, CardMenu, Drags, LineAsk, LineStep, RemovedAsk, RemovedLines, ShownLine,
 };
 use crate::l10n::L10n;
-use crate::line_editing::{self, FieldOf, TypedLine, TypedLines, Typing};
+use crate::line_editing::{self, FieldOf, Listed, TypedLine, TypedLines, Typing};
 use crate::setting_badges::{BadgeValue, badge};
 use crate::theme::{self, Tones};
 use crate::{icons, routine_editor};
@@ -344,9 +343,10 @@ pub fn card_count(ui: &mut Ui, t: &L10n, list: &ShoppingList) {
     ui.label(RichText::new(said).size(14.0).color(text));
 }
 
-/// The Shopping List part of a Note's editor (#122), under its text: its
-/// Lines as they are typed in `typed`, in their rows, each typed in place
-/// where this Device may (#141, #184).
+/// The Shopping List part of a Note's editor (#122), under its text in
+/// its card (obf-1071): its Lines as they are typed in `typed`, in their
+/// rows, each typed in place where this Device may (#141, #184), and "Add
+/// a Line".
 pub fn section(
     ui: &mut Ui,
     (t, tones): (&L10n, Tones),
@@ -354,10 +354,9 @@ pub fn section(
     typed: &mut TypedLines,
     actions: &mut Vec<ShoppingAction>,
 ) {
-    let text = ui.visuals().text_color();
     let list = &shown.list;
-    embossed(ui, tones, false, None, |ui| {
-        ui.label(RichText::new(t.shopping_heading()).strong().color(text));
+    // In the card of its name, which heads it (obf-1071).
+    ui.scope(|ui| {
         let menued = typed.with_menus(&shown.editable);
         let lines = shown_lines(t, list);
         let rows: Vec<ShownLine> = typed
@@ -493,42 +492,37 @@ pub fn section(
         if let Some((from, before)) = checklist_view::line_drop_shown(ui, tones, typed, &drawn) {
             actions.push(ShoppingAction::Drop(from, before));
         }
+        line_editing::add_line(ui, t, typed, Listed::Shopping(list));
         let mut removed = Vec::new();
         checklist_view::removed_lines(ui, t, &list.note_id, &shown.removed, &mut removed);
         actions.extend(removed.into_iter().map(ShoppingAction::Removed));
     });
 }
 
-/// "Show on the Agenda" of a Shopping List in a card's menu as `menu`
-/// offers it (#186): its three ways as radio buttons under their heading,
-/// before "Back to a plain Note" as on the phone; the way clicked. A
-/// click on the way it has already changes nothing.
+/// "Show on the Agenda ▸" of a Shopping List in a card's This Note ▸ as
+/// `menu` offers it (#186, obf-1014): its three ways as radio buttons;
+/// the way clicked. A click on the way it has already changes nothing.
 pub fn card_on_agenda(ui: &mut Ui, t: &L10n, menu: &CardMenu) -> Option<ShoppingAction> {
     let current = menu.shopping_on_agenda?;
-    agenda_radios(ui, t, current).map(|shows| ShoppingAction::OnAgenda(menu.note.clone(), shows))
+    agenda_menu(ui, t, current).map(|shows| ShoppingAction::OnAgenda(menu.note.clone(), shows))
 }
 
-/// "Show on the Agenda" of a Shopping List or a Checklist (#219) in a
-/// card's menu: its three ways as radio buttons under their heading,
-/// `current` marked; the other way clicked.
-pub fn agenda_radios(ui: &mut Ui, t: &L10n, current: ShoppingOnAgenda) -> Option<ShoppingOnAgenda> {
+/// "Show on the Agenda ▸" of a Shopping List or a Checklist (#219) in a
+/// card's menu: its three ways as radio buttons, `current` marked; the
+/// other way clicked.
+pub fn agenda_menu(ui: &mut Ui, t: &L10n, current: ShoppingOnAgenda) -> Option<ShoppingOnAgenda> {
     let text = ui.visuals().text_color();
-    let weak = ui.visuals().weak_text_color();
     let mut picked = None;
-    ui.separator();
-    ui.label(
-        RichText::new(t.checklist_show_on_agenda())
-            .small()
-            .color(weak),
-    );
-    for shows in ShoppingOnAgenda::ALL {
-        let on = shows == current;
-        let label = RichText::new(on_agenda_label(t, shows)).color(text);
-        if ui.radio(on, label).clicked() && !on {
-            picked = Some(shows);
+    let label = RichText::new(t.checklist_show_on_agenda()).color(text);
+    ui.menu_button(label, |ui| {
+        for shows in ShoppingOnAgenda::ALL {
+            let on = shows == current;
+            let label = RichText::new(on_agenda_label(t, shows)).color(text);
+            if ui.radio(on, label).clicked() && !on {
+                picked = Some(shows);
+            }
         }
-    }
-    ui.separator();
+    });
     picked
 }
 

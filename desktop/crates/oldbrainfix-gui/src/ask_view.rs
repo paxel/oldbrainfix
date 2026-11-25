@@ -10,7 +10,7 @@
 //! ask again, and Up in the empty field fetches the last one. Each
 //! answer shows with links to the Notes it came from, then to the other
 //! Notes the model read for it under "Also read" (#314), which open them,
-//! and "Copy as text", "Keep as Note", "Add to Note…" and "Save as
+//! and "Copy text", "Keep as Note", "Add to Note…" and "Save as
 //! Markdown…" (#316). What the model changed waits as an AI Task for its
 //! review. The thread is gone once the list shows another place.
 //!
@@ -19,12 +19,14 @@
 //! the API key, a local setting of this computer.
 
 use egui::text::{CCursor, CCursorRange};
-use egui::{Align, Id, Key, Layout, RichText, TextEdit, Ui};
+use egui::{Align, Id, Key, Layout, RichText, Ui};
 use oldbrainfix_core::ask::{Answer, AskError, Exchange, Protocol, Provider, Unready};
 use oldbrainfix_core::share::NoteShare;
 use oldbrainfix_core::{markdown, text_format};
 
 use crate::app::{embossed, name_field};
+use crate::design;
+use crate::icons;
 use crate::l10n::L10n;
 use crate::text_marks_view::{self, BoxLook};
 use crate::theme::{self, Tones};
@@ -307,7 +309,7 @@ fn field_rows(
         let width = (ui.available_width() - 220.0).max(160.0);
         let field = ui.add_enabled(
             !asking,
-            TextEdit::singleline(&mut panel.question)
+            crate::theme::field(ui, &mut panel.question)
                 .id(id)
                 .hint_text(t.ask_hint())
                 .text_color(text)
@@ -381,7 +383,7 @@ fn thread(
                 }
                 embossed(ui, tones, false, None, |ui| {
                     ui.horizontal_wrapped(|ui| {
-                        ui.label(RichText::new(&exchange.question).strong().color(text));
+                        ui.label(RichText::new(&exchange.question).strong());
                         let edit = egui::Button::new(RichText::new(t.edit()).color(text));
                         if ui.add_enabled(!asking, edit).clicked() {
                             asked.push(AskAsked::Edit(at));
@@ -395,7 +397,7 @@ fn thread(
             }
             if let Some(question) = &panel.asking {
                 embossed(ui, tones, false, None, |ui| {
-                    ui.label(RichText::new(question).strong().color(text));
+                    ui.label(RichText::new(question).strong());
                     ui.horizontal(|ui| {
                         ui.spinner();
                         let status = match panel.read {
@@ -407,7 +409,7 @@ fn thread(
                 });
             } else if let Some(failed) = &panel.failed {
                 embossed(ui, tones, false, None, |ui| {
-                    ui.label(RichText::new(&failed.question).strong().color(text));
+                    ui.label(RichText::new(&failed.question).strong());
                     ui.label(RichText::new(&failed.cause).color(error));
                     ui.label(RichText::new(&failed.fix).color(text));
                     if ui
@@ -424,7 +426,7 @@ fn thread(
 /// An answer as Markdown, its links opening the Notes they name, whether
 /// it was cut off, whether a link to a Note not read was removed from it
 /// (#294), the Notes it came from, then those the model also read
-/// (#314), and in one row "Copy as text", "Keep as Note" or that it was
+/// (#314), and in one row "Copy text", "Keep as Note" or that it was
 /// kept, "Add to Note…" and "Save as Markdown…" (#316), Copy and Save only
 /// for an answer with words, then the Note it was added to last.
 fn answer_rows(
@@ -469,17 +471,15 @@ fn answer_rows(
     }
     // An answer without words has nothing to copy or save.
     let words = !answer.text.trim().is_empty();
+    // Lesser actions inside the card: text buttons with their icons
+    // (obf-1103).
     ui.horizontal_wrapped(|ui| {
-        if words
-            && ui
-                .button(RichText::new(t.copy_as_text()).color(text))
-                .clicked()
-        {
+        if words && design::text_button(ui, icons::COPY, t.copy_text()).clicked() {
             asked.push(AskAsked::Copy(at));
         }
         match &exchange.kept {
             None => {
-                if ui.button(RichText::new(t.ask_keep()).color(text)).clicked() {
+                if design::text_button(ui, icons::NOTE_ADD, t.ask_keep()).clicked() {
                     asked.push(AskAsked::Keep(at));
                 }
             }
@@ -492,17 +492,10 @@ fn answer_rows(
                 }
             }
         }
-        if ui
-            .button(RichText::new(t.add_to_note()).color(text))
-            .clicked()
-        {
+        if design::text_button(ui, icons::ADD_TO_NOTE, t.add_to_note()).clicked() {
             asked.push(AskAsked::AddToNote(at));
         }
-        if words
-            && ui
-                .button(RichText::new(t.save_as_markdown()).color(text))
-                .clicked()
-        {
+        if words && design::text_button(ui, icons::SAVE_FILE, t.save_as_markdown()).clicked() {
             asked.push(AskAsked::Save(at));
         }
     });
@@ -606,7 +599,7 @@ pub fn settings_card(
     let weak = ui.visuals().weak_text_color();
     let mut changed = None;
     embossed(ui, tones, false, None, |ui| {
-        let title = ui.label(RichText::new(t.ask_settings_title()).strong().color(text));
+        let title = ui.label(RichText::new(t.ask_settings_title()).strong());
         if at {
             title.scroll_to_me_animation(
                 Some(egui::Align::TOP),
@@ -628,7 +621,7 @@ pub fn settings_card(
                      password: bool| {
             ui.label(RichText::new(label).color(text));
             let edit = ui.add(
-                TextEdit::singleline(value)
+                crate::theme::field(ui, value)
                     .id(Id::new(("ask setting", id)))
                     .hint_text(hint)
                     .password(password)

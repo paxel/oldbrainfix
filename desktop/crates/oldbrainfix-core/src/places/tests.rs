@@ -233,6 +233,34 @@ mod area_trash {
         Ok(())
     }
 
+    #[test]
+    fn deleting_an_area_stopped_keeps_the_area_and_the_notes_not_gone_yet() -> Result<()> {
+        for notes_go in [NotesGo::Trash, NotesGo::Unsorted] {
+            let store = crate::store::tests::store();
+            let area_id = plant(&store)?;
+            let places = Places::new(&store);
+            let gone = std::cell::Cell::new(0);
+            let deleted = places.delete_area_stopping(
+                &area_id,
+                notes_go,
+                &|n, _| gone.set(n),
+                // Stopped once two Notes have gone.
+                &|| gone.get() >= 2,
+            )?;
+            assert!(!deleted);
+            assert!(places.area_by_id(&area_id)?.is_some(), "the Area stays");
+            let kitchen = places.topics(&area_id)?;
+            assert_eq!(kitchen.len(), 1, "its Topic too");
+            let notes = Notes::new(&store);
+            let left = notes.inside(&area_id)?.len();
+            assert_eq!(left, 2, "{notes_go:?}: two of four gone, two stay");
+            // Asked again, the rest goes, and the Area.
+            assert!(places.delete_area_stopping(&area_id, notes_go, &|_, _| (), &|| false)?);
+            assert!(places.area_by_id(&area_id)?.is_none());
+        }
+        Ok(())
+    }
+
     /// The reads of deleting an Area of `count` Notes into the trash,
     /// beside the same Routines.
     fn reads_with(count: usize) -> Result<usize> {

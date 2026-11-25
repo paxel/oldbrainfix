@@ -30,10 +30,10 @@
 <box-more>
 <p>
   On the Profile page, under Backups and recovery, <strong>Back up this Device</strong> opens
-  Backups. "A Backup is an encrypted file of all your Areas, Notes, photos, voice recordings,
-  Routines and their history. Only your passphrase, or the recovery key on the Recovery Sheet, opens
-  it. This Device's settings stay out, except the playback speed. All your Devices share one
-  passphrase and one recovery key, and each writes Backups of its own." The two settings of the
+  Backups. A Backup is an encrypted file of all your Areas, Notes, photos, voice recordings,
+  Routines and their history, and of the Device's settings, except those bound to that Device.
+  Only your passphrase, or the recovery key on the Recovery Sheet, opens it. All your Devices share
+  one passphrase and one recovery key, and each writes Backups of its own. The two settings of the
   person, Simple or Advanced and "Move a Note to the Trash when its one-time Reminder is done", are
   not settings of the Device: they sync to your own Devices and come with a Backup.
 </p>
@@ -60,10 +60,25 @@
   A Backup is restored on the first start of a Device that holds no Notes yet, with
   <strong>Restore from a Backup</strong> (see <a href="getting-started.html#restore-from-a-backup">Restore
   from a Backup</a>), on the phone and on the desktop: choose the Backup file, then type the
-  passphrase, or the recovery key from the Recovery Sheet; the phone can also scan it. Settings such
-  as alarms, Quiet Hours and locks are not in a Backup; set them again afterwards, choose the Backup
-  folder again and pair your other Devices again. Simple or Advanced and the Trash setting come back
-  with the Backup.
+  passphrase, or the recovery key from the Recovery Sheet; the phone can also scan it. The Device's
+  settings come back with it, such as alerts, Quiet Hours, the theme, the text size, the tips and the
+  Agenda's switches, and so do Simple or Advanced and the Trash setting. Not in a Backup, and to set
+  again afterwards: the App Lock and its PIN, the Area Locks, the alarm sound, the shared folder and
+  the Backup folder; pair your other Devices again too. A phone's Backup restored on the desktop
+  brings the settings both apps have, and the other way round.
+</p>
+<p>
+  The speech model itself is not in a Backup, only which model was in use. On the phone, right
+  after the restore, "Transcribe voice Notes on the phone?" names that model:
+  <strong>Download</strong> downloads it in the background, or, for a model taken from a file,
+  <strong>Pick the file again</strong> asks for that file; <strong>Not now</strong> turns the offer
+  down. If it is still not in place on the next start, the top offers it once more, and a tap fetches
+  it. On the desktop, once the
+  Backup is restored and "Backup restored." is clicked away, the top says that the speech model used
+  before is not on this computer yet: <strong>Download</strong> downloads it, or, for a model taken
+  from a file, <strong>Use a file of my own</strong> asks for that file again. <strong>Not
+  now</strong> turns the offer down; Settings ▸ Speech model still fetches a model at any time. When
+  that model is in use here already, nothing is offered.
 </p>
 <p>
   <strong>Open a Backup…</strong> under Take Notes back on the Backups page brings Notes back from
@@ -215,12 +230,12 @@
 <p>Keep a diary, health papers or a lawyer's letter away from any AI you let read your Notes.</p>
 <box-tab device="phone" alt="The menu of the Household in the Areas list, its switch Hidden from AI">
 <li>Tap <strong>⋮</strong> on the Note's card.</li>
-<li>Tap <strong>Hidden from AI</strong>.</li>
+<li>Tap <strong>This Note</strong> ▸ <strong>Hidden from AI</strong>.</li>
 <li>Tap <strong>⋮</strong> beside an Area in the Areas list for all of it.</li>
 </box-tab>
 <box-tab device="desktop" alt="The Household marked Hidden from AI in the desktop window: shields on its row and its cards, its right-click menu with Hidden from AI ticked">
 <li>Right-click the Note's card.</li>
-<li>Click <strong>Hidden from AI</strong>.</li>
+<li>Click <strong>This Note ▸ Hidden from AI</strong>.</li>
 <li>Right-click an Area in the sidebar for all of it.</li>
 </box-tab>
 <box-more>
@@ -304,7 +319,11 @@
   your own Devices; the other settings belong to this phone." These two are settings of you as a
   person: they go to your own Devices and into your Backups, never to anyone else. On the phone and
   the desktop, the search field above that line finds a setting by its name or detail line; a search
-  that finds nothing says so. On the desktop Ctrl+F puts the cursor into it.
+  that finds nothing says so. On the desktop Ctrl+F puts the cursor into it. On the phone the top
+  bar and the band the search field sits on share a colour set off from the page, with a line under
+  the band, and the settings go under it, as on File into…, Merge into…, Add to Note… and Link to….
+  On the desktop the search field sits on such a band too, with that line under it, and the settings
+  scroll under the line, as in File into…, Merge into…, Add to Note…, Link to… and the lists of Notes.
 </p>
 <p>
   The app sends nothing on its own. When the phone app stopped unexpectedly, the next start says so
@@ -350,6 +369,16 @@
 </ul>
 <p>
   On the iPhone, where the app was installed from reads "App Store", "TestFlight" or "unknown".
+</p>
+<p>
+  On the phone, once a notification was tapped, <strong>The last notification taps</strong> is
+  ticked too: the last ten taps, each with its time, the notification's kind and ids, whether the app
+  was running, in the background or not started, and where it went, without any Note's text.
+</p>
+<p>
+  On the desktop, once a notification was clicked, <strong>Notification clicks</strong> is ticked
+  too: the last eight clicks since the app started, each with its time, the notification's kind and
+  ids, the button, whether the window showed, and where it went, without any Note's text.
 </p>
 </box-more>
 </guide-box>

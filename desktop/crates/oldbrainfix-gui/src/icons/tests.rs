@@ -132,3 +132,20 @@ fn every_symbol_of_the_app_and_its_texts_has_a_glyph() {
     );
     assert!(before.contains('→'), "{before:?}");
 }
+
+/// The name the bundled icon font gives the glyph of `icon`.
+fn glyph_name(icon: char) -> Option<String> {
+    let face = ttf_parser::Face::parse(MATERIAL_ICONS, 0).expect("the icon font");
+    let glyph = face.glyph_index(icon)?;
+    face.glyph_name(glyph).map(str::to_string)
+}
+
+#[test]
+fn the_badges_drop_down_mark_is_the_fonts_arrow_drop_down() {
+    // Not `smart_toy`, a robot face, which `e5c5` is in this font
+    // (obf-1116).
+    assert_eq!(
+        glyph_name(ARROW_DROP_DOWN).as_deref(),
+        Some("arrow_drop_down_baseline")
+    );
+}

@@ -16,6 +16,8 @@ import 'package:oldbrainfix/src/setting_badges.dart';
 import 'package:oldbrainfix/src/text_marks_view.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'editor_actions.dart';
+
 /// The Note editor's row of badges (#160): each setting as its icon and
 /// value, a tap opening its small editor, "+" spawning from the Note.
 void main() {
@@ -120,6 +122,8 @@ void main() {
       expect(find.bySemanticsLabel('Area and Topic: Unsorted'), findsOneWidget);
       expect(find.bySemanticsLabel(RegExp(r'^Captured: ')), findsOneWidget);
       expect(find.bySemanticsLabel('Kind: Plain Note'), findsOneWidget);
+      // "+" leads the Add group at the page's end (obf-1073).
+      await revealInEditor(tester, key('badge-add'));
       expect(
         find.bySemanticsLabel('Routine, Reminder, Frog or Session'),
         findsOneWidget,
@@ -203,12 +207,23 @@ void main() {
         'its editor (#344)', (tester) async {
       final id = notes.capture('dentist').id;
       await edit(tester, id);
-      await tap(tester, key('badge-add'));
+      await revealInEditor(tester, key('badge-add'));
+      // A finger near the "+"'s left end: the menu opens there (obf-1117).
+      final at =
+          tester.getRect(key('badge-add')).centerLeft + const Offset(4, 0);
+      await tester.tapAt(at);
+      await tester.pumpAndSettle();
       expect(find.byType(BottomSheet), findsNothing);
+      final menu = tester.getTopLeft(
+        find
+            .ancestor(of: key('spawn-remind'), matching: find.byType(Material))
+            .last,
+      );
+      expect((menu.dx - at.dx).abs(), lessThan(16));
       for (final spawn in ['remind', 'frog', 'session']) {
         expect(key('spawn-$spawn'), findsOneWidget, reason: spawn);
       }
-      for (final words in ['Remind me…', 'Frog', 'Session']) {
+      for (final words in ['Remind me…', 'Frog', 'Session…']) {
         expect(find.text(words), findsOneWidget, reason: words);
       }
       await tap(tester, key('spawn-remind'));
@@ -604,7 +619,7 @@ void main() {
     expect(find.bySemanticsLabel('Art: Checkliste'), findsOneWidget);
     semantics.dispose();
     await tap(tester, key('badge-add'));
-    for (final words in ['Erinnere mich …', 'Frosch', 'Einheit']) {
+    for (final words in ['Erinnere mich …', 'Frosch', 'Einheit …']) {
       expect(find.text(words), findsOneWidget, reason: words);
     }
     expect(tester.takeException(), isNull);

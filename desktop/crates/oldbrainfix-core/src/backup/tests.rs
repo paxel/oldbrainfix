@@ -90,7 +90,7 @@ fn is(result: Result<Restored>, want: Problem) -> bool {
 }
 
 #[test]
-fn a_backup_restores_everything_but_the_settings_other_than_the_speed_onto_a_new_identity()
+fn a_backup_restores_everything_but_the_settings_bound_to_the_old_device_onto_a_new_identity()
 -> Result<()> {
     let dir = tempfile::tempdir()?;
     let (old, code, path) = backed_up(dir.path())?;
@@ -130,7 +130,8 @@ fn a_backup_restores_everything_but_the_settings_other_than_the_speed_onto_a_new
             "backup:key",
             "backup:pass",
             "backup:version",
-            "playbackSpeed"
+            "playbackSpeed",
+            "theme"
         ]
     );
     assert_eq!(DeviceSettings::new(&store).playback_speed()?, 1.5);
@@ -241,6 +242,176 @@ fn a_playback_speed_not_offered_here_or_not_written_as_text_is_passed_over() -> 
     restore(&store, &path, &backup_key)?;
     assert_eq!(store.local_setting("playbackSpeed")?, None);
     assert_eq!(DeviceSettings::new(&store).playback_speed()?, 1.0);
+    Ok(())
+}
+
+/// A Backup of nothing but `old`'s identity and `records`, sealed as one
+/// last chunk, and its backup key.
+fn crafted(dir: &Path, old: &Store, records: &[Value]) -> Result<(PathBuf, [u8; KEY_BYTES])> {
+    let code = set_up(old, PASSPHRASE, CHEAP, &mut system_random)?;
+    let backup_key = recovery::decode_code(&code).ok_or(damaged_err())?;
+    let pass = old.backup_pass()?.ok_or(damaged_err())?;
+    let content_key = [7; KEY_BYTES];
+    let sealed_key = seal(&backup_key, &content_key, sealed_as::KEY, &[1; 24])?;
+    let line = Header::encode(*held(2).lock(), &pass, &sealed_key, CHUNK_BYTES);
+    let about =
+        json!({"about": {"device": old.device_id()?, "seed": old.signing_key()?.seed_hex()}});
+    let payload = std::iter::once(&about)
+        .chain(records)
+        .map(|r| format!("{r}\n"))
+        .collect::<String>();
+    let aad = sealed_as::chunk(&hex::encode(Sha256::digest(&line)), 0, true);
+    let mut file = line.clone();
+    file.push(b'\n');
+    file.extend(seal(&content_key, payload.as_bytes(), &aad, &[2; 24])?);
+    let path = dir.join(format!("crafted.{EXTENSION}"));
+    std::fs::write(&path, file)?;
+    Ok((path, backup_key))
+}
+
+/// The local settings of `store` but its identity, keys and Profile.
+fn plain(store: &Store) -> Result<Vec<(String, String)>> {
+    Ok(store
+        .local_settings_with_prefix("")?
+        .into_iter()
+        .filter(|(k, _)| {
+            !k.starts_with("areakey:")
+                && !k.starts_with("key:")
+                && !k.starts_with("backup:")
+                && !k.starts_with("profile")
+                && k != "device"
+                && k != "signseed"
+        })
+        .collect())
+}
+
+fn owned(list: &[(&str, &str)]) -> Vec<(String, String)> {
+    list.iter()
+        .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+        .collect()
+}
+
+#[test]
+fn a_backup_brings_back_the_settings_the_desktop_has_and_its_speech_model_as_an_offer() -> Result<()>
+{
+    use crate::settings::{SpeechModelChoice, SpeechModelSource};
+    let dir = tempfile::tempdir()?;
+    let old = full(dir.path())?;
+    for (key, value) in [
+        ("alertsOff", "true"),
+        ("quietHours", "21:30-07:00"),
+        ("tipsOff", "true"),
+        ("recordingPauseSeconds", "3"),
+        // The phone's alone.
+        ("twoRowEditorOff", "true"),
+        // Bound to this computer.
+        ("captureHotkey", "Ctrl+Alt+M"),
+        ("autostartOff", "true"),
+        ("alarmSound", "/home/ada/bell.ogg"),
+    ] {
+        old.set_local_setting(key, value)?;
+    }
+    old.set_ai_on(true)?;
+    DeviceSettings::new(&old).set_speech_model(Some(&SpeechModelChoice {
+        name: "base".into(),
+        source: SpeechModelSource::Download,
+    }))?;
+    let code = set_up(&old, PASSPHRASE, CHEAP, &mut system_random)?;
+    let path = dir.path().join(format!("b.{EXTENSION}"));
+    write_backup(&old, &path, &mut system_random)?;
+    let key = recovery::decode_code(&code).ok_or(damaged_err())?;
+    let store = device(dir.path(), "new", &held(20), 2)?;
+    restore(&store, &path, &key)?;
+    assert_eq!(
+        plain(&store)?,
+        owned(&[
+            ("alertsOff", "true"),
+            ("playbackSpeed", "1.5"),
+            ("quietHours", "21:30-07:00"),
+            ("recordingPauseSeconds", "3"),
+            ("speechModelOffer", "base:download"),
+            ("theme", "dark"),
+            ("tipsOff", "true"),
+        ])
+    );
+    let settings = DeviceSettings::new(&store);
+    assert!(!settings.alerts_on()?);
+    assert_eq!(settings.speech_model()?, None);
+    assert_eq!(
+        settings.speech_model_offer()?.map(|c| c.source),
+        Some(SpeechModelSource::Download)
+    );
+    assert!(!store.ai_on()?);
+    Ok(())
+}
+
+/// As both apps make the Profile at their first start, every Backup
+/// carries one, and with it the old Device counts as one's own.
+#[test]
+fn simple_and_the_other_settings_of_the_person_come_back_with_the_log() -> Result<()> {
+    use crate::person_settings::PersonSettings;
+    let dir = tempfile::tempdir()?;
+    let old = own(dir.path(), "old", &held(1), 1, Some("Ada"))?;
+    PersonSettings::new(&old).set_advanced(false)?;
+    PersonSettings::new(&old).set_trashes_done_reminder(true)?;
+    let code = set_up(&old, PASSPHRASE, CHEAP, &mut system_random)?;
+    let path = dir.path().join(format!("b.{EXTENSION}"));
+    write_backup(&old, &path, &mut system_random)?;
+    let key = recovery::decode_code(&code).ok_or(damaged_err())?;
+    let store = device(dir.path(), "new", &held(20), 2)?;
+    restore(&store, &path, &key)?;
+    assert!(!PersonSettings::new(&store).advanced()?);
+    assert!(PersonSettings::new(&store).trashes_done_reminder()?);
+    Ok(())
+}
+
+#[test]
+fn a_crafted_settings_record_sets_nothing_but_the_settings_carried() -> Result<()> {
+    let dir = tempfile::tempdir()?;
+    let old = device(dir.path(), "old", &held(1), 1)?;
+    let (path, key) = crafted(
+        dir.path(),
+        &old,
+        &[json!({"settings": {
+            "signseed": "00".repeat(32),
+            "device": "a".repeat(32),
+            "author": "Mallory",
+            "lockPin": "pbkdf2-sha256:1:aa:bb",
+            "appLock": "true",
+            "backup:key": "AAAA",
+            "backup:folder": "/elsewhere",
+            "folder": "/elsewhere",
+            "paired:x": "{}",
+            "ask:on": "true",
+            "ask:openai:url": "https://example.org/v1",
+            "ai:token": "t",
+            "speechModelOffer": "small:file",
+            "theme": "light",
+        }})],
+    )?;
+    let store = device(dir.path(), "new", &held(20), 2)?;
+    let before = |s: &Store| -> Result<Vec<Option<String>>> {
+        ["device", "signseed", "author"]
+            .iter()
+            .map(|k| s.local_setting(k))
+            .collect()
+    };
+    let identity = before(&store)?;
+    restore(&store, &path, &key)?;
+    assert_eq!(before(&store)?, identity);
+    assert_eq!(plain(&store)?, owned(&[("theme", "light")]));
+    assert_eq!(store.backup_folder()?, None);
+    Ok(())
+}
+
+#[test]
+fn a_backup_without_the_record_or_with_one_that_is_no_map_restores_as_before() -> Result<()> {
+    let dir = tempfile::tempdir()?;
+    let old = device(dir.path(), "old", &held(1), 1)?;
+    let (path, key) = crafted(dir.path(), &old, &[json!({"settings": "theme=dark"})])?;
+    let store = device(dir.path(), "new", &held(20), 2)?;
+    restore(&store, &path, &key)?;
+    assert!(plain(&store)?.is_empty());
     Ok(())
 }
 

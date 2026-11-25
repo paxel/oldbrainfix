@@ -389,10 +389,7 @@ impl SyncHost {
             }
             Err(e) => {
                 let failure = join_failure(t, &e);
-                self.code_error = Some(match &failure {
-                    JoinFailure::Paused => t.sync_paused_error().to_string(),
-                    JoinFailure::Failed { cause, fix, .. } => format!("{cause} {fix}"),
-                });
+                self.code_error = Some(format!("{} {}", failure.cause, failure.fix));
                 self.join_failure = Some(failure);
                 Some(false)
             }
@@ -418,7 +415,7 @@ impl SyncHost {
         let weak = ui.visuals().weak_text_color();
         let error = ui.visuals().error_fg_color;
         let heading = if pair { t.menu_pair() } else { t.sync_title() };
-        ui.heading(RichText::new(heading).color(text));
+        crate::design::dialog_title(ui, heading);
         ui.label(RichText::new(t.sync_host_intro()).color(weak));
         ui.add_space(8.0);
         egui::ScrollArea::vertical()
@@ -437,15 +434,11 @@ impl SyncHost {
                         .unwrap_or_default();
                     let name = display_name(t, &choice.profile.name).to_string();
                     embossed(ui, tones, true, None, |ui| {
-                        ui.label(
-                            RichText::new(t.invite_confirm_title(&area))
-                                .strong()
-                                .color(text),
-                        );
+                        ui.label(RichText::new(t.invite_confirm_title(&area)).strong());
                         ui.horizontal(|ui| {
                             person_picture(ui, &mut self.pictures, &choice.profile, 56.0, &name);
                             ui.vertical(|ui| {
-                                ui.label(RichText::new(&name).strong().color(text));
+                                ui.label(RichText::new(&name).strong());
                                 ui.label(
                                     RichText::new(format!(
                                         "{}: {}",
@@ -488,11 +481,7 @@ impl SyncHost {
                         AreaRole::Member => t.role_member(),
                     };
                     embossed(ui, tones, true, None, |ui| {
-                        ui.label(
-                            RichText::new(t.inviting_banner(&area, role))
-                                .strong()
-                                .color(text),
-                        );
+                        ui.label(RichText::new(t.inviting_banner(&area, role)).strong());
                         if ui
                             .button(RichText::new(t.stop_inviting()).color(text))
                             .clicked()
@@ -519,25 +508,21 @@ impl SyncHost {
                         } else {
                             t.shared_with_you(who, &area)
                         };
-                        ui.label(RichText::new(said).strong().color(text));
+                        ui.label(RichText::new(said).strong());
                     }
                     if self.refused > 0 {
                         ui.label(RichText::new(t.sync_refused(self.refused as i64)).color(error));
                     }
                     // The Conflicts are listed in the Sync dialog.
                     if self.found > 0 && !pair {
-                        ui.label(
-                            RichText::new(t.sync_conflicts_below(self.found as i64))
-                                .strong()
-                                .color(text),
-                        );
+                        ui.label(RichText::new(t.sync_conflicts_below(self.found as i64)).strong());
                     }
                 }
                 if pair {
                     return;
                 }
                 embossed(ui, tones, false, None, |ui| {
-                    ui.label(RichText::new(t.conflicts_title()).strong().color(text));
+                    ui.label(RichText::new(t.conflicts_title()).strong());
                     if self.conflicts.is_empty() {
                         ui.label(RichText::new(t.conflicts_none()).color(weak));
                     } else {
@@ -545,11 +530,7 @@ impl SyncHost {
                     }
                     for conflict in &self.conflicts {
                         ui.add_space(4.0);
-                        ui.label(
-                            RichText::new(conflict_heading(t, store, conflict))
-                                .strong()
-                                .color(text),
-                        );
+                        ui.label(RichText::new(conflict_heading(t, store, conflict)).strong());
                         if let Some(note) = conflict_note(store, conflict) {
                             ui.label(RichText::new(note).color(text));
                         }
@@ -596,7 +577,7 @@ impl SyncHost {
                     action = Some(asked);
                 }
                 embossed(ui, tones, false, None, |ui| {
-                    ui.label(RichText::new(t.paired_devices_title()).strong().color(text));
+                    ui.label(RichText::new(t.paired_devices_title()).strong());
                     let devices = store.paired_devices().unwrap_or_default();
                     if devices.is_empty() {
                         ui.label(RichText::new(t.paired_none()).color(weak));
@@ -670,11 +651,7 @@ impl SyncHost {
         };
         let mut action = None;
         embossed(ui, tones, true, None, |ui| {
-            ui.label(
-                RichText::new(t.sync_trust_question(&who))
-                    .strong()
-                    .color(text),
-            );
+            ui.label(RichText::new(t.sync_trust_question(&who)).strong());
             ui.horizontal(|ui| {
                 if ui
                     .button(RichText::new(t.sync_trust()).color(text))
@@ -713,15 +690,9 @@ impl SyncHost {
                 qr(ui, &host.pair_code(false), qrcode::EcLevel::M, 240.0, None);
                 let typed = host.pair_code(true);
                 for line in pair_code_lines(&typed) {
-                    ui.label(
-                        RichText::new(line)
-                            .monospace()
-                            .strong()
-                            .size(20.0)
-                            .color(text),
-                    );
+                    ui.label(RichText::new(line).monospace().strong().size(20.0));
                 }
-                ui.label(RichText::new(t.sync_pin(host.pin())).strong().color(text));
+                ui.label(RichText::new(t.sync_pin(host.pin())).strong());
                 ui.label(
                     RichText::new(format!("{}:{}", host.address(), host.port()))
                         .small()
@@ -747,14 +718,17 @@ impl SyncHost {
         let joining = self.joining.is_some();
         let mut asked = false;
         embossed(ui, tones, false, None, |ui| {
-            ui.label(RichText::new(t.sync_join_title()).strong().color(text));
+            ui.label(RichText::new(t.sync_join_title()).strong());
             ui.label(RichText::new(t.sync_type_code_intro()).small().color(weak));
             let label = ui.label(RichText::new(t.sync_code_label()).color(text));
+            let mono = egui::TextStyle::Monospace.resolve(ui.style());
+            let margin = crate::theme::field_margin(ui, &mono);
             let field = ui
                 .add_enabled(
                     !joining,
-                    egui::TextEdit::singleline(&mut self.code)
-                        .font(egui::TextStyle::Monospace)
+                    crate::theme::field(ui, &mut self.code)
+                        .font(mono)
+                        .margin(margin)
                         .desired_width(f32::INFINITY),
                 )
                 .labelled_by(label.id);
@@ -779,29 +753,24 @@ impl SyncHost {
     }
 }
 
-/// Why joining a typed code failed.
+/// Why joining a typed code failed: why and what to do, one sentence
+/// each, and the full text.
 #[derive(Debug, Clone, PartialEq)]
-pub enum JoinFailure {
-    /// Refused while an AI Task waits: said as everywhere.
-    Paused,
-    /// Failed: why and what to do, one sentence each, and the full text.
-    Failed {
-        cause: &'static str,
-        fix: &'static str,
-        details: String,
-    },
+pub struct JoinFailure {
+    pub cause: &'static str,
+    pub fix: &'static str,
+    pub details: String,
 }
 
 /// Why joining a typed code failed as `error` says: each
 /// [`SyncFailure`] as the phone says it, anything else as broken off.
 pub fn join_failure(t: &L10n, error: &Error) -> JoinFailure {
     let (failure, details) = match error {
-        Error::SyncPaused => return JoinFailure::Paused,
         Error::Sync(failure) => (*failure, format!("sync: {failure:?}")),
         e => (SyncFailure::Failed, format!("sync: {e}")),
     };
     let (cause, fix) = sync_failure_why(t, failure);
-    JoinFailure::Failed {
+    JoinFailure {
         cause,
         fix,
         details,
@@ -844,7 +813,7 @@ fn folder_section(
     let error = ui.visuals().error_fg_color;
     let mut action = None;
     embossed(ui, tones, false, None, |ui| {
-        ui.label(RichText::new(t.folder_title()).strong().color(text));
+        ui.label(RichText::new(t.folder_title()).strong());
         ui.label(RichText::new(t.folder_intro()).small().color(weak));
         match store.sync_folder().ok().flatten() {
             None => {
@@ -914,7 +883,7 @@ fn bundle_section(
         }
     };
     embossed(ui, tones, false, None, |ui| {
-        ui.label(RichText::new(t.bundle_title()).strong().color(text));
+        ui.label(RichText::new(t.bundle_title()).strong());
         ui.label(RichText::new(t.bundle_intro()).small().color(weak));
         // Device names are the user's own: radio buttons, as on the
         // phone (UI laws, "Dialogs and pages"), Everything last.
@@ -986,7 +955,6 @@ pub fn bundle_error_text(t: &L10n, error: Error) -> String {
             let (cause, fix) = offer_refusal(t, e);
             format!("{cause} {fix}")
         }
-        Error::SyncPaused => t.sync_paused_error().to_string(),
         e => format!("{} ({e})", t.bundle_failed()),
     }
 }

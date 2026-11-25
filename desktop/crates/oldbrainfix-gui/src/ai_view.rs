@@ -4,9 +4,9 @@
 //! and copies the client's config, and "Done, review", which closes it;
 //! and the review of the AI Task, its changes grouped by kind, each with
 //! what the log holds and what the task wrote, accepted or rejected as a
-//! whole. While an AI Task is open or waits for its review, sync waits;
-//! the window says so where a sync, a bundle, an Area offer or a Sent
-//! Item was refused for it.
+//! whole. Sync goes on meanwhile (obf-1076): the review marks a change
+//! another Device's edit, synced in since, touches, and which one Accept
+//! keeps.
 
 use egui::{Id, RichText, Ui};
 use oldbrainfix_core::ai_port::{Reach, bridged_client_config, claude_code_command, client_config};
@@ -93,13 +93,17 @@ pub struct ReviewItem {
 }
 
 /// One change in words: what changes, before and after; neither for a
-/// deletion. `mine_wins` when the user's own edit came later and stays.
+/// deletion. `mine_wins` when the user's own edit came later and stays;
+/// `synced` when another Device's later edit came in by sync while the
+/// AI Task waited (obf-1076): with `mine_wins` one of the user's own,
+/// which stays, without another person's, which Accept writes over.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ReviewChange {
     pub label: String,
     pub before: Option<String>,
     pub after: Option<String>,
     pub mine_wins: bool,
+    pub synced: bool,
 }
 
 /// What a group of the review is called.
@@ -165,6 +169,7 @@ fn review_item(
             before: Some(text(before)),
             after: Some(text(after)),
             mine_wins: item.changes.iter().filter(schedule).any(|c| c.mine_wins),
+            synced: item.changes.iter().filter(schedule).any(|c| c.synced),
         });
     }
     for change in &item.changes {
@@ -235,6 +240,7 @@ fn change_line(
             before: None,
             after: None,
             mine_wins: change.mine_wins,
+            synced: change.synced,
         })
     };
     let words = |label: String, text: &dyn Fn(Option<&str>) -> String| {
@@ -243,6 +249,7 @@ fn change_line(
             before: Some(text(change.before.as_deref())),
             after: Some(text(change.after.as_deref())),
             mine_wins: change.mine_wins,
+            synced: change.synced,
         })
     };
     if ty == note_keys::TYPE_NOTE
@@ -290,6 +297,7 @@ fn change_line(
                 ),
                 after: Some(after.to_string()),
                 mine_wins: change.mine_wins,
+                synced: change.synced,
             }));
         }
         (line_keys::TYPE_LINE, line_keys::INDENT) => {
@@ -360,6 +368,7 @@ fn change_line(
                 before: Some(pool(change.before.as_deref())?),
                 after: Some(pool(change.after.as_deref())?),
                 mine_wins: change.mine_wins,
+                synced: change.synced,
             }));
         }
         (routine_keys::TYPE_ROUTINE | note_keys::TYPE_NOTE, session_keys::RULE) => {
@@ -415,6 +424,7 @@ fn change_line(
                 before: None,
                 after: None,
                 mine_wins: change.mine_wins,
+                synced: change.synced,
             }),
         );
     }
@@ -445,6 +455,7 @@ fn change_line(
         before: Some(value_text(store, t, ty, field, change.before.as_deref())?),
         after: Some(value_text(store, t, ty, field, change.after.as_deref())?),
         mine_wins: change.mine_wins,
+        synced: change.synced,
     }))
 }
 
@@ -565,6 +576,7 @@ fn tally_change(
         before: None,
         after: None,
         mine_wins: change.mine_wins,
+        synced: change.synced,
     };
     let text = |value: Option<&str>| -> String {
         match (part, value) {
@@ -606,6 +618,7 @@ fn tally_change(
         before: Some(text(change.before.as_deref())),
         after: Some(text(change.after.as_deref())),
         mine_wins: change.mine_wins,
+        synced: change.synced,
     }))
 }
 
@@ -637,7 +650,7 @@ pub fn port_card(ui: &mut Ui, t: &L10n, tones: Tones, shown: PortShown<'_>) -> O
     let weak = ui.visuals().weak_text_color();
     let mut asked = None;
     embossed(ui, tones, false, None, |ui| {
-        let title = ui.label(RichText::new(t.ai_port_title()).strong().color(text));
+        let title = ui.label(RichText::new(t.ai_port_title()).strong());
         if shown.at {
             title.scroll_to_me_animation(
                 Some(egui::Align::TOP),
@@ -717,25 +730,39 @@ pub fn port_card(ui: &mut Ui, t: &L10n, tones: Tones, shown: PortShown<'_>) -> O
 /// per kind of change, each item a card naming what it is about with its
 /// changes, before and after, the user's own later edits marked as
 /// staying. A click on an item with a Note opens that Note in the Note dialog,
-/// as the task leaves it. Whether a Note was asked for, by its id.
+/// as the task leaves it. With no change yet it says so (obf-1077).
+/// While the port is `open`, "Close the port" stands in for Accept all
+/// and Reject all, which wait until it is closed. Whether a Note was
+/// asked for, by its id.
 pub fn review_page(
     ui: &mut Ui,
     t: &L10n,
     tones: Tones,
     shown: &ReviewShown,
+    open: bool,
     asked: &mut Option<AiAction>,
 ) -> Option<String> {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     ui.heading(RichText::new(t.ai_review_title()).color(text));
-    ui.label(RichText::new(t.ai_review_intro()).color(weak));
+    if shown.groups.is_empty() {
+        ui.label(RichText::new(t.ai_review_no_changes()).color(weak));
+    } else {
+        ui.label(RichText::new(t.ai_review_intro()).color(weak));
+    }
     ui.add_space(4.0);
     ui.horizontal(|ui| {
-        if theme::primary(ui, true, t.ai_accept_all()).clicked() {
-            *asked = Some(AiAction::Accept);
-        }
-        if theme::destructive(ui, true, t.ai_reject_all()).clicked() {
-            *asked = Some(AiAction::AskReject);
+        if open {
+            if theme::primary(ui, true, t.ai_port_close()).clicked() {
+                *asked = Some(AiAction::Done);
+            }
+        } else if !shown.groups.is_empty() {
+            if theme::primary(ui, true, t.ai_accept_all()).clicked() {
+                *asked = Some(AiAction::Accept);
+            }
+            if theme::destructive(ui, true, t.ai_reject_all()).clicked() {
+                *asked = Some(AiAction::AskReject);
+            }
         }
     });
     ui.add_space(8.0);
@@ -744,10 +771,10 @@ pub fn review_page(
         ui.spacing_mut().item_spacing.y = 12.0;
         for (kind, items) in &shown.groups {
             ui.add_space(4.0);
-            ui.label(RichText::new(kind_label(t, *kind)).strong().color(text));
+            ui.label(RichText::new(kind_label(t, *kind)).strong());
             for item in items {
                 let content = |ui: &mut Ui| {
-                    ui.label(RichText::new(&item.title).strong().color(text));
+                    ui.label(RichText::new(&item.title).strong());
                     for change in &item.changes {
                         change_rows(ui, t, change);
                     }
@@ -770,8 +797,11 @@ pub fn review_page(
     open
 }
 
-/// One change of an item: what changes, before and after, and "Your
-/// edit stays" where the user's own later edit is kept.
+/// One change of an item: what changes, before and after, and where a
+/// later edit touches it which one Accept keeps: "Your edit stays" for
+/// the user's own here, their other Device's newer value for one synced
+/// from it, and a warning for another person's synced one, which Accept
+/// writes over (obf-1076).
 fn change_rows(ui: &mut Ui, t: &L10n, change: &ReviewChange) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
@@ -782,11 +812,13 @@ fn change_rows(ui: &mut Ui, t: &L10n, change: &ReviewChange) {
     if let Some(after) = &change.after {
         ui.label(RichText::new(t.ai_after(after)).color(text));
     }
-    if change.mine_wins {
-        ui.label(
-            RichText::new(t.ai_your_edit_stays())
-                .small()
-                .color(ui.visuals().hyperlink_color),
-        );
+    let mark = match (change.synced, change.mine_wins) {
+        (true, true) => Some((t.ai_synced_mine_stays(), ui.visuals().hyperlink_color)),
+        (true, false) => Some((t.ai_synced_overwritten(), ui.visuals().warn_fg_color)),
+        (false, true) => Some((t.ai_your_edit_stays(), ui.visuals().hyperlink_color)),
+        (false, false) => None,
+    };
+    if let Some((said, colour)) = mark {
+        ui.label(RichText::new(said).small().color(colour));
     }
 }

@@ -12,6 +12,7 @@ import 'package:oldbrainfix/src/text_marks_view.dart';
 import 'package:oldbrainfix/src/two_row_text_field.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'add_a_part.dart';
 import 'open_capture.dart';
 
 /// Formatted text (#127, ADR 0033): drawn formatted on cards, in Sections
@@ -740,8 +741,66 @@ void main() {
       controller.selection = const TextSelection.collapsed(offset: 2);
       await tester.pump();
       await press(tester, 'format-more');
-      await press(tester, 'format-code-more');
-      expect(controller.text, '`line`');
+      await press(tester, 'format-quote-more');
+      expect(controller.text, '> line');
+    });
+
+    testWidgets('Code shows on a narrow screen without ⋮', (tester) async {
+      tester.view.physicalSize = const Size(360, 2000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await pumpField(tester, text: 'line');
+      expect(key('format-code'), findsOneWidget);
+      expect(
+        tester.getTopRight(key('format-code')).dx,
+        lessThanOrEqualTo(tester.getTopLeft(key('format-more')).dx),
+      );
+    });
+
+    testWidgets('Code makes inline code of a selection in one line and a '
+        'code block of lines or an empty line', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final controller = await pumpField(tester, text: 'run ls -l now\nb');
+      controller.selection = const TextSelection(
+        baseOffset: 4,
+        extentOffset: 9,
+      );
+      await tester.pump();
+      await press(tester, 'format-code');
+      expect(controller.text, 'run `ls -l` now\nb');
+      expect(controller.markdown, isTrue);
+      await press(tester, 'format-code');
+      expect(controller.text, 'run ls -l now\nb');
+
+      // Over two lines: a block around them.
+      controller.selection = const TextSelection(
+        baseOffset: 0,
+        extentOffset: 15,
+      );
+      await tester.pump();
+      await press(tester, 'format-code');
+      expect(controller.text, '```\nrun ls -l now\nb\n```');
+      expect(controller.selection, const TextSelection.collapsed(offset: 4));
+      expect(
+        tester.getSemantics(key('format-code')),
+        isSemantics(hasToggledState: true, isToggled: true),
+      );
+      // In the block, Code takes its fences off.
+      await press(tester, 'format-code');
+      expect(controller.text, 'run ls -l now\nb');
+
+      // On an empty line: an empty block, the cursor in its line.
+      controller.value = const TextEditingValue(
+        text: 'a\n\nb',
+        selection: TextSelection.collapsed(offset: 2),
+      );
+      await tester.pump();
+      await press(tester, 'format-code');
+      expect(controller.text, 'a\n```\n\n```\nb');
+      expect(controller.selection, const TextSelection.collapsed(offset: 6));
+      await press(tester, 'format-code');
+      expect(controller.text, 'a\n\nb');
+      semantics.dispose();
     });
 
     testWidgets('a shortcut typed makes the text formatted; plain typing '
@@ -1042,23 +1101,17 @@ void main() {
       await openEditor(tester);
       tester.view.resetViewInsets();
       await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(
-        find.text('Add to Note'),
-        200,
-        scrollable: find
-            .descendant(
-              of: find.byType(NoteEditorScreen),
-              matching: find.byType(Scrollable),
-            )
-            .first,
-      );
-      await tester.tap(find.text('Add to Note'));
-      await tester.pumpAndSettle();
+      await addAPart(tester);
       tester.view.viewInsets = const FakeViewPadding(bottom: 900);
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField).last, 'and *oat*');
       await tester.pump();
-      await tester.tap(find.text('Add'));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Add'),
+        ),
+      );
       await tester.pumpAndSettle();
       final section = notes.sections(id).single;
       expect(section.text, 'and *oat*');

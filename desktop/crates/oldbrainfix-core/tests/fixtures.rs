@@ -25,7 +25,9 @@ use chrono::{DateTime, Duration, NaiveDateTime, TimeZone, Utc};
 use oldbrainfix_core::alarms::{WallMoment, instant_of};
 use oldbrainfix_core::history::{Adherence, DoneTiming, RoutineHistory, schedule_spans};
 use oldbrainfix_core::ics::routines_ics;
-use oldbrainfix_core::imports::MAX_FILE_BYTES;
+use oldbrainfix_core::imports::{
+    EarlierImport, ImportSourceKind, MAX_FILE_BYTES, keys as import_keys,
+};
 use oldbrainfix_core::named_places::keys as named_place_keys;
 use oldbrainfix_core::notes::keys as note_keys;
 use oldbrainfix_core::nudges::QuietHours;
@@ -89,7 +91,7 @@ const SCENARIOS: [&str; 35] = [
 ];
 
 /// The queries every scenario's search is checked with, the generator's.
-const QUERIES: [&str; 15] = [
+const QUERIES: [&str; 16] = [
     "",
     "sauce",
     "MILK",
@@ -97,6 +99,8 @@ const QUERIES: [&str; 15] = [
     "dentist",
     "x-ray",
     "müller",
+    // Folded (obf-1047): without the umlaut, in upper case.
+    "MULLER",
     "called",
     "loop",
     " e ",
@@ -239,6 +243,13 @@ fn note_json(note: &Note) -> Value {
         }
         if note.wordless() == Wordless::File {
             all.insert("wordlessName".into(), json!(note.wordless_name()));
+        }
+        // The name a Note without text of its own is shown by (obf-1049):
+        // only when it is not its text.
+        let calendar = note.calendar_text();
+        if !calendar.is_empty() && calendar != note.visible_text() {
+            all.insert("shownName".into(), json!(note.shown_name()));
+            all.insert("calendarText".into(), json!(calendar));
         }
     }
     out
@@ -472,6 +483,15 @@ fn read(store: &Store) -> Result<Value, Box<dyn std::error::Error>> {
     for query in QUERIES {
         searched.insert(query.to_string(), found(query, None)?);
     }
+    let mut findings = serde_json::Map::new();
+    for query in FINDING_QUERIES {
+        let mut of = serde_json::Map::new();
+        for note in Search::new(store).notes(query, None)? {
+            let sections = notes.sections(&note.id)?;
+            of.insert(note.id.clone(), findings_json(&note, &sections, query));
+        }
+        findings.insert(query.to_string(), Value::Object(of));
+    }
     Ok(json!({
         "now": dart_iso(store.now()),
         "device": store.device_id()?,
@@ -488,8 +508,69 @@ fn read(store: &Store) -> Result<Value, Box<dyn std::error::Error>> {
         "shares": shares,
         "search": searched,
         "searchWithin": within,
+        "findings": findings,
         "conflicts": conflicts_json(&store.conflicts()?),
     }))
+}
+
+/// The queries whose places in each Note found are read (obf-1047), the
+/// generator's.
+const FINDING_QUERIES: [&str; 7] = [
+    "MULLER", "dentist", "receipt", "called", "loop", "lease", "rent due",
+];
+
+/// The places of `query` in `note` and its `sections` in the shape of
+/// the generator's `_findingsOf`, offsets in code points.
+fn findings_json(note: &Note, sections: &[oldbrainfix_core::notes::Section], query: &str) -> Value {
+    use oldbrainfix_core::findings::{FindingPart, of_note};
+    let points = |of: &str, at: usize| of.get(..at).map(|t| t.chars().count());
+    let found: Vec<Value> = of_note(note, query, sections)
+        .iter()
+        .map(|f| {
+            let section = sections.iter().find(|s| Some(&s.id) == f.section.as_ref());
+            let pick =
+                |own: &std::collections::BTreeMap<String, String>,
+                 of_section: Option<&std::collections::BTreeMap<String, String>>| {
+                    of_section
+                        .unwrap_or(own)
+                        .get(&f.key)
+                        .cloned()
+                        .unwrap_or_default()
+                };
+            let text = match f.part {
+                FindingPart::Text => section.map_or_else(|| note.shown_text(), |s| s.shown_text()),
+                FindingPart::Transcript => pick(&note.transcripts, section.map(|s| &s.transcripts)),
+                FindingPart::PhotoText => pick(&note.photo_texts, section.map(|s| &s.photo_texts)),
+                FindingPart::AttachmentText => {
+                    pick(&note.attachment_texts, section.map(|s| &s.attachment_texts))
+                }
+                FindingPart::FileName => section
+                    .map_or(&note.attachments, |s| &s.attachments)
+                    .iter()
+                    .find(|a| a.hash == f.key)
+                    .map(|a| a.name.clone())
+                    .unwrap_or_default(),
+            };
+            json!({
+                "cell": f.cell.map(|cell| json!({
+                    "column": cell.column,
+                    "row": cell.row,
+                    "table": cell.table,
+                    "tableStart": points(&text, cell.table_start),
+                })),
+                "context": f.context,
+                "contextEnd": points(&f.context, f.context_end),
+                "contextStart": points(&f.context, f.context_start),
+                "end": points(&text, f.end),
+                "key": f.key,
+                "line": f.line,
+                "part": f.part.name(),
+                "section": f.section,
+                "start": points(&text, f.start),
+            })
+        })
+        .collect();
+    Value::Array(found)
 }
 
 /// Conflicts in the shape of the generator's `_conflicts`.
@@ -2296,17 +2377,111 @@ fn import_folder() -> Result<Vec<ImportFile>, Box<dyn std::error::Error>> {
     ])
 }
 
+/// Where the generator's `import` scenario picked the folder it fills
+/// in, and another one.
+const IMPORT_FROM: &str = "content://tree/primary%3ANotes";
+const IMPORT_OTHER: &str = "content://tree/primary%3AOther";
+
+/// What the Imports of the generator's `import` scenario came to, and
+/// what it found of earlier Imports (obf-1078).
+type ImportSteps = (Vec<ImportSummary>, Vec<Option<EarlierImport>>);
+
 /// The Imports of the generator's `import` scenario, with what each came
 /// to.
 fn import_into(store: &Store) -> Result<Vec<ImportSummary>, Box<dyn std::error::Error>> {
-    Places::new(store).add_area("From Notes")?;
+    Ok(import_steps(store)?.0)
+}
+
+/// The steps of the generator's `import` scenario.
+fn import_steps(store: &Store) -> Result<ImportSteps, Box<dyn std::error::Error>> {
+    let own = Places::new(store).add_area("From Notes")?.id;
     let imports = Imports::new(store);
     let folder = import_folder()?;
-    Ok(vec![
+    let mut made = vec![
         imports.folder("From Notes", &folder)?,
         imports.folder("From Notes", &folder[8..10])?,
         imports.folder("From Notes", &folder[1..2])?,
-    ])
+    ];
+    let at = |i: usize| folder.get(i).cloned().ok_or("a file");
+    let picked = Imports::new(store)
+        .from_source(IMPORT_FROM)
+        .folder("From Notes", &[at(0)?, at(1)?, at(2)?, at(5)?])?;
+    let area = picked.area_id.clone().unwrap_or_default();
+    made.push(picked);
+    let paths: Vec<&str> = folder.iter().map(|f| f.name.as_str()).collect();
+    let mut earlier = vec![
+        imports.earlier(ImportSourceKind::Folder, IMPORT_FROM, &paths)?,
+        imports.earlier(ImportSourceKind::Folder, IMPORT_OTHER, &paths)?,
+        imports.earlier(ImportSourceKind::Keep, IMPORT_FROM, &paths)?,
+    ];
+    let notes = Notes::new(store);
+    let with_path = |path: &str| -> Result<String, Box<dyn std::error::Error>> {
+        for note in notes.inside(&area)? {
+            if store.current(&note.id, import_keys::SOURCE)?.as_deref() == Some(path) {
+                return Ok(note.id);
+            }
+        }
+        Err(format!("no Note of {path}").into())
+    };
+    notes.file(&with_path("dentist.txt")?, &own)?;
+    notes.trash(&with_path("Müller.txt")?)?;
+    let shopping = at(0)?;
+    let ideas = at(5)?;
+    made.push(
+        Imports::new(store)
+            .from_source(IMPORT_FROM)
+            .filling_in(&area)
+            .folder(
+                "From Notes",
+                &[
+                    ImportFile {
+                        bytes: b"# Shopping\nchanged".to_vec(),
+                        ..shopping
+                    },
+                    at(1)?,
+                    at(2)?,
+                    at(3)?,
+                    at(4)?,
+                    ImportFile {
+                        name: ideas.name.replace('/', "\\"),
+                        ..ideas
+                    },
+                    at(6)?,
+                ],
+            )?,
+    );
+    earlier.push(imports.earlier(ImportSourceKind::Folder, IMPORT_FROM, &paths)?);
+    made.push(
+        Imports::new(store)
+            .from_source(IMPORT_OTHER)
+            .filling_in(&area)
+            .folder("From Notes", &[at(3)?])?,
+    );
+    Ok((made, earlier))
+}
+
+/// What an earlier Import found came to, as the generator's
+/// `_earlierJson` writes it.
+fn earlier_json(e: &Option<EarlierImport>) -> Value {
+    match e {
+        None => Value::Null,
+        Some(e) => json!({
+            "areaId": e.area_id,
+            "areaName": e.area_name,
+            "at": dart_iso(e.at),
+            "held": e.held,
+        }),
+    }
+}
+
+#[test]
+fn earlier_imports_are_found_as_the_dart_core_finds_them() -> TestResult {
+    let store = writer_store()?;
+    let (_, earlier) = import_steps(&store)?;
+    let found: Vec<Value> = earlier.iter().map(earlier_json).collect();
+    let expected = read_json(&fixtures().join("import").join("earlier.json"))?;
+    assert_eq!(json!({ "earlier": found }), expected);
+    Ok(())
 }
 
 /// The generator's `import` scenario.
@@ -2477,7 +2652,9 @@ const KEEP_PNG: [u8; 67] = [
 /// The Import of the generator's `keep` scenario.
 fn keep_into(store: &Store) -> Result<Vec<ImportSummary>, Box<dyn std::error::Error>> {
     Ok(vec![
-        Imports::new(store).keep("From Google Keep", &keep_takeout())?,
+        Imports::new(store)
+            .from_source("content://downloads/takeout.zip")
+            .keep("From Google Keep", &keep_takeout())?,
     ])
 }
 
@@ -2490,6 +2667,7 @@ fn write_keep(store: &Store) -> Built {
 /// What an Import came to, as the generator's `_summary` writes it.
 fn summary_json(s: &ImportSummary) -> Value {
     json!({
+        "already": s.already,
         "areaId": s.area_id,
         "checklists": s.checklists,
         "missing": s.missing,
@@ -2592,6 +2770,27 @@ fn write_media(store: &Store) -> Built {
     notes.remove_photo_text(&bike.id, frame)?;
     notes.remove_transcript(&bike.id, lock)?;
     notes.set_transcript(&bike.id, lock, "Lock code 1234")?;
+    let plumber = notes.capture_with("", None, None, &[photo(9)], &[recording(8), recording(9)])?;
+    notes.set_photo_text(&plumber.id, &plumber.photos[0], "SALE")?;
+    notes.set_transcript(&plumber.id, &plumber.recordings[0], "")?;
+    let call = "\n  Call the plumber  \r\nabout the leak\n";
+    notes.set_transcript(&plumber.id, &plumber.recordings[1], call)?;
+    let ordered = notes.capture_with("", None, None, &[], &[recording(10), recording(11)])?;
+    let swapped = notes.capture_with("", None, None, &[], &[recording(11), recording(10)])?;
+    for note in [&ordered, &swapped] {
+        notes.set_transcript(&note.id, &ordered.recordings[0], "Ten")?;
+        notes.set_transcript(&note.id, &ordered.recordings[1], "Eleven")?;
+    }
+    let ferns = notes.capture_with("", None, None, &[], &[recording(12)])?;
+    notes.set_transcript(&ferns.id, &ferns.recordings[0], "Water the ferns")?;
+    // As versions before obf-1084 removed it: the Transcript stays.
+    store.append(
+        &ferns.id,
+        &note_keys::audio(&ferns.recordings[0]),
+        None,
+        None,
+    )?;
+    store.drop_removed_blobs()?;
     Ok(())
 }
 
@@ -5130,6 +5329,16 @@ fn write_shopping_lists(store: &Store) -> Built {
         "Butter, flour und 1,5 Liter Milch.",
     )?;
     lists.add_owed_lines(&said.id, &wall)?;
+    // Said into the quick note (obf-1082): its text holds the Transcript,
+    // whose line is no Line, the items said split instead; and a typed line
+    // made a Line before the same words came as its Transcript.
+    let heard = notes.capture_with("Honey\n\nTea and jam", None, None, &[], &[recording(33)])?;
+    notes.set_transcript(&heard.id, &heard.recordings[0], "Tea and jam")?;
+    lists.add_voice_capture(&market, &heard.id, &wall)?;
+    let typed = notes.capture_with("Rice and oats", None, None, &[], &[recording(34)])?;
+    lists.add_voice_capture(&market, &typed.id, &wall)?;
+    notes.set_transcript(&typed.id, &typed.recordings[0], "Rice and oats")?;
+    lists.add_owed_lines(&typed.id, &wall)?;
     Ok(())
 }
 
@@ -7629,13 +7838,43 @@ fn the_backup_the_dart_core_wrote_is_restored_here_and_written_the_same() -> Tes
         .map(|m| json!({"seq": m.seq, "cause": m.cause, "label": m.label, "at": m.at}))
         .collect();
     assert_eq!(Value::Array(moments), expected["moments"]);
+    // The settings record each app takes as the Dart core's list says,
+    // and the desktop the settings the phone kept, but those the phone
+    // took of the record for those it takes (obf-1098).
+    use oldbrainfix_core::backup_settings::{SettingsApp, taken_settings};
+    let taken = |app| -> Value {
+        Value::Array(
+            taken_settings(&expected["carried"], app)
+                .into_iter()
+                .map(|(k, v)| json!([k, v]))
+                .collect(),
+        )
+    };
+    assert_eq!(taken(SettingsApp::Phone), expected["taken"]["phone"]);
+    assert_eq!(taken(SettingsApp::Desktop), expected["taken"]["desktop"]);
+    let phone_took = expected["taken"]["phone"].as_array().ok_or("taken")?;
+    let mut want: Vec<Value> = expected["settings"]
+        .as_array()
+        .ok_or("settings")?
+        .iter()
+        .filter(|pair| !phone_took.contains(pair))
+        .cloned()
+        .chain(
+            taken(SettingsApp::Desktop)
+                .as_array()
+                .into_iter()
+                .flatten()
+                .cloned(),
+        )
+        .collect();
+    want.sort_by(|a, b| a[0].as_str().cmp(&b[0].as_str()));
     let settings: Vec<Value> = restored
         .local_settings_with_prefix("")?
         .into_iter()
         .filter(|(k, _)| k != "device" && k != "signseed")
         .map(|(k, v)| json!([k, v]))
         .collect();
-    assert_eq!(Value::Array(settings), expected["settings"]);
+    assert_eq!(settings, want);
     let mut actual = read(&restored)?;
     let mut read_back = expected["read"].clone();
     for value in [&mut actual, &mut read_back] {
@@ -8715,6 +8954,68 @@ fn sentence_repeat(value: &Value) -> Option<oldbrainfix_core::SimpleRepeat> {
 }
 
 #[test]
+fn heads_up_choices_and_lengths_are_the_dart_cores() -> TestResult {
+    use oldbrainfix_core::HeadsUpUnit;
+    let fixture = read_json(&fixtures().join("heads_ups.json"))?;
+    let names = |units: &[HeadsUpUnit]| -> Value {
+        units.iter().map(|u| u.name()).collect::<Vec<_>>().into()
+    };
+    assert_eq!(fixture["maxMinutes"], json!(heads_up_keys::MAX_MINUTES));
+    assert_eq!(
+        fixture["choices"],
+        json!({"allDay": heads_up_keys::choices(true), "timed": heads_up_keys::choices(false)})
+    );
+    assert_eq!(
+        fixture["units"],
+        json!({
+            "allDay": names(heads_up_keys::units(true)),
+            "timed": names(heads_up_keys::units(false)),
+        })
+    );
+    let most: serde_json::Map<String, Value> = HeadsUpUnit::ALL
+        .iter()
+        .map(|u| (u.name().to_string(), json!(u.most())))
+        .collect();
+    assert_eq!(fixture["most"], Value::Object(most));
+    let cases = fixture["minutesOf"].as_array().ok_or("minutesOf")?;
+    assert_eq!(cases.len(), 2 * HeadsUpUnit::ALL.len() * 16);
+    for case in cases {
+        let unit = HeadsUpUnit::ALL
+            .into_iter()
+            .find(|u| case["unit"] == u.name())
+            .ok_or("unit")?;
+        let minutes = heads_up_keys::minutes_of(
+            case["count"].as_i64().ok_or("count")?,
+            unit,
+            case["allDay"].as_bool().ok_or("allDay")?,
+        );
+        assert_eq!(case["minutes"], json!(minutes), "{case}");
+    }
+    let read = fixture["read"].as_array().ok_or("read")?;
+    assert_eq!(read.len(), 6);
+    for case in read {
+        let minutes = heads_up_keys::read(case["value"].as_str());
+        assert_eq!(case["minutes"], json!(minutes), "{case}");
+    }
+    let written = fixture["write"].as_array().ok_or("write")?;
+    assert_eq!(written.len(), 3);
+    for case in written {
+        let minutes: Vec<i64> = case["minutes"]
+            .as_array()
+            .ok_or("minutes")?
+            .iter()
+            .filter_map(Value::as_i64)
+            .collect();
+        assert_eq!(
+            case["value"],
+            json!(heads_up_keys::write(&minutes)),
+            "{case}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn schedule_sentences_read_and_write_as_the_dart_core_does() -> TestResult {
     use oldbrainfix_core::schedule_sentence::{
         QuickChip, SentenceNow, SimpleSchedule, quick_reminders, read, read_at, sentence, suggest,
@@ -9091,6 +9392,12 @@ fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
                 table::set_align(text, start, number("column")?, align)
             }
             "headingColumn" => table::toggle_heading_column(text, start),
+            "sortRows" => table::sort_rows(
+                text,
+                start,
+                number("column")?,
+                edit["descending"].as_bool().ok_or("descending")?,
+            ),
             "insertTable" => table::insert(text, start),
             "taskBoxes" => markdown::task_boxes(text, start, end),
             op => return Err(format!("an op: {op}").into()),
@@ -9102,6 +9409,26 @@ fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
             "text": got.text,
         });
         assert_eq!(&ours, &edit["result"], "{edit}");
+    }
+    // A table's rows sorted by each column (obf-1052).
+    let sorts = fixture["sorts"].as_array().ok_or("sorts")?;
+    assert!(sorts.len() >= 40);
+    for sort in sorts {
+        let text = sort["text"].as_str().ok_or("text")?;
+        let tables = table::all(text);
+        let of = tables.first().ok_or("a table")?;
+        let columns: Vec<Value> = (0..=of.columns())
+            .map(|c| {
+                json!({
+                    "ascending": table::sorted_rows(of, c, false),
+                    "column": c,
+                    "descending": table::sorted_rows(of, c, true),
+                    "kind": table::sort_kind(of, c).name(),
+                })
+            })
+            .collect();
+        let ours = json!({"columns": columns, "text": text});
+        assert_eq!(&ours, sort, "{text:?}");
     }
     for (url, opens) in fixture["mayOpen"].as_object().ok_or("mayOpen")? {
         assert_eq!(Some(may_open(url)), opens.as_bool(), "{url:?}");
@@ -9148,6 +9475,70 @@ fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
             looks.as_bool(),
             "{text:?}"
         );
+    }
+    Ok(())
+}
+
+// ------------------------------------------------------------ Findings
+
+#[test]
+fn texts_fold_and_places_are_found_as_the_dart_core_finds_them() -> TestResult {
+    use oldbrainfix_core::findings::{fold, in_text};
+    let fixture = read_json(&fixtures().join("findings.json"))?;
+    // Every character: those listed fold as listed, the others to
+    // themselves.
+    let folding = fixture["folding"].as_object().ok_or("folding")?;
+    assert!(folding.len() > 1000);
+    for c in (0..=0x10FFFF).filter_map(char::from_u32) {
+        let own = c.to_string();
+        let expected = match folding.get(&format!("{:04X}", u32::from(c))) {
+            Some(listed) => listed.as_str().ok_or("folded")?,
+            None => &own,
+        };
+        assert_eq!(fold(&own), expected, "U+{:04X}", u32::from(c));
+    }
+    for word in fixture["words"].as_array().ok_or("words")? {
+        let text = word["text"].as_str().ok_or("text")?;
+        assert_eq!(
+            Some(fold(text).as_str()),
+            word["folded"].as_str(),
+            "{text:?}"
+        );
+    }
+    let cases = fixture["cases"].as_array().ok_or("cases")?;
+    assert!(cases.len() >= 20);
+    for case in cases {
+        let text = case["text"].as_str().ok_or("text")?;
+        let format = case["format"].as_str().ok_or("format")?;
+        let query = case["query"].as_str().ok_or("query")?;
+        // Offsets as the generator counts them: in code points.
+        let points = |of: &str, at: usize| of.get(..at).map(|t| t.chars().count());
+        let findings: Vec<Value> = in_text(text, format, query)
+            .iter()
+            .map(|f| {
+                json!({
+                    "cell": f.cell.map(|cell| json!({
+                        "column": cell.column,
+                        "row": cell.row,
+                        "table": cell.table,
+                        "tableStart": points(text, cell.table_start),
+                    })),
+                    "context": f.context,
+                    "contextEnd": points(&f.context, f.context_end),
+                    "contextStart": points(&f.context, f.context_start),
+                    "end": points(text, f.end),
+                    "line": f.line,
+                    "start": points(text, f.start),
+                })
+            })
+            .collect();
+        let ours = json!({
+            "findings": findings,
+            "format": format,
+            "query": query,
+            "text": text,
+        });
+        assert_eq!(&ours, case, "{text:?} {query:?}");
     }
     Ok(())
 }

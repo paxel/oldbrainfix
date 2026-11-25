@@ -1,3 +1,5 @@
+import 'package:meta/meta.dart';
+
 import 'checklists.dart';
 import 'note_kinds.dart';
 import 'notes.dart';
@@ -116,6 +118,52 @@ abstract final class HeadsUpKeys {
     }.toList()..sort();
     return kept.isEmpty ? null : kept.join(',');
   }
+
+  /// The Heads-ups the Routine editor offers for a timed schedule, in
+  /// minutes: 5, 10, 15 and 30 min, 1 h, 2 h, 1 day, 2 days and 1 week.
+  static const timedChoices = [5, 10, 15, 30, 60, 120, 1440, 2880, 10080];
+
+  /// Those for an all-day schedule, which takes whole days only: 1, 2
+  /// and 3 days and 1 week.
+  static const allDayChoices = [1440, 2880, 4320, 10080];
+
+  /// The Heads-ups the editor offers for a schedule all-day or not;
+  /// "Custom…" follows them (obf-1087).
+  static List<int> choices({required bool allDay}) =>
+      allDay ? allDayChoices : timedChoices;
+
+  /// The units a custom Heads-up is given in: all four for a timed
+  /// schedule, days and weeks for an all-day one (obf-1087).
+  static List<HeadsUpUnit> units({required bool allDay}) =>
+      allDay ? const [HeadsUpUnit.days, HeadsUpUnit.weeks] : HeadsUpUnit.values;
+
+  /// A custom Heads-up of [count] [unit]s in minutes, as [headsUps]
+  /// holds it (obf-1087); null when [count] is not from 1 to
+  /// [HeadsUpUnit.most], or [unit] is not one of [units] for the
+  /// schedule.
+  static int? minutesOf(int count, HeadsUpUnit unit, {required bool allDay}) {
+    if (!units(allDay: allDay).contains(unit)) return null;
+    if (count < 1 || count > unit.most) return null;
+    return count * unit.inMinutes;
+  }
+}
+
+/// A unit a custom Heads-up is given in (obf-1087).
+enum HeadsUpUnit {
+  minutes(1),
+  hours(60),
+  days(1440),
+  weeks(10080);
+
+  const HeadsUpUnit(this.inMinutes);
+
+  /// How many minutes one of it is.
+  final int inMinutes;
+
+  /// The most of it a Heads-up can be, so it lies no further ahead than
+  /// [HeadsUpKeys.maxMinutes]: 43200 minutes, 720 hours, 30 days or 4
+  /// weeks.
+  int get most => HeadsUpKeys.maxMinutes ~/ inMinutes;
 }
 
 /// Something to be done on a schedule, spawned from a Note (CONTEXT.md).
@@ -497,6 +545,17 @@ class Routines {
     List<Note> notes, {
     void Function(int trashed, int of)? progress,
   }) {
+    trashNotesStopping(notes, progress: progress);
+  }
+
+  /// As [trashNotes], asking [stop] before each Note (obf-1078): once it
+  /// says so, the Notes in the trash stay there, the others where they
+  /// are, and it answers false; true once all are in.
+  bool trashNotesStopping(
+    List<Note> notes, {
+    void Function(int trashed, int of)? progress,
+    bool Function()? stop,
+  }) {
     final byNote = <String, List<Routine>>{};
     for (final routine in all()) {
       if (note(routine) case final note?) {
@@ -505,6 +564,7 @@ class Routines {
     }
     progress?.call(0, notes.length);
     for (final (i, note) in notes.indexed) {
+      if (stop?.call() ?? false) return false;
       store.batch(() {
         final at = _now();
         store.append(note.id, NoteKeys.trashed, at);
@@ -515,6 +575,7 @@ class Routines {
       });
       progress?.call(i + 1, notes.length);
     }
+    return true;
   }
 
   /// Brings the Note [noteId] back from the trash, with the Routines and
@@ -557,17 +618,27 @@ class Routines {
   void purgeTrash() {
     final now = store.clock().toUtc();
     store.batch(() {
-      for (final id in store.entitiesOfType(RoutineKeys.typeRoutine)) {
-        final routine = byId(id);
-        final at = routine == null ? null : purgeAt(routine);
-        // Only where this Device may change it (ADR 0013).
-        if (at == null || now.isBefore(at) || !store.mayChangeRoutine(id)) {
-          continue;
-        }
+      for (final id in purgeable(due: now)) {
         store.append(id, RoutineKeys.type, null);
       }
     });
   }
+
+  /// The Routines and Reminders in the trash a purge removes, by id: with
+  /// [due], those that have been there for [Notes.trashKeep] by then;
+  /// without, every one, as "Empty the trash now" removes them
+  /// (obf-1095).
+  @internal
+  List<String> purgeable({DateTime? due}) => [
+    for (final id in store.entitiesOfType(RoutineKeys.typeRoutine))
+      if (byId(id) case final routine?)
+        if (purgeAt(routine) case final at?
+            when due == null || !due.isBefore(at))
+          // In the trash in the log, as for a Note ([Notes.purgeable]).
+          if (store.logged(id, RoutineKeys.trashed) != null)
+            // Only where this Device may change it (ADR 0013).
+            if (store.mayChangeRoutine(id)) id,
+  ];
 
   /// Checks off [occurrence] of the Routine [id] as Done, at [at] or the
   /// store's now: [at] is when it was tapped on a notification, applied

@@ -4,7 +4,7 @@ Search read every Note on each query: their texts, Sections, Transcripts, Photo 
 
 ## What the index holds
 
-The index lies in the store's own database, beside the log: `search_texts`, an FTS5 table with the trigram tokenizer and `case_sensitive 1`, and `search_state` with the index's `version` and its mark `seq`. Each entry that wrote a text search reads is one row: its entity and its text in lower case, lowered letter by letter by the cores' own rule (ADR 0032: "İ" to "i", a closing "Σ" to "σ"), never by SQLite's. The fields are `text`, `line`, `transcript:`, `ocr:`, `fileText:` and `file:`, of which the file's name counts (`Attachment.read`, `Attachment::read`). A `text` holds the ways search reads one, a line apart: as a Note's with its boxes as written, as a Section's and as a Line's (ADR 0033, ADR 0035).
+The index lies in the store's own database, beside the log: `search_texts`, an FTS5 table with the trigram tokenizer and `case_sensitive 1`, and `search_state` with the index's `version` and its mark `seq`. Each entry that wrote a text search reads is one row: its entity and its text folded letter by letter by the cores' own rule (see Folding below; it was lowered only up to `version` 1), never by SQLite's. The fields are `text`, `line`, `transcript:`, `ocr:`, `fileText:` and `file:`, of which the file's name counts (`Attachment.read`, `Attachment::read`). A `text` holds the ways search reads one, a line apart: as a Note's with its boxes as written, as a Section's and as a Line's (ADR 0033, ADR 0035).
 
 The index narrows and never decides. It names every entity one of whose texts ever held the query, and search reads those as they are now: latest wins, what the roles of a Shared Area leave out (ADR 0013), the end of a Merge chain, the making of a Checklist or Shopping List, a gone or deleted Line, a trashed Tally entry, the trash and the Area or Topic searched in. An older value, an entry a role leaves out or one deleted when a person was blocked (ADR 0021) is no more than a candidate too many. An index of the values as they count now would have to decide each of these again on every write; one of every value written can find too much, which search reads away, and never too little.
 
@@ -16,9 +16,24 @@ The database's `user_version` stays 1 (ADR 0034): the tables only repeat what th
 
 ## A query
 
-A query is trimmed and lowered as before, and a blank one finds every Note in scope. One of three characters or more is looked up as an FTS5 phrase, its `"` doubled, and the rows are checked to hold it as typed (`instr`), spaces and marks included. Trigrams find nothing shorter, so a query of one or two characters is looked for in every row's text, which SQLite does without reading a Note. A query holding a box's glyph, ☐, ✅ or ❌, reads every Note as before: a tick changes the glyph a box shows, and the rows hold the one it was written with.
+A query is trimmed and folded, and a blank one finds every Note in scope; one that is not blank but folds to nothing, such as an accent alone, finds none. One of three characters, counted folded, or more is looked up as an FTS5 phrase, its `"` doubled, and the rows are checked to hold it as typed (`instr`), spaces and marks included. Trigrams find nothing shorter, so a query of one or two characters is looked for in every row's text, which SQLite does without reading a Note. A query holding a box's glyph, ☐, ✅ or ❌, reads every Note as before: a tick changes the glyph a box shows, and the rows hold the one it was written with.
 
 The Notes found come newest capture first, and those captured at the same moment in the order the store lists the Notes in (`everOfType`, `ever_of_type`), as the Rust core's stable sort of every Note keeps them. `Search.among`/`Search::among` keep the order of the list given, as before.
+
+## Folding (obf-1047)
+
+A hit ignores case, accents and umlauts, and nothing more: "muller" finds "Müller", "strasse" finds "Straße", "mueller" does not find "Müller", and no typo is allowed for. Search, the index and the places of a query in a Note match by the same folding (`Findings.fold`, `findings::fold`), so what the list finds and what the find bar shows agree. Each character folds on its own, so a text folds as its characters do:
+
+1. In lower case, by a table both cores carry (`_lowerRuns`, `LOWER_RUNS`, Unicode 18 as Rust 1.100 has it), the first character where the lower case is more than one ("İ" to "i"). The platforms' own lower case is not used: Dart 3.14 lacked 485 pairs Rust's has (Cherokee, Georgian Mtavruli, Osage, Adlam and newer Latin letters among them), and either changes with an update, which would change what a core finds without a change to its code.
+2. A combining accent, U+0300 to U+036F, is dropped, so a decomposed "u" with its diaeresis folds as "ü" does.
+3. "ß" and "ẞ" fold to "ss", "æ" to "ae" and "œ" to "oe".
+4. A Latin or Greek letter whose canonical decomposition is a letter and combining accents folds to that letter, and so do the letters with a stroke ø, đ, ħ, ł and ŧ and the dotless ı (`_foldRuns`, `FOLD_RUNS`). Cyrillic letters are only lowered: "й" is a letter of its own, not "и" with an accent.
+
+The index's `version` is 2 since then, so an index of lowered texts is built anew at the first search after the update. `desktop/fixtures/findings.json` lists what every character that does not fold to itself folds to, and the Rust core checks every character against it.
+
+## Where a query is found (obf-1047)
+
+`Findings.inText`/`findings::in_text` give the places of a query in a text as it shows: a Note's or Section's shown text (its boxes as glyphs, ADR 0035), a Transcript, a Photo Text, an Attachment Text or a file name. A formatted text is matched line by line as it reads without its marks, as search reads it: a table's row as its cells that show something, a space between them; a table's delimiter row, the line marking its first column and a code block's fence are no lines. Each place runs from the first character shown to the last, marks inside it included, in the shown text's offsets (UTF-16 code units in the Dart core, bytes in the Rust core), with its line, for a table's row the table (by its index and its start), the row (the header 0) and the column it begins in, and its line as a context, cut around the place at whole words when longer than 80 characters. A match on half of a character's folding takes the character, and two matches on the same character are one place. `Findings.ofNote`/`findings::of_note` give those of a Note: its text, Transcripts, Photo Texts, file names and Attachment Texts, then the same of each Section given. A Note found through a Tally entry's line or a Line of its Checklist or Shopping List has no places, and a query holding a line break none; search still finds those.
 
 ## Where FTS5 is
 
@@ -50,5 +65,5 @@ A query found in most Notes still reads each of them, which is what listing ever
 ## Consequences
 
 - The database grows by the searchable texts and their trigrams.
-- The first search after the update builds the index; later ones take in only what was written since.
+- The first search after the update builds the index; later ones take in only what was written since. The update that folds builds it once more (obf-1047).
 - What search reads stays decided in one place, the code that read every Note, which a test of each core compares the index with.

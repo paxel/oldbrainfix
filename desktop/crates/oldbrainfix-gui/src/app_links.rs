@@ -6,14 +6,16 @@
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-use egui::{Id, RichText, ScrollArea, TextEdit, Ui};
+use egui::{Id, RichText, ScrollArea, Ui};
 use oldbrainfix_core::app_link::AppLink;
 use oldbrainfix_core::{Note, Notes, PersonSettings, Places, Result, Store};
 
+use crate::design;
 use crate::icons;
 use crate::l10n::L10n;
 use crate::names::{area_name, topic_name};
 use crate::text_marks_view;
+use crate::theme;
 
 /// What the picker groups its targets under.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -128,14 +130,17 @@ pub enum Picked {
 pub fn picker(ui: &mut Ui, t: &L10n, picker: &mut Picker, focus: bool) -> Option<Picked> {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
-    ui.label(RichText::new(t.format_link_to()).heading().color(text));
-    let field = ui.add(
-        TextEdit::singleline(&mut picker.search)
-            .id(Id::new("link to search"))
-            .hint_text(t.link_to_search())
-            .text_color(text)
-            .desired_width(f32::INFINITY),
-    );
+    crate::design::dialog_title(ui, t.format_link_to());
+    // On its band, so the targets scroll under its line (obf-1088).
+    let field = theme::search_band(ui, |ui| {
+        ui.add(
+            crate::theme::field(ui, &mut picker.search)
+                .id(Id::new("link to search"))
+                .hint_text(t.link_to_search())
+                .text_color(text)
+                .desired_width(f32::INFINITY),
+        )
+    });
     if focus {
         field.request_focus();
     }
@@ -150,6 +155,8 @@ pub fn picker(ui: &mut Ui, t: &L10n, picker: &mut Picker, focus: bool) -> Option
         .id_salt("link to")
         .max_height(360.0)
         .show(ui, |ui| {
+            // Room under the band's line, inside, so the list is cut there.
+            ui.add_space(4.0);
             if found.is_empty() {
                 ui.label(RichText::new(t.link_to_nothing()).color(weak));
             }
@@ -162,7 +169,7 @@ pub fn picker(ui: &mut Ui, t: &L10n, picker: &mut Picker, focus: bool) -> Option
                 let Some(first) = shown.next() else {
                     continue;
                 };
-                ui.label(RichText::new(heading).strong().color(text));
+                ui.label(RichText::new(heading).strong());
                 for target in std::iter::once(first).chain(shown) {
                     let row = ui
                         .selectable_label(false, RichText::new(&target.label).color(text))
@@ -173,7 +180,7 @@ pub fn picker(ui: &mut Ui, t: &L10n, picker: &mut Picker, focus: bool) -> Option
                 }
             }
         });
-    if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+    if design::row_button(ui, t.cancel()).clicked() {
         picked = Some(Picked::Cancel);
     }
     picked

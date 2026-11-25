@@ -9,6 +9,7 @@ use egui::{RichText, Ui};
 use oldbrainfix_core::places::STARTER_SET;
 
 use crate::backup_view::WelcomeAction;
+use crate::design;
 use crate::l10n::L10n;
 use crate::names::offered_area_name;
 use crate::theme;
@@ -58,19 +59,25 @@ pub fn starter_set(
     actions: &mut Vec<WelcomeAction>,
 ) {
     let text = ui.visuals().text_color();
+    // 12 between a heading and its group, 24 between groups (obf-1131).
     ui.heading(RichText::new(t.starter_set_title()).color(text));
-    ui.label(RichText::new(t.features()).strong().color(text));
+    gap(ui, 24.0);
+    ui.label(RichText::new(t.features()).strong());
+    gap(ui, 12.0);
     features_choice(ui, t, advanced);
-    ui.add_space(8.0);
+    gap(ui, 24.0);
     ui.label(RichText::new(t.starter_set_intro()).color(text));
-    for (area, topics) in STARTER_SET {
-        ui.add_space(8.0);
+    gap(ui, 12.0);
+    for (i, (area, topics)) in STARTER_SET.iter().enumerate() {
+        if i > 0 {
+            gap(ui, 8.0);
+        }
         let mut on = picked.contains(area.slug);
         let name = offered_area_name(t, Some(area.slug), area.name);
-        if theme::checkbox(ui, &mut on, RichText::new(name).strong().color(text)).changed() {
+        if theme::checkbox(ui, &mut on, RichText::new(name).strong()).changed() {
             tick_area(picked, area.slug, on);
         }
-        for topic in topics {
+        for topic in *topics {
             ui.horizontal(|ui| {
                 ui.add_space(24.0);
                 let mut on = picked.contains(topic.slug);
@@ -81,12 +88,12 @@ pub fn starter_set(
             });
         }
     }
-    ui.add_space(12.0);
+    gap(ui, 24.0);
     ui.horizontal(|ui| {
         if theme::primary(ui, true, t.starter_set_done()).clicked() {
             actions.push(WelcomeAction::Plant);
         }
-        if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+        if design::row_button(ui, t.cancel()).clicked() {
             actions.push(WelcomeAction::Back);
         }
     });
@@ -104,6 +111,10 @@ pub fn features_choice(ui: &mut Ui, t: &L10n, advanced: &mut bool) -> bool {
         (false, t.features_simple(), t.features_simple_detail()),
         (true, t.features_advanced(), t.features_advanced_detail()),
     ] {
+        // 8 between the choices (obf-1131).
+        if value {
+            gap(ui, 8.0);
+        }
         ui.radio_value(advanced, value, RichText::new(label).color(text));
         ui.horizontal(|ui| {
             ui.add_space(24.0);
@@ -111,6 +122,12 @@ pub fn features_choice(ui: &mut Ui, t: &L10n, advanced: &mut bool) -> bool {
         });
     }
     *advanced != was
+}
+
+/// `room` between what was placed last and what comes next, the room
+/// egui puts between two items in it.
+fn gap(ui: &mut Ui, room: f32) {
+    ui.add_space((room - ui.spacing().item_spacing.y).max(0.0));
 }
 
 #[cfg(test)]

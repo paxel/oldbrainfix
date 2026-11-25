@@ -4,9 +4,9 @@
 //! week when this Device's Quiet Hours end (09:00 while they are off),
 //! Tonight only until 19:00. One click sets the schedule and Save writes
 //! it; a chip is read again at the click. A new Reminder from a Note,
-//! also one the quick note's More opened (#352), and a new Routine set to
-//! Once offer them; a saved Reminder, a Session, an Advanced schedule and
-//! a repeat do not.
+//! also one the quick note's Open in the editor opened (#352), and a new
+//! Routine set to Once offer them; a saved Reminder, a Session, an
+//! Advanced schedule and a repeat do not.
 
 // A test may unwrap, expect, panic and index, its helpers too (#229).
 #![allow(
@@ -297,7 +297,7 @@ fn a_saved_reminder_and_a_new_session_offer_none() -> TestResult {
     harness.run();
     harness.get_by_label(CLOCK).click();
     harness.run();
-    click(&mut harness, "Session")?;
+    click(&mut harness, "Session…")?;
     assert!(harness.query_all_by_label("New Session").next().is_some());
     pick(&mut harness, "Once");
     assert!(chips(&harness).is_empty());
@@ -305,9 +305,9 @@ fn a_saved_reminder_and_a_new_session_offer_none() -> TestResult {
 }
 
 #[test]
-fn the_quick_notes_more_leads_to_the_alarm_clock_and_its_chips() -> TestResult {
-    // The quick note has no alarm clock (#352): More saves it and opens
-    // the Note dialog, whose alarm clock offers the chips.
+fn the_quick_notes_open_in_the_editor_leads_to_the_alarm_clock_and_its_chips() -> TestResult {
+    // The quick note has no alarm clock (#352): Open in the editor saves
+    // it and opens the Note dialog, whose alarm clock offers the chips.
     let (store, _) = store(NOW)?;
     let mut harness = window(&store, Selection::Agenda);
     harness.state_mut().new_note();
@@ -319,7 +319,7 @@ fn the_quick_notes_more_leads_to_the_alarm_clock_and_its_chips() -> TestResult {
     harness.get_by(|n| n.is_focused()).type_text("Buy stamps");
     harness.run();
     assert!(harness.query_all_by_label(CLOCK).next().is_none());
-    click(&mut harness, "More")?;
+    click(&mut harness, "Open in the editor")?;
     assert!(!harness.state().quick_note_open());
     harness.get_by_role_and_label(Role::Button, CLOCK).click();
     harness.run();

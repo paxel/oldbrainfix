@@ -33,11 +33,15 @@
 //! code, a code block or a link ([`markdown::autolinks`]); a tag or a box
 //! inside one is none. Nothing about it is stored.
 //!
-//! A table of a formatted text (#128, ADR 0033) is drawn as a grid,
-//! scaled down to the width there is: its header row bold on grey, its
-//! first column bold while it holds headings, each cell one line of the
-//! formats above with its boxes and tags taking clicks. A click
-//! elsewhere on it opens it in the full-screen table view.
+//! A table of a formatted text (#128, ADR 0033) is drawn as a grid at
+//! the text's own size (obf-1048): its header row bold on grey, its
+//! first column bold while it holds headings, each cell the formats
+//! above with its boxes and tags taking clicks, a long one wrapped once
+//! the table is wider than its room. Still wider, it moves sideways
+//! inside its room, its first column staying while it holds headings;
+//! its header row stays in view while its rows scroll. On a card it
+//! shows its first rows until "Show all" unfolds the rest in place. A
+//! click elsewhere on it opens it in the full-screen table view.
 //!
 //! Code is coloured by its language (obf-1036, ADR 0054): a Code text by
 //! the language its Note keeps, a fenced code block by the one its fence
@@ -66,7 +70,7 @@ use oldbrainfix_core::text_boxes::{self, FoundBox};
 use oldbrainfix_core::{BoxState, BoxTick, FoundTag, ShownBox, text_format};
 
 use crate::l10n::L10n;
-use crate::{schedule_text, theme};
+use crate::{cell_pick, find_marks, icons, schedule_text, theme, whole_tables};
 
 /// How far apart the lines of a formatted text lie (#327, obf-1020), as
 /// on the phone: a line's height in parts of its font's size.
@@ -199,11 +203,231 @@ pub struct LinkSpot {
 }
 
 /// A table of a formatted text as it is drawn: where it begins in the
-/// whole text, in bytes, and where it lies on the screen.
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// whole text, in bytes, where it lies on the screen, where what is kept
+/// of it between frames is ([`TableState`]), where its "Show all" goes
+/// with how many rows it has under its header while it is folded on a
+/// card, and where the bar under it lies while it moves sideways, with
+/// how far its cells move per point the bar is dragged and how far they
+/// move at most (obf-1048); where its ⋮ lies, and whether there is a
+/// block of the text above it and below it to move past (obf-1050);
+/// what of each cell of its header row shows, with its column and its
+/// words, and how its rows show sorted (obf-1052); whether its cells
+/// are picked by a drag (obf-1054).
+#[derive(Debug, Clone, PartialEq)]
 pub struct TableSpot {
     pub at: usize,
     pub rect: Rect,
+    pub key: Id,
+    pub more: Option<(Rect, usize)>,
+    pub bar: Option<(Rect, f32, f32)>,
+    pub menu: Rect,
+    pub moves: (bool, bool),
+    pub heads: Vec<(usize, Rect, String)>,
+    pub sort: Option<TableSort>,
+    pub picks: bool,
+}
+
+/// What was done to a table drawn (obf-1050): a click on it, or a pick
+/// in its ⋮.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TableAct {
+    /// A click on the table: it opens full screen, or in the editor its
+    /// cell is edited.
+    Open,
+    /// Copy, as in the bar of the table full screen (#324).
+    Copy,
+    /// Move up and Move down, past the block above or below it.
+    Up,
+    Down,
+    /// Delete table.
+    Delete,
+}
+
+/// How many rows under its header a table shows on a card until "Show
+/// all" unfolds the rest in place (obf-1048).
+pub const CARD_ROWS: usize = 10;
+
+/// Where the tables of a text are drawn (obf-1048): on the card of the
+/// Note or Section whose clicks [`table_clicks`] takes as `card`, each
+/// folded to its first [`CARD_ROWS`] rows under its header; elsewhere
+/// whole. `wide` is the room across a table may take beyond the text's
+/// column, centred on it, as the reading view gives the window's width;
+/// without it a table takes the column's.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct TableRoom {
+    pub card: Option<Id>,
+    pub wide: Option<egui::Rangef>,
+}
+
+/// What is kept of a table drawn between frames, under its
+/// [`TableSpot::key`]: whether "Show all" unfolded it, how far its cells
+/// moved sideways, the row to bring into view once it is drawn, how its
+/// rows show sorted (obf-1052) and the frame it was drawn in last, which
+/// forgets the sort once a frame goes by without it.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+struct TableState {
+    unfolded: bool,
+    offset: f32,
+    reveal: Option<usize>,
+    sort: Option<TableSort>,
+    drawn: u64,
+}
+
+/// How a table being read shows its rows (obf-1052): sorted by its
+/// column `column`, ascending or `descending`, in the view only, the
+/// Note's text as written.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TableSort {
+    pub column: usize,
+    pub descending: bool,
+}
+
+/// The sort a click on the heading of `column` gives after `sort`:
+/// ascending, then descending, then as written.
+pub fn next_sort(sort: Option<TableSort>, column: usize) -> Option<TableSort> {
+    match sort {
+        Some(s) if s.column == column && !s.descending => Some(TableSort {
+            column,
+            descending: true,
+        }),
+        Some(s) if s.column == column => None,
+        _ => Some(TableSort {
+            column,
+            descending: false,
+        }),
+    }
+}
+
+/// A table to sort, for [`SortCache`]: told apart by its lines as
+/// written, the column and the direction.
+#[derive(Clone, Copy)]
+struct Sorting<'a> {
+    table: &'a Table,
+    lines: &'a str,
+    sort: TableSort,
+}
+
+impl std::hash::Hash for Sorting<'_> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.lines.hash(state);
+        self.sort.column.hash(state);
+        self.sort.descending.hash(state);
+    }
+}
+
+/// Sorts the rows of a table by the core, for [`SortCache`].
+#[derive(Default)]
+struct Sorter;
+
+impl ComputerMut<Sorting<'_>, Arc<Vec<usize>>> for Sorter {
+    fn compute(&mut self, key: Sorting<'_>) -> Arc<Vec<usize>> {
+        let sorted = markdown::table::sorted_rows(key.table, key.sort.column, key.sort.descending);
+        Arc::new(std::iter::once(0).chain(sorted).collect())
+    }
+}
+
+/// The orders of the tables shown sorted, kept while they are drawn
+/// frame after frame, so a long table is not sorted again each frame.
+type SortCache = FrameCache<Arc<Vec<usize>>, Sorter>;
+
+/// The rows of `table` of `text` in the order `sort` shows them, each by
+/// its index in [`Table::rows`], the header row first; as written
+/// without a sort or with one by a column the table does not have.
+pub(crate) fn row_order(
+    ctx: &egui::Context,
+    (text, table): (&str, &Table),
+    sort: Option<TableSort>,
+) -> Arc<Vec<usize>> {
+    match sort {
+        Some(sort) if sort.column < table.columns() => {
+            let lines = text.get(table.start..table.end).unwrap_or_default();
+            let key = Sorting { table, lines, sort };
+            ctx.memory_mut(|m| m.caches.cache::<SortCache>().get(key).clone())
+        }
+        _ => Arc::new((0..table.rows.len()).collect()),
+    }
+}
+
+/// How much wider the heading of the column a table is sorted by is for
+/// its arrow, at the text size `size`.
+pub(crate) fn sort_room(size: f32) -> f32 {
+    size + 4.0
+}
+
+/// Paints the arrow of the direction a table's rows are sorted by the
+/// column whose heading lies in `cell`, up for ascending, down for
+/// `descending`, `size` high at its top right, `pad` in from its edges.
+pub(crate) fn paint_sort_arrow(
+    ui: &Ui,
+    cell: Rect,
+    (descending, size, pad): (bool, f32, Vec2),
+    colour: Color32,
+) {
+    let at = Rect::from_min_size(
+        egui::pos2(cell.right() - pad.x - size, cell.top() + pad.y),
+        egui::vec2(size, size),
+    );
+    if ui.is_rect_visible(at) {
+        let icon = if descending {
+            icons::ARROW_DOWN
+        } else {
+            icons::ARROW_UP
+        };
+        icons::paint(ui.painter(), at, icon, colour);
+    }
+}
+
+/// What a screen reader says of the heading of a column a click sorts
+/// the rows by, `words` reading as it does: the click's "Sort by this
+/// column", and which way the rows are sorted by it while they are.
+pub(crate) fn sort_info(t: &L10n, words: &str, descending: Option<bool>) -> WidgetInfo {
+    let label = if words.trim().is_empty() {
+        t.table_sort().to_string()
+    } else {
+        format!("{}: {}", words.trim(), t.table_sort())
+    };
+    let mut info = WidgetInfo::labeled(WidgetType::Button, true, label);
+    info.current_text_value = descending.map(|down| {
+        if down {
+            t.table_sorted_down().to_string()
+        } else {
+            t.table_sorted_up().to_string()
+        }
+    });
+    info
+}
+
+/// Where what is kept of the table beginning at the byte `at` of the text
+/// whose tables are drawn under `of` lies.
+fn table_key(of: Id, at: usize) -> Id {
+    of.with(("table rows", at))
+}
+
+/// Unfolds the table beginning at the byte `at` of the text whose card
+/// takes its clicks as `of` (its [`TableRoom::card`]) and brings its row
+/// `row` into view once it is drawn, the header row counted as 0: for a
+/// search hit further down it (obf-1047). The card must be drawn to
+/// show it; bringing the card into view is the list's.
+pub fn unfold_table(ctx: &egui::Context, of: Id, at: usize, row: usize) {
+    let key = table_key(of, at);
+    ctx.data_mut(|d| {
+        let state: &mut TableState = d.get_temp_mut_or_default(key);
+        state.unfolded = true;
+        state.reveal = Some(row);
+    });
+    ctx.request_repaint();
+}
+
+/// Unfolds the table beginning at the byte `at` of the text whose card
+/// takes its clicks as `of`, as "Show all" does, and brings no row into
+/// view: on a card of a search's list whose Note was found in a row the
+/// card folds away (obf-1047).
+pub fn show_all_rows(ctx: &egui::Context, of: Id, at: usize) {
+    let key = table_key(of, at);
+    ctx.data_mut(|d| {
+        let state: &mut TableState = d.get_temp_mut_or_default(key);
+        state.unfolded = true;
+    });
 }
 
 /// A cell of a table of a formatted text as it is drawn: the table's
@@ -350,12 +574,13 @@ pub fn marked_label(
         .any(|b| b.0.start >= from && b.0.end <= to);
     let tagged = found.tags.iter().any(|t| t.start >= from && t.end <= to);
     let linked = found.links.iter().any(|&(s, e)| s >= from && e <= to);
-    if !marked && !tagged && !linked {
+    // The places a find found in it (obf-1047).
+    let finds = TextFound::of(ui.ctx(), text, text_format::PLAIN);
+    let finding = finds.as_ref().is_some_and(|f| !f.ranges(shown).is_empty());
+    if !marked && !tagged && !linked && !finding {
         // At the Device's text size, as [`Look::of`] has it (#326,
         // obf-1019).
-        let size = look
-            .0
-            .unwrap_or_else(|| TextStyle::Body.resolve(ui.style()).size);
+        let size = look.0.unwrap_or(crate::theme::LABEL);
         let rich = RichText::new(part)
             .color(look.1)
             .size(crate::theme::content(ui, size));
@@ -368,7 +593,8 @@ pub fn marked_label(
     } else {
         TextWrapMode::Wrap
     };
-    let look = Look::of(ui, look);
+    let mut look = Look::of(ui, look);
+    look.found = finds;
     let mut line = Line::default();
     add_written(&mut line, text, shown, Style::default(), (&found, &look));
     let galley = WidgetText::from(std::mem::take(&mut line.job)).into_galley(
@@ -378,6 +604,12 @@ pub fn marked_label(
         FontSelection::Default,
     );
     let response = crate::read_text::label(ui, egui::Label::new(galley.clone()));
+    reveal_line(
+        ui,
+        (&galley, response.rect.min),
+        &line,
+        look.found.as_deref(),
+    );
     line_spots(&galley, response.rect.min, &line)
 }
 
@@ -402,11 +634,33 @@ pub fn formatted_label(
 /// of the grammar its Note keeps (obf-1036).
 pub fn note_label(
     ui: &mut Ui,
+    text: (&str, &str, &BoxLook),
+    language: Option<&str>,
+    shown: (usize, usize),
+    look: (Option<f32>, Color32),
+    truncate: bool,
+) -> Spots {
+    room_label(
+        ui,
+        text,
+        language,
+        shown,
+        look,
+        truncate,
+        TableRoom::default(),
+    )
+}
+
+/// As [`note_label`], its tables drawn in `room` (obf-1048): folded on a
+/// card, as wide as the reading view's window.
+pub fn room_label(
+    ui: &mut Ui,
     (text, format, boxes): (&str, &str, &BoxLook),
     language: Option<&str>,
     shown: (usize, usize),
     look: (Option<f32>, Color32),
     truncate: bool,
+    tables: TableRoom,
 ) -> Spots {
     if format == text_format::CODE {
         code_text_label(ui, (text, language), shown, look, (truncate, false));
@@ -419,7 +673,7 @@ pub fn note_label(
     if text.get(from..to).is_none() {
         return Spots::default();
     }
-    let look = Look::of(ui, look);
+    let look = Look::of(ui, look).finding(ui.ctx(), text, format);
     let parsed = parsed(ui.ctx(), text, true);
     let found = Found::in_parsed(&parsed, boxes);
     let blocks = &parsed.blocks;
@@ -469,7 +723,9 @@ pub fn note_label(
                 Some(table) if !truncate => {
                     if block.line == table.first_line.max(first) {
                         room(ui, BlockKind::Table, &mut blank);
-                        spots.extend(table_label(ui, text, table, (&found, &look)));
+                        let moves = whole_tables::moves(text, table);
+                        let table = (text, table.as_ref(), moves);
+                        spots.extend(table_label(ui, table, (&found, &look), tables));
                     }
                 }
                 // A blank line reads as room, not as a line.
@@ -520,13 +776,23 @@ pub fn code_text_label(
         Some(grammar) => code_text_colours(ui.ctx(), grammar, text, (from, &shown)),
         None => Vec::new(),
     };
+    // The places a find found in it (obf-1047), where its ids took no
+    // room.
+    let found = TextFound::of(ui.ctx(), text, text_format::CODE);
+    let ranges = found
+        .as_ref()
+        .filter(|_| shown.len() == part.len())
+        .map(|f| f.ranges((from, to)))
+        .unwrap_or_default();
+    let reveals = found.as_ref().filter(|f| f.reveals((from, to)));
     let mut job = LayoutJob::single_section(shown, format);
     paint_code(&mut job, 0, &colours, look.dark);
+    find_marks::mark_job(&mut job, &ranges, look.dark);
     if truncate {
         crate::read_text::label(ui, egui::Label::new(job).truncate());
         return;
     }
-    egui::Frame::NONE
+    let framed = egui::Frame::NONE
         .fill(look.code)
         .corner_radius(4.0)
         .inner_margin(egui::Margin::symmetric(8, 6))
@@ -550,6 +816,9 @@ pub fn code_text_label(
                 .with_clip_rect(rect.intersect(ui.clip_rect()))
                 .galley(rect.min, galley, look.colour);
         });
+    if let Some(found) = reveals {
+        find_marks::reveal(ui, &found.marks, framed.response.rect);
+    }
 }
 
 /// Draws the lines of `code`, among `blocks` of `text`, from the line
@@ -562,11 +831,32 @@ fn code_label(
     (first, last): (usize, usize),
     look: &Look,
 ) {
-    let lines: Vec<String> = (code.first_line.max(first)..=code.last_line.min(last))
+    let shown: Vec<&Block> = (code.first_line.max(first)..=code.last_line.min(last))
         .filter(|&l| !code.is_fence(l))
         .filter_map(|l| blocks.get(l))
+        .collect();
+    let lines: Vec<String> = shown
+        .iter()
         .map(|b| text_boxes::strip(text.get(b.start..b.end).unwrap_or_default()))
         .collect();
+    // The places a find found in its lines (obf-1047), each where it
+    // lies among the lines joined; a line whose ids took room has none.
+    let mut ranges = Vec::new();
+    let mut reveals = None;
+    if let Some(found) = &look.found {
+        let mut at = 0;
+        for (block, line) in shown.iter().zip(&lines) {
+            let source = (block.start, block.end);
+            if line.len() == block.end - block.start {
+                let found_here = found.ranges(source);
+                ranges.extend(found_here.into_iter().map(|(a, b, c)| (a + at, b + at, c)));
+            }
+            if found.reveals(source) {
+                reveals = Some(found.marks.clone());
+            }
+            at += line.len() + 1;
+        }
+    }
     // Only its closing fence shown: nothing to draw.
     if lines.is_empty() && code.first_line < first {
         return;
@@ -577,7 +867,8 @@ fn code_label(
     let colours = block_colours(ui.ctx(), text, (blocks, code), (first, last));
     let mut job = LayoutJob::single_section(lines.join("\n"), format);
     paint_code(&mut job, 0, &colours, look.dark);
-    egui::Frame::NONE
+    find_marks::mark_job(&mut job, &ranges, look.dark);
+    let framed = egui::Frame::NONE
         .fill(look.code)
         .corner_radius(4.0)
         .inner_margin(egui::Margin::symmetric(8, 6))
@@ -592,6 +883,9 @@ fn code_label(
             let galley = spread(galley, |_, _| extra);
             crate::read_text::label(ui, egui::Label::new(galley));
         });
+    if let Some(marks) = reveals {
+        find_marks::reveal(ui, &marks, framed.response.rect);
+    }
 }
 
 /// How a formatted text is drawn: its font, its colour, the accent for
@@ -606,6 +900,55 @@ pub(crate) struct Look {
     weak: Color32,
     code: Color32,
     dark: bool,
+    /// The places a find found in the text drawn (obf-1047).
+    found: Option<Arc<TextFound>>,
+}
+
+/// The places the find marks set found in a text drawn, and which of them
+/// is the current one (obf-1047).
+pub(crate) struct TextFound {
+    hits: Arc<find_marks::Hits>,
+    marks: Arc<find_marks::FindMarks>,
+    current: Option<usize>,
+}
+
+impl TextFound {
+    /// Those of the source `text` in `format`, while find marks are set
+    /// that find something in it.
+    fn of(ctx: &egui::Context, text: &str, format: &str) -> Option<Arc<TextFound>> {
+        let (hits, marks) = find_marks::hits(ctx, text, format)?;
+        let current = hits.current(&marks);
+        Some(Arc::new(TextFound {
+            hits,
+            marks,
+            current,
+        }))
+    }
+
+    /// The ranges of the source bytes `from..to` that are places found,
+    /// in bytes of that part from its start, each with whether it is the
+    /// current one.
+    fn ranges(&self, (from, to): (usize, usize)) -> Vec<(usize, usize, bool)> {
+        self.hits
+            .across((from, to), self.current)
+            .into_iter()
+            .map(|(h, current)| {
+                let a = h.source.0.max(from) - from;
+                let b = h.source.1.min(to) - from;
+                (a, b, current)
+            })
+            .collect()
+    }
+
+    /// Whether the current place lies across the source bytes
+    /// `from..to` and is to come into view.
+    fn reveals(&self, (from, to): (usize, usize)) -> bool {
+        self.marks.reveal
+            && self
+                .current
+                .and_then(|i| self.hits.found.get(i))
+                .is_some_and(|h| h.source.0 < to && from < h.source.1.max(h.source.0 + 1))
+    }
 }
 
 impl Look {
@@ -613,11 +956,9 @@ impl Look {
     /// the Device's text size (#326, obf-1019), the rest as `ui`'s
     /// visuals have it.
     pub(crate) fn of(ui: &Ui, (size, colour): (Option<f32>, Color32)) -> Look {
+        // The body's own size before the text size grows it (obf-1081).
         let mut font = TextStyle::Body.resolve(ui.style());
-        if let Some(size) = size {
-            font.size = size;
-        }
-        font.size = crate::theme::content(ui, font.size);
+        font.size = crate::theme::content(ui, size.unwrap_or(crate::theme::LABEL));
         let visuals = ui.visuals();
         Look {
             font,
@@ -626,19 +967,20 @@ impl Look {
             weak: visuals.weak_text_color(),
             code: visuals.code_bg_color,
             dark: visuals.dark_mode,
+            found: None,
         }
+    }
+
+    /// As it is, with the places a find found in the source `text` in
+    /// `format` (obf-1047).
+    pub(crate) fn finding(mut self, ctx: &egui::Context, text: &str, format: &str) -> Look {
+        self.found = TextFound::of(ctx, text, format);
+        self
     }
 
     /// Its font, at the size it shows.
     pub(crate) fn font(&self) -> FontId {
         self.font.clone()
-    }
-
-    /// The same, `scale` times as large.
-    fn scaled(&self, scale: f32) -> Look {
-        let mut look = self.clone();
-        look.font.size *= scale;
-        look
     }
 }
 
@@ -1066,9 +1408,65 @@ struct Line {
     boxes: Vec<(String, BoxState, (usize, usize))>,
     tags: Vec<(usize, String, (usize, usize))>,
     links: Vec<(usize, String, (usize, usize))>,
+    /// Where the current place a find found lies in it, in characters,
+    /// while it is to come into view (obf-1047).
+    current: Option<(usize, usize)>,
 }
 
 impl Line {
+    /// Adds `shown`, which stands for the source bytes `source`, in
+    /// `format`, the places found across them on their tints (obf-1047):
+    /// cut where they lie while it shows as written, else on it whole, as
+    /// a box's glyph or a link without an id. Gives where it lies, in
+    /// characters.
+    fn push_src(
+        &mut self,
+        shown: &str,
+        (format, bold): (TextFormat, bool),
+        source: (usize, usize),
+        look: &Look,
+    ) -> (usize, usize) {
+        let Some(found) = look.found.as_ref() else {
+            return self.push(shown, format, bold);
+        };
+        let ranges = found.ranges(source);
+        if ranges.is_empty() {
+            return self.push(shown, format, bold);
+        }
+        let from = self.chars;
+        let reveal = found.reveals(source);
+        let note = |line: &mut Line, chars: (usize, usize)| {
+            line.current = Some(match line.current {
+                Some((a, b)) => (a.min(chars.0), b.max(chars.1)),
+                None => chars,
+            });
+        };
+        if shown.len() != source.1.saturating_sub(source.0) {
+            let current = ranges.iter().any(|r| r.2);
+            let chars = self.push(shown, find_marks::marked(&format, look.dark, current), bold);
+            if current && reveal {
+                note(self, chars);
+            }
+            return (from, self.chars);
+        }
+        let mut at = 0;
+        for (a, b, current) in ranges {
+            let a = a.max(at);
+            let (Some(before), Some(piece)) = (shown.get(at..a), shown.get(a..b)) else {
+                continue;
+            };
+            self.push(before, format.clone(), bold);
+            let marked = find_marks::marked(&format, look.dark, current);
+            let chars = self.push(piece, marked, bold);
+            if current && reveal {
+                note(self, chars);
+            }
+            at = b;
+        }
+        self.push(shown.get(at..).unwrap_or_default(), format, bold);
+        (from, self.chars)
+    }
+
     /// Adds `shown` in `format`; gives where it lies, in characters.
     fn push(&mut self, shown: &str, format: TextFormat, bold: bool) -> (usize, usize) {
         let from = self.chars;
@@ -1132,11 +1530,14 @@ fn add_spans(line: &mut Line, text: &str, spans: &[Span], style: Style, ctx: (&F
             // Never an id drawn, of a box or of a glyph copied in.
             SpanKind::Text => {
                 let shown = text_boxes::strip(&span.text);
-                line.push(&shown, part_format(look, style, false), style.bold);
+                let format = (part_format(look, style, false), style.bold);
+                line.push_src(&shown, format, (span.start, span.end), look);
             }
             SpanKind::Code => {
                 let shown = text_boxes::strip(&span.text);
-                line.push(&shown, part_format(look, style, true), style.bold);
+                let format = (part_format(look, style, true), style.bold);
+                let source = (span.content_start, span.content_end);
+                line.push_src(&shown, format, source, look);
             }
             SpanKind::Bold => {
                 let inner = Style {
@@ -1227,14 +1628,14 @@ fn add_written(
         let (Some(before), Some(piece)) = (text.get(at..a), text.get(a..b)) else {
             continue;
         };
-        line.push(before, format.clone(), style.bold);
+        line.push_src(before, (format.clone(), style.bold), (at, a), look);
         match cut {
             Cut::Box(i) => {
                 let Some((found, state, after)) = found.boxes.get(i) else {
                     continue;
                 };
                 let glyph = state.glyph().to_string();
-                let chars = line.push(&glyph, format.clone(), style.bold);
+                let chars = line.push_src(&glyph, (format.clone(), style.bold), (a, b), look);
                 line.boxes.push((found.id.clone(), *state, chars));
                 if let Some(after) = after {
                     let small =
@@ -1245,7 +1646,7 @@ fn add_written(
             Cut::Tag => {
                 let mut tagged = format.clone();
                 tagged.color = look.accent;
-                let chars = line.push(piece, tagged, style.bold);
+                let chars = line.push_src(piece, (tagged, style.bold), (a, b), look);
                 line.tags.push((a, piece.to_string(), chars));
             }
             Cut::Link => {
@@ -1255,7 +1656,8 @@ fn add_written(
                     link: true,
                     ..style
                 };
-                let chars = line.push(&url, part_format(look, linked, false), style.bold);
+                let format = (part_format(look, linked, false), style.bold);
+                let chars = line.push_src(&url, format, (a, b), look);
                 if markdown::may_open(&url) {
                     line.links.push((a, url, chars));
                 }
@@ -1263,7 +1665,8 @@ fn add_written(
         }
         at = b;
     }
-    line.push(text.get(at..end).unwrap_or_default(), format, style.bold);
+    let rest = text.get(at..end).unwrap_or_default();
+    line.push_src(rest, (format, style.bold), (at, end), look);
 }
 
 /// What goes before an item's words: its bullet or its number.
@@ -1309,6 +1712,7 @@ fn block_label(
         weak: look.weak,
         code: look.code,
         dark: look.dark,
+        found: look.found.clone(),
     };
     let style = Style {
         bold: heading.is_some(),
@@ -1344,6 +1748,18 @@ fn block_label(
             let shown = text_boxes::strip(text.get(block.start..block.end).unwrap_or_default());
             line.push(&shown, part_format(&look, style, true), false);
             paint_code(&mut line.job, 0, colours, look.dark);
+            // The places found, over its colours (obf-1047).
+            if let Some(found) = &look.found {
+                let source = (block.start, block.end);
+                let ranges = found.ranges(source);
+                find_marks::mark_job(&mut line.job, &ranges, look.dark);
+                if found.reveals(source)
+                    && let Some(&(a, b, _)) = ranges.iter().find(|r| r.2)
+                {
+                    let chars = |at: usize| shown.get(..at).map_or(0, |s| s.chars().count());
+                    line.current = Some((chars(a), chars(b)));
+                }
+            }
         }
         None => add_spans(&mut line, text, &block.spans, style, (found, &look)),
     }
@@ -1392,6 +1808,7 @@ fn block_label(
         let galley = spread(galley, |_, _| extra);
         let response = crate::read_text::label(ui, egui::Label::new(galley.clone()));
         let origin = response.rect.min;
+        reveal_line(ui, (&galley, origin), &line, look.found.as_deref());
         if line.bold && ui.is_rect_visible(response.rect) {
             let mut ghost = std::mem::take(&mut line.ghost);
             ghost.wrap = galley.job.wrap.clone();
@@ -1452,8 +1869,20 @@ impl LaidCell {
 pub(crate) fn lay_cell(
     ui: &Ui,
     (text, cell): (&str, &Cell),
+    ctx: (&Found, &Look),
+    bold: bool,
+) -> LaidCell {
+    lay_wrapped(ui, (text, cell), ctx, bold, f32::INFINITY)
+}
+
+/// Lays out `cell` of `text`, bold while `bold`, its lines wrapped at
+/// `width` (obf-1048).
+fn lay_wrapped(
+    ui: &Ui,
+    (text, cell): (&str, &Cell),
     (found, look): (&Found, &Look),
     bold: bool,
+    width: f32,
 ) -> LaidCell {
     let mut line = Line::default();
     let style = Style {
@@ -1461,10 +1890,12 @@ pub(crate) fn lay_cell(
         ..Style::default()
     };
     add_spans(&mut line, text, &cell.spans, style, (found, look));
-    let job = std::mem::take(&mut line.job);
+    let mut job = std::mem::take(&mut line.job);
+    job.wrap.max_width = width;
     let galley = ui.fonts_mut(|f| f.layout_job(job));
     let ghost = line.bold.then(|| {
-        let ghost = std::mem::take(&mut line.ghost);
+        let mut ghost = std::mem::take(&mut line.ghost);
+        ghost.wrap.max_width = width;
         ui.fonts_mut(|f| f.layout_job(ghost))
     });
     LaidCell {
@@ -1543,97 +1974,665 @@ pub(crate) fn table_tones(colour: Color32) -> (Stroke, Color32) {
     )
 }
 
-/// The room around a cell's words in a table, at full size.
+/// The room around a cell's words in a table.
 const CELL_PAD: Vec2 = egui::vec2(6.0, 3.0);
 
-/// Draws `table` of `text` as a grid, scaled down to the width there is,
-/// and gives where its marks, tags and links lie and where it does.
-fn table_label(ui: &mut Ui, text: &str, table: &Table, (found, look): (&Found, &Look)) -> Spots {
-    let room = ui.available_width().max(1.0);
-    let mut scale = 1.0f32;
-    let mut scaled = look.clone();
-    let mut laid = lay_table(ui, (text, table), (found, &scaled));
-    let (mut widths, mut heights) = grid(ui, &laid, &scaled, CELL_PAD);
-    // Smaller till it fits; a font does not shrink quite in proportion.
-    for _ in 0..3 {
-        let wide: f32 = widths.iter().sum();
-        if wide <= room {
+/// The widest a column is drawn while its table is wider than its room,
+/// in parts of the text's size: longer words wrap (obf-1048).
+const COLUMN_EMS: f32 = 20.0;
+
+/// How high the bar under a table that moves sideways is, the room above
+/// it, and the room above "Show all" (obf-1048).
+const BAR: f32 = 6.0;
+const BAR_GAP: f32 = 3.0;
+const MORE_GAP: f32 = 4.0;
+
+/// How large a table's ⋮ beside its top right corner is, and the room
+/// before it (obf-1050).
+pub(crate) const TABLE_MENU: f32 = 22.0;
+const TABLE_MENU_GAP: f32 = 2.0;
+
+/// How wide each column of a table is in `room` across, as wide as its
+/// widest words with their room, `natural`, while the whole table fits;
+/// else none wider than `cap`, the room left shared among the columns cut,
+/// none past its words (obf-1048).
+fn column_widths(natural: &[f32], room: f32, cap: f32) -> Vec<f32> {
+    if natural.iter().sum::<f32>() <= room {
+        return natural.to_vec();
+    }
+    let mut widths: Vec<f32> = natural.iter().map(|w| w.min(cap)).collect();
+    let mut left = room - widths.iter().sum::<f32>();
+    // Each round either uses up the room left or fills a column.
+    for _ in 0..natural.len() {
+        let cut = widths.iter().zip(natural).filter(|(w, n)| w < n).count();
+        if left <= 0.5 || cut == 0 {
             break;
         }
-        scale = (scale * room / wide).max(0.2);
-        scaled = look.scaled(scale);
-        laid = lay_table(ui, (text, table), (found, &scaled));
-        (widths, heights) = grid(ui, &laid, &scaled, CELL_PAD * scale);
+        let share = left / cut as f32;
+        for (width, wide) in widths.iter_mut().zip(natural) {
+            if *width < *wide {
+                let add = share.min(*wide - *width);
+                *width += add;
+                left -= add;
+            }
+        }
     }
-    let pad = CELL_PAD * scale;
-    let size = egui::vec2(widths.iter().sum(), heights.iter().sum());
-    let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
-    // The cells' labels in a part of their own, which moves nothing after
-    // the table.
-    let mut cells = ui.new_child(
-        egui::UiBuilder::new()
-            .max_rect(rect)
-            .id_salt(("table", table.start)),
+    widths
+}
+
+/// Where each of `sizes` begins, one after another from 0, and where the
+/// last ends.
+fn running(sizes: &[f32]) -> (Vec<f32>, f32) {
+    let mut at = 0.0;
+    let starts = sizes
+        .iter()
+        .map(|size| {
+            let start = at;
+            at += size;
+            start
+        })
+        .collect();
+    (starts, at)
+}
+
+/// `spots` but those outside `clip`, each cut to it (obf-1048): what of a
+/// table moved under its parts that stay, or past its edge, takes no
+/// click.
+fn spots_in(spots: Spots, clip: Rect) -> Spots {
+    let cut = |rect: Rect| Some(rect.intersect(clip)).filter(Rect::is_positive);
+    Spots {
+        boxes: spots
+            .boxes
+            .into_iter()
+            .filter_map(|mut spot| {
+                spot.rect = cut(spot.rect)?;
+                Some(spot)
+            })
+            .collect(),
+        tags: spots
+            .tags
+            .into_iter()
+            .filter_map(|mut spot| {
+                spot.rect = cut(spot.rect)?;
+                Some(spot)
+            })
+            .collect(),
+        links: spots
+            .links
+            .into_iter()
+            .filter_map(|mut spot| {
+                spot.rects = spot.rects.into_iter().filter_map(cut).collect();
+                (!spot.rects.is_empty()).then_some(spot)
+            })
+            .collect(),
+        tables: spots.tables,
+        cells: spots.cells,
+    }
+}
+
+/// Draws `table` of `text` as a grid at the text's own size in `room`
+/// (obf-1048), and gives where its marks, tags, links and cells lie and
+/// where it does. Wider than its room, its long cells wrap, no column
+/// wider than [`COLUMN_EMS`]; still wider, it moves sideways inside its
+/// room, by the bar under it or the wheel sideways, its first column
+/// staying while it holds headings. Its header row stays in view while
+/// its rows scroll under it. On a card it shows its first [`CARD_ROWS`]
+/// rows under its header until "Show all" ([`table_clicks`]) unfolds the
+/// rest; only the rows shown are laid out. Its ⋮ beside its top right
+/// corner (obf-1050) takes the room it needs, `moves` saying whether
+/// there is a block above and below it to move past. Its rows show in
+/// the order its sort gives (obf-1052), the column sorted by with an
+/// arrow in its heading; a card's first rows are the first of it. Where
+/// its text selects, never on a card, a drag that starts on a cell picks
+/// cells and Shift+click does too ([`cell_pick`], obf-1054): those
+/// picked are tinted, Ctrl+C copies them, and while Shift is held its
+/// links, tags and boxes take no click.
+fn table_label(
+    ui: &mut Ui,
+    (text, table, moves): (&str, &Table, (bool, bool)),
+    (found, look): (&Found, &Look),
+    room: TableRoom,
+) -> Spots {
+    let key = table_key(room.card.unwrap_or_else(|| ui.id()), table.start);
+    let mut state: TableState = ui.data(|d| d.get_temp(key)).unwrap_or_default();
+    // A sort goes with the view it was made in, which drew the table in
+    // the frame before, and with the column it was by (obf-1052).
+    let frame = ui.ctx().cumulative_frame_nr();
+    if state.drawn + 1 < frame || state.sort.is_some_and(|s| s.column >= table.columns()) {
+        state.sort = None;
+    }
+    state.drawn = frame;
+    let order = row_order(ui.ctx(), (text, table), state.sort);
+    let under = table.rows.len().saturating_sub(1);
+    let folded = room.card.is_some() && !state.unfolded && under > CARD_ROWS;
+    // The rows shown, each by its index in the table: on a card folded
+    // the first of the order.
+    let shown_rows: &[usize] = if folded {
+        order.get(..=CARD_ROWS).unwrap_or(&order)
+    } else {
+        &order
+    };
+    let rows: Vec<_> = shown_rows
+        .iter()
+        .filter_map(|&r| table.rows.get(r))
+        .collect();
+    let column = ui.available_width().max(1.0);
+    let menu = TABLE_MENU + TABLE_MENU_GAP;
+    let space = (room.wide.map_or(column, |r| r.span().max(column)) - menu).max(1.0);
+    let pad = CELL_PAD;
+    // Each cell on one line first, for how wide its words are.
+    let bold = |r: usize, c: usize| r == 0 || (table.heading_column && c == 0);
+    let mut laid: Vec<Vec<LaidCell>> = rows
+        .iter()
+        .enumerate()
+        .map(|(r, row)| {
+            row.cells
+                .iter()
+                .enumerate()
+                .map(|(c, cell)| lay_cell(ui, (text, cell), (found, look), bold(r, c)))
+                .collect()
+        })
+        .collect();
+    let columns = laid.first().map_or(0, Vec::len);
+    let mut natural = vec![0.0f32; columns];
+    for row in &laid {
+        for (width, cell) in natural.iter_mut().zip(row) {
+            *width = width.max(cell.size(ui, look).x + pad.x * 2.0);
+        }
+    }
+    // The heading of the column the rows are sorted by holds its arrow
+    // after its words.
+    let arrow = sort_room(look.font.size);
+    let sorted = state.sort.map(|s| s.column);
+    let beside = |r: usize, c: usize| {
+        if r == 0 && sorted == Some(c) {
+            arrow
+        } else {
+            0.0
+        }
+    };
+    if let Some(width) = sorted.and_then(|c| natural.get_mut(c)) {
+        *width += arrow;
+    }
+    let mut widths = column_widths(&natural, space, look.font.size * COLUMN_EMS);
+    // A first column of headings that stays while the rest moves takes at
+    // most half the room, its words wrapped.
+    if table.heading_column
+        && widths.iter().sum::<f32>() > space + 0.5
+        && let Some(first) = widths.first_mut()
+    {
+        *first = first.min(space / 2.0);
+    }
+    // The cells wider than their column laid out again, wrapped.
+    for (r, (row, cells)) in rows.iter().zip(&mut laid).enumerate() {
+        for (c, ((cell, slot), width)) in row.cells.iter().zip(cells).zip(&widths).enumerate() {
+            if slot.size(ui, look).x + pad.x * 2.0 + beside(r, c) > *width + 0.5 {
+                let wrap = (*width - pad.x * 2.0 - beside(r, c) - 1.0).max(1.0);
+                *slot = lay_wrapped(ui, (text, cell), (found, look), bold(r, c), wrap);
+            }
+        }
+    }
+    let heights: Vec<f32> = laid
+        .iter()
+        .map(|row| {
+            row.iter()
+                .map(|cell| cell.size(ui, look).y + pad.y * 2.0)
+                .fold(0.0, f32::max)
+        })
+        .collect();
+    let (xs, wide) = running(&widths);
+    let (ys, high) = running(&heights);
+    let shown = wide.min(space);
+    let sideways = wide > space + 0.5;
+    let most = (wide - shown).max(0.0);
+    state.offset = state.offset.clamp(0.0, most);
+    // The text's column takes the table's height, the bar's and
+    // "Show all"'s; the table itself lies across the room it has.
+    let bar_room = if sideways { BAR_GAP + BAR } else { 0.0 };
+    let more_height = ui.spacing().interact_size.y;
+    let more_room = if folded { MORE_GAP + more_height } else { 0.0 };
+    let size = egui::vec2(column, high + bar_room + more_room);
+    let (taken, _) = ui.allocate_exact_size(size, Sense::hover());
+    let left = match room.wide {
+        Some(range) if shown + menu > column => {
+            let most = (range.max - shown - menu).max(range.min);
+            (taken.center().x - (shown + menu) / 2.0).clamp(range.min, most)
+        }
+        _ => taken.left(),
+    };
+    let rect = Rect::from_min_size(egui::pos2(left, taken.top()), egui::vec2(shown, high));
+    let menu = Rect::from_min_size(
+        egui::pos2(rect.right() + TABLE_MENU_GAP, rect.top()),
+        egui::vec2(TABLE_MENU, TABLE_MENU),
     );
-    let (stroke, header) = table_tones(look.colour);
+    // The wheel sideways, or with Shift, moves it while it is pointed at.
+    if sideways && ui.rect_contains_pointer(rect) {
+        let dx = ui.input(|i| i.smooth_scroll_delta.x);
+        let to = (state.offset - dx).clamp(0.0, most);
+        if (to - state.offset).abs() > f32::EPSILON {
+            state.offset = to;
+            ui.input_mut(|i| i.smooth_scroll_delta.x = 0.0);
+        }
+    }
+    // The bar under it, its thumb as wide as the part shown; a drag on it
+    // moves the cells along. Over a card, [`table_clicks`] takes it again.
+    let bar = sideways.then(|| {
+        let bar = Rect::from_min_size(
+            egui::pos2(rect.left(), rect.bottom() + BAR_GAP),
+            egui::vec2(shown, BAR),
+        );
+        let thumb = (shown * shown / wide.max(1.0)).clamp(BAR * 4.0, shown);
+        let per_point = most / (shown - thumb).max(1.0);
+        (bar, thumb, per_point)
+    });
+    if let Some((bar, _, per_point)) = bar {
+        let drag = ui.interact(bar, key.with("bar"), Sense::drag());
+        let dx = drag.drag_delta().x;
+        state.offset = (state.offset + dx * per_point).clamp(0.0, most);
+    }
+    // The header row stays at the top of what shows while the rows scroll
+    // under it, within the table.
+    let clip = ui.clip_rect();
+    let head = heights.first().copied().unwrap_or_default();
+    let header_top = rect.top().max(clip.top()).min(rect.bottom() - head);
+    let pinned = if table.heading_column && sideways {
+        widths.first().copied().unwrap_or_default()
+    } else {
+        0.0
+    };
+    // The cell of the current place a find found moves into the part
+    // shown, once (obf-1047).
+    let current = laid.iter().enumerate().find_map(|(r, row)| {
+        let c = row.iter().position(|cell| cell.line.current.is_some())?;
+        Some((r, c))
+    });
+    if let Some((_, c)) = current
+        && sideways
+        && !(c == 0 && pinned > 0.0)
+        && let (Some(x), Some(width)) = (xs.get(c), widths.get(c))
+    {
+        if *x - state.offset < pinned {
+            state.offset = (*x - pinned).clamp(0.0, most);
+        } else if *x + *width - state.offset > shown {
+            state.offset = (*x + *width - shown).clamp(0.0, most);
+        }
+    }
+    let split = (rect.left() + pinned, header_top + head);
+    // Its cells picked (obf-1054), by their row as shown.
+    let picks = ui.style().interaction.selectable_labels && room.card.is_none();
+    let pick_id = key.with("cells");
+    let offset = state.offset;
+    let cell_at = |pos: Pos2| -> Option<(usize, usize)> {
+        if !rect.contains(pos) {
+            return None;
+        }
+        let r = if pos.y < split.1 {
+            0
+        } else {
+            (1..laid.len()).find(|&r| {
+                let y = rect.top() + ys.get(r).copied().unwrap_or(high);
+                (y..y + heights.get(r).copied().unwrap_or_default()).contains(&pos.y)
+            })?
+        };
+        let c = if pinned > 0.0 && pos.x < split.0 {
+            0
+        } else {
+            (0..columns).find(|&c| {
+                let x = rect.left() + xs.get(c).copied().unwrap_or(wide) - offset;
+                (x..x + widths.get(c).copied().unwrap_or_default()).contains(&pos.x)
+            })?
+        };
+        Some((r, c))
+    };
+    let cell_words = |(r, c): (usize, usize)| {
+        shown_rows
+            .get(r)
+            .and_then(|&r| table.rows.get(r))
+            .and_then(|row| row.cells.get(c))
+            .map(|cell| text_boxes::strip(&cell.visible()))
+            .unwrap_or_default()
+    };
+    let picked = if picks {
+        let bounds = rect.intersect(clip);
+        let size = (laid.len(), columns);
+        let (picked, copies) =
+            cell_pick::read_table(ui, (key, pick_id), (bounds, size), cell_at, cell_words);
+        if let Some(cells) = picked.filter(|_| copies) {
+            let rows: Vec<usize> = shown_rows
+                .get(cells.top..=cells.bottom)
+                .unwrap_or_default()
+                .to_vec();
+            let states: BTreeMap<String, BoxState> = found
+                .boxes
+                .iter()
+                .map(|(b, state, _)| (b.id.clone(), *state))
+                .collect();
+            let columns = (cells.left, cells.right);
+            if let Some(copy) = cell_pick::copy(text, table.start, (&rows, columns), &states) {
+                cell_pick::put_copy(ui.ctx(), copy);
+            }
+        }
+        picked
+    } else {
+        None
+    };
+    let tint = ui.visuals().selection.bg_fill;
+    // Four parts, each clipped to its own: the body, the first column, the
+    // header row and the corner of the two, the cells' labels in parts of
+    // their own, which move nothing after the table.
+    let mut parts: Vec<(Rect, Ui)> = [(false, false), (false, true), (true, false), (true, true)]
+        .into_iter()
+        .map(|(header, first)| {
+            let x = if first {
+                egui::Rangef::new(rect.left(), split.0)
+            } else {
+                egui::Rangef::new(split.0, rect.right())
+            };
+            let y = if header {
+                egui::Rangef::new(header_top, split.1)
+            } else {
+                egui::Rangef::new(split.1, rect.bottom())
+            };
+            let part = Rect::from_x_y_ranges(x, y).intersect(clip);
+            let mut cells = ui.new_child(egui::UiBuilder::new().max_rect(rect).id_salt((
+                "table",
+                table.start,
+                header,
+                first,
+            )));
+            cells.set_clip_rect(part);
+            (part, cells)
+        })
+        .collect();
+    let (stroke, fill) = table_tones(look.colour);
     let mut spots = Spots::default();
-    let mut y = rect.top();
+    let mut heads = Vec::new();
     for (r, row) in laid.iter().enumerate() {
         let height = heights.get(r).copied().unwrap_or_default();
-        let mut x = rect.left();
+        let y = if r == 0 {
+            header_top
+        } else {
+            rect.top() + ys.get(r).copied().unwrap_or(high)
+        };
         for (c, cell) in row.iter().enumerate() {
+            let first = c == 0 && pinned > 0.0;
             let width = widths.get(c).copied().unwrap_or_default();
+            let x = if first {
+                rect.left()
+            } else {
+                rect.left() + xs.get(c).copied().unwrap_or(wide) - state.offset
+            };
+            let Some((part, cells)) = parts.get_mut(usize::from(r == 0) * 2 + usize::from(first))
+            else {
+                continue;
+            };
+            let part = *part;
             let at = Rect::from_min_size(egui::pos2(x, y), egui::vec2(width, height));
-            if r == 0 && ui.is_rect_visible(at) {
-                ui.painter().rect_filled(at, 0.0, header);
+            let seen = at.intersect(part);
+            let painter = ui.painter().with_clip_rect(part);
+            if r == 0 && seen.is_positive() {
+                painter.rect_filled(at, 0.0, fill);
+            }
+            if seen.is_positive() && picked.is_some_and(|p| p.holds((r, c))) {
+                painter.rect_filled(at, 0.0, tint);
             }
             let align = table.aligns.get(c).copied().unwrap_or(Align::None);
-            let words = cell.size(ui, &scaled);
-            let left = aligned(align, width, words.x, pad.x);
-            let pos = egui::pos2(x + left, y + pad.y);
-            spots.extend(cell.paint(&mut cells, pos, scaled.colour, true));
-            spots.cells.push(CellSpot {
-                at: table.start,
-                cell: (r, c),
-                rect: at,
-            });
-            if ui.is_rect_visible(at) {
-                ui.painter()
-                    .rect_stroke(at, 0.0, stroke, egui::StrokeKind::Inside);
+            let words = cell.size(ui, look);
+            let inset = aligned(align, width - beside(r, c), words.x, pad.x);
+            let pos = egui::pos2(x + inset, y + pad.y);
+            spots.extend(spots_in(cell.paint(cells, pos, look.colour, true), part));
+            if let Some(sort) = state.sort.filter(|s| r == 0 && s.column == c) {
+                let arrow = (sort.descending, look.font.size, pad);
+                paint_sort_arrow(cells, at, arrow, look.colour);
             }
-            x += width;
+            let index = shown_rows.get(r).copied().unwrap_or(r);
+            if current == Some((r, c))
+                && let Some(found) = &look.found
+            {
+                find_marks::reveal(ui, &found.marks, at);
+            }
+            if seen.is_positive() {
+                spots.cells.push(CellSpot {
+                    at: table.start,
+                    cell: (index, c),
+                    rect: seen,
+                });
+                if let Some(head) = table.rows.first().and_then(|h| h.cells.get(c))
+                    && r == 0
+                {
+                    let words = text_boxes::strip(&head.visible());
+                    heads.push((c, seen, words));
+                }
+                painter.rect_stroke(at, 0.0, stroke, egui::StrokeKind::Inside);
+            }
         }
-        y += height;
     }
+    // Over the cells' words: a drag on them picks cells, not words. With
+    // Shift held, or cells picked, a click on its links, tags and boxes
+    // is the pick's too.
+    if picks && !crate::read_text::selecting_all(ui.ctx()) {
+        ui.interact(rect, pick_id, Sense::drag());
+        if picked.is_some() || ui.input(|i| i.modifiers.shift) {
+            let outside = |r: &Rect| !rect.intersects(*r);
+            spots.boxes.retain(|s| outside(&s.rect));
+            spots.tags.retain(|s| outside(&s.rect));
+            spots.links.retain(|s| s.rects.iter().all(outside));
+        }
+    }
+    if let Some((bar, thumb, _)) = bar
+        && ui.is_rect_visible(bar)
+    {
+        let painter = ui.painter();
+        painter.rect_filled(bar, BAR / 2.0, look.colour.gamma_multiply(0.12));
+        let along = if most > 0.0 {
+            state.offset / most * (shown - thumb)
+        } else {
+            0.0
+        };
+        let knob = Rect::from_min_size(
+            egui::pos2(bar.left() + along, bar.top()),
+            egui::vec2(thumb, BAR),
+        );
+        painter.rect_filled(knob, BAR / 2.0, look.colour.gamma_multiply(0.45));
+    }
+    // A row asked for, as by a search hit in it, comes into view once.
+    if let Some(row) = state.reveal.take()
+        && let Some(row) = shown_rows.iter().position(|&r| r == row)
+        && let (Some(y), Some(height)) = (ys.get(row), heights.get(row))
+    {
+        let target = Rect::from_min_size(
+            egui::pos2(rect.left(), rect.top() + y),
+            egui::vec2(shown, *height),
+        );
+        ui.scroll_to_rect_animation(
+            target,
+            Some(egui::Align::Center),
+            egui::style::ScrollAnimation::none(),
+        );
+    }
+    ui.data_mut(|d| d.insert_temp(key, state));
+    let more = folded.then(|| {
+        let top = rect.bottom() + bar_room + MORE_GAP;
+        let at = Rect::from_min_size(
+            egui::pos2(taken.left(), top),
+            egui::vec2(column, more_height),
+        );
+        (at, under)
+    });
     spots.tables.push(TableSpot {
         at: table.start,
         rect,
+        key,
+        more,
+        bar: bar.map(|(bar, _, per_point)| (bar, per_point, most)),
+        menu,
+        moves,
+        heads,
+        sort: state.sort,
+        picks,
     });
     spots
 }
 
 /// Takes the tables `spots` of the text `of`, by id, as buttons over
 /// what was drawn of them, read as "Open the table". Gives where the
-/// table clicked begins in the text. Taken before the marks, tags and
-/// links in them, those keep their clicks.
-pub fn table_clicks(ui: &mut Ui, t: &L10n, of: Id, spots: &[TableSpot]) -> Option<usize> {
+/// table clicked begins in the text, and what was done to it. Taken
+/// before the marks, tags and links in them, those keep their clicks.
+/// Over the table's own click and whatever else lies over it, as a card
+/// does, the bar under a table moves it sideways, "Show all" unfolds a
+/// table folded on a card (obf-1048), and its ⋮ (obf-1050) offers Copy
+/// and, where the text is edited (`edits`), Move up, Move down and
+/// Delete table. Where the text is only read, a click on a cell of a
+/// table's header row sorts its rows shown by that column (obf-1052):
+/// ascending, then descending, then as written. On a table whose cells a
+/// drag picks (obf-1054), Shift+click picks, and a click while cells are
+/// picked only ends that.
+pub fn table_clicks(
+    ui: &mut Ui,
+    t: &L10n,
+    of: Id,
+    spots: &[TableSpot],
+    edits: bool,
+) -> Option<(usize, TableAct)> {
     let mut picked = None;
     for spot in spots {
+        // A click the cells picked take, which does nothing else.
+        let picking = |ui: &Ui| {
+            spot.picks
+                && (ui.input(|i| i.modifiers.shift) || cell_pick::end_read(ui.ctx(), spot.key))
+        };
         let resp = ui.interact(spot.rect, of.with(("table", spot.at)), Sense::click());
         resp.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, t.table_open()));
         if resp
             .on_hover_cursor(egui::CursorIcon::PointingHand)
             .on_hover_text(t.table_open())
             .clicked()
+            && !picking(ui)
         {
-            picked = Some(spot.at);
+            picked = Some((spot.at, TableAct::Open));
+        }
+        // Where it is only read, a click on a cell of its header row
+        // sorts the rows shown by its column (obf-1052), over the
+        // table's click; in the editor it edits the cell.
+        for (c, rect, words) in spot.heads.iter().filter(|_| !edits) {
+            let id = of.with(("table sort", spot.at, *c));
+            let resp = ui.interact(*rect, id, Sense::click());
+            let now = spot.sort.filter(|s| s.column == *c).map(|s| s.descending);
+            resp.widget_info(|| sort_info(t, words, now));
+            if resp
+                .on_hover_cursor(egui::CursorIcon::PointingHand)
+                .on_hover_text(t.table_sort())
+                .clicked()
+                && !picking(ui)
+            {
+                ui.data_mut(|d| {
+                    let state: &mut TableState = d.get_temp_mut_or_default(spot.key);
+                    state.sort = next_sort(state.sort, *c);
+                });
+                ui.ctx().request_repaint();
+            }
+        }
+        let (up, down) = spot.moves;
+        let menu = (of.with(("table menu", spot.at)), spot.menu);
+        if let (_, Some(act)) = table_menu(ui, t, menu, (edits, up, down)) {
+            picked = Some((spot.at, act));
+        }
+        if let Some((bar, per_point, most)) = spot.bar {
+            let drag = ui.interact(bar, of.with(("table bar", spot.at)), Sense::drag());
+            let dx = drag.drag_delta().x;
+            if dx != 0.0 {
+                ui.data_mut(|d| {
+                    let state: &mut TableState = d.get_temp_mut_or_default(spot.key);
+                    state.offset = (state.offset + dx * per_point).clamp(0.0, most);
+                });
+                ui.ctx().request_repaint();
+            }
+        }
+        if let Some((rect, count)) = spot.more {
+            let builder = egui::UiBuilder::new()
+                .max_rect(rect)
+                .layout(egui::Layout::left_to_right(egui::Align::Center));
+            let said = t.table_show_all(count as i64);
+            let shown = ui.scope_builder(builder, |ui| ui.button(said).clicked());
+            if shown.inner {
+                ui.data_mut(|d| {
+                    let state: &mut TableState = d.get_temp_mut_or_default(spot.key);
+                    state.unfolded = true;
+                });
+                ui.ctx().request_repaint();
+            }
         }
     }
     picked
 }
 
+/// A table's ⋮ (obf-1050) as `id` at `rect`, weak until pointed at, and
+/// its menu, opened by a click: Copy, and with `edits` Move up while
+/// `up`, Move down while `down`, and Delete table. Gives the ⋮ and what
+/// was picked.
+pub(crate) fn table_menu(
+    ui: &mut Ui,
+    t: &L10n,
+    (id, rect): (Id, Rect),
+    (edits, up, down): (bool, bool, bool),
+) -> (egui::Response, Option<TableAct>) {
+    let resp = ui.interact(rect, id, Sense::click());
+    let label = t.desk_table_more();
+    resp.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, label));
+    if ui.is_rect_visible(rect) {
+        if resp.hovered() {
+            let fill = ui.visuals().widgets.hovered.weak_bg_fill;
+            ui.painter().rect_filled(rect, 6.0, fill);
+        }
+        let weak = ui.visuals().weak_text_color();
+        icons::paint(ui.painter(), rect.shrink(2.0), icons::MORE_VERT, weak);
+    }
+    let resp = resp
+        .on_hover_cursor(egui::CursorIcon::PointingHand)
+        .on_hover_text(label);
+    let mut picked = None;
+    Popup::menu(&resp).show(|ui| {
+        let text = ui.visuals().text_color();
+        let mut entries = vec![(TableAct::Copy, t.table_copy(), true)];
+        if edits {
+            entries.extend([
+                (TableAct::Up, t.table_up(), up),
+                (TableAct::Down, t.table_down(), down),
+                (TableAct::Delete, t.table_delete(), true),
+            ]);
+        }
+        for (act, words, enabled) in entries {
+            let colour = if act == TableAct::Delete {
+                ui.visuals().error_fg_color
+            } else {
+                text
+            };
+            let entry = egui::Button::new(RichText::new(words).color(colour));
+            if ui.add_enabled(enabled, entry).clicked() {
+                picked = Some(act);
+                ui.close();
+            }
+        }
+    });
+    (resp, picked)
+}
+
 /// Where the boxes, tags and links of `line`, laid out in `galley` at
 /// `origin`, lie on the screen.
+/// Brings the current place a find found in `line`, laid out in `galley`
+/// at `origin`, into view while it is to (obf-1047).
+fn reveal_line(ui: &Ui, (galley, origin): (&Galley, Pos2), line: &Line, found: Option<&TextFound>) {
+    let (Some(chars), Some(found)) = (line.current, found) else {
+        return;
+    };
+    let rect = row_rects(galley, chars)
+        .into_iter()
+        .reduce(|a, b| a.union(b));
+    if let Some(rect) = rect {
+        find_marks::reveal(ui, &found.marks, rect.translate(origin.to_vec2()));
+    }
+}
+
 fn line_spots(galley: &Galley, origin: Pos2, line: &Line) -> Spots {
     let at =
         |chars: (usize, usize)| place_chars(galley, chars).map(|r| r.translate(origin.to_vec2()));
@@ -1693,7 +2692,7 @@ fn line_spots(galley: &Galley, origin: Pos2, line: &Line) -> Spots {
 
 /// Where the characters `start..end` of `galley` lie, a rectangle on each
 /// row they are on.
-fn row_rects(galley: &Galley, (start, end): (usize, usize)) -> Vec<Rect> {
+pub(crate) fn row_rects(galley: &Galley, (start, end): (usize, usize)) -> Vec<Rect> {
     let mut out = Vec::new();
     let mut at = 0;
     for row in &galley.rows {
@@ -2090,6 +3089,21 @@ pub fn field_job(mut job: LayoutJob, look: &BoxLook, gap: &dyn Fn(&str) -> f32) 
     }
     job.sections = out;
     job
+}
+
+/// Brings the current place a find found in the text `typed` of an edit
+/// field in `format`, laid out in `galley` at `origin`, into view while
+/// it is to (obf-1047).
+pub fn reveal_typed(ui: &Ui, (galley, origin): (&Galley, Pos2), (typed, format): (&str, &str)) {
+    let Some((hits, marks)) = find_marks::hits(ui.ctx(), typed, format) else {
+        return;
+    };
+    let Some(hit) = hits.current(&marks).and_then(|i| hits.found.get(i)) else {
+        return;
+    };
+    if let Some(rect) = place(galley, typed, 0, hit.source) {
+        find_marks::reveal(ui, &marks, rect.translate(origin.to_vec2()));
+    }
 }
 
 /// Where the last character before the byte `end` of `text` begins.

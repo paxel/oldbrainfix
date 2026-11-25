@@ -179,7 +179,7 @@ void main() {
       expect(key('badge-frog'), findsNothing);
     });
 
-    testWidgets('Remove the Frog moves it to the trash without asking, as '
+    testWidgets('Move to trash moves it to the trash without asking, as '
         'the Frog view does; its Note stays, and the announcement at the '
         'top brings the badge back (#268)', (tester) async {
       final made = frog('wash the windows');
@@ -192,7 +192,7 @@ void main() {
       expect(key('badge-frog'), findsNothing);
       expect(find.byType(NoteEditorScreen), findsOneWidget);
 
-      await tap(tester, find.text('Frog moved to the Trash'));
+      await tap(tester, find.text('Frog moved to the trash'));
       expect(frogs.byId(made.id)?.isTrashed, isFalse);
       expect(key('badge-frog'), findsOneWidget);
     });
@@ -378,23 +378,23 @@ void main() {
       expect(find.text('book the scan'), findsNothing);
     });
 
-    testWidgets('a long press deletes a Frog without asking; the '
+    testWidgets('a long press moves a Frog to the trash without asking; the '
         'announcement undoes it, and the trash restores it', (tester) async {
       final mistake = frog('cupboard');
       await start(tester);
 
       await tester.longPress(row(mistake));
       await tester.pumpAndSettle();
-      await tap(tester, find.text('Delete'));
+      await tap(tester, find.text('Move to trash'));
       expect(find.byType(AlertDialog), findsNothing);
       expect(frogs.byId(mistake.id)?.isTrashed, isTrue);
-      await tap(tester, find.text('Frog moved to the Trash'));
+      await tap(tester, find.text('Frog moved to the trash'));
       expect(frogs.byId(mistake.id)?.isTrashed, isFalse);
       expect(row(mistake), findsOneWidget);
 
       await tester.longPress(row(mistake));
       await tester.pumpAndSettle();
-      await tap(tester, find.text('Delete'));
+      await tap(tester, find.text('Move to trash'));
       expect(frogs.byId(mistake.id)?.isTrashed, isTrue);
       expect(notes.byId(mistake.noteId)?.isTrashed, isFalse);
       expect(find.text('Eat a frog'), findsNothing);

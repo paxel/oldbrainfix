@@ -245,8 +245,8 @@ fn a_note_recorded_into_stays_on_the_list_and_the_items_said_become_lines() -> T
         None,
     );
     let mut harness = window(app, &bread);
-    // Record voice in the Note dialog goes onto its Note (#352).
-    click(&mut harness, t().record_voice());
+    // Voice in the Note dialog goes onto its Note (#352).
+    click(&mut harness, t().voice());
     click(&mut harness, t().stop_recording());
     let recorded = Notes::new(&store).by_id(&bread)?.ok_or("Bread")?;
     assert_eq!(recorded.recordings.len(), 1);

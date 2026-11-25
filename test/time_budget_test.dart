@@ -38,8 +38,8 @@ void main() {
     });
     tearDown(() => store.close());
 
-    testWidgets('opens its Note within half a second of frames, while the '
-        'alarms are still being armed anew', (tester) async {
+    testWidgets('marks it on the Agenda within half a second of frames, '
+        'while the alarms are still being armed anew', (tester) async {
       now = DateTime(2026, 10, 24, 6);
       final note = Notes(store).capture('Packing\nTent\nPegs').id;
       Checklists(store).make(note);
@@ -55,7 +55,10 @@ void main() {
       final alarms = _HeldAlarms();
       await tester.pumpWidget(OldBrainFixApp(store: store, alarms: alarms));
       await tester.pumpAndSettle();
-      expect(find.byType(NoteEditorScreen), findsNothing);
+      // Away on the Areas list, as a tap can come from anywhere.
+      await tester.tap(find.byKey(const ValueKey('browse')));
+      await tester.pumpAndSettle();
+      final marked = find.byKey(const ValueKey('agenda-marked'));
 
       // Arming hands every alarm to the platform, which takes its time.
       final held = alarms.hold();
@@ -65,13 +68,14 @@ void main() {
         occurrenceKey: '2026-10-24T08:00',
       ));
       var waited = Duration.zero;
-      while (find.byType(NoteEditorScreen).evaluate().isEmpty &&
+      while (marked.evaluate().isEmpty &&
           waited < const Duration(milliseconds: 500)) {
         await tester.pump(const Duration(milliseconds: 16));
         waited += const Duration(milliseconds: 16);
       }
 
-      expect(find.byType(NoteEditorScreen), findsOneWidget);
+      expect(find.byType(NoteEditorScreen), findsNothing);
+      expect(marked.hitTestable(), findsOneWidget);
       expect(find.text('Tent'), findsWidgets);
       expect(alarms.arms, arms, reason: 'opened before the arming ended');
       held.complete();

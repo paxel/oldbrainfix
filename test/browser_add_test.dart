@@ -5,12 +5,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/browser_add.dart';
 import 'package:oldbrainfix/src/line_editing.dart';
+import 'package:oldbrainfix/src/look.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix/src/session_form_screen.dart';
 import 'package:oldbrainfix/src/tally_form_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'accent_row.dart';
 import 'open_capture.dart';
 
 Map<String, Object?> wire(Map<String, Object?> json) =>
@@ -92,6 +94,10 @@ void main() {
     );
     await tap(tester, find.text('Create'));
   }
+
+  /// The text field of the Note editor.
+  Finder noteText() =>
+      find.descendant(of: key('note-text'), matching: find.byType(TextField));
 
   /// The only Note there is, which must exist.
   Note only() => notes.all().single;
@@ -194,13 +200,48 @@ void main() {
       testWidgets('Note captures one filed there', (tester) async {
         await openPage(tester, page);
         await pick(tester, NewKind.note);
-        await tester.enterText(find.byType(TextField), 'nees mor sauce');
+        // In an Area or a Topic the full editor opens, not the quick note
+        // (obf-1140).
+        final sorted = page != _Page.all;
+        expect(
+          find.byType(NoteEditorScreen),
+          sorted ? findsOneWidget : findsNothing,
+        );
+        expect(key('captureSave'), findsNothing);
+        await tester.enterText(
+          sorted ? noteText() : find.byType(TextField),
+          'nees mor sauce',
+        );
         // Leaving by Back saves, with a Nudge where it stays Unsorted;
         // the quick note has no back arrow on Android (#352).
         await backFromCapture(tester);
+        expect(find.byType(NoteEditorScreen), findsNothing);
         expect(only().text, 'nees mor sauce');
         expect(only().place, placeOf(page));
+        expect(only().nudge, sorted ? isNull : isNotNull);
+        expect(find.text('nees mor sauce'), findsOneWidget);
       });
+
+      if (page != _Page.all) {
+        testWidgets('Note opens the editor typing, without Add a part, and '
+            'left empty makes nothing', (tester) async {
+          await openPage(tester, page);
+          await pick(tester, NewKind.note);
+          final typing = tester.widget<EditableText>(
+            find.descendant(
+              of: key('note-text'),
+              matching: find.byType(EditableText),
+            ),
+          );
+          expect(typing.focusNode.hasFocus, isTrue);
+          expect(tester.testTextInput.isVisible, isTrue);
+          expect(key('editor-add-part'), findsNothing);
+          expect(only().place, placeOf(page));
+          await backFromCapture(tester);
+          expect(find.byType(NoteEditorScreen), findsNothing);
+          expect(notes.all(), isEmpty);
+        });
+      }
 
       testWidgets('Checklist takes its name, then its Lines in place', (
         tester,
@@ -422,18 +463,46 @@ void main() {
   });
 
   group('the New Session page', () {
+    /// The page [page] is one card that holds [parts] (obf-1118).
+    void oneCard(WidgetTester tester, Type page, List<String> parts) {
+      final cards = find.descendant(
+        of: find.byType(page),
+        matching: find.byType(Embossed),
+      );
+      expect(cards, findsOneWidget, reason: '$page');
+      for (final part in parts) {
+        expect(
+          find.descendant(of: cards, matching: key(part), skipOffstage: false),
+          findsOneWidget,
+          reason: part,
+        );
+      }
+    }
+
     testWidgets('makes a new Tally inside its pool, ticked, on one page', (
       tester,
     ) async {
       await openPage(tester, _Page.area);
       await pick(tester, NewKind.session);
       await tester.enterText(key('session-form-name'), 'Morning');
+      oneCard(tester, SessionFormScreen, [
+        'session-form-name',
+        'session-pool',
+        'session-form-count',
+      ]);
       // Without a Tally it says what is missing.
       await tap(tester, key('session-form-save'));
       expect(key('session-pool-error'), findsOneWidget);
 
+      await tester.ensureVisible(key('session-new-tally'));
+      expectAccentRow(tester, key('session-new-tally'), 'New Tally');
       await tap(tester, key('session-new-tally'));
       expect(find.byType(TallyFormScreen), findsOneWidget);
+      oneCard(tester, TallyFormScreen, [
+        'tally-form-name',
+        'tally-form-field-0',
+        'tally-form-add-field',
+      ]);
       await fillTally(tester, 'Push-ups', [
         (name: 'Times', unit: '', target: '20', chip: null),
       ]);

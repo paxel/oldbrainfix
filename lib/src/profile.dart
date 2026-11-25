@@ -186,10 +186,7 @@ class _Choice extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            FilledButton.tonal(
-              onPressed: onPick,
-              child: Text(t.profileWhichPick),
-            ),
+            OutlinedButton(onPressed: onPick, child: Text(t.profileWhichPick)),
           ],
         ),
       ),

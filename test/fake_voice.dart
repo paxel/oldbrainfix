@@ -26,6 +26,13 @@ class FakeVoice implements VoicePlatform {
   /// Whether a recording runs.
   bool recording = false;
 
+  /// The microphone's level each ask hears while a recording runs, 0
+  /// silent to 1 the loudest; null as if the phone could not tell.
+  double? loudness;
+
+  /// How often the level was asked.
+  int levelAsks = 0;
+
   /// The recordings played, in order.
   final played = <Uint8List>[];
 
@@ -72,6 +79,12 @@ class FakeVoice implements VoicePlatform {
     stops++;
     recording = false;
     return nextRecording;
+  }
+
+  @override
+  Future<double?> level() async {
+    levelAsks++;
+    return recording ? loudness : null;
   }
 
   @override

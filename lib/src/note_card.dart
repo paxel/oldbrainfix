@@ -12,11 +12,13 @@ import 'attachment_views.dart';
 import 'calendar_platform.dart';
 import 'card_occurrences.dart';
 import 'checklist_view.dart';
+import 'found_marks.dart';
 import 'frogs_screen.dart' show FrogIcon;
 import 'hidden_from_ai_view.dart';
 import 'iphone_words.dart';
 import 'l10n.dart';
 import 'look.dart';
+import 'menu_groups.dart';
 import 'ocr_platform.dart';
 import 'person_screen.dart';
 import 'photo_views.dart';
@@ -459,6 +461,17 @@ class NoteCard extends StatelessWidget {
   /// says so.
   final bool hiddenFromAi;
 
+  /// The places a search found in the Note (obf-1047), listed over its
+  /// text in the detailed view and under it in the compact one: the
+  /// first [shownFindings], each its line with the place on a tint, whose
+  /// tap runs [onFinding] with it, then how many more, whose tap runs it
+  /// with the first of them. None when empty.
+  final List<Finding> findings;
+  final ValueChanged<Finding>? onFinding;
+
+  /// How many places a search found a card lists.
+  static const shownFindings = 3;
+
   /// How much faded an unimportant card is drawn.
   static const unimportantOpacity = 0.55;
 
@@ -499,6 +512,8 @@ class NoteCard extends StatelessWidget {
     this.onSelect,
     this.selected = false,
     this.hiddenFromAi = false,
+    this.findings = const [],
+    this.onFinding,
   });
 
   /// Where the first line with words of [text] starts and ends, without
@@ -672,7 +687,6 @@ class NoteCard extends StatelessWidget {
             onSchedule: onSchedule,
             spawnsNow: spawnsNow,
             onMerge: onMerge,
-            adding: note.isUnsorted,
           )
         : null;
     final bottom = full && acts;
@@ -697,6 +711,13 @@ class NoteCard extends StatelessWidget {
         // Under where it is filed, over its text (#215).
         if (occurrences case final occurrences?)
           CardOccurrences(noteId: note.id, occurrences: occurrences),
+        // The places found lead the detailed view, over a long text or
+        // a table unfolded to them (obf-1047); a compact one has them
+        // under its lines.
+        if (full && findings.isNotEmpty) ...[
+          _Findings(findings: findings, onTap: onFinding),
+          const SizedBox(height: 8),
+        ],
         if (full)
           // With nothing over its text it starts with it, the Important
           // marker beside it.
@@ -726,6 +747,8 @@ class NoteCard extends StatelessWidget {
             glance: glance,
             ticking: boxes?.call(note.id, note.boxes),
           ),
+        if (!full && findings.isNotEmpty)
+          _Findings(findings: findings, onTap: onFinding),
       ],
     );
     if (!full && (menu != null || marker != null)) {
@@ -798,7 +821,6 @@ class NoteCard extends StatelessWidget {
                         onFile: onFile,
                         onSchedule: onSchedule,
                         onMerge: onMerge,
-                        adding: note.isUnsorted,
                         actions: actions,
                         spawnsNow: spawnsNow,
                       ),
@@ -817,6 +839,96 @@ class NoteCard extends StatelessWidget {
   }
 }
 
+/// The places a search found in a Note, on its card (obf-1047):
+/// the first [NoteCard.shownFindings], each with the icon of the part it
+/// lies in and its line, the place on a tint, then "+n more".
+class _Findings extends StatelessWidget {
+  final List<Finding> findings;
+  final ValueChanged<Finding>? onTap;
+
+  const _Findings({required this.findings, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    final theme = Theme.of(context);
+    final weak = theme.colorScheme.onSurfaceVariant;
+    final style = theme.textTheme.bodyMedium;
+    final shown = findings.take(NoteCard.shownFindings).toList();
+    final more = findings.length - shown.length;
+    Widget row(Key key, Widget icon, Widget words, Finding at) {
+      final tap = onTap;
+      return InkWell(
+        key: key,
+        onTap: tap == null ? null : () => tap(at),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 40),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                icon,
+                const SizedBox(width: 8),
+                Expanded(child: words),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      key: const ValueKey('card-findings'),
+      padding: const EdgeInsets.only(top: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final (i, finding) in shown.indexed)
+            row(
+              ValueKey('finding-$i'),
+              Icon(_findingIcon(finding.part), size: 18, color: weak),
+              ContentText(
+                child: Text.rich(
+                  TextSpan(
+                    children: foundSpans(
+                      context,
+                      finding.context,
+                      0,
+                      finding.context.length,
+                      FoundMarks([(finding.contextStart, finding.contextEnd)]),
+                    ),
+                  ),
+                  style: style,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              finding,
+            ),
+          if (more > 0)
+            row(
+              const ValueKey('findings-more'),
+              const SizedBox(width: 18),
+              Text(
+                t.findingsMore(more),
+                style: style?.copyWith(color: theme.colorScheme.primary),
+              ),
+              findings[shown.length],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The icon of the part of a Note a place found lies in.
+IconData _findingIcon(FindingPart part) => switch (part) {
+  FindingPart.text => Icons.short_text,
+  FindingPart.transcript => Icons.mic_none,
+  FindingPart.photoText => Icons.image_outlined,
+  FindingPart.fileName || FindingPart.attachmentText => Icons.attach_file,
+};
+
 /// A Note's action row, icons only, so it stays one line in every
 /// language; the words show on a long press: file it, spawn one of
 /// [spawns] from it (a Routine, Reminder, Frog or Session), merge it, and
@@ -831,10 +943,6 @@ class NoteActionRow extends StatelessWidget {
   final VoidCallback? onFile;
   final ValueChanged<Spawn>? onSchedule;
   final VoidCallback? onMerge;
-
-  /// Whether [onMerge] is named "Add to Note…", as on an Unsorted Note's
-  /// card (#308), not "Merge into…".
-  final bool adding;
   final NoteActions? actions;
 
   /// What the spawn menu offers, in this order.
@@ -849,7 +957,6 @@ class NoteActionRow extends StatelessWidget {
     this.onFile,
     this.onSchedule,
     this.onMerge,
-    this.adding = false,
     this.actions,
     this.spawns = Spawn.values,
     this.spawnsNow,
@@ -887,14 +994,14 @@ class NoteActionRow extends StatelessWidget {
                       child: Text(switch (spawn) {
                         Spawn.remind => t.remindMe,
                         Spawn.frog => t.frog,
-                        Spawn.session => t.session,
+                        Spawn.session => t.spawnSession,
                       }),
                     ),
                 ],
               ),
             if (onMerge != null)
               IconButton(
-                tooltip: adding ? t.addToNote : t.mergeInto,
+                tooltip: t.mergeInto,
                 onPressed: onMerge,
                 icon: const Icon(Icons.call_merge),
               ),
@@ -929,32 +1036,34 @@ List<Spawn> offeredSpawns(List<Spawn> spawns, {required bool advanced}) => [
 ];
 
 /// The ⋮ of a card's action row, or of a compact card's top right: a menu
-/// at the button with words. It leads with Edit, then on a compact card
-/// File into…, Remind me…, in Advanced Frog and Session…, and
-/// Merge into… (#189, #281), then, for a Note being captured, its Importance as radio
-/// buttons, the one it has marked, then Show ticks while it has boxes, then
-/// "Share…", which opens a small menu at the button of sending, sharing,
-/// copying its text and exporting it as a Pack (#281), then removing its "From …" badge (#164), the calendar, adding to the Note, "Add entry" and
-/// "Add to home screen" (#284) of a Tally or "Make it a Tally", "Make it a Checklist" and "Make it a
-/// Shopping List" or, for one, "Show on the Agenda" (a Checklist's a
-/// switch, a Shopping List's three choices as radio buttons) and "Uncheck
-/// all" (a Checklist's) and "Back to a plain Note", removing a photo or recording while its
-/// text stays, one entry each with the start of that text under it, and
-/// deleting.
+/// at the button with words (obf-1014). It leads with Edit, then the four
+/// groups of the Note editor, each opening its entries in a second menu
+/// at the button, and a group with nothing in it is left out:
+/// **This Note**, on a compact card File into…, then, for a Note being
+/// captured, its Importance, then Show ticks while it has boxes, Hidden
+/// from AI, removing its "From …" badge (#164), "Add to home screen"
+/// (#284) of a Tally or "Make it a Tally", "Make it a Checklist" and "Make
+/// it a Shopping List" or, for one, "Show on the Agenda" (a Checklist's a
+/// switch, a Shopping List's three choices as radio buttons) and "Back to
+/// a plain Note"; **Add**, on a compact card Remind me… and in Advanced
+/// Frog and Session… (#189, #281), then Add a part and a Tally's "Add
+/// entry"; **Share**, sending, sharing, copying its text, exporting it as
+/// a Pack and the calendar's; **Tidy**, on a compact card Merge into…,
+/// then adding to a Shopping List, "Uncheck all" (a Checklist's), Move to
+/// trash, and removing a photo, recording or file while its text stays,
+/// one entry each with the start of that text under it. A group past
+/// seven entries ends in "More…" (#321).
 class _MoreButton extends StatelessWidget {
   final Importance importance;
   final NoteActions actions;
 
-  /// "File into…", the Remind me…, Frog and Session of
-  /// [spawnsNow] and "Merge into…" after Edit, for a compact card, which
-  /// has no action row (#189, #281); left out when null.
+  /// "File into…", the Remind me…, Frog and Session… of [spawnsNow] and
+  /// "Merge into…", for a compact card, which has no action row (#189,
+  /// #281); left out when null.
   final VoidCallback? onFile;
   final ValueChanged<Spawn>? onSchedule;
   final List<Spawn> Function()? spawnsNow;
   final VoidCallback? onMerge;
-
-  /// Whether [onMerge] is named "Add to Note…" (#308).
-  final bool adding;
 
   const _MoreButton({
     required this.importance,
@@ -963,7 +1072,6 @@ class _MoreButton extends StatelessWidget {
     this.onSchedule,
     this.spawnsNow,
     this.onMerge,
-    this.adding = false,
   });
 
   @override
@@ -990,17 +1098,6 @@ class _MoreButton extends StatelessWidget {
                 spawnsNow?.call() ?? Spawn.values,
                 advanced: actions.advanced,
               );
-        // Send, Share, Copy and Export as Pack under one "Share…" (#281).
-        final shares = <_MenuEntry>[
-          if (actions.onSend case final send?)
-            ('note-send', Icons.send_outlined, t.sendToPerson, send),
-          if (actions.onShare case final share?)
-            ('note-share', Icons.share_outlined, t.shareToApp, share),
-          if (actions.onCopy case final copy?)
-            ('note-copy', Icons.copy_outlined, t.copyText, copy),
-          if (actions.onExportPack case final pack?)
-            ('note-pack', Icons.inventory_2_outlined, t.exportAsPack, pack),
-        ];
         PopupMenuItem<VoidCallback> drawn(
           String key,
           Widget icon,
@@ -1023,13 +1120,120 @@ class _MoreButton extends StatelessWidget {
           String label,
           VoidCallback run,
         ) => drawn(key, Icon(icon), label, run);
-        return [
-          if (actions.onEdit case final edit?) ...[
-            item('note-edit', Icons.edit_outlined, t.edit, edit),
-            const PopupMenuDivider(),
-          ],
+        // A choice of one value as radio buttons under its heading, in a
+        // menu of its own.
+        PopupMenuItem<VoidCallback> choice<T>(
+          String key,
+          IconData icon,
+          String heading,
+          List<(T, String)> options,
+          T current,
+          ValueChanged<T> choose,
+          String Function(T value) keyOf,
+        ) => groupMenuItem(
+          key: ValueKey(key),
+          icon: Icon(icon),
+          label: heading,
+          value: () => unawaited(
+            openMenuGroup(button, [
+              // The heading the choices continue: "Importance" "Important".
+              PopupMenuItem(enabled: false, child: Text(heading)),
+              for (final (value, label) in options)
+                PopupMenuItem(
+                  key: ValueKey(keyOf(value)),
+                  // A tap on the one it has changes nothing.
+                  value: () {
+                    if (value != current) choose(value);
+                  },
+                  child: Semantics(
+                    checked: value == current,
+                    inMutuallyExclusiveGroup: true,
+                    child: Row(
+                      children: [
+                        Icon(
+                          value == current
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_unchecked,
+                        ),
+                        const SizedBox(width: 12),
+                        Flexible(child: Text(label)),
+                      ],
+                    ),
+                  ),
+                ),
+            ]),
+          ),
+        );
+        final thisNote = <PopupMenuEntry<VoidCallback>>[
           if (onFile case final file?)
             item('note-file', Icons.drive_file_move_outline, t.fileInto, file),
+          if (actions.onImportance case final set?)
+            choice(
+              'note-importance',
+              Icons.label_important_outline,
+              t.importance,
+              [
+                (Importance.important, t.importanceImportant),
+                (Importance.normal, t.importanceNormal),
+                (Importance.unimportant, t.importanceUnimportant),
+              ],
+              importance,
+              set,
+              (value) => 'importance-${value.name}',
+            ),
+          if (ticks != null) showTicksItem(button, ticks),
+          if (hidden != null)
+            hiddenFromAiMenuItem(
+              button,
+              key: const ValueKey('note-hidden-from-ai'),
+              value: hidden.toggle,
+              on: hidden.on,
+            ),
+          if ((actions.onRemovePackFrom, actions.packFrom) case (
+            final remove?,
+            final name?,
+          ))
+            item(
+              'note-remove-pack-from',
+              Icons.inventory_2_outlined,
+              t.removePackFrom(name),
+              remove,
+            ),
+          if (tally == true)
+            if (actions.onAddToHome case final home?)
+              item(
+                'note-add-to-home',
+                Icons.add_to_home_screen,
+                t.addToHomeScreenHere,
+                home,
+              ),
+          // A Checklist or Shopping List is no Tally, and a Tally neither.
+          if (tally == false && !(list?.isList ?? false))
+            if (actions.onMakeTally case final make?)
+              item('note-make-tally', Icons.bar_chart, t.makeTally, make),
+          if (list?.make case final make?)
+            item('note-make-checklist', Icons.checklist, t.makeChecklist, make),
+          if (list?.makeShopping case final make?)
+            item(
+              'note-make-shopping',
+              Icons.shopping_cart_outlined,
+              t.makeShoppingList,
+              make,
+            ),
+          if (list?.onAgenda case final agenda?)
+            choice(
+              'note-show-on-agenda',
+              Icons.today_outlined,
+              t.checklistShowOnAgenda,
+              listOnAgendaOptions(t),
+              agenda.shows,
+              agenda.choose,
+              (value) => 'note-show-on-agenda-${value.name}',
+            ),
+          if (list?.toPlain case final plain?)
+            item('note-to-plain', Icons.notes, t.checklistToPlain, plain),
+        ];
+        final add = <PopupMenuEntry<VoidCallback>>[
           if (schedule != null)
             for (final spawn in spawns)
               drawn(
@@ -1047,74 +1251,21 @@ class _MoreButton extends StatelessWidget {
                 },
                 () => schedule(spawn),
               ),
-          if (onMerge case final merge?)
-            item(
-              'note-merge',
-              Icons.call_merge,
-              adding ? t.addToNote : t.mergeInto,
-              merge,
-            ),
-          if (onFile != null || spawns.isNotEmpty || onMerge != null)
-            const PopupMenuDivider(),
-          if (actions.onImportance case final set?) ...[
-            // The heading the choices continue: "Importance" "Important".
-            PopupMenuItem(enabled: false, child: Text(t.importance)),
-            for (final (value, label) in [
-              (Importance.important, t.importanceImportant),
-              (Importance.normal, t.importanceNormal),
-              (Importance.unimportant, t.importanceUnimportant),
-            ])
-              PopupMenuItem(
-                key: ValueKey('importance-${value.name}'),
-                // A tap on the one it has changes nothing.
-                value: () {
-                  if (value != importance) set(value);
-                },
-                child: Semantics(
-                  checked: value == importance,
-                  inMutuallyExclusiveGroup: true,
-                  child: Row(
-                    children: [
-                      Icon(
-                        value == importance
-                            ? Icons.radio_button_checked
-                            : Icons.radio_button_unchecked,
-                      ),
-                      const SizedBox(width: 12),
-                      Flexible(child: Text(label)),
-                    ],
-                  ),
-                ),
-              ),
-            const PopupMenuDivider(),
-          ],
-          if (ticks != null) showTicksItem(button, ticks),
-          if (hidden != null)
-            hiddenFromAiMenuItem(
-              button,
-              key: const ValueKey('note-hidden-from-ai'),
-              value: hidden.toggle,
-              on: hidden.on,
-            ),
-          if (shares case [(final key, final icon, final label, final run)])
-            item(key, icon, label, run)
-          else if (shares.isNotEmpty)
-            item(
-              'note-share-menu',
-              Icons.share_outlined,
-              t.shareNote,
-              () => unawaited(_shareMenu(button, shares)),
-            ),
-          if ((actions.onRemovePackFrom, actions.packFrom) case (
-            final remove?,
-            final name?,
-          ))
-            item(
-              'note-remove-pack-from',
-              Icons.inventory_2_outlined,
-              t.removePackFrom(name),
-              remove,
-            ),
+          if (actions.onAmend case final amend?)
+            item('note-amend', Icons.post_add, t.addAPart, amend),
+          if (tally == true)
+            if (actions.onAddEntry case final add?)
+              item('note-add-entry', Icons.add_chart, t.addTallyEntry, add),
+        ];
+        final share = <PopupMenuEntry<VoidCallback>>[
+          if (actions.onSend case final send?)
+            item('note-send', Icons.send_outlined, t.sendToPerson, send),
+          if (actions.onShare case final share?)
+            item('note-share', Icons.share_outlined, t.shareToApp, share),
+          if (actions.onCopy case final copy?)
+            item('note-copy', Icons.copy_outlined, t.copyText, copy),
+          if (actions.onExportPack case final pack?)
+            item('note-pack', Icons.inventory_2_outlined, t.exportAsPack, pack),
           if (calendar != null && calendar.add.isNotEmpty)
             item(
               'note-calendar',
@@ -1129,62 +1280,12 @@ class _MoreButton extends StatelessWidget {
               file.label,
               file.run,
             ),
-          if (actions.onAmend case final amend?)
-            item('note-amend', Icons.add, t.amend, amend),
-          if (tally == true)
-            if (actions.onAddEntry case final add?)
-              item('note-add-entry', Icons.add_chart, t.addTallyEntry, add),
-          if (tally == true)
-            if (actions.onAddToHome case final home?)
-              item(
-                'note-add-to-home',
-                Icons.add_to_home_screen,
-                t.addToHomeScreenHere,
-                home,
-              ),
-          // A Checklist or Shopping List is no Tally, and a Tally neither.
-          if (tally == false && !(list?.isList ?? false))
-            if (actions.onMakeTally case final make?)
-              item('note-make-tally', Icons.bar_chart, t.makeTally, make),
+        ];
+        final tidy = <PopupMenuEntry<VoidCallback>>[
+          if (onMerge case final merge?)
+            item('note-merge', Icons.call_merge, t.mergeInto, merge),
           if (addToShopping case (:final label, :final run))
             item('note-add-to-shopping', Icons.add_shopping_cart, label, run),
-          if (list?.make case final make?)
-            item('note-make-checklist', Icons.checklist, t.makeChecklist, make),
-          if (list?.makeShopping case final make?)
-            item(
-              'note-make-shopping',
-              Icons.shopping_cart_outlined,
-              t.makeShoppingList,
-              make,
-            ),
-          if (list?.onAgenda case final agenda?) ...[
-            const PopupMenuDivider(),
-            // The heading the choices continue, as Importance's.
-            PopupMenuItem(enabled: false, child: Text(t.checklistShowOnAgenda)),
-            for (final (value, label) in listOnAgendaOptions(t))
-              PopupMenuItem(
-                key: ValueKey('note-show-on-agenda-${value.name}'),
-                // A tap on the one it has changes nothing.
-                value: () {
-                  if (value != agenda.shows) agenda.choose(value);
-                },
-                child: Semantics(
-                  checked: value == agenda.shows,
-                  inMutuallyExclusiveGroup: true,
-                  child: Row(
-                    children: [
-                      Icon(
-                        value == agenda.shows
-                            ? Icons.radio_button_checked
-                            : Icons.radio_button_unchecked,
-                      ),
-                      const SizedBox(width: 12),
-                      Flexible(child: Text(label)),
-                    ],
-                  ),
-                ),
-              ),
-          ],
           if (list?.uncheckAll case final uncheck?)
             item(
               'note-uncheck-all',
@@ -1192,8 +1293,8 @@ class _MoreButton extends StatelessWidget {
               t.checklistUncheckAll,
               uncheck,
             ),
-          if (list?.toPlain case final plain?)
-            item('note-to-plain', Icons.notes, t.checklistToPlain, plain),
+          if (actions.onDelete case final delete?)
+            item('note-delete', Icons.delete_outline, t.moveToTrash, delete),
           for (final removal in actions.removals?.call() ?? <MediaRemoval>[])
             PopupMenuItem(
               key: ValueKey('note-remove-${removal.hash}'),
@@ -1233,47 +1334,44 @@ class _MoreButton extends StatelessWidget {
                 ],
               ),
             ),
-          if (actions.onDelete case final delete?)
-            item('note-delete', Icons.delete_outline, t.delete, delete),
+        ];
+        PopupMenuItem<VoidCallback> group(
+          String key,
+          IconData icon,
+          String label,
+          List<PopupMenuEntry<VoidCallback>> entries,
+        ) => groupMenuItem(
+          key: ValueKey(key),
+          icon: Icon(icon),
+          label: label,
+          value: () => unawaited(openMenuGroup(button, entries)),
+        );
+        return [
+          if (actions.onEdit case final edit?) ...[
+            item('note-edit', Icons.edit_outlined, t.edit, edit),
+            const PopupMenuDivider(),
+          ],
+          if (thisNote.isNotEmpty)
+            group(
+              'note-group-this-note',
+              Icons.tune,
+              t.editorGroupThisNote,
+              thisNote,
+            ),
+          if (add.isNotEmpty) group('note-group-add', Icons.add, t.add, add),
+          if (share.isNotEmpty)
+            group('note-group-share', Icons.share_outlined, t.share, share),
+          if (tidy.isNotEmpty)
+            group(
+              'note-group-tidy',
+              Icons.cleaning_services_outlined,
+              t.editorGroupTidy,
+              tidy,
+            ),
         ];
       },
     );
   }
-}
-
-/// An entry of a card's ⋮: its key, icon, words and what it does.
-typedef _MenuEntry = (String, IconData, String, VoidCallback);
-
-/// Opens the small menu of "Share…" where [button] is, its entries with
-/// their icons and words, and does the one picked (#281).
-Future<void> _shareMenu(BuildContext button, List<_MenuEntry> entries) async {
-  final box = button.findRenderObject() as RenderBox?;
-  final overlay = Overlay.of(button).context.findRenderObject() as RenderBox?;
-  if (box == null || overlay == null) return;
-  final at = box.localToGlobal(box.size.bottomLeft(Offset.zero));
-  final picked = await showMenu<VoidCallback>(
-    context: button,
-    position: RelativeRect.fromRect(
-      overlay.globalToLocal(at) & Size.zero,
-      Offset.zero & overlay.size,
-    ),
-    items: [
-      for (final (key, icon, label, run) in entries)
-        PopupMenuItem(
-          key: ValueKey(key),
-          value: run,
-          child: Row(
-            children: [
-              Icon(icon),
-              const SizedBox(width: 12),
-              Flexible(child: Text(label)),
-            ],
-          ),
-        ),
-    ],
-  );
-  if (picked == null || !button.mounted) return;
-  picked();
 }
 
 /// The menu entry that switches Show ticks of a Note on and off, [ticks]
@@ -1646,6 +1744,11 @@ class _CompactNoteState extends State<_CompactNote> {
   NoteKind _kind = NoteKind.plain;
   List<String> _glance = const [];
 
+  /// The Photo Text line a photo Note without words is named by
+  /// (obf-1049); empty when it has none, or when it is named by a
+  /// Transcript, which the card shows under its play button anyway.
+  String _photoName = '';
+
   @override
   void initState() {
     super.initState();
@@ -1663,6 +1766,18 @@ class _CompactNoteState extends State<_CompactNote> {
   void _read() {
     _kind = widget.kind?.call() ?? NoteKind.plain;
     _glance = widget.glance?.call() ?? const [];
+    _photoName = _namedByPhoto(widget.note) ? widget.note.shownName : '';
+  }
+
+  /// Whether [note] has no words and goes by a Photo Text of a photo it
+  /// still shows, which the card does not show otherwise; the Texts of
+  /// recordings and of removed photos show on it already.
+  static bool _namedByPhoto(Note note) {
+    bool words(String? text) => text != null && text.trim().isNotEmpty;
+    return !words(note.shownText) &&
+        !note.recordings.any((hash) => words(note.transcripts[hash])) &&
+        !note.removedRecordings.any((hash) => words(note.transcripts[hash])) &&
+        note.photos.any((hash) => words(note.photoTexts[hash]));
   }
 
   @override
@@ -1672,6 +1787,8 @@ class _CompactNoteState extends State<_CompactNote> {
     final text = theme.textTheme;
     final note = widget.note;
     final shown = note.shownText;
+    // The places a search found in it (obf-1047).
+    final found = FindScope.of(context, note.id, FindingPart.text, '');
     Widget marked(
       int start,
       int end, {
@@ -1691,6 +1808,7 @@ class _CompactNoteState extends State<_CompactNote> {
       source: note.text,
       ticking: widget.ticking,
       language: note.codeLanguage,
+      found: found,
     );
     final glance = [
       for (final (i, line) in _glance.indexed)
@@ -1754,8 +1872,20 @@ class _CompactNoteState extends State<_CompactNote> {
             ),
           ),
         ...glance,
-        // Without words it shows what it holds instead.
+        // Without words it shows what it holds instead, named by the
+        // first line of a photo's text when it has one.
         if (shown.trim().isEmpty) ...[
+          if (_photoName.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                _photoName,
+                key: const ValueKey('note-photo-name'),
+                style: text.bodyLarge,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           if (note.photos.isNotEmpty)
             // Not a sideways list: swipes on a card belong to the browser.
             Row(
@@ -2058,6 +2188,9 @@ class _Whole extends StatelessWidget {
   Widget build(BuildContext context) {
     final style = Theme.of(context).textTheme.bodyLarge;
     final list = this.list;
+    // The places a search found in it, a table holding one unfolded
+    // (obf-1047).
+    final found = FindScope.of(context, id, FindingPart.text, '');
     // A photo Note may have no words; a list without a name shows its
     // kind.
     final Widget? words = text.isEmpty && untitled == null
@@ -2082,6 +2215,9 @@ class _Whole extends StatelessWidget {
             ticking: ticking,
             tableEdit: onTable,
             language: language,
+            rows: MarkedText.cardRows,
+            found: found,
+            unfoldAt: found?.unfoldAt,
           );
     final parts = <Widget>[
       if (list == null)
@@ -2250,6 +2386,7 @@ class _NameAndDescriptionState extends State<_NameAndDescription> {
     final from = text.length - NoteKinds.description(text).length;
     final description = text.substring(from);
     final (start, end) = NoteCard.firstLine(description);
+    final found = FindScope.of(context, widget.noteId, FindingPart.text, '');
     Widget part({required int start, int? end, TextStyle? style, int? lines}) =>
         MarkedText(
           text,
@@ -2263,6 +2400,9 @@ class _NameAndDescriptionState extends State<_NameAndDescription> {
           source: widget.source,
           ticking: widget.ticking,
           tableEdit: widget.onTable,
+          rows: MarkedText.cardRows,
+          found: found,
+          unfoldAt: found?.unfoldAt,
         );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

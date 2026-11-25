@@ -247,11 +247,11 @@ class PlannedAlarm {
   /// rings with sound from its first ring.
   final QuietHours? quiet;
 
-  /// The text of the Note the Routine links back to as it reads without
-  /// its marks ([Note.visibleText]); null when it is gone.
+  /// The name the Note the Routine links back to is shown by
+  /// ([Note.shownName], obf-1049); null when it is gone.
   final String? text;
 
-  /// What that Note is titled as while [text] is blank ([Note.wordless]).
+  /// What that Note is titled as while [text] is empty ([Note.wordless]).
   final Wordless wordless;
 
   /// The name of the file it goes by as [Wordless.file]
@@ -409,7 +409,7 @@ List<PlannedAlarm> alarmPlan({
           endsAt: t.endsAt,
           // Escalation is the only way through Quiet Hours.
           quiet: routine.escalation == null ? quiet : null,
-          text: note?.visibleText,
+          text: note?.shownName,
           wordless: note?.wordless ?? Wordless.photo,
           wordlessName: note?.wordlessName ?? '',
         ),
@@ -450,11 +450,11 @@ class PlannedHeadsUp {
   /// nothing.
   final QuietHours? quiet;
 
-  /// The text of the Note the Routine links back to as it reads without
-  /// its marks ([Note.visibleText]); null when it is gone.
+  /// The name the Note the Routine links back to is shown by
+  /// ([Note.shownName], obf-1049); null when it is gone.
   final String? text;
 
-  /// What that Note is titled as while [text] is blank ([Note.wordless]).
+  /// What that Note is titled as while [text] is empty ([Note.wordless]).
   final Wordless wordless;
 
   /// The name of the file it goes by as [Wordless.file]
@@ -605,7 +605,7 @@ List<PlannedHeadsUp> headsUpPlan({
             wall: wall,
             start: startOf(occurrence, from),
             quiet: quiet,
-            text: note?.visibleText,
+            text: note?.shownName,
             wordless: note?.wordless ?? Wordless.photo,
             wordlessName: note?.wordlessName ?? '',
           ),

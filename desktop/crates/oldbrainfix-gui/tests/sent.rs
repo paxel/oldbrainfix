@@ -28,6 +28,7 @@ use oldbrainfix_core::{
 };
 use oldbrainfix_gui::media::Player;
 use oldbrainfix_gui::schedule_text::schedule_text;
+use oldbrainfix_gui::theme::{self, ButtonKind};
 use oldbrainfix_gui::{App, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -105,6 +106,38 @@ fn enabled(harness: &Harness<'_, App>, label: &str) -> bool {
     !harness.get_by_label(label).accesskit_node().is_disabled()
 }
 
+/// Whether the last button labelled `label`, a dialog's, is drawn on the
+/// idle fill of `kind` (obf-1101).
+fn wears(harness: &Harness<'_, App>, label: &str, kind: ButtonKind) -> bool {
+    let Some(node) = harness
+        .query_all_by(|n| n.role() == Role::Button && n.label().as_deref() == Some(label))
+        .last()
+    else {
+        return false;
+    };
+    let scale = harness.ctx.pixels_per_point();
+    let rect = node.rect();
+    let at = egui::Rect::from_min_max(
+        (rect.min.to_vec2() / scale).to_pos2(),
+        (rect.max.to_vec2() / scale).to_pos2(),
+    );
+    let fill = theme::button_tones(harness.ctx.global_style().visuals.dark_mode, kind).idle;
+    fn flat(shape: &egui::Shape, into: &mut Vec<egui::epaint::RectShape>) {
+        match shape {
+            egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| flat(s, into)),
+            egui::Shape::Rect(r) => into.push(r.clone()),
+            _ => {}
+        }
+    }
+    let mut rects = Vec::new();
+    for egui::epaint::ClippedShape { shape, .. } in &harness.output().shapes {
+        flat(shape, &mut rects);
+    }
+    rects
+        .iter()
+        .any(|r| r.fill == fill && r.rect.contains_rect(at.shrink(1.0)))
+}
+
 fn shows(harness: &Harness<'_, App>, label: &str) -> bool {
     harness.query_all_by_label_contains(label).next().is_some()
 }
@@ -127,7 +160,7 @@ fn a_person_without_a_name_shows_as_no_name() -> TestResult {
     app.select(Selection::All);
     app.select_note(&note.id);
     let mut harness = window(app);
-    harness.get_by_label("Send…").click_accesskit();
+    harness.get_by_label("Send to a person").click_accesskit();
     harness.run();
     assert!(shows(&harness, "No name, encrypted"));
     Ok(())
@@ -154,7 +187,7 @@ fn a_note_is_saved_to_send_encrypted_to_a_person_met_or_signed_only() -> TestRes
     }
     let mut harness = window(app);
 
-    harness.get_by_label("Send…").click_accesskit();
+    harness.get_by_label("Send to a person").click_accesskit();
     harness.run();
     assert!(shows(&harness, "Ben, encrypted"));
     assert!(!shows(&harness, "Not encrypted: whoever"));
@@ -171,7 +204,7 @@ fn a_note_is_saved_to_send_encrypted_to_a_person_met_or_signed_only() -> TestRes
     assert_eq!(opened.item.text, "Dentist on Friday");
 
     // To anyone: signed only, and said so before.
-    harness.get_by_label("Send…").click_accesskit();
+    harness.get_by_label("Send to a person").click_accesskit();
     harness.run();
     harness
         .get_by_label("Anyone, not encrypted")
@@ -208,7 +241,7 @@ fn a_new_send_picks_nobody_and_an_update_starts_at_the_person_before() -> TestRe
     let mut harness = window(app);
 
     // New: nobody picked, not even the first person, and Send waits.
-    harness.get_by_label("Send…").click_accesskit();
+    harness.get_by_label("Send to a person").click_accesskit();
     harness.run();
     assert!(shows(&harness, "Send this Note"));
     assert!(!picked(&harness, "Ben, encrypted"));
@@ -229,7 +262,7 @@ fn a_new_send_picks_nobody_and_an_update_starts_at_the_person_before() -> TestRe
     assert!(ben.open_sent_item(&bytes)?.is_err(), "Ben does not");
 
     // An update starts at Cleo, the person it went to before.
-    harness.get_by_label("Send…").click_accesskit();
+    harness.get_by_label("Send to a person").click_accesskit();
     harness.run();
     assert!(shows(&harness, "Send an update"));
     assert!(picked(&harness, "Cleo, encrypted"));
@@ -279,6 +312,8 @@ fn a_sent_item_dropped_or_handed_over_is_previewed_and_accepted_or_declined() ->
     assert!(shows(&harness, "came unencrypted"));
     assert!(shows(&harness, "Blood test"));
     assert!(shows(&harness, "08:15"));
+    // The dialog's main action, filled on the accent (obf-1101).
+    assert!(wears(&harness, "Accept", ButtonKind::Primary));
     harness.get_by_label("Decline").click_accesskit();
     harness.run();
     assert!(!harness.state().previewing());
@@ -392,7 +427,7 @@ fn a_note_sent_before_goes_as_an_update_or_a_cancellation() -> TestResult {
     }
     let mut harness = window(app);
 
-    harness.get_by_label("Send…").click_accesskit();
+    harness.get_by_label("Send to a person").click_accesskit();
     harness.run();
     assert!(shows(&harness, "Send an update"));
     harness.get_by_label("Send").click_accesskit();
@@ -403,7 +438,7 @@ fn a_note_sent_before_goes_as_an_update_or_a_cancellation() -> TestResult {
     assert_eq!(update.item.version, 2);
     assert!(!update.item.cancel);
 
-    harness.get_by_label("Send…").click_accesskit();
+    harness.get_by_label("Send to a person").click_accesskit();
     harness.run();
     harness
         .get_by_label("Send a cancellation instead")
@@ -470,6 +505,7 @@ fn an_update_shows_what_changes_and_a_cancellation_trashes_the_note() -> TestRes
         "{moved}"
     );
     assert!(shows(&harness, &moved));
+    assert!(wears(&harness, "Apply update", ButtonKind::Primary));
     harness.get_by_label("Apply update").click_accesskit();
     harness.run();
     assert!(shows(&harness, "Updated. Your own additions stayed."));
@@ -514,7 +550,14 @@ fn an_update_shows_what_changes_and_a_cancellation_trashes_the_note() -> TestRes
     std::fs::write(&cancel, ann.send_note(&note.id, None, true)?)?;
     drop_file(&mut harness, &cancel);
     assert!(shows(&harness, "Cancelled: Dentist, room 3"));
-    harness.get_by_label("Move to the trash").click_accesskit();
+    // One spelling of the trash wording (obf-1014, C4), on the error
+    // colour, as an action that removes (obf-1101).
+    assert!(wears(&harness, "Move to trash", ButtonKind::Destructive));
+    harness
+        .query_all_by_label("Move to trash")
+        .last()
+        .ok_or("Move to trash")?
+        .click_accesskit();
     harness.run();
     assert!(shows(&harness, "Moved to the trash"));
     let held = harness.state().store();

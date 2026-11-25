@@ -98,9 +98,27 @@ fn click_cell(harness: &mut Harness<'_, App>, cell: &str) -> TestResult {
     Ok(())
 }
 
-/// Clicks a heading's menu entry `label`, after the heading `heading`.
+/// Opens the submenu `label` of the menu open (obf-1014).
+fn sub(harness: &mut Harness<'_, App>, label: &str) -> TestResult {
+    let label = format!("{label} ⏵");
+    harness
+        .query_all_by_label(&label)
+        .last()
+        .ok_or(format!("{label:?}"))?
+        .click();
+    harness.run();
+    Ok(())
+}
+
+/// Clicks a heading's menu entry `label`, after the heading `heading`,
+/// its submenus as "Move ▸ Move left".
 fn menu(harness: &mut Harness<'_, App>, heading: &str, label: &str) -> TestResult {
     press(harness, heading)?;
+    let mut parts: Vec<&str> = label.split(" ▸ ").collect();
+    let label = parts.pop().unwrap_or_default();
+    for part in parts {
+        sub(harness, part)?;
+    }
     harness
         .query_all_by_label(label)
         .last()
@@ -341,7 +359,7 @@ fn the_plus_and_the_menus_add_delete_move_and_line_up() -> TestResult {
     );
     // Moved: the row up, the column left.
     menu(&mut harness, "Row 3", "Move up")?;
-    menu(&mut harness, "Column C", "Move left")?;
+    menu(&mut harness, "Column C", "Move ▸ Move left")?;
     assert!(
         field(&harness)?.starts_with(
             "| Item | Shop | Qty |\n| --- | --- | --- |\n| eggs |  |  |\n| milk |  | 2 |"
@@ -350,9 +368,10 @@ fn the_plus_and_the_menus_add_delete_move_and_line_up() -> TestResult {
         field(&harness)?
     );
     // A column lines up as picked, the pick checked.
-    menu(&mut harness, "Column C", "Align right")?;
+    menu(&mut harness, "Column C", "Align ▸ Align right")?;
     assert!(field(&harness)?.contains("| --- | --- | --: |"));
     press(&mut harness, "Column C")?;
+    sub(&mut harness, "Align")?;
     let right = harness
         .query_all_by_label("Align right")
         .last()
@@ -438,9 +457,12 @@ fn show_as_lines_and_show_as_grid_switch_the_tables_view() -> TestResult {
     let mut harness = editor(&store, &note);
     edit_table(&mut harness)?;
     let before = field(&harness)?;
+    // Each a text button, its words in the accent (obf-1111).
+    assert!(in_accent(&harness, "Show as lines"));
     press(&mut harness, "Show as lines")?;
     assert_eq!(buttons(&harness, "Row 1"), 0);
     assert_eq!(buttons(&harness, "Show as table"), 1);
+    assert!(in_accent(&harness, "Show as table"));
     assert_eq!(field(&harness)?, before);
     // Typed into its lines, as text.
     key(&mut harness, Key::ArrowLeft);
@@ -468,6 +490,23 @@ fn show_as_lines_and_show_as_grid_switch_the_tables_view() -> TestResult {
     assert_eq!(buttons(&harness, "Row 1"), 1);
     assert_eq!(table_count(&field(&harness)?), 1);
     Ok(())
+}
+
+/// Whether the words `label` are drawn in the accent's text colour.
+fn in_accent(harness: &Harness<'_, App>, label: &str) -> bool {
+    fn flat(shape: &egui::Shape, label: &str, accent: egui::Color32) -> bool {
+        match shape {
+            egui::Shape::Vec(shapes) => shapes.iter().any(|s| flat(s, label, accent)),
+            egui::Shape::Text(text) => text.galley.text() == label && text.fallback_color == accent,
+            _ => false,
+        }
+    }
+    let accent = harness.ctx.global_style().visuals.hyperlink_color;
+    harness
+        .output()
+        .shapes
+        .iter()
+        .any(|clipped| flat(&clipped.shape, label, accent))
 }
 
 /// How many tables `text` holds, by their delimiter rows.
@@ -541,6 +580,7 @@ fn the_text_around_still_edits_and_leaving_the_field_keeps_it() -> TestResult {
     assert!(text.contains("| milk | 20 |"), "{text:?}");
     assert!(text.ends_with("the very end"), "{text:?}");
     // Into another field, the Note's is left: kept, and read again.
+    press(&mut harness, "Add a part")?;
     harness
         .get_by(|n| n.placeholder() == Some("What's new?"))
         .click();
@@ -593,7 +633,8 @@ fn a_sections_table_is_edited_in_its_grid_too() -> TestResult {
 fn a_table_of_add_to_note_is_edited_in_its_grid() -> TestResult {
     let (store, note) = with_note("Shop", "plain")?;
     let mut harness = editor(&store, &note);
-    // The Amend field's bar, the second.
+    // Its box shows once asked (obf-1072); its bar is the second.
+    press(&mut harness, "Add a part")?;
     harness
         .query_all_by_role_and_label(Role::Button, "Table")
         .nth(1)

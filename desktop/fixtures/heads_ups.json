@@ -1,0 +1,870 @@
+{
+  "maxMinutes": 43200,
+  "choices": {
+    "timed": [
+      5,
+      10,
+      15,
+      30,
+      60,
+      120,
+      1440,
+      2880,
+      10080
+    ],
+    "allDay": [
+      1440,
+      2880,
+      4320,
+      10080
+    ]
+  },
+  "units": {
+    "timed": [
+      "minutes",
+      "hours",
+      "days",
+      "weeks"
+    ],
+    "allDay": [
+      "days",
+      "weeks"
+    ]
+  },
+  "most": {
+    "minutes": 43200,
+    "hours": 720,
+    "days": 30,
+    "weeks": 4
+  },
+  "minutesOf": [
+    {
+      "allDay": false,
+      "count": -1,
+      "minutes": null,
+      "unit": "minutes"
+    },
+    {
+      "allDay": false,
+      "count": 0,
+      "minutes": null,
+      "unit": "minutes"
+    },
+    {
+      "allDay": false,
+      "count": 1,
+      "minutes": 1,
+      "unit": "minutes"
+    },
+    {
+      "allDay": false,
+      "count": 2,
+      "minutes": 2,
+      "unit": "minutes"
+    },
+    {
+      "allDay": false,
+      "count": 4,
+      "minutes": 4,
+      "unit": "minutes"
+    },
+    {
+      "allDay": false,
+      "count": 5,
+      "minutes": 5,
+      "unit": "minutes"
+    },
+    {
+      "allDay": false,
+      "count": 24,
+      "minutes": 24,
+      "unit": "minutes"
+    },
+    {
+      "allDay": false,
+      "count": 30,
+      "minutes": 30,
+      "unit": "minutes"
+    },
+    {
+      "allDay": false,
+      "count": 31,
+      "minutes": 31,
+      "unit": "minutes"
+    },
+    {
+      "allDay": false,
+      "count": 45,
+      "minutes": 45,
+      "unit": "minutes"
+    },
+    {
+      "allDay": false,
+      "count": 720,
+      "minutes": 720,
+      "unit": "minutes"
+    },
+    {
+      "allDay": false,
+      "count": 721,
+      "minutes": 721,
+      "unit": "minutes"
+    },
+    {
+      "allDay": false,
+      "count": 1440,
+      "minutes": 1440,
+      "unit": "minutes"
+    },
+    {
+      "allDay": false,
+      "count": 43200,
+      "minutes": 43200,
+      "unit": "minutes"
+    },
+    {
+      "allDay": false,
+      "count": 43201,
+      "minutes": null,
+      "unit": "minutes"
+    },
+    {
+      "allDay": false,
+      "count": 9223372036854775807,
+      "minutes": null,
+      "unit": "minutes"
+    },
+    {
+      "allDay": false,
+      "count": -1,
+      "minutes": null,
+      "unit": "hours"
+    },
+    {
+      "allDay": false,
+      "count": 0,
+      "minutes": null,
+      "unit": "hours"
+    },
+    {
+      "allDay": false,
+      "count": 1,
+      "minutes": 60,
+      "unit": "hours"
+    },
+    {
+      "allDay": false,
+      "count": 2,
+      "minutes": 120,
+      "unit": "hours"
+    },
+    {
+      "allDay": false,
+      "count": 4,
+      "minutes": 240,
+      "unit": "hours"
+    },
+    {
+      "allDay": false,
+      "count": 5,
+      "minutes": 300,
+      "unit": "hours"
+    },
+    {
+      "allDay": false,
+      "count": 24,
+      "minutes": 1440,
+      "unit": "hours"
+    },
+    {
+      "allDay": false,
+      "count": 30,
+      "minutes": 1800,
+      "unit": "hours"
+    },
+    {
+      "allDay": false,
+      "count": 31,
+      "minutes": 1860,
+      "unit": "hours"
+    },
+    {
+      "allDay": false,
+      "count": 45,
+      "minutes": 2700,
+      "unit": "hours"
+    },
+    {
+      "allDay": false,
+      "count": 720,
+      "minutes": 43200,
+      "unit": "hours"
+    },
+    {
+      "allDay": false,
+      "count": 721,
+      "minutes": null,
+      "unit": "hours"
+    },
+    {
+      "allDay": false,
+      "count": 1440,
+      "minutes": null,
+      "unit": "hours"
+    },
+    {
+      "allDay": false,
+      "count": 43200,
+      "minutes": null,
+      "unit": "hours"
+    },
+    {
+      "allDay": false,
+      "count": 43201,
+      "minutes": null,
+      "unit": "hours"
+    },
+    {
+      "allDay": false,
+      "count": 9223372036854775807,
+      "minutes": null,
+      "unit": "hours"
+    },
+    {
+      "allDay": false,
+      "count": -1,
+      "minutes": null,
+      "unit": "days"
+    },
+    {
+      "allDay": false,
+      "count": 0,
+      "minutes": null,
+      "unit": "days"
+    },
+    {
+      "allDay": false,
+      "count": 1,
+      "minutes": 1440,
+      "unit": "days"
+    },
+    {
+      "allDay": false,
+      "count": 2,
+      "minutes": 2880,
+      "unit": "days"
+    },
+    {
+      "allDay": false,
+      "count": 4,
+      "minutes": 5760,
+      "unit": "days"
+    },
+    {
+      "allDay": false,
+      "count": 5,
+      "minutes": 7200,
+      "unit": "days"
+    },
+    {
+      "allDay": false,
+      "count": 24,
+      "minutes": 34560,
+      "unit": "days"
+    },
+    {
+      "allDay": false,
+      "count": 30,
+      "minutes": 43200,
+      "unit": "days"
+    },
+    {
+      "allDay": false,
+      "count": 31,
+      "minutes": null,
+      "unit": "days"
+    },
+    {
+      "allDay": false,
+      "count": 45,
+      "minutes": null,
+      "unit": "days"
+    },
+    {
+      "allDay": false,
+      "count": 720,
+      "minutes": null,
+      "unit": "days"
+    },
+    {
+      "allDay": false,
+      "count": 721,
+      "minutes": null,
+      "unit": "days"
+    },
+    {
+      "allDay": false,
+      "count": 1440,
+      "minutes": null,
+      "unit": "days"
+    },
+    {
+      "allDay": false,
+      "count": 43200,
+      "minutes": null,
+      "unit": "days"
+    },
+    {
+      "allDay": false,
+      "count": 43201,
+      "minutes": null,
+      "unit": "days"
+    },
+    {
+      "allDay": false,
+      "count": 9223372036854775807,
+      "minutes": null,
+      "unit": "days"
+    },
+    {
+      "allDay": false,
+      "count": -1,
+      "minutes": null,
+      "unit": "weeks"
+    },
+    {
+      "allDay": false,
+      "count": 0,
+      "minutes": null,
+      "unit": "weeks"
+    },
+    {
+      "allDay": false,
+      "count": 1,
+      "minutes": 10080,
+      "unit": "weeks"
+    },
+    {
+      "allDay": false,
+      "count": 2,
+      "minutes": 20160,
+      "unit": "weeks"
+    },
+    {
+      "allDay": false,
+      "count": 4,
+      "minutes": 40320,
+      "unit": "weeks"
+    },
+    {
+      "allDay": false,
+      "count": 5,
+      "minutes": null,
+      "unit": "weeks"
+    },
+    {
+      "allDay": false,
+      "count": 24,
+      "minutes": null,
+      "unit": "weeks"
+    },
+    {
+      "allDay": false,
+      "count": 30,
+      "minutes": null,
+      "unit": "weeks"
+    },
+    {
+      "allDay": false,
+      "count": 31,
+      "minutes": null,
+      "unit": "weeks"
+    },
+    {
+      "allDay": false,
+      "count": 45,
+      "minutes": null,
+      "unit": "weeks"
+    },
+    {
+      "allDay": false,
+      "count": 720,
+      "minutes": null,
+      "unit": "weeks"
+    },
+    {
+      "allDay": false,
+      "count": 721,
+      "minutes": null,
+      "unit": "weeks"
+    },
+    {
+      "allDay": false,
+      "count": 1440,
+      "minutes": null,
+      "unit": "weeks"
+    },
+    {
+      "allDay": false,
+      "count": 43200,
+      "minutes": null,
+      "unit": "weeks"
+    },
+    {
+      "allDay": false,
+      "count": 43201,
+      "minutes": null,
+      "unit": "weeks"
+    },
+    {
+      "allDay": false,
+      "count": 9223372036854775807,
+      "minutes": null,
+      "unit": "weeks"
+    },
+    {
+      "allDay": true,
+      "count": -1,
+      "minutes": null,
+      "unit": "minutes"
+    },
+    {
+      "allDay": true,
+      "count": 0,
+      "minutes": null,
+      "unit": "minutes"
+    },
+    {
+      "allDay": true,
+      "count": 1,
+      "minutes": null,
+      "unit": "minutes"
+    },
+    {
+      "allDay": true,
+      "count": 2,
+      "minutes": null,
+      "unit": "minutes"
+    },
+    {
+      "allDay": true,
+      "count": 4,
+      "minutes": null,
+      "unit": "minutes"
+    },
+    {
+      "allDay": true,
+      "count": 5,
+      "minutes": null,
+      "unit": "minutes"
+    },
+    {
+      "allDay": true,
+      "count": 24,
+      "minutes": null,
+      "unit": "minutes"
+    },
+    {
+      "allDay": true,
+      "count": 30,
+      "minutes": null,
+      "unit": "minutes"
+    },
+    {
+      "allDay": true,
+      "count": 31,
+      "minutes": null,
+      "unit": "minutes"
+    },
+    {
+      "allDay": true,
+      "count": 45,
+      "minutes": null,
+      "unit": "minutes"
+    },
+    {
+      "allDay": true,
+      "count": 720,
+      "minutes": null,
+      "unit": "minutes"
+    },
+    {
+      "allDay": true,
+      "count": 721,
+      "minutes": null,
+      "unit": "minutes"
+    },
+    {
+      "allDay": true,
+      "count": 1440,
+      "minutes": null,
+      "unit": "minutes"
+    },
+    {
+      "allDay": true,
+      "count": 43200,
+      "minutes": null,
+      "unit": "minutes"
+    },
+    {
+      "allDay": true,
+      "count": 43201,
+      "minutes": null,
+      "unit": "minutes"
+    },
+    {
+      "allDay": true,
+      "count": 9223372036854775807,
+      "minutes": null,
+      "unit": "minutes"
+    },
+    {
+      "allDay": true,
+      "count": -1,
+      "minutes": null,
+      "unit": "hours"
+    },
+    {
+      "allDay": true,
+      "count": 0,
+      "minutes": null,
+      "unit": "hours"
+    },
+    {
+      "allDay": true,
+      "count": 1,
+      "minutes": null,
+      "unit": "hours"
+    },
+    {
+      "allDay": true,
+      "count": 2,
+      "minutes": null,
+      "unit": "hours"
+    },
+    {
+      "allDay": true,
+      "count": 4,
+      "minutes": null,
+      "unit": "hours"
+    },
+    {
+      "allDay": true,
+      "count": 5,
+      "minutes": null,
+      "unit": "hours"
+    },
+    {
+      "allDay": true,
+      "count": 24,
+      "minutes": null,
+      "unit": "hours"
+    },
+    {
+      "allDay": true,
+      "count": 30,
+      "minutes": null,
+      "unit": "hours"
+    },
+    {
+      "allDay": true,
+      "count": 31,
+      "minutes": null,
+      "unit": "hours"
+    },
+    {
+      "allDay": true,
+      "count": 45,
+      "minutes": null,
+      "unit": "hours"
+    },
+    {
+      "allDay": true,
+      "count": 720,
+      "minutes": null,
+      "unit": "hours"
+    },
+    {
+      "allDay": true,
+      "count": 721,
+      "minutes": null,
+      "unit": "hours"
+    },
+    {
+      "allDay": true,
+      "count": 1440,
+      "minutes": null,
+      "unit": "hours"
+    },
+    {
+      "allDay": true,
+      "count": 43200,
+      "minutes": null,
+      "unit": "hours"
+    },
+    {
+      "allDay": true,
+      "count": 43201,
+      "minutes": null,
+      "unit": "hours"
+    },
+    {
+      "allDay": true,
+      "count": 9223372036854775807,
+      "minutes": null,
+      "unit": "hours"
+    },
+    {
+      "allDay": true,
+      "count": -1,
+      "minutes": null,
+      "unit": "days"
+    },
+    {
+      "allDay": true,
+      "count": 0,
+      "minutes": null,
+      "unit": "days"
+    },
+    {
+      "allDay": true,
+      "count": 1,
+      "minutes": 1440,
+      "unit": "days"
+    },
+    {
+      "allDay": true,
+      "count": 2,
+      "minutes": 2880,
+      "unit": "days"
+    },
+    {
+      "allDay": true,
+      "count": 4,
+      "minutes": 5760,
+      "unit": "days"
+    },
+    {
+      "allDay": true,
+      "count": 5,
+      "minutes": 7200,
+      "unit": "days"
+    },
+    {
+      "allDay": true,
+      "count": 24,
+      "minutes": 34560,
+      "unit": "days"
+    },
+    {
+      "allDay": true,
+      "count": 30,
+      "minutes": 43200,
+      "unit": "days"
+    },
+    {
+      "allDay": true,
+      "count": 31,
+      "minutes": null,
+      "unit": "days"
+    },
+    {
+      "allDay": true,
+      "count": 45,
+      "minutes": null,
+      "unit": "days"
+    },
+    {
+      "allDay": true,
+      "count": 720,
+      "minutes": null,
+      "unit": "days"
+    },
+    {
+      "allDay": true,
+      "count": 721,
+      "minutes": null,
+      "unit": "days"
+    },
+    {
+      "allDay": true,
+      "count": 1440,
+      "minutes": null,
+      "unit": "days"
+    },
+    {
+      "allDay": true,
+      "count": 43200,
+      "minutes": null,
+      "unit": "days"
+    },
+    {
+      "allDay": true,
+      "count": 43201,
+      "minutes": null,
+      "unit": "days"
+    },
+    {
+      "allDay": true,
+      "count": 9223372036854775807,
+      "minutes": null,
+      "unit": "days"
+    },
+    {
+      "allDay": true,
+      "count": -1,
+      "minutes": null,
+      "unit": "weeks"
+    },
+    {
+      "allDay": true,
+      "count": 0,
+      "minutes": null,
+      "unit": "weeks"
+    },
+    {
+      "allDay": true,
+      "count": 1,
+      "minutes": 10080,
+      "unit": "weeks"
+    },
+    {
+      "allDay": true,
+      "count": 2,
+      "minutes": 20160,
+      "unit": "weeks"
+    },
+    {
+      "allDay": true,
+      "count": 4,
+      "minutes": 40320,
+      "unit": "weeks"
+    },
+    {
+      "allDay": true,
+      "count": 5,
+      "minutes": null,
+      "unit": "weeks"
+    },
+    {
+      "allDay": true,
+      "count": 24,
+      "minutes": null,
+      "unit": "weeks"
+    },
+    {
+      "allDay": true,
+      "count": 30,
+      "minutes": null,
+      "unit": "weeks"
+    },
+    {
+      "allDay": true,
+      "count": 31,
+      "minutes": null,
+      "unit": "weeks"
+    },
+    {
+      "allDay": true,
+      "count": 45,
+      "minutes": null,
+      "unit": "weeks"
+    },
+    {
+      "allDay": true,
+      "count": 720,
+      "minutes": null,
+      "unit": "weeks"
+    },
+    {
+      "allDay": true,
+      "count": 721,
+      "minutes": null,
+      "unit": "weeks"
+    },
+    {
+      "allDay": true,
+      "count": 1440,
+      "minutes": null,
+      "unit": "weeks"
+    },
+    {
+      "allDay": true,
+      "count": 43200,
+      "minutes": null,
+      "unit": "weeks"
+    },
+    {
+      "allDay": true,
+      "count": 43201,
+      "minutes": null,
+      "unit": "weeks"
+    },
+    {
+      "allDay": true,
+      "count": 9223372036854775807,
+      "minutes": null,
+      "unit": "weeks"
+    }
+  ],
+  "read": [
+    {
+      "minutes": [],
+      "value": null
+    },
+    {
+      "minutes": [],
+      "value": ""
+    },
+    {
+      "minutes": [
+        20
+      ],
+      "value": "20"
+    },
+    {
+      "minutes": [
+        20,
+        1440
+      ],
+      "value": "1440,20,20"
+    },
+    {
+      "minutes": [
+        45,
+        90,
+        14400,
+        43200
+      ],
+      "value": "45,90,14400,43200"
+    },
+    {
+      "minutes": [],
+      "value": "43201,0,020,+5, 5,abc,-3,0x10,,99999"
+    }
+  ],
+  "write": [
+    {
+      "minutes": [],
+      "value": null
+    },
+    {
+      "minutes": [
+        0,
+        -5,
+        43201
+      ],
+      "value": null
+    },
+    {
+      "minutes": [
+        90,
+        45,
+        45,
+        43200,
+        1
+      ],
+      "value": "1,45,90,43200"
+    }
+  ]
+}

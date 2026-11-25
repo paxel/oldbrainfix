@@ -2,7 +2,71 @@
 
 Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `CHANGELOG.md` und `OLDER_CHANGES.md` im Wurzelverzeichnis, in einer Datei: die aktuelle Version oben ohne Datum, die veröffentlichten darunter mit dem Datum ihres Tags. Die Seite "Was ist neu" der Dokumentation wird daraus gebaut; eine englische Version ohne deutschen Abschnitt lässt den Bau fehlschlagen.
 
-## [0.7.2]
+## [0.8.0]
+
+### Neu
+
+- Auf dem Handy und dem Desktop zeigt eine Suche, wo jede Notiz passt, und eine Suchleiste hebt jeden Treffer in einer Notiz hervor. ([obf-1047](https://github.com/paxel/oldbrainfix/issues/358))
+- Auf dem Handy schwebt über einer Auswahl eine Leiste mit Kopieren, Einfügen und Suchen; auf dem Desktop bekommt das Rechtsklickmenü Suchen. ([obf-1055](https://github.com/paxel/oldbrainfix/issues/366))
+- Auf dem Desktop öffnet sich eine Markdown-Datei in einer Ansicht mit Obsidian-Links und lässt sich samt verlinkter Dateien importieren. ([obf-1056](https://github.com/paxel/oldbrainfix/issues/367))
+- Auf dem Handy und dem Desktop hat der Notiz-Editor Rückgängig und Wiederholen, Schritt für Schritt, und „Alle Änderungen zurücknehmen“ in seinem ⋮. ([obf-1051](https://github.com/paxel/oldbrainfix/issues/362))
+- Auf dem Handy und dem Desktop kopiert das ⋮ einer Tabelle sie, und im Editor schiebt es sie nach oben oder unten oder löscht sie. ([obf-1050](https://github.com/paxel/oldbrainfix/issues/361))
+- Auf dem Handy und dem Desktop sortiert ein Tippen auf die Kopfreihe eine Tabelle beim Lesen; der Editor sortiert ihre Zeilen nach Spalte. ([obf-1052](https://github.com/paxel/oldbrainfix/issues/363))
+- Auf dem Handy und dem Desktop wählt langes Drücken oder Ziehen auf einer Tabellenzelle ein Rechteck aus Zellen, das sich als Tabelle kopieren lässt. ([obf-1054](https://github.com/paxel/oldbrainfix/issues/365))
+- Auf dem Handy und dem Desktop kann eine Vorwarnung eine eigene Länge haben: Minuten, Stunden, Tage oder Wochen. ([obf-1087](https://github.com/paxel/oldbrainfix/issues/400))
+- Auf dem Handy und dem Desktop schalten „Tipps zeigen“ in den Einstellungen und „Keine Tipps mehr“ auf jedem Tipp die Tipps ab. ([obf-1060](https://github.com/paxel/oldbrainfix/issues/373))
+- Auf dem Handy und dem Desktop kann eine Sprachaufnahme nach einer Pause von 2, 3, 5 oder 10 Sekunden von selbst enden. ([obf-1053](https://github.com/paxel/oldbrainfix/issues/364))
+- Auf dem Desktop listet eine Seite „Im Hintergrund“ die laufenden Arbeiten, wie weit jede ist, und Abbrechen; ein abgebrochener Import behält seine Notizen. ([obf-1078](https://github.com/paxel/oldbrainfix/issues/391))
+- Auf dem Handy listet eine Seite „Im Hintergrund“ die laufenden Arbeiten mit Abbrechen, geöffnet über die wandernde Linie oder ⋮. ([obf-1078](https://github.com/paxel/oldbrainfix/issues/391))
+- „Papierkorb jetzt leeren“ auf der Seite Papierkorb löscht nach einer Frage mit den Anzahlen sofort alles darin endgültig. ([obf-1095](https://github.com/paxel/oldbrainfix/issues/408))
+- Das „+“ der Agenda bietet neben der Schnellnotiz „Editor“ an, für eine leere Notiz im vollen Editor. ([obf-1141](https://github.com/paxel/oldbrainfix/issues/457))
+- Ein Tippen auf einen Knopf zeigt kurz ein grünes „!“ über Finger oder Zeiger; ein Schalter in den Einstellungen schaltet es ab. ([obf-1143](https://github.com/paxel/oldbrainfix/issues/459))
+- Wird derselbe Ordner, Google-Keep-Export oder dieselbe Markdown-Datei noch einmal importiert, bieten Android und Desktop an, nur das Fehlende zu ergänzen. ([obf-1078](https://github.com/paxel/oldbrainfix/issues/391))
+
+### Geändert
+
+- Auf dem Handy und dem Desktop behält eine Tabelle die Textgröße, bricht lange Zellen um und scrollt seitwärts; eine Karte zeigt ihre ersten 10 Zeilen. ([obf-1048](https://github.com/paxel/oldbrainfix/issues/359))
+- Auf dem Handy und dem Desktop übergeht die Suche Akzente und Umlaute, sodass „muller“ „Müller“ und „strasse“ „Straße“ findet. ([obf-1047](https://github.com/paxel/oldbrainfix/issues/358))
+- Auf dem Handy steht Code weit vorn in der Formatleiste und macht aus mehreren Zeilen oder einer leeren Zeile auch einen Codeblock. ([obf-1097](https://github.com/paxel/oldbrainfix/issues/410))
+- Auf dem Handy zeigt die Liste der Bereiche Griffe zum Verschieben erst nach „Neu anordnen“ in ihrem ⋮; Scrollen und Wischen erwischen sie nicht mehr. ([obf-1089](https://github.com/paxel/oldbrainfix/issues/402))
+- Auf dem Handy stehen die Knöpfe der Schnellnotiz direkt unter dem Text und springen nicht mehr, wenn sich die Tastatur öffnet. ([obf-1083](https://github.com/paxel/oldbrainfix/issues/396))
+- Auf dem Handy und dem Desktop heißt der Abschnitt der Einstellungen für Einfach und Erweitert jetzt Komplexität. ([obf-1086](https://github.com/paxel/oldbrainfix/issues/399))
+- Auf dem Handy ist jeder Abschnitt der Einstellungen eine Karte mit Titel darüber, auch Aussehen, Einheiten und Komplexität. ([obf-1085](https://github.com/paxel/oldbrainfix/issues/398))
+- Auf dem Handy und dem Desktop ist „Mehr“ der Schnellnotiz ein breiter Knopf „Im Editor öffnen“ unter den Stupser-Knöpfen. ([obf-1080](https://github.com/paxel/oldbrainfix/issues/393))
+- Auf dem Desktop beginnt jede Liste von Notizen mit einem zweizeiligen Kopfstreifen, der mit der Textgröße wächst. ([obf-1064](https://github.com/paxel/oldbrainfix/issues/377))
+- Auf dem Desktop ist das Suchfeld einer Liste so hoch wie ein Knopf, seine Schrift so groß wie auf Karten, Lupe und ✕ darin. ([obf-1063](https://github.com/paxel/oldbrainfix/issues/376))
+- Auf dem Desktop sind Ansicht und Neue Notiz gerahmte Knöpfe mit Symbol und Wort, wie „Notizen zeigen von …“. ([obf-1067](https://github.com/paxel/oldbrainfix/issues/380))
+- Auf dem Handy und dem Desktop heißt eine Notiz ohne Text nach ihrem Transkript oder Fototext, auf Karten, in Agenda, Kalender und Benachrichtigungen. ([obf-1049](https://github.com/paxel/oldbrainfix/issues/360))
+- Auf dem Desktop verlassen die Menüs Bereich und Notiz die Menüleiste; ihre Aktionen stehen im ⋮ des Bereichs, Themas und der Notiz. ([obf-1065](https://github.com/paxel/oldbrainfix/issues/378))
+- Auf dem Desktop ist „Heute ruhig“ ein Knopf in der oberen Zeile der Agenda, der während des ruhigen Tags „Ruhigen Tag beenden“ heißt. ([obf-1066](https://github.com/paxel/oldbrainfix/issues/379))
+- Auf dem Handy zeigt die Schnellnotiz nach einer Aufnahme „Wird transkribiert …“ und setzt das Transkript danach in ihren Text. ([obf-1082](https://github.com/paxel/oldbrainfix/issues/395))
+- Auf dem Handy und dem Desktop erscheint das Feld zum Ergänzen erst nach „Teil hinzufügen“, und eine neue Notiz hat keins. ([obf-1072](https://github.com/paxel/oldbrainfix/issues/385))
+- Auf dem Handy und dem Desktop ist eine Checkliste, Einkaufsliste oder Strichliste eine Karte mit „Zeile hinzufügen“, die Beschreibung erst nach „Beschreibung hinzufügen“. ([obf-1071](https://github.com/paxel/oldbrainfix/issues/384))
+- Auf dem Desktop läuft der Abgleich weiter, während der KI-Port offen ist; die Änderungen der KI bleiben bis zum Annehmen auf diesem Rechner. ([obf-1076](https://github.com/paxel/oldbrainfix/issues/389))
+- Auf dem Desktop bietet die Zeile des KI-Ports Prüfen mit der Zahl der Änderungen an, oder „KI-Port schließen“, solange nichts geändert ist. ([obf-1075](https://github.com/paxel/oldbrainfix/issues/388))
+- Auf dem Handy und dem Desktop bringt eine Sicherung die Einstellungen des Geräts zurück und bietet das vorher gewählte Sprachmodell an. ([obf-1098](https://github.com/paxel/oldbrainfix/issues/411))
+- Auf dem Handy und dem Desktop stehen die Knöpfe einer Notiz in vier benannten Gruppen: Diese Notiz, Hinzufügen, Teilen und Aufräumen. ([obf-1073](https://github.com/paxel/oldbrainfix/issues/386))
+- Auf dem Handy und dem Desktop kommen die Worte einer entfernten Aufnahme oder eines Fotos in den Text der Notiz, zum Bearbeiten oder Löschen. ([obf-1084](https://github.com/paxel/oldbrainfix/issues/397))
+- Auf dem Handy und dem Desktop stehen die meistgenutzten #Wörter unter der Suche, am Ende „Alle #Wörter …“ für den ganzen Baum. ([obf-1074](https://github.com/paxel/oldbrainfix/issues/387))
+- Auf dem Handy und dem Desktop folgen Knöpfe, Chips und Kopfstreifen einem Entwurf: umrandete Knöpfe sind getönt, Löschen ist rot, Chips sind Pillen. ([obf-1081](https://github.com/paxel/oldbrainfix/issues/394))
+- Aktionen heißen in beiden Apps gleich, und die Menüs einer Karte, eines Bereichs, einer Tabellenspalte, Datei und Ansicht stehen in kurzen Untermenüs. ([obf-1014](https://github.com/paxel/oldbrainfix/issues/321))
+- Auf dem Handy stehen die Importe nicht mehr in den Einstellungen, sondern unter Importieren … im ⋮ der Bereichsliste. ([obf-1096](https://github.com/paxel/oldbrainfix/issues/409))
+- In einem Bereich oder Thema öffnet „+“ ▸ Notiz den vollen Editor mit einer dort einsortierten Notiz statt der Schnellnotiz. ([obf-1140](https://github.com/paxel/oldbrainfix/issues/456))
+- Die Benachrichtigung einer Erinnerung oder Routine öffnet auf Handy und Desktop die Agenda bei ihrer markierten Fälligkeit; „Feedback senden“ kann die zuletzt angetippten Benachrichtigungen mitschicken. ([obf-1039](https://github.com/paxel/oldbrainfix/issues/349))
+
+### Behoben
+
+- Ein Paket mit „Mein Profil beifügen“ und Profilbild lässt sich wieder öffnen, beim Absender und bei den Empfängern. ([obf-1142](https://github.com/paxel/oldbrainfix/issues/458))
+- Auf dem Handy ist „Vor KI verborgen“ im ⋮ einer Karte und im Menü eines Bereichs eine Zeile, der Schalter am Ende. ([obf-1135](https://github.com/paxel/oldbrainfix/issues/451))
+- Auf dem Desktop steht hinter dem Wert einer Notiz-Einstellung ein Aufklapp-Pfeil statt eines Roboterkopfs. ([obf-1116](https://github.com/paxel/oldbrainfix/issues/432))
+- Auf dem Handy bleibt die Linie unter der Leiste einer Liste, wenn ihr Suchstreifen weggescrollt ist. ([obf-1129](https://github.com/paxel/oldbrainfix/issues/445))
+- Auf dem Handy ist ein Konflikt eine Karte wie die anderen, auch im dunklen Modus, und jede Fassung eine Zeile zum Wählen. ([obf-1119](https://github.com/paxel/oldbrainfix/issues/435))
+- Auf dem Handy sehen Neue Strichliste, Notizen dieser Person, Änderungen schicken und Konflikte nicht mehr wie bloßer Text aus, sondern antippbar. ([obf-1108](https://github.com/paxel/oldbrainfix/issues/424))
+- Auf dem Handy und dem Desktop schneidet keine Suchleiste mehr ab, was darunter scrollt; jede steht auf einem Streifen mit einer Linie darunter. ([obf-1088](https://github.com/paxel/oldbrainfix/issues/401))
+- Auf dem Desktop bleibt Neue Notiz bei einem Filter; in beiden Apps meldet sich eine vom Filter ausgeblendete Notiz mit „Zeigen“. ([obf-1070](https://github.com/paxel/oldbrainfix/issues/383))
+- Auf dem Desktop ist „KI-Aufgabe prüfen“ nie ausgegraut; ohne etwas zu prüfen steht dort „Noch keine Änderungen“. ([obf-1077](https://github.com/paxel/oldbrainfix/issues/390))
+
+## [0.7.2] - 2026-11-23
 
 ### Geändert
 
@@ -19,6 +83,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Handy stürzt die App nach einem Absturz und „App neu starten“ nicht kurz darauf erneut ab. ([obf-1059](https://github.com/paxel/oldbrainfix/issues/372))
 - Auf dem Handy und dem Desktop friert ein Import die App nicht mehr ein: Er läuft daneben und zählt seine Notizen, auch wenn du weggehst. ([obf-1061](https://github.com/paxel/oldbrainfix/issues/374))
 - Auf dem Handy und dem Desktop friert das Verschieben eines Bereichs in den Papierkorb die App nicht mehr ein; seine Zeile zählt die verschobenen Notizen. ([obf-1093](https://github.com/paxel/oldbrainfix/issues/406))
+- Auf dem Handy und dem Desktop schneidet keine Suchleiste mehr ab, was darunter scrollt; jede steht auf einem Streifen mit einer Linie darunter. ([obf-1088](https://github.com/paxel/oldbrainfix/issues/401))
 
 ## [0.7.1] - 2026-11-21
 

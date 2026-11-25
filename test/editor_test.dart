@@ -8,6 +8,8 @@ import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/trash_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'add_a_part.dart';
+import 'editor_actions.dart';
 import 'reveal.dart';
 
 void main() {
@@ -150,8 +152,7 @@ void main() {
       await edit(tester, find.text('nees mor sauce'));
 
       tick(const Duration(hours: 3));
-      await reveal(tester, find.text('Add to Note'));
-      await tap(tester, find.text('Add to Note'));
+      await addAPart(tester);
       await tester.enterText(
         find.descendant(
           of: find.byType(AlertDialog),
@@ -159,7 +160,13 @@ void main() {
         ),
         'Update: sauce bought',
       );
-      await tap(tester, find.text('Add'));
+      await tap(
+        tester,
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Add'),
+        ),
+      );
 
       expect(find.text('Update: sauce bought'), findsOneWidget);
       // Under it, the same day as the Note, its time only (#170).
@@ -249,7 +256,7 @@ void main() {
       notes.capture('milk');
       await startAtNotes(tester);
       await edit(tester, find.text('nees mor sauce'));
-      await tap(tester, find.byTooltip('Move to trash'));
+      await tapEditorAction(tester, find.byKey(const ValueKey('editor-trash')));
 
       expect(find.byType(NoteEditorScreen), findsNothing);
       expect(find.text('nees mor sauce'), findsNothing);
@@ -358,8 +365,10 @@ void main() {
     await edit(tester, find.text('Soße kaufen'));
     await tap(tester, find.byKey(const ValueKey('badge-importance')));
     await tap(tester, find.text('Unwichtig'));
-    await reveal(tester, find.text('Zur Notiz hinzufügen'));
-    expect(find.text('Zur Notiz hinzufügen'), findsOneWidget);
+    await reveal(tester, find.text('Gekauft'));
+    // "Add a part" in the Add group at the page's end (obf-1073).
+    await reveal(tester, find.text('Teil hinzufügen'));
+    expect(find.text('Aufräumen'), findsOneWidget);
     await tap(tester, find.byType(BackButton));
     await tap(tester, find.byType(BackButton));
     await tap(tester, find.text('Ein ziemlich langer Bereichsname'));

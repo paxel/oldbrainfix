@@ -1,6 +1,7 @@
 import 'package:meta/meta.dart';
 import 'package:sqlite3/sqlite3.dart';
 
+import 'findings.dart';
 import 'notes.dart';
 import 'store.dart';
 import 'tallies.dart';
@@ -9,8 +10,9 @@ import 'text_format.dart';
 
 /// The full-text index of what search reads (ADR 0048), the same in
 /// both cores (`search_index.rs`): beside the log in the same database,
-/// a row for every entry that wrote a text search reads, in lower case
-/// as search lowers it, in an FTS5 table with the trigram tokenizer.
+/// a row for every entry that wrote a text search reads, folded as
+/// search folds it ([Findings.fold]), in an FTS5 table with the trigram
+/// tokenizer.
 ///
 /// It only narrows: it names every entity one of whose texts ever held a
 /// query, and search reads those as they are now, so an entry that no
@@ -21,11 +23,12 @@ import 'text_format.dart';
 /// mark are missing or of another version.
 @internal
 abstract final class SearchIndex {
-  /// The version of what the rows hold; another one is built anew.
-  static const version = 1;
+  /// The version of what the rows hold; another one is built anew. 2:
+  /// the texts folded, no longer only lowered (obf-1047).
+  static const version = 2;
 
-  /// The entities whose texts, at some time, held [wanted], in lower
-  /// case and not blank, and those the shown pending sets change: every
+  /// The entities whose texts, at some time, held [wanted], folded and
+  /// not empty, and those the shown pending sets change: every
   /// entity whose text holds it now, and maybe more. Null when the index
   /// cannot be used, such as a SQLite without FTS5: search then reads
   /// every Note.
@@ -53,8 +56,8 @@ abstract final class SearchIndex {
     }
   }
 
-  /// What the index holds of the entry that wrote [value] to [field], in
-  /// lower case: every way search reads such a text, a line apart, or
+  /// What the index holds of the entry that wrote [value] to [field],
+  /// folded: every way search reads such a text, a line apart, or
   /// null for a field search does not read. A `text` is read as a Note's
   /// with its boxes as written, a Section's and a Line's.
   static String? textOf(String field, String? value) {
@@ -64,21 +67,23 @@ abstract final class SearchIndex {
       final shown = stored.editable
           ? TextBoxes.strip(stored.text)
           : stored.text;
-      return {
-        stored.visible,
-        stored.text,
-        TextFormats.visible(stored.format, shown),
-      }.join('\n').toLowerCase();
+      return Findings.fold(
+        {
+          stored.visible,
+          stored.text,
+          TextFormats.visible(stored.format, shown),
+        }.join('\n'),
+      );
     }
     if (field == TallyKeys.line ||
         field.startsWith(NoteKeys.transcriptPrefix) ||
         field.startsWith(NoteKeys.ocrPrefix) ||
         field.startsWith(NoteKeys.fileTextPrefix)) {
-      return value.toLowerCase();
+      return Findings.fold(value);
     }
     if (field.startsWith(NoteKeys.filePrefix)) {
       final hash = field.substring(NoteKeys.filePrefix.length);
-      return Attachment.read(hash, value).name.toLowerCase();
+      return Findings.fold(Attachment.read(hash, value).name);
     }
     return null;
   }

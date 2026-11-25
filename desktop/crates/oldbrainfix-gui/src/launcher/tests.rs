@@ -16,7 +16,8 @@ fn a_fresh_register_writes_the_icon_and_a_marked_launcher() {
         ICON
     );
     let desktop = fs::read_to_string(dir.path().join(ENTRY)).unwrap();
-    assert!(desktop.contains("\nExec=/opt/brew/bin/oldbrainfix\n"));
+    assert!(desktop.contains("\nExec=/opt/brew/bin/oldbrainfix %F\n"));
+    assert!(desktop.contains("\nMimeType=text/markdown;text/x-markdown;\n"));
     assert!(desktop.contains("\nTryExec=/opt/brew/bin/oldbrainfix\n"));
     assert!(desktop.contains("\nIcon=oldbrainfix\n"));
     assert!(desktop.contains("\nStartupWMClass=io.github.paxel.oldbrainfix\n"));
@@ -25,7 +26,7 @@ fn a_fresh_register_writes_the_icon_and_a_marked_launcher() {
     assert!(!register_at(dir.path(), exec).unwrap());
     assert!(register_at(dir.path(), Path::new("/new/oldbrainfix")).unwrap());
     let desktop = fs::read_to_string(dir.path().join(ENTRY)).unwrap();
-    assert!(desktop.contains("\nExec=/new/oldbrainfix\n"));
+    assert!(desktop.contains("\nExec=/new/oldbrainfix %F\n"));
 }
 
 #[test]

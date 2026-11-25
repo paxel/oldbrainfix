@@ -43,8 +43,10 @@
   abgedunkelt, und eine Karte daneben sagt, was sie tut. <strong>Weiter</strong> zeigt den nächsten
   Tipp, <strong>Überspringen</strong> oder ein Tippen außerhalb der Karte beendet die Tipps der Seite,
   und jeder Tipp kommt auf diesem Gerät einmal. Später bekommt Neues auf einer Seite einmal seinen
-  eigenen Tipp. <strong>Tipps wieder zeigen</strong> in den Einstellungen bringt sie auf diesem
-  Gerät alle zurück.
+  eigenen Tipp. <strong>Keine Tipps mehr</strong> auf einem Tipp oder der Schalter <strong>Tipps
+  zeigen</strong> in den Einstellungen schaltet die Tipps auf diesem Gerät aus, auch neue.
+  <strong>Tipps wieder zeigen</strong> unter dem Schalter schaltet sie wieder ein und bringt sie alle
+  zurück.
 </p>
 <p>Die Startauswahl, jeder Bereich und jedes Thema mit Haken:</p>
 <ul>
@@ -130,9 +132,11 @@
   Die Bereiche kommen mit der Sicherung.
 </p>
 <p>
-  Eine Sicherung enthält Einfach oder Erweitert und die Papierkorb-Einstellung, aber keine anderen
-  Einstellungen. Stell nach dem Wiederherstellen Alarme und Sperren
-  neu ein, wähle den Sicherungsordner noch einmal und kopple deine anderen Geräte noch einmal.
+  Eine Sicherung enthält die Einstellungen des Geräts und Einfach oder Erweitert und die
+  Papierkorb-Einstellung, außer denen, die an das Gerät gebunden sind. Stell nach dem
+  Wiederherstellen die Sperren und den Alarmton neu ein, wähle den Sicherungsordner noch einmal und
+  kopple deine anderen Geräte noch einmal. Das Sprachmodell wird wieder zum Herunterladen angeboten
+  (siehe <a href="backups-locks-and-privacy.html">Sicherungen, Sperren und Privatsphäre</a>).
 </p>
 <p>
   Hat Androids eigene Datensicherung mit der App eine Sicherung aus deinem Google-Konto
@@ -151,9 +155,9 @@
 <guide-box name="import-folder">
 <h2>Notizen aus einer anderen App importieren</h2>
 <p>Mach aus einem Ordner mit Markdown-, Text-, AsciiDoc-, Org-, reStructuredText- oder HTML-Dateien Notizen.</p>
-<box-tab device="phone" alt="Die Zeilen zum Importieren in den Einstellungen des Handys, gefunden über ihre Suche">
-<li>Tippe dein Profilbild, dann <strong>Einstellungen dieses Geräts</strong>.</li>
-<li>Tippe <strong>Import</strong> oben ins Suchfeld.</li>
+<box-tab device="phone" alt="Die Seite Import des Handys, geöffnet aus dem ⋮ der Bereichsliste">
+<li>Tippe auf der Agenda <strong>Suchen und stöbern</strong>.</li>
+<li>Tippe <strong>⋮ ▸ Importieren …</strong> in der oberen Leiste.</li>
 <li>Tippe <strong>Ordner importieren</strong>.</li>
 <li>Wähle den Ordner.</li>
 <li>Tippe oben <strong>Import abgeschlossen.</strong>, um zu sehen, was hereinkam.</li>
@@ -161,6 +165,7 @@
 <box-tab device="desktop" alt="Der Dialog Import in der Desktop-App">
 <li>Klicke <strong>Datei ▸ Importieren …</strong>.</li>
 <li>Klicke <strong>Ein Ordner …</strong> und wähle den Ordner.</li>
+<li>Klicke <strong>Ergänzen</strong> oder <strong>Neu importieren</strong>, wenn gefragt.</li>
 <li>Klicke <strong>Bereich öffnen</strong>, sobald der Import fertig ist.</li>
 </box-tab>
 <box-more>
@@ -183,20 +188,44 @@
   Internet geladen. Ein Ordner darf alle diese Arten zugleich enthalten.
 </p>
 <p>
-  Alle landen in einem neuen Bereich, der nach dem Ordner benannt ist, etwa „Aus Notes“; denselben
-  Ordner noch einmal zu importieren legt einen zweiten Bereich an, „Aus Notes (2)“. Keine davon ist
+  Alle landen in einem neuen Bereich, der nach dem Ordner benannt ist, etwa „Aus Notes“. Keine davon ist
   unsortiert, und für keine kommt ein Stupser. Andere Dateien, versteckte Dateien und Dateien, die zu
   groß für eine Notiz sind (mehr als 1 MiB), werden übersprungen. Auf dem Handy läuft der Import
   neben der App auf einer eigenen Seite: Sie zeigt „Der Ordner wird gelesen …“ und zählt dann die
   Notizen, die hereinkommen, etwa „120 von 340 Notizen“. Du kannst die Seite verlassen und die App
-  derweil benutzen; die Zeile des Imports in den Einstellungen öffnet sie wieder. In der Desktop-App
+  derweil benutzen; die Zeile des Imports auf der Seite Import öffnet sie wieder. In der Desktop-App
   läuft der Import neben dem Fenster, und der Dialog „Import“ zeigt und zählt dasselbe; du kannst
   ihn schließen und das Fenster derweil benutzen, und <strong>Datei ▸ Importieren …</strong> zeigt
-  ihn wieder. „Import abgeschlossen.“ und am Ende die Seite auf dem Handy und der Dialog am Desktop
+  ihn wieder. <strong>Ansicht ▸ Im Hintergrund</strong> oder ein Klick auf die Linie unter der
+  Menüleiste bietet <strong>Abbrechen</strong>: Der Import hält vor seiner nächsten Notiz an, die
+  Notizen, die er angelegt hat, bleiben, und die Seite sagt „Angehalten: 120 von 340 importiert“.
+  Auf dem Handy öffnet <strong>⋮ ▸ Im Hintergrund</strong> auf der Agenda oder ein Tippen auf die
+  Linie unter der Leiste dieselbe Seite; oben steht dann „Import angehalten.“
+  „Import abgeschlossen.“ und am Ende die Seite auf dem Handy und der Dialog am Desktop
   zeigen, wie viele Notizen in welchen Bereich kamen und wie viele Dateien warum
   übersprungen wurden, mit <strong>Bereich öffnen</strong>. Ein Ordner ohne eine solche Datei ändert nichts. Nach
   dem Import behält die App keinen Zugriff auf den Ordner, außer er ist der geteilte Ordner oder der
   Sicherungsordner.
+</p>
+<p>
+  Wählst du auf einem Android-Handy einen Ordner, aus dem du schon importiert hast, fragt die App einmal, bevor
+  sie eine Datei liest: „Den Import vom 1.3.2025 in Aus Notes ergänzen?“ <strong>Ergänzen</strong>
+  fügt seinem Bereich nur die Dateien hinzu, aus denen dieser Import keine Notiz gemacht hat; eine
+  Datei, deren Notiz du inzwischen verschoben oder in den Papierkorb gelegt hast, kommt nicht noch
+  einmal, eine geänderte auch nicht. Die Seite sagt dann, wie viele Notizen hinzukamen und wie viele
+  schon früher importiert wurden, oder, wenn nichts fehlt, „Nichts Neues: 340 schon importiert“.
+  <strong>Neu importieren</strong> legt einen zweiten Bereich mit allen Dateien an, „Aus Notes (2)“,
+  und <strong>Abbrechen</strong> importiert nichts. Ein Ordner wird an der Stelle erkannt, an der du
+  ihn gewählt hast, nie an seinem Namen allein. Auf dem iPhone legt ein zweiter Import immer einen
+  neuen Bereich an.
+</p>
+<p>
+  Die Desktop-App fragt dasselbe in ihrem Fenster, sobald ein Ordner oder ein Export von Google Keep
+  gewählt ist, aus dem du schon importiert hast, und für eine Markdown-Datei, deren <strong>Als Notiz
+  importieren …</strong> schon lief: <strong>Abbrechen</strong>, <strong>Neu importieren</strong>
+  oder <strong>Ergänzen</strong>. Esc und ein Klick neben die Frage importieren ebenfalls nichts.
+  Fehlt nichts, steht oben „Nichts Neues zu importieren.“, und ein Klick darauf zeigt, wie viele
+  schon importiert waren, mit <strong>Bereich öffnen</strong>.
 </p>
 </box-more>
 </guide-box>
@@ -206,8 +235,8 @@
 <p>Mach aus einem Export von Google Keep (Google Notizen) aus Google Takeout Notizen.</p>
 <box-tab device="phone" alt="Die Frage nach dem Export auf dem Handy: ZIP-Datei oder Ordner">
 <li>Exportiere nur Keep auf <a href="https://takeout.google.com">takeout.google.com</a>.</li>
-<li>Tippe dein Profilbild, dann <strong>Einstellungen dieses Geräts</strong>.</li>
-<li>Tippe <strong>Import</strong> oben ins Suchfeld.</li>
+<li>Tippe auf der Agenda <strong>Suchen und stöbern</strong>.</li>
+<li>Tippe <strong>⋮ ▸ Importieren …</strong> in der oberen Leiste.</li>
 <li>Tippe <strong>Aus Google Keep importieren</strong>.</li>
 <li>Tippe <strong>ZIP-Datei</strong> oder <strong>Ordner</strong> und wähle den Export.</li>
 </box-tab>
@@ -215,6 +244,7 @@
 <li>Exportiere nur Keep auf <a href="https://takeout.google.com">takeout.google.com</a>.</li>
 <li>Klicke <strong>Datei ▸ Importieren …</strong>, dann <strong>Google Keep …</strong>.</li>
 <li>Klicke <strong>ZIP-Datei</strong> oder <strong>Ordner</strong> und wähle den Export.</li>
+<li>Klicke <strong>Ergänzen</strong> oder <strong>Neu importieren</strong>, wenn gefragt.</li>
 </box-tab>
 <box-more>
 <p>
@@ -243,6 +273,12 @@
   wurde, mit <strong>Bereich öffnen</strong>. Nach dem Import behält die App keinen Zugriff auf die
   ZIP-Datei oder den Ordner.
 </p>
+<p>
+  Wählst du auf einem Android-Handy dieselbe ZIP-Datei oder denselben Ordner noch einmal, fragt die App wie
+  bei einem Ordner: <strong>Ergänzen</strong> fügt „Aus Google Keep“ nur die Notizen aus Keep hinzu,
+  die der erste Import nicht mitgebracht hat, <strong>Neu importieren</strong> legt einen zweiten
+  Bereich mit allen an. Siehe <a href="#notizen-aus-einer-anderen-app-importieren">Notizen aus einer anderen App importieren</a>.
+</p>
 </box-more>
 </guide-box>
 
@@ -268,7 +304,10 @@
   Veröffentlichung von Old Brain Fix auf GitHub heruntergeladen und läuft auf dem Handy.
   <strong>Herunterladen</strong> startet den Download im Hintergrund, und die Einrichtung geht sofort
   weiter; mit mobilen Daten sagt der Bildschirm, wie viel davon der Download verbraucht. Das Angebot
-  kommt nur einmal und nur, wo das Sprachmodell laufen kann und noch keines da ist. Unter
+  kommt nur einmal und nur, wo das Sprachmodell laufen kann und noch keines da ist. Nach einer
+  Wiederherstellung bietet es das Modell an, das die Sicherung nennt, Basis oder Klein, und für ein
+  Modell aus einer Datei <strong>Datei noch einmal wählen</strong>; ist dieses Modell hier schon in
+  Gebrauch, kommt es nicht. Unter
   Einstellungen, Sprachmodell gibt es es jederzeit später, mit der Wahl zwischen dem Basis- und dem
   kleinen Modell oder einer eigenen Datei. Die Aufnahmen bleiben in jedem Fall.
 </p>

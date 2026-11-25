@@ -5,6 +5,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import '../l10n/app_localizations.dart';
 import 'app_lock.dart';
 import 'l10n.dart';
+import 'look.dart';
 import 'page_bar.dart';
 import 'schedule_text.dart';
 import 'system_bars.dart';
@@ -116,56 +117,59 @@ class _ConflictCard extends StatelessWidget {
         : null;
     final shopping =
         lineNote != null && ShoppingLists(store).isShoppingList(lineNote);
-    return Card(
-      margin: const EdgeInsets.only(top: 16),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              shopping
-                  ? t.conflictShoppingLineText
-                  : conflictLabel(t, conflict),
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-            if (note != null) Text(note),
-            if (!conflict.resolvable)
-              Text(t.conflictNewerFormat)
-            else if (onKeep == null)
-              Text(t.onlyManagers),
-            for (final version in conflict.versions)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: OutlinedButton(
-                  onPressed: switch (onKeep) {
-                    final keep? => () => keep(version),
-                    null => null,
+    // An embossed card with its versions as radio rows, none picked
+    // until one is kept (obf-1119).
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Embossed(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                shopping
+                    ? t.conflictShoppingLineText
+                    : conflictLabel(t, conflict),
+                style: sectionHeading(context),
+              ),
+              if (note != null) Text(note),
+              if (!conflict.resolvable)
+                Text(t.conflictNewerFormat)
+              else if (onKeep == null)
+                Text(t.onlyManagers),
+              const SizedBox(height: 8),
+              RadioColumn<ConflictVersion?>(
+                value: null,
+                onChanged: switch (onKeep) {
+                  final keep? => (version) {
+                    if (version != null) keep(version);
                   },
-                  child: Semantics(
-                    hint: t.conflictKeep,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(conflictValue(t, locale, conflict, version)),
-                          Text(
-                            conflictOrigin(
-                              t,
-                              store,
-                              version.entry,
-                              when.format(version.entry.recorded.toLocal()),
-                            ),
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ],
+                  null => null,
+                },
+                options: [
+                  for (final version in conflict.versions)
+                    RadioOption(
+                      value: version,
+                      title: Semantics(
+                        hint: t.conflictKeep,
+                        child: Text(
+                          conflictValue(t, locale, conflict, version),
+                        ),
+                      ),
+                      subtitle: Text(
+                        conflictOrigin(
+                          t,
+                          store,
+                          version.entry,
+                          when.format(version.entry.recorded.toLocal()),
+                        ),
                       ),
                     ),
-                  ),
-                ),
+                ],
               ),
-          ],
+            ],
+          ),
         ),
       ),
     );

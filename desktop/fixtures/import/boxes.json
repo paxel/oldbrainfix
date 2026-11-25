@@ -75,6 +75,75 @@
       "shown": "dentist\nTuesday 9:00\nbring the X-ray",
       "visible": "dentist\nTuesday 9:00\nbring the X-ray",
       "boxes": []
+    },
+    {
+      "id": "note:0000000000000000000000000000000f",
+      "text": "Müller\nHerr Müller € 12,50",
+      "shown": "Müller\nHerr Müller € 12,50",
+      "visible": "Müller\nHerr Müller € 12,50",
+      "boxes": []
+    },
+    {
+      "id": "note:00000000000000000000000000000010",
+      "text": "dentist\nTuesday 9:00\nbring the X-ray",
+      "shown": "dentist\nTuesday 9:00\nbring the X-ray",
+      "visible": "dentist\nTuesday 9:00\nbring the X-ray",
+      "boxes": []
+    },
+    {
+      "id": "note:00000000000000000000000000000011",
+      "text": "# Shopping\n- **milk** and ~~bread~~\n- ☐󠁸󠁹󠁶󠁣󠁿 eggs",
+      "shown": "# Shopping\n- **milk** and ~~bread~~\n- ☐ eggs",
+      "visible": "Shopping\nmilk and bread\n☐ eggs",
+      "boxes": [
+        {
+          "id": "xyvc",
+          "state": "open",
+          "starting": "open",
+          "start": 38,
+          "end": 39,
+          "sourceStart": 38,
+          "idStart": 39,
+          "sourceEnd": 44,
+          "last": null,
+          "history": []
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000013",
+      "text": "# Ideas 2\\*3\n> *quoted*\n`code` [link](https://x.org)",
+      "shown": "# Ideas 2\\*3\n> *quoted*\n`code` [link](https://x.org)",
+      "visible": "Ideas 2*3\nquoted\ncode link",
+      "boxes": []
+    },
+    {
+      "id": "note:00000000000000000000000000000014",
+      "text": "～\ntilde",
+      "shown": "～\ntilde",
+      "visible": "～\ntilde",
+      "boxes": []
+    },
+    {
+      "id": "note:00000000000000000000000000000015",
+      "text": "😀\nemoji",
+      "shown": "😀\nemoji",
+      "visible": "😀\nemoji",
+      "boxes": []
+    },
+    {
+      "id": "note:00000000000000000000000000000016",
+      "text": "later\nWritten later",
+      "shown": "later\nWritten later",
+      "visible": "later\nWritten later",
+      "boxes": []
+    },
+    {
+      "id": "note:00000000000000000000000000000018",
+      "text": "😀\nemoji",
+      "shown": "😀\nemoji",
+      "visible": "😀\nemoji",
+      "boxes": []
     }
   ]
 }

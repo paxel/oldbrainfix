@@ -7,12 +7,14 @@
 //! the one in use only once it is checked, so the one before stays in
 //! use until then, and stays when the fetch fails. Checking, downloading
 //! and copying run on a thread of their own; the Settings show how far
-//! they came.
+//! they came. What it came to is kept as the Device's choice of speech
+//! model (obf-1098), which a Backup carries.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use oldbrainfix_core::{SpeechModelChoice, SpeechModelSource};
 use oldbrainfix_whisper::model::{ModelDir, Outcome, WhisperModel};
 use parking_lot::Mutex;
 
@@ -50,6 +52,11 @@ struct State {
     current: Option<WhisperModel>,
     /// The model being downloaded.
     target: Option<WhisperModel>,
+    /// How the model in use came, once a fetch put it in place; `None`
+    /// for the one found at start.
+    source: Option<SpeechModelSource>,
+    /// When the fetch running started, for the page Running (obf-1078).
+    since: Option<std::time::Instant>,
 }
 
 /// The speech model of this computer.
@@ -84,6 +91,8 @@ impl SpeechModel {
                 outcome: None,
                 current: None,
                 target: None,
+                source: None,
+                since: None,
             })),
             stop: Arc::new(AtomicBool::new(false)),
             download,
@@ -123,6 +132,31 @@ impl SpeechModel {
         state.target.or(state.current)
     }
 
+    /// The choice of speech model to keep (obf-1098), given the one
+    /// `kept`: `None` while the model is checked or fetched, so nothing is
+    /// decided yet; else the model in use and how it came, `Some(None)`
+    /// for none. The model found at start keeps how it came as `kept`
+    /// says when that names it, and counts as downloaded otherwise.
+    pub fn choice(&self, kept: Option<&SpeechModelChoice>) -> Option<Option<SpeechModelChoice>> {
+        let state = self.state.lock();
+        if !matches!(state.status, Status::Missing | Status::Ready) {
+            return None;
+        }
+        let Some(current) = state.current else {
+            return Some(None);
+        };
+        let name = model_name(current);
+        let source = match (state.source, kept) {
+            (Some(source), _) => source,
+            (None, Some(kept)) if kept.name == name => kept.source,
+            (None, _) => SpeechModelSource::Download,
+        };
+        Some(Some(SpeechModelChoice {
+            name: name.to_owned(),
+            source,
+        }))
+    }
+
     /// The model file in use, once there is one.
     pub fn model(&self) -> PathBuf {
         self.dir.model()
@@ -156,6 +190,19 @@ impl SpeechModel {
         self.stop.store(true, Ordering::Relaxed);
     }
 
+    /// When the download or copy running started; `None` while none runs.
+    pub fn since(&self) -> Option<std::time::Instant> {
+        let state = self.state.lock();
+        matches!(state.status, Status::Fetching { .. })
+            .then_some(state.since)
+            .flatten()
+    }
+
+    /// Whether the download or copy running was told to stop.
+    pub fn cancelling(&self) -> bool {
+        self.since().is_some() && self.stop.load(Ordering::Relaxed)
+    }
+
     /// Fetches a model with `fetch`, a download of `target` or, for none,
     /// a file; whatever the outcome, the model in use before stays until
     /// a new one took its place.
@@ -171,6 +218,7 @@ impl SpeechModel {
             }
             state.outcome = None;
             state.target = target;
+            state.since = Some(std::time::Instant::now());
             state.status = Status::Fetching {
                 downloading: target.is_some(),
                 received: 0,
@@ -188,6 +236,11 @@ impl SpeechModel {
                 state.target = None;
                 if let Outcome::Installed(installed) = outcome {
                     state.current = Some(installed);
+                    state.source = Some(if target.is_some() {
+                        SpeechModelSource::Download
+                    } else {
+                        SpeechModelSource::File
+                    });
                 }
                 state.current.is_some()
             };
@@ -203,6 +256,21 @@ impl SpeechModel {
         self.state.lock().status = status;
         (self.changed)();
     }
+}
+
+/// The name both apps give `model` (`SPEECH_MODEL_NAMES`).
+pub fn model_name(model: WhisperModel) -> &'static str {
+    match model {
+        WhisperModel::Base => "base",
+        WhisperModel::Small => "small",
+    }
+}
+
+/// The model named `name` as [`model_name`] names it.
+pub fn named(name: &str) -> Option<WhisperModel> {
+    WhisperModel::ALL
+        .into_iter()
+        .find(|m| model_name(*m) == name)
 }
 
 #[cfg(test)]

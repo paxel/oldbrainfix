@@ -295,7 +295,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
               itemBuilder: (_) => [
                 item(PhotoOut.save, Icons.download_outlined, t.savePhoto),
                 item(PhotoOut.copy, Icons.copy_outlined, t.copyPhoto),
-                item(PhotoOut.share, Icons.share_outlined, t.sharePhoto),
+                item(PhotoOut.share, Icons.share_outlined, t.shareToApp),
               ],
             ),
         ],

@@ -329,6 +329,47 @@ void main() {
       expect(captured, hasLength(4));
       expect(Notes(importing).inside(summary.areaId!), hasLength(3));
     });
+
+    test('stopped, it keeps the Notes it wrote and says how many it was to '
+        'write (obf-1078)', () {
+      final made = [
+        for (var i = 0; i < 4; i++)
+          ImportedNote(
+            name: 'Note $i',
+            text: 'Note $i',
+            format: TextFormats.plain,
+            captured: march.add(Duration(days: i)),
+            // The last two, the ones not written, are Checklists.
+            lines: i < 2 ? null : [ImportedLine('Line $i')],
+          ),
+      ];
+      var written = 0;
+      final summary = imports.notes(
+        'From Notes',
+        made,
+        progress: (n, _) => written = n,
+        stop: () => written >= 2,
+      );
+      expect(summary.notes, 2);
+      expect(summary.stopped, 4);
+      expect(summary.checklists, 0, reason: 'of the Notes written');
+      expect(notes.inside(summary.areaId!).map((n) => n.text).toSet(), {
+        'Note 0',
+        'Note 1',
+      }, reason: 'the oldest, written first, stay');
+
+      // Not stopped: none said.
+      final again = imports.notes('Again', made, stop: () => false);
+      expect((again.notes, again.checklists, again.stopped), (4, 2, null));
+
+      // Stopped before the first: no Area is made.
+      final areas = places.areas().length;
+      final never = imports.folder('Never', [
+        file('a.txt', 'a', march),
+      ], stop: () => true);
+      expect((never.areaId, never.notes, never.stopped), (null, 0, 1));
+      expect(places.areas(), hasLength(areas));
+    });
   });
 
   group('Google Keep', () {

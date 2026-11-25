@@ -12,6 +12,7 @@ import 'package:oldbrainfix/src/capture_requests.dart';
 import 'package:oldbrainfix/src/capture_fan.dart';
 import 'package:oldbrainfix/src/capture_screen.dart';
 import 'package:oldbrainfix/src/lock_screen.dart';
+import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/photo_platform.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
@@ -60,7 +61,7 @@ void main() {
 
   final plus = find.byIcon(Icons.add);
   final close = find.byKey(const ValueKey('captureFanClose'));
-  const ways = ['text', 'voice', 'photo', 'gallery', 'paste'];
+  const ways = ['text', 'voice', 'photo', 'gallery', 'paste', 'editor'];
 
   void expectFanOpen(bool open) {
     for (final way in ways) {
@@ -70,17 +71,27 @@ void main() {
   }
 
   group('"+" on the Agenda', () {
-    testWidgets('fans out Text, Voice, Photo, Gallery and Paste, each with '
-        'its words, and opens no capture by itself', (tester) async {
+    testWidgets('fans out Text, Voice, Photo, Gallery, Paste and Editor at '
+        'the top, each with its words, and opens no capture by itself', (
+      tester,
+    ) async {
       await start(tester);
       await tap(tester, plus);
 
       expectFanOpen(true);
-      for (final label in ['Text', 'Voice', 'Photo', 'Gallery', 'Paste']) {
+      for (final label in [
+        'Text',
+        'Voice',
+        'Photo',
+        'Gallery',
+        'Paste',
+        'Editor',
+      ]) {
         expect(find.text(label), findsOneWidget);
       }
       expect(find.byType(CaptureScreen), findsNothing);
-      // The fan opens upward from "+", Text nearest it.
+      // The fan opens upward from "+", Text nearest it, Editor at the top
+      // (obf-1141).
       final closeTop = tester.getRect(close).top;
       final tops = [for (final way in ways) tester.getRect(fanEntry(way)).top];
       expect(tops.first, lessThan(closeTop));
@@ -100,6 +111,7 @@ void main() {
       await tap(tester, plus);
 
       expect(fanEntry('text'), findsOneWidget);
+      expect(fanEntry('editor'), findsOneWidget);
       expect(fanEntry('voice'), findsNothing);
       expect(fanEntry('photo'), findsNothing);
       expect(fanEntry('gallery'), findsNothing);
@@ -113,7 +125,14 @@ void main() {
       await tap(tester, plus);
 
       final de = AppLocalizationsDe();
-      for (final label in [de.text, de.voice, de.photo, de.gallery, de.paste]) {
+      for (final label in [
+        de.text,
+        de.voice,
+        de.photo,
+        de.gallery,
+        de.paste,
+        de.captureFanEditor,
+      ]) {
         expect(find.text(label), findsOneWidget);
       }
       expect(find.byTooltip(de.captureFanClose), findsOneWidget);
@@ -332,6 +351,73 @@ void main() {
       expect(notes.all().single.text, 'call');
     });
   });
+  group('Editor (obf-1141)', () {
+    Finder noteText() => find.descendant(
+      of: find.byKey(const ValueKey('note-text')),
+      matching: find.byType(TextField),
+    );
+
+    testWidgets('opens an empty Note in the Note editor, typing; Back keeps '
+        'it Unsorted with a Nudge in 1 h, on top of the Agenda', (
+      tester,
+    ) async {
+      await start(tester);
+      await tap(tester, plus);
+      await tap(tester, fanEntry('editor'));
+
+      expect(find.byType(NoteEditorScreen), findsOneWidget);
+      expect(find.byType(CaptureScreen), findsNothing);
+      expect(find.byKey(const ValueKey('editor-add-part')), findsNothing);
+      final typing = tester.widget<EditableText>(
+        find.descendant(
+          of: find.byKey(const ValueKey('note-text')),
+          matching: find.byType(EditableText),
+        ),
+      );
+      expect(typing.focusNode.hasFocus, isTrue);
+      await tester.enterText(noteText(), 'call the vet');
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AgendaScreen), findsOneWidget);
+      final note = notes.all().single;
+      expect(note.text, 'call the vet');
+      expect(note.place, isNull);
+      expect(note.nudge, isNotNull);
+      expect(find.text('call the vet'), findsOneWidget);
+    });
+
+    testWidgets('left empty makes nothing', (tester) async {
+      await start(tester);
+      await tap(tester, plus);
+      await tap(tester, fanEntry('editor'));
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AgendaScreen), findsOneWidget);
+      expect(notes.all(), isEmpty);
+    });
+
+    testWidgets('is not in the lock screen\'s fan', (tester) async {
+      final lock = AppLock(store: store);
+      addTearDown(lock.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: LockScope(
+            lock: lock,
+            child: LockScreen(lock: lock, onCapture: (_) {}),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tap(tester, plus);
+      expect(fanEntry('text'), findsOneWidget);
+      expect(fanEntry('editor'), findsNothing);
+    });
+  });
+
   group('A long press on "+" (#282)', () {
     /// The hints a screen reader gives for the long press of [data].
     List<String?> longPressHints(SemanticsData data) => [

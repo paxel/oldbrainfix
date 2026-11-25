@@ -748,7 +748,10 @@ fn deleting_a_note_with_routines_asks_nothing_and_its_undo_brings_them_back() ->
     // #268), with no way to delete the Note alone.
     harness.get_by_label("Move to trash").click();
     harness.run();
-    assert!(!shows(&harness, "Delete this Note and its 1 Routine?"));
+    assert!(!shows(
+        &harness,
+        "Move this Note and its 1 Routine to the trash?"
+    ));
     assert!(!shows(&harness, "Delete only the Note"));
     assert!(trashed(&harness)?);
     assert!(routine_of(harness.state(), "Walk the dog").is_err());

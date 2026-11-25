@@ -221,7 +221,22 @@ fn the_same_folder_again_makes_a_second_area() -> TestResult {
         .click_accesskit();
     harness.step();
     harness.step();
-    import(&mut harness)?;
+    // Asked whether to fill in the first Import (obf-1078), as new.
+    import_dialog(&mut harness);
+    harness.get_by_label("A folder…").click_accesskit();
+    harness.step();
+    for _ in 0..400 {
+        if harness.query_by_label("Import as new").is_some() {
+            break;
+        }
+        harness.step();
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    harness.get_by_label("Import as new").click_accesskit();
+    harness.step();
+    step_until(&mut harness, |app| !app.importing())?;
+    harness.step();
+    close_end(&mut harness);
     let mut names: Vec<String> = Places::new(harness.state().store())
         .areas()?
         .into_iter()

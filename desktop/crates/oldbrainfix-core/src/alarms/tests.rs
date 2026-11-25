@@ -83,6 +83,41 @@ fn an_alarm_names_what_its_note_without_words_holds() -> Result<()> {
 }
 
 #[test]
+fn an_alarm_and_a_heads_up_name_a_note_without_text_by_its_transcript() -> Result<()> {
+    let store = crate::store::tests::store();
+    let notes = Notes::new(&store);
+    let routines = Routines::new(&store);
+    let memo = notes.capture_with("", None, None, &[], &[vec![0x52, 0x49, 0x46, 0x46, 1]])?;
+    notes.set_transcript(&memo.id, &memo.recordings[0], "Pills\nblue")?;
+    let silent = notes.capture_with("", None, None, &[], &[vec![0x52, 0x49, 0x46, 0x46, 2]])?;
+    let ten = ClockTime::new(10, 0).into_iter().collect::<Vec<_>>();
+    let schedule = crate::schedule::Schedule::new(Day::new(2026, 1, 2), &ten, None)
+        .ok_or_else(|| Error::Invalid("a schedule".into()))?;
+    let named = routines.spawn(&memo.id, &schedule)?.id;
+    let wordless = routines.spawn(&silent.id, &schedule)?.id;
+    routines.set_heads_ups(&named, &[20])?;
+    routines.set_heads_ups(&wordless, &[20])?;
+    let alarms = Alarms::new(&store);
+    let rung: BTreeMap<String, Option<String>> = alarms
+        .plan(&utc_wall)?
+        .into_iter()
+        .map(|a| (a.routine_id, a.text))
+        .collect();
+    let warned: BTreeMap<String, Option<String>> = alarms
+        .heads_ups(&utc_wall)?
+        .into_iter()
+        .map(|h| (h.routine_id, h.text))
+        .collect();
+    let expected = BTreeMap::from([
+        (named, Some("Pills".to_string())),
+        (wordless, Some(String::new())),
+    ]);
+    assert_eq!(rung, expected);
+    assert_eq!(warned, expected);
+    Ok(())
+}
+
+#[test]
 fn an_alarm_names_a_formatted_note_as_it_reads() -> Result<()> {
     let store = crate::store::tests::store();
     let note = Notes::new(&store).capture_as(
@@ -354,6 +389,27 @@ fn heads_ups_are_kept_leniently_and_written_canonically() -> Result<()> {
     routines.trash(&id)?;
     assert_eq!(routines.heads_ups(&id)?, [20]);
     assert!(heads_ups(&store)?.is_empty());
+    Ok(())
+}
+
+#[test]
+fn a_custom_heads_up_off_the_list_is_kept_and_planned() -> Result<()> {
+    let store = store_at("2026-10-24T07:00:00.000Z")?;
+    let routines = Routines::new(&store);
+    let id = reminder(&store, "dentist", Day::new(2026, 10, 26), Some(time(10, 0)))?;
+    let day = reminder(&store, "birthday", Day::new(2026, 10, 30), None)?;
+    routines.set_heads_ups(&id, &[45, 10 * 1440])?;
+    routines.set_heads_ups(&day, &[90, 3 * 1440])?;
+    assert_eq!(routines.heads_ups(&id)?, [45, 14400]);
+    assert_eq!(routines.heads_ups(&day)?, [90, 4320]);
+    // An all-day one plans its whole days only; the 90 minutes stay kept
+    // for a timed schedule again.
+    let mut planned: Vec<String> = heads_ups(&store)?
+        .iter()
+        .map(|h| h.split(' ').take(2).collect::<Vec<_>>().join(" "))
+        .collect();
+    planned.sort();
+    assert_eq!(planned, ["4320 2026-10-30", "45 2026-10-26T10:00"]);
     Ok(())
 }
 

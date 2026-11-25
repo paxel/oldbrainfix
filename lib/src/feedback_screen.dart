@@ -13,7 +13,8 @@ import 'bundle_platform.dart';
 import 'crash_guard.dart';
 import 'failure_dialog.dart';
 import 'l10n.dart';
-import 'look.dart' show ControlBelow;
+import 'look.dart' show ControlBelow, StartCheckbox;
+import 'notification_taps.dart';
 import 'pack_screen.dart';
 import 'page_bar.dart';
 import 'place_names.dart';
@@ -128,14 +129,17 @@ FeedbackFacts feedbackFactsOf(
 
 /// The text the feedback sends, exactly as the preview shows it: the
 /// user's [text], then each of [version], [system] and [install] that
-/// is ticked, then the [crash] report, thinned and cut as a crash mail
-/// is so that the whole fits into a mail link where it can, at least
-/// its first 400 characters.
+/// is ticked, then the trace of the notification [taps] (obf-1039), its
+/// oldest taps left out as far as the whole would not fit into a mail
+/// link, the newest always in, then the [crash] report, thinned and cut as a crash mail is so that the
+/// whole fits into a mail link where it can, at least its first 400
+/// characters.
 String feedbackBody(
   String text, {
   String? version,
   String? system,
   String? install,
+  String? taps,
   String? crash,
 }) {
   final facts = [
@@ -143,12 +147,32 @@ String feedbackBody(
     if (system != null) 'System: $system',
     if (install != null) 'Installed from: $install',
   ];
-  final before = [text.trim(), if (facts.isNotEmpty) facts.join('\n')];
+  final shown = [text.trim(), if (facts.isNotEmpty) facts.join('\n')];
+  const tapsLabel = 'Notification taps:\n';
+  final tapsRoom =
+      mailBodyLimit - shown.join('\n\n').length - 2 - tapsLabel.length;
+  final before = [
+    ...shown,
+    if (taps != null) '$tapsLabel${_newestThatFit(taps, tapsRoom)}',
+  ];
   if (crash == null) return before.join('\n\n');
   const label = 'Last crash report:\n';
   final head = '${before.join('\n\n')}\n\n$label';
   final room = mailBodyLimit - head.length;
   return '$head${mailBody(crash, limit: room < 400 ? 400 : room)}';
+}
+
+/// The newest lines of [lines] that fit into [room] characters, at least
+/// the newest one.
+String _newestThatFit(String lines, int room) {
+  final all = lines.split('\n');
+  var used = all.last.length;
+  var from = all.length - 1;
+  while (from > 0 && used + 1 + all[from - 1].length <= room) {
+    from--;
+    used += 1 + all[from].length;
+  }
+  return all.sublist(from).join('\n');
 }
 
 /// The page (#214). [facts] and [crash] are read when it opens, [mail]
@@ -157,6 +181,9 @@ class FeedbackScreen extends StatefulWidget {
   final Store store;
   final Future<FeedbackFacts> Function() facts;
   final ({String text, DateTime at})? Function() crash;
+
+  /// The trace of the notification taps (obf-1039), read when it opens.
+  final ({String text, int count})? Function() taps;
   final Future<void> Function(String body) mail;
 
   const FeedbackScreen({
@@ -164,6 +191,7 @@ class FeedbackScreen extends StatefulWidget {
     required this.store,
     this.facts = readFeedbackFacts,
     this.crash = keptCrashReport,
+    this.taps = keptNotificationTaps,
     this.mail = _mail,
   });
 
@@ -178,10 +206,14 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
   final _text = TextEditingController();
   FeedbackFacts? _facts;
   late final _crash = widget.crash();
+  late final _taps = widget.taps();
   var _version = true;
   var _system = true;
   var _install = true;
   var _withCrash = false;
+
+  /// Ticked at first while there are any: they hold no Note's text.
+  late var _withTaps = _taps != null;
 
   /// The Pack of everything the tree offers, made when Notes are first
   /// ticked, and what is ticked in it.
@@ -221,6 +253,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
       version: _version ? facts?.version : null,
       system: _system ? facts?.system : null,
       install: _install ? facts?.install : null,
+      taps: _withTaps ? _taps?.text : null,
       crash: _withCrash ? _crash?.text : null,
     );
   }
@@ -327,6 +360,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
     final fits = body.length <= mailBodyLimit;
     final picked = _picked;
     final crash = _crash;
+    final taps = _taps;
     String? notes;
     if (picked != null) {
       notes = t.feedbackNotesPicked(_pickedNotes, packSizeText(locale, _size));
@@ -342,10 +376,10 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
         padding: const EdgeInsets.symmetric(vertical: 4),
         title: Text(title),
         subtitle: detail == null ? null : Text(detail),
-        control: Checkbox(
-          key: ValueKey('feedback-$key'),
+        control: StartCheckbox(
+          boxKey: ValueKey('feedback-$key'),
           value: value,
-          onChanged: onChanged == null ? null : (on) => onChanged(on ?? false),
+          onChanged: onChanged,
         ),
       ),
     );
@@ -387,6 +421,13 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
             facts?.install,
             _install,
             (on) => setState(() => _install = on),
+          ),
+          tick(
+            'taps',
+            t.feedbackTaps,
+            taps == null ? t.feedbackTapsNone : t.feedbackTapsKept(taps.count),
+            _withTaps,
+            taps == null ? null : (on) => setState(() => _withTaps = on),
           ),
           tick(
             'crash',

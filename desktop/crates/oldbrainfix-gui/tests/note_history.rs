@@ -1,5 +1,5 @@
 //! A Note's History on the desktop (#193), driven headless by
-//! egui_kittest: Note ▸ History over the Note dialog lists every change
+//! egui_kittest: History in the Note dialog's ⋮ lists every change
 //! of the Note and its Amends, the newest first, with who made it, when
 //! and its text before and after; "Use this version" brings an old text
 //! back as a new change, the dialog's fields showing it, so closing the
@@ -68,12 +68,9 @@ fn last<'a>(harness: &'a Harness<'_, App>, label: &'a str) -> Node<'a> {
     }
 }
 
-/// Picks Note ▸ History.
+/// Picks History in the Note dialog's ⋮ (obf-1065).
 fn open_history(harness: &mut Harness<'_, App>) {
-    match harness.get_all_by_label("Note").next() {
-        Some(menu) => menu.click(),
-        None => panic!("no Note menu"),
-    }
+    harness.get_by_label("More for this Note").click();
     harness.run();
     last(harness, "History").click();
     harness.run();

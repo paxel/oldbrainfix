@@ -320,7 +320,6 @@ fn without_a_bridge_the_docker_choice_opens_nothing() -> TestResult {
     }
     assert!(matches!(AiPort::open(&store), Err(Error::NoDockerBridge)));
     assert_eq!(store.ai_task()?, None, "no AI Task was opened");
-    assert!(!store.sync_paused()?);
     Ok(())
 }
 
@@ -439,7 +438,6 @@ fn a_client_drives_the_tools_end_to_end_and_only_accept_keeps_it() -> TestResult
     assert_eq!(seen[7].pointer("/error/code"), Some(&json!(-32602)));
 
     assert_eq!(store.all_entries()?, logged, "the log saw nothing yet");
-    assert!(store.sync_paused()?);
     let review = store.ai_review(port.task())?;
     assert_eq!(
         review.groups.len(),
@@ -459,6 +457,6 @@ fn a_client_drives_the_tools_end_to_end_and_only_accept_keeps_it() -> TestResult
         Some("Oat milk".into())
     );
     assert_eq!(store.all_entries()?.len(), logged.len() + 4);
-    assert!(!store.sync_paused()?);
+    assert_eq!(store.ai_task()?, None);
     Ok(())
 }

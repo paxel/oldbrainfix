@@ -1,9 +1,9 @@
 //! A photo got out of a Note from the window (#149), driven headless by
 //! egui_kittest with a fake save dialog, clipboard and opener: a
 //! right-click on a photo in the Note editor or shown full screen offers
-//! "Save image as…", which writes its file where the user says, "Copy
-//! image", which puts it on the clipboard, and "Open in another
-//! program", which hands a copy of it to the system's program. Done says
+//! "Save photo…", which writes its file where the user says, "Copy
+//! photo", which puts it on the clipboard, and "Open in another app",
+//! which hands a copy of it to the system's program (obf-1014). Done says
 //! nothing; each failure, and a photo whose file is not here, is
 //! announced at the top. The real dialog, clipboard and opener are
 //! device-only.
@@ -30,9 +30,9 @@ use oldbrainfix_gui::{App, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SAVE: &str = "Save image as…";
-const COPY: &str = "Copy image";
-const OPEN: &str = "Open in another program";
+const SAVE: &str = "Save photo…";
+const COPY: &str = "Copy photo";
+const OPEN: &str = "Open in another app";
 
 /// What the fake devices were asked and answer.
 #[derive(Default)]
@@ -355,14 +355,10 @@ fn the_menu_speaks_german_in_german() -> TestResult {
     let devices: Shared = Rc::default();
     let mut harness = window(store, &id, &devices, ("de", dir.path().join("opened")));
     right_click_editor_photo_de(&mut harness)?;
-    for entry in [
-        "Bild speichern unter …",
-        "Bild kopieren",
-        "In anderem Programm öffnen",
-    ] {
+    for entry in ["Foto speichern …", "Foto kopieren", "In anderer App öffnen"] {
         assert!(shows(&harness, entry), "{entry}");
     }
-    pick(&mut harness, "Bild kopieren");
+    pick(&mut harness, "Foto kopieren");
     assert_eq!(
         harness.state().notice(),
         Some("Das Foto wurde nicht kopiert.")

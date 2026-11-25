@@ -105,14 +105,23 @@ class SessionNoteSetup extends StatelessWidget {
               ),
               if (changes && draft.ordersByHand) Text(t.sessionPoolOrder),
               if (changes)
-                // Making one stays inside the list, on this page.
+                // Making one stays inside the list, on this page. In the
+                // accent with a chevron: it opens the Tally's page
+                // (obf-1108).
                 Material(
                   type: MaterialType.transparency,
                   child: ListTile(
                     key: const ValueKey('session-new-tally'),
                     contentPadding: EdgeInsets.zero,
+                    iconColor: Theme.of(context).colorScheme.primary,
                     leading: const Icon(Icons.add),
-                    title: Text(t.newTally),
+                    title: Text(
+                      t.newTally,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
                     onTap: onNewTally,
                   ),
                 ),
@@ -527,7 +536,7 @@ class _CardSessionState extends State<CardSession> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(t.sessionPool, style: text.titleSmall),
+          Text(t.sessionPool, style: sectionHeading(context)),
           for (final (i, note) in _pool.indexed)
             Padding(
               key: ValueKey('card-session-pool-$i'),
@@ -557,12 +566,12 @@ class _CardSessionState extends State<CardSession> {
           ),
           if (_today.isNotEmpty) ...[
             const SizedBox(height: 12),
-            Text(t.agendaToday, style: text.titleSmall),
+            Text(t.agendaToday, style: sectionHeading(context)),
             for (final today in _today) _occurrence(today, locale, decimal),
           ],
           if (_weeks.isNotEmpty) ...[
             const SizedBox(height: 12),
-            Text(t.sessionHistory, style: text.titleSmall),
+            Text(t.sessionHistory, style: sectionHeading(context)),
             for (final (i, week) in _weeks.indexed)
               Padding(
                 padding: const EdgeInsets.only(top: 2),
@@ -578,7 +587,7 @@ class _CardSessionState extends State<CardSession> {
               ),
           ],
           const SizedBox(height: 12),
-          Text(t.sessionRuns, style: text.titleSmall),
+          Text(t.sessionRuns, style: sectionHeading(context)),
           SessionRuns(
             notes: widget.notes,
             noteId: widget.noteId,

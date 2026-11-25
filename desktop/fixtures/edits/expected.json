@@ -541,6 +541,7 @@
     "dentist": [],
     "x-ray": [],
     "müller": [],
+    "MULLER": [],
     "called": [],
     "loop": [],
     " e ": [
@@ -566,6 +567,15 @@
       "note:0000000000000000000000000000000d",
       "note:0000000000000000000000000000000a"
     ]
+  },
+  "findings": {
+    "MULLER": {},
+    "dentist": {},
+    "receipt": {},
+    "called": {},
+    "loop": {},
+    "lease": {},
+    "rent due": {}
   },
   "conflicts": []
 }

@@ -309,6 +309,9 @@ fn file_into_from_the_right_click_files_the_cards_selected() -> TestResult {
     pause(&mut harness);
     card(&harness, PLUMBER).click_secondary();
     harness.run();
+    // Under This Note ▸ (obf-1014).
+    harness.get_by_label("This Note ⏵").click();
+    harness.run();
     harness.get_by_label("File into…").click();
     harness.run_steps(8);
     // The dialog names how many go.
@@ -324,7 +327,7 @@ fn file_into_from_the_right_click_files_the_cards_selected() -> TestResult {
 }
 
 #[test]
-fn ctrl_m_and_the_note_menu_file_the_cards_selected() -> TestResult {
+fn ctrl_m_files_the_cards_selected() -> TestResult {
     let mut harness = harness(store()?, Selection::Unsorted);
     let order = shown_order(&harness);
     click(&mut harness, order[0], Modifiers::NONE);
@@ -338,20 +341,10 @@ fn ctrl_m_and_the_note_menu_file_the_cards_selected() -> TestResult {
     assert_eq!(place_of(&harness, order[1])?, Some(kitchen));
     assert_eq!(place_of(&harness, order[2])?, None);
 
-    // Note ▸ File into… acts on the card selected, no Note open.
+    // Ctrl+M acts on the one card selected too, no Note open, with no
+    // Note menu (obf-1065).
     click(&mut harness, order[2], Modifiers::NONE);
-    // The menu bar's Note is the first of that name.
-    harness
-        .query_all_by_label("Note")
-        .next()
-        .ok_or("the Note menu")?
-        .click();
-    harness.run();
-    harness
-        .query_all_by_label_contains("File into…")
-        .next_back()
-        .ok_or("File into… in the Note menu")?
-        .click();
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::M);
     harness.run_steps(8);
     assert!(harness.query_by_label("File into…").is_some());
     pick_place(&mut harness, "Garden")?;

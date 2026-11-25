@@ -1,6 +1,6 @@
 //! The Session's part of the Routine editor (#104, ADR 0029), as the
 //! phone's `session_editor.dart` draws it, on top of the schedule: the
-//! pool as a checkbox per Tally, filtered by the pills of its Tallies'
+//! pool as a checkbox per Tally, filtered by the chips of its Tallies'
 //! tags (#220), ordered with up and down buttons for Rolling while it is
 //! not filtered; the count's − / + stepper; the weekdays in a fold, each with
 //! a checkbox for its own count and then its stepper, open as last left
@@ -18,8 +18,9 @@ use egui::{RichText, Ui};
 use oldbrainfix_core::sessions::keys::MAX_COUNT;
 use oldbrainfix_core::{Notes, Schedule, SessionRule, SessionSetup, Sessions, Store, text_tags};
 
-use crate::app::{embossed, icon_button, pill, row_title};
+use crate::app::{embossed, icon_button, row_title};
 use crate::capture_choices::SessionChoice;
+use crate::design;
 use crate::icons;
 use crate::l10n::L10n;
 use crate::routine_editor::stepper;
@@ -259,16 +260,20 @@ impl SessionDraft {
         Ok(())
     }
 
-    /// Draws the Session's panels; what was asked beyond typing.
-    pub fn show(&mut self, ui: &mut Ui, t: &L10n, tones: Tones) -> Option<SessionIntent> {
+    /// Draws the Session's groups in the dialog's one card (obf-1118),
+    /// after the group before them; what was asked beyond typing.
+    pub fn show(&mut self, ui: &mut Ui, t: &L10n) -> Option<SessionIntent> {
         let text = ui.visuals().text_color();
         let weak = ui.visuals().weak_text_color();
-        let mut intent = self.pool_panel(ui, t, tones, None);
-        embossed(ui, tones, false, None, |ui| {
-            ui.label(RichText::new(t.session_count()).strong().color(text));
+        design::group_gap(ui);
+        let mut intent = self.pool_panel(ui, t, None);
+        design::group_gap(ui);
+        ui.vertical(|ui| {
+            ui.label(RichText::new(t.session_count()).strong());
             stepper(ui, t, &mut self.count, (1, Some(MAX_COUNT)), None);
         });
-        embossed(ui, tones, false, None, |ui| {
+        design::group_gap(ui);
+        ui.vertical(|ui| {
             let open = self.weekdays_open;
             let fold =
                 egui::CollapsingHeader::new(RichText::new(t.session_weekday_counts()).color(text))
@@ -284,8 +289,9 @@ impl SessionDraft {
                 ui.label(RichText::new(summary).small().color(weak));
             }
         });
-        embossed(ui, tones, false, None, |ui| {
-            ui.label(RichText::new(t.session_rule()).strong().color(text));
+        design::group_gap(ui);
+        ui.vertical(|ui| {
+            ui.label(RichText::new(t.session_rule()).strong());
             self.rules(ui, t);
         });
         intent
@@ -307,9 +313,12 @@ impl SessionDraft {
     ) -> (bool, Option<SessionIntent>) {
         let text = ui.visuals().text_color();
         let before = (self.pool(), self.count);
-        let intent = self.pool_panel(ui, t, tones, Some(changes));
+        // One card, the pool and the count its groups (obf-1118).
+        let mut intent = None;
         embossed(ui, tones, false, None, |ui| {
-            ui.label(RichText::new(t.session_count()).strong().color(text));
+            intent = self.pool_panel(ui, t, Some(changes));
+            design::group_gap(ui);
+            ui.label(RichText::new(t.session_count()).strong());
             if changes {
                 stepper(ui, t, &mut self.count, (1, Some(MAX_COUNT)), None);
             } else {
@@ -319,38 +328,30 @@ impl SessionDraft {
         (before != (self.pool(), self.count), intent)
     }
 
-    /// The pool's panel: for a Session Note's page `page` holds whether
-    /// this Device may change it, `None` on the Session page.
-    fn pool_panel(
-        &mut self,
-        ui: &mut Ui,
-        t: &L10n,
-        tones: Tones,
-        page: Option<bool>,
-    ) -> Option<SessionIntent> {
+    /// The pool's group, in the card of its caller: for a Session Note's
+    /// page `page` holds whether this Device may change it, `None` on
+    /// the Session page.
+    fn pool_panel(&mut self, ui: &mut Ui, t: &L10n, page: Option<bool>) -> Option<SessionIntent> {
         let mut intent = None;
         let text = ui.visuals().text_color();
         let weak = ui.visuals().weak_text_color();
         let error = ui.visuals().error_fg_color;
         let changes = page.unwrap_or(true);
-        embossed(ui, tones, false, None, |ui| {
-            ui.label(RichText::new(t.session_pool()).strong().color(text));
+        ui.vertical(|ui| {
+            ui.label(RichText::new(t.session_pool()).strong());
             ui.label(RichText::new(t.session_pool_explain()).color(text));
             if self.order.is_empty() && !self.new_tally {
                 ui.label(RichText::new(t.session_pool_none_desk()).color(weak));
             } else if !self.order.is_empty() {
-                self.tag_chips(ui, tones);
+                self.tag_chips(ui);
                 self.pool_rows(ui, t, page);
             }
             // Making one stays inside the list, on this page (#161).
-            if self.new_tally && changes {
-                let made = ui.horizontal(|ui| {
-                    icons::show(ui, icons::ADD, 20.0, text);
-                    ui.button(RichText::new(t.new_tally()).color(text))
-                });
-                if made.inner.clicked() {
-                    intent = Some(SessionIntent::NewTally);
-                }
+            if self.new_tally
+                && changes
+                && design::text_button(ui, icons::ADD, t.new_tally()).clicked()
+            {
+                intent = Some(SessionIntent::NewTally);
             }
             let ordered = match page {
                 None => self.order.len(),
@@ -422,11 +423,11 @@ impl SessionDraft {
         }
     }
 
-    /// The tags of the pool's Tallies as pills (#220), those most of them
+    /// The tags of the pool's Tallies as chips (#220), those most of them
     /// carry first; a click picks one to show only the Tallies carrying
     /// any of those picked, and again takes it back. Nothing without a
     /// tag.
-    fn tag_chips(&mut self, ui: &mut Ui, tones: Tones) {
+    fn tag_chips(&mut self, ui: &mut Ui) {
         let tags = self.tag_list();
         if tags.is_empty() {
             return;
@@ -434,7 +435,7 @@ impl SessionDraft {
         ui.horizontal_wrapped(|ui| {
             for tag in tags {
                 let on = self.picked.contains(&tag);
-                if pill(ui, tones, on, &tag).clicked() {
+                if design::chip(ui, on, &tag).clicked() {
                     if on {
                         self.picked.remove(&tag);
                     } else {

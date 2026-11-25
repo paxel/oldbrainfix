@@ -48,6 +48,7 @@ use oldbrainfix_gui::auto_sync::{self, Syncing};
 use oldbrainfix_gui::autostart::{Autostart, TRAY_ARG};
 use oldbrainfix_gui::backups;
 use oldbrainfix_gui::cli::{self, Launch};
+use oldbrainfix_gui::click_trace::ClickTrace;
 use oldbrainfix_gui::enrich::{
     Enricher, Kind, OcrEngine, PromptsNow, WhisperEngine, transcript_prompts,
 };
@@ -297,7 +298,26 @@ fn focus(ctx: &egui::Context) {
     ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
     ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
     ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
+    come_forward();
 }
+
+/// Brings the app before the others on macOS (obf-1039). As winit 0.30
+/// reads, shown again the window is ordered front as the app's key
+/// window, and egui's Focus asks winit to activate the app only for a
+/// window not key, so the window may stay behind the app in front, as
+/// reported after a click on a notification. Activated here in any case.
+/// Called on the main thread, as the window's frames run.
+#[cfg(target_os = "macos")]
+fn come_forward() {
+    if let Some(main) = objc2::MainThreadMarker::new() {
+        #[allow(deprecated)]
+        objc2_app_kit::NSApplication::sharedApplication(main).activateIgnoringOtherApps(true);
+    }
+}
+
+/// Elsewhere Focus brings the window forward.
+#[cfg(not(target_os = "macos"))]
+fn come_forward() {}
 
 /// Everything the windows share while the app runs.
 struct Shell {
@@ -330,9 +350,11 @@ struct Shell {
     /// Raised by a click on the Changes Nudge, for the window to save the
     /// bundles.
     changes_wanted: Arc<AtomicBool>,
-    /// Given the Routine by a click on an Occurrence's notification, for
-    /// the window to open its Note.
+    /// Given the Occurrence by a click on its notification, the Agenda by
+    /// one on the Catch-up Notification, for the window to show them.
     occurrence_wanted: OccurrenceWanted,
+    /// Every click on a notification, for Send feedback (obf-1039).
+    click_trace: ClickTrace,
     /// Files for the window to open.
     handed: Arc<Mutex<Vec<std::path::PathBuf>>>,
     tray: TrayHeld,
@@ -439,6 +461,7 @@ impl Shell {
         app.set_unsorted_wanted(self.unsorted_wanted.clone());
         app.set_changes_wanted(self.changes_wanted.clone());
         app.set_occurrence_wanted(self.occurrence_wanted.clone());
+        app.set_click_trace(self.click_trace.clone());
         app.set_handed_files(self.handed.clone());
         app.set_autostart(self.autostart.clone());
         // Nothing written here yet: a Backup may be restored first.
@@ -497,7 +520,10 @@ impl Shell {
             store: self.store.clone(),
             place: kept,
         };
-        self.run(viewport, placed, Box::new(native))?;
+        let ran = self.run(viewport, placed, Box::new(native));
+        // A click from now on comes while it waits in the tray.
+        self.click_trace.set_shown(false);
+        ran?;
         // Where the tray lives in the window's event loop, its end is the
         // app's: nothing hears the tray or the hotkey after it.
         Ok(quit.load(Ordering::SeqCst) || self.tray.borrow().is_none() || tray::IN_EVENT_LOOP)
@@ -566,7 +592,7 @@ fn older_stays(locale: &'static str, launch: &Launch) -> Result<i32, String> {
     );
     if !matches!(
         launch,
-        Launch::Window | Launch::Tray | Launch::Popup | Launch::Open(_)
+        Launch::Window | Launch::Tray | Launch::Popup | Launch::Open(_) | Launch::Markdown(_)
     ) {
         return Ok(cli::FAILED);
     }
@@ -756,6 +782,21 @@ fn run() -> Result<i32, String> {
             }
             Some(Command::Open)
         }
+        Launch::Markdown(files) => {
+            // Each in a viewer of the running app, one connection each
+            // (obf-1056); without one, this start shows them.
+            let paths: Vec<std::path::PathBuf> = files
+                .iter()
+                .map(|f| std::path::absolute(f).unwrap_or_else(|_| f.into()))
+                .collect();
+            if paths.iter().all(|p| instance::hand_over_file(&socket, p)) {
+                return Ok(cli::OK);
+            }
+            if let Ok(mut held) = handed.lock() {
+                held.extend(paths);
+            }
+            Some(Command::Open)
+        }
         Launch::Window | Launch::Help | Launch::Version => Some(Command::Open),
         Launch::Popup => Some(Command::Capture),
         // A login start adds nothing to a running app.
@@ -768,6 +809,10 @@ fn run() -> Result<i32, String> {
     // The menu entry and icon the window's app id names, kept current.
     #[cfg(target_os = "linux")]
     std::thread::spawn(oldbrainfix_gui::launcher::register);
+    // Offered under "Open with" for Markdown files, kept current; a file
+    // opened with it while it runs comes in over the named pipe (Q12).
+    #[cfg(windows)]
+    std::thread::spawn(oldbrainfix_gui::open_with::register);
     // A database of a newer version opens nothing: the window, the tray's
     // start and the capture popup's all show why instead.
     let store = match open_store(&dir) {
@@ -805,6 +850,7 @@ fn run() -> Result<i32, String> {
     let unsorted_wanted = Arc::new(AtomicBool::new(false));
     let changes_wanted = Arc::new(AtomicBool::new(false));
     let occurrence_wanted: OccurrenceWanted = Arc::new(Mutex::new(None));
+    let click_trace = ClickTrace::default();
     {
         let (shown, tapped) = (store.clone(), changes.clone());
         let store = own_store(&dir, &store);
@@ -813,6 +859,7 @@ fn run() -> Result<i32, String> {
         alerts.set_unsorted_wanted(unsorted_wanted.clone());
         alerts.set_changes_wanted(changes_wanted.clone());
         alerts.set_occurrence_wanted(occurrence_wanted.clone());
+        alerts.set_trace(click_trace.clone());
         alerts.set_ringer(Box::new(SpeakerRinger::new()));
         let open = command_tx.clone();
         let wake_window = waker(&window);
@@ -969,7 +1016,9 @@ fn run() -> Result<i32, String> {
             changes.fetch_add(1, Ordering::SeqCst);
             let _ = events.send(Event::Wake);
             wake(&window);
-            // A voice Note from the popup is transcribed without the window.
+            // A Note saved from the popup, a pasted picture held on it,
+            // has its Photo Text read without the window; what else waits
+            // to be read or transcribed is taken up too.
             reader.kick();
             files_reader.kick();
             if speech.current().is_some() {
@@ -1022,10 +1071,24 @@ fn run() -> Result<i32, String> {
     ) {
         eprintln!("oldbrainfix: {e}");
     }
+    // Markdown files the Finder opens with the app (Q12), as a later
+    // start's.
+    #[cfg(target_os = "macos")]
+    {
+        let (handed, commands, wake) = (handed.clone(), command_tx.clone(), waker(&window));
+        let open: instance::OpenFile = Box::new(move |path| {
+            if let Ok(mut held) = handed.lock() {
+                held.push(path.to_path_buf());
+            }
+        });
+        oldbrainfix_gui::mac_open::install(Box::new(move |path| {
+            instance::file_handed(&path, &open, &commands, &*wake);
+        }));
+    }
     let labels = tray::Labels {
         title: t.app_title().into(),
         open: t.tray_open().into(),
-        capture: t.capture_tooltip().into(),
+        capture: t.settings_quick_note().into(),
         quit: t.tray_quit().into(),
     };
     // On Linux on ksni's own thread, now; on Windows and macOS in the
@@ -1079,6 +1142,7 @@ fn run() -> Result<i32, String> {
         unsorted_wanted,
         changes_wanted,
         occurrence_wanted,
+        click_trace,
         handed,
         tray: tray.clone(),
         tray_wanted: RefCell::new(tray_wanted),

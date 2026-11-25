@@ -167,6 +167,25 @@ void main() {
       ]);
     });
 
+    test('titles a row of a Note without words by the first line of its '
+        'Transcript or Photo Text (obf-1049)', () {
+      final voice = notes.capture(
+        '',
+        recordings: [
+          Uint8List.fromList([1]),
+        ],
+      );
+      notes.setTranscript(voice.id, voice.recordings.single, 'Pills\nblue');
+      routines.spawn(voice.id, daily([ClockTime(8, 0)]));
+      final photo = notes.capture('', photos: [onePixelPng]);
+      notes.setPhotoText(photo.id, photo.photos.single, ' RECEIPT\nTotal');
+      routines.spawn(photo.id, daily([ClockTime(9, 0)]));
+
+      expect(titles(snapshot().days['2026-10-24']), ['Pills', 'RECEIPT']);
+      // Nothing of it is copied into the Note.
+      expect(notes.byId(voice.id)?.text, '');
+    });
+
     test('a Routine in the trash is gone from it', () {
       final pills = routines.create('pills', daily([ClockTime(8, 0)]));
       routines.trash(pills.id);

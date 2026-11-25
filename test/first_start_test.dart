@@ -146,6 +146,26 @@ void main() {
     expect(store.ownProfile, isNull);
   });
 
+  testWidgets('each of the three choices is a card with a chevron '
+      '(obf-1109)', (tester) async {
+    await start(tester);
+    for (final choice in [newUser, addDevice, restore]) {
+      expect(
+        find.ancestor(of: choice, matching: find.byType(Embossed)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: choice, matching: find.byIcon(Icons.chevron_right)),
+        findsOneWidget,
+      );
+    }
+    final cards = find.descendant(
+      of: find.byType(FirstStartScreen),
+      matching: find.byType(Embossed),
+    );
+    expect(cards, findsNWidgets(3));
+  });
+
   testWidgets('New shows the Starter Set, Back the first screen again, and '
       'the Profile is made once it is planted', (tester) async {
     await start(tester);

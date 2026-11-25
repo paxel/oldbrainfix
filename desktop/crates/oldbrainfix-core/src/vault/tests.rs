@@ -112,7 +112,11 @@ fn full(clock: &Arc<parking_lot::Mutex<DateTime<Utc>>>) -> Made<Store> {
     let voiced = notes.by_id(&voice.id)?.ok_or("the voice Note")?;
     let recording = voiced.recordings.first().ok_or("its recording")?.clone();
     notes.set_transcript(&voice.id, &recording, "Buy oat milk")?;
-    notes.remove_recording(&voice.id, &recording)?;
+    // Removed as versions before obf-1084 removed it: the Transcript
+    // stays beside the Note.
+    let audio = crate::notes::keys::audio(&recording);
+    store.append(&voice.id, &audio, None, None)?;
+    store.drop_removed_blobs()?;
     set(5, 12);
     let bag = notes.capture("Bag\nShoes\nBottle", Some(&health.id), None)?;
     let checklists = Checklists::new(&store);

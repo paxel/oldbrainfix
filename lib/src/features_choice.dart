@@ -10,10 +10,15 @@ class FeaturesChoice extends StatelessWidget {
   final bool advanced;
   final ValueChanged<bool> onChanged;
 
+  /// Around what it means: in line with the page's headings by default,
+  /// with the card's rows on a Settings card.
+  final EdgeInsetsGeometry detailPadding;
+
   const FeaturesChoice({
     super.key,
     required this.advanced,
     required this.onChanged,
+    this.detailPadding = const EdgeInsets.fromLTRB(24, 0, 24, 0),
   });
 
   @override
@@ -22,10 +27,7 @@ class FeaturesChoice extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
-          child: Text(t.featuresDetail),
-        ),
+        Padding(padding: detailPadding, child: Text(t.featuresDetail)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: RadioColumn<bool>(

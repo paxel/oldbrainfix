@@ -12,6 +12,7 @@ import 'auto_sync.dart';
 import 'bundle_platform.dart';
 import 'failure_dialog.dart';
 import 'l10n.dart';
+import 'look.dart';
 import 'merge_into_screen.dart';
 import 'page_bar.dart';
 import 'system_bars.dart';
@@ -752,7 +753,7 @@ class _AskScreenState extends State<AskScreen> {
 
   Widget _tryAgain(AppLocalizations t) => Align(
     alignment: Alignment.centerLeft,
-    child: FilledButton.tonal(
+    child: OutlinedButton(
       key: const ValueKey('ask-try-again'),
       onPressed: _look,
       child: Text(t.phoneAskTryAgain),
@@ -817,7 +818,7 @@ class _AskScreenState extends State<AskScreen> {
         ),
       ),
       const SizedBox(height: 16),
-      Text(t.phoneAskConsentWhat(name), style: theme.textTheme.titleSmall),
+      Text(t.phoneAskConsentWhat(name), style: sectionHeading(context)),
       item(t.phoneAskConsentQuestion),
       item(t.phoneAskConsentNames),
       item(t.phoneAskConsentRoutines),
@@ -1054,10 +1055,11 @@ class _AskScreenState extends State<AskScreen> {
                 style: theme.textTheme.titleSmall,
               ),
             ),
-            TextButton(
+            TextButton.icon(
               key: ValueKey('ask-edit-$i'),
               onPressed: _asking == null ? () => _edit(asked) : null,
-              child: Text(t.edit),
+              icon: const Icon(Icons.edit_outlined),
+              label: Text(t.edit),
             ),
           ],
         ),

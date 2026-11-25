@@ -8,6 +8,7 @@ use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, SubsecRound, Utc};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 
 use crate::checklists::{
     Checklists, NewLine, keys as checklist_keys, line_text, order, write_line,
@@ -15,11 +16,12 @@ use crate::checklists::{
 use crate::entry::dart_iso;
 use crate::error::{Error, Result};
 use crate::import_formats::{self, ImportFormat};
-use crate::notes::keys;
-use crate::places::Places;
+use crate::notes::keys as note_keys;
+use crate::obsidian;
+use crate::places::{Places, Stopping};
 use crate::search::lower_case;
 use crate::shopping_lists::ListOnAgenda;
-use crate::store::Store;
+use crate::store::{Store, utf16_cmp};
 use crate::text_boxes;
 use crate::text_format::{self, KNOWN, MARKDOWN, PLAIN, StoredText, VERSION};
 use crate::text_tags;
@@ -38,6 +40,76 @@ pub const MAX_TOTAL_BYTES: usize = 32 << 20;
 
 /// The largest photo kept; the apps need not read a larger one.
 pub const MAX_PHOTO_BYTES: usize = 16 << 20;
+
+/// The fields an Import keeps of where its Notes came from (obf-1078,
+/// ADR 0036), as the Dart core's `ImportKeys`, so the same source
+/// imported again adds only what is missing.
+pub mod keys {
+    /// On a Note an Import made: the path of its file inside what was
+    /// imported, its folders apart by `/`.
+    pub const SOURCE: &str = "source";
+    /// On a Note an Import made: the Area that Import made, which names
+    /// the Import.
+    pub const IMPORT_AREA: &str = "importArea";
+    /// On the Area an Import made: what was imported
+    /// ([`super::source_id`]).
+    pub const IMPORT_SOURCE: &str = "importSource";
+}
+
+/// What an Import reads: a folder, a Google Keep export, or a Markdown
+/// file with the files it links to (obf-1056). Part of the identity of
+/// its source ([`source_id`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ImportSourceKind {
+    Folder,
+    Keep,
+    Markdown,
+}
+
+impl ImportSourceKind {
+    /// Its name in the identity of a source, as the Dart core's
+    /// `ImportSourceKind.name`.
+    pub fn name(self) -> &'static str {
+        match self {
+            ImportSourceKind::Folder => "folder",
+            ImportSourceKind::Keep => "keep",
+            ImportSourceKind::Markdown => "markdown",
+        }
+    }
+}
+
+/// An earlier Import of a source, which a new one may fill in: the Area
+/// it made, by `area_id` and `area_name`, when it was made, and how many
+/// of the paths asked about its Notes hold already.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EarlierImport {
+    pub area_id: String,
+    pub area_name: String,
+    pub at: DateTime<Utc>,
+    pub held: usize,
+}
+
+/// The identity of what an Import of `kind` reads, as the Area it made
+/// keeps it ([`keys::IMPORT_SOURCE`]): the SHA-256 in lower case hex of
+/// the kind's name, a line break and `from`, where the app picked it (the
+/// folder's, the zip's or the file's path, or the system's lasting
+/// address of it), so no path lies in the log as written.
+pub fn source_id(kind: ImportSourceKind, from: &str) -> String {
+    hex::encode(Sha256::digest(format!("{}\n{from}", kind.name())))
+}
+
+/// Where a Note an Import made came from: the `path` of its file inside
+/// what was imported and the Area that Import made, `area_id`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ImportedFrom {
+    pub path: String,
+    pub area_id: String,
+}
+
+/// Where an Import writes its Notes: the Area of the earlier Import it
+/// fills in, with the paths that Import's Notes came from, or `None` and
+/// nothing for a new Area.
+type Target = (Option<String>, HashSet<String>);
 
 /// One file handed to an Import: its name, when it was last changed
 /// (`None` when the app cannot tell) and its bytes.
@@ -61,7 +133,8 @@ pub struct ImportedLine {
 /// One Note an Import makes: its `text` in its `format`, when it was
 /// `captured`, and the `name` of what it came from, which orders Notes
 /// of the same date. With `lines` it is a Checklist of them, an empty
-/// one too; it holds the `photos`, as their bytes.
+/// one too; it holds the `photos`, as their bytes. Its `path` inside
+/// what was imported, when it has one, is kept on it ([`keys`]).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ImportedNote {
     pub name: String,
@@ -70,6 +143,7 @@ pub struct ImportedNote {
     pub captured: DateTime<Utc>,
     pub lines: Option<Vec<ImportedLine>>,
     pub photos: Vec<Vec<u8>>,
+    pub path: Option<String>,
 }
 
 /// What an Import made, for the apps to announce.
@@ -96,6 +170,14 @@ pub struct ImportSummary {
     pub missing: usize,
     /// Files a note names that are no photo, such as a voice recording.
     pub not_photo: usize,
+    /// How many Notes it was to write, when it was stopped before all of
+    /// them were in (obf-1078): the `notes` written stay, the others are
+    /// not made. `None` when it was not stopped.
+    pub stopped: Option<usize>,
+    /// Files and notes left out of an Import that filled in an earlier
+    /// one (obf-1078), as that one made a Note of their path already; not
+    /// counted among the [`ImportSummary::skipped`].
+    pub already: usize,
 }
 
 impl ImportSummary {
@@ -113,6 +195,9 @@ pub type ImportProgress<'a> = &'a dyn Fn(usize, usize);
 pub struct Imports<'a> {
     store: &'a Store,
     progress: Option<ImportProgress<'a>>,
+    stop: Option<Stopping<'a>>,
+    from: Option<&'a str>,
+    fill_in: Option<&'a str>,
 }
 
 impl<'a> Imports<'a> {
@@ -120,7 +205,171 @@ impl<'a> Imports<'a> {
         Imports {
             store,
             progress: None,
+            stop: None,
+            from: None,
+            fill_in: None,
         }
+    }
+
+    /// These Imports, of what the app picked at `from`, as the Dart
+    /// core's `from:`: the Area an Import makes keeps it
+    /// ([`source_id`]).
+    pub fn from_source(self, from: &'a str) -> Imports<'a> {
+        Imports {
+            from: Some(from),
+            ..self
+        }
+    }
+
+    /// These Imports, filling in the earlier Import of the same source
+    /// that made the Area `area_id` ([`Imports::earlier`]), as the Dart
+    /// core's `fillIn:` (obf-1078): only what no Note of that Import came
+    /// from is made, into that Area. One the rule of
+    /// [`Imports::earlier`] does not take, or one without
+    /// [`Imports::from_source`], makes a new Area for everything.
+    pub fn filling_in(self, area_id: &'a str) -> Imports<'a> {
+        Imports {
+            fill_in: Some(area_id),
+            ..self
+        }
+    }
+
+    /// The earlier Import of `kind` from `from` that a new one may fill
+    /// in (obf-1078), as the Dart core's `earlier`: of the Areas an Import
+    /// of it made that are still there and may be written in, as one of
+    /// the user's own Devices wrote it, the newest whose Notes came from
+    /// any of `paths`, the paths inside the source the app lists, before
+    /// any file is read; `None` when there is none. A name alone matches
+    /// nothing: neither the Area's nor a file's.
+    pub fn earlier<I>(
+        &self,
+        kind: ImportSourceKind,
+        from: &str,
+        paths: I,
+    ) -> Result<Option<EarlierImport>>
+    where
+        I: IntoIterator,
+        I::Item: AsRef<str>,
+    {
+        let source = source_id(kind, from);
+        let wanted: HashSet<String> = paths.into_iter().map(|p| slashed(p.as_ref())).collect();
+        let mut own = HashMap::new();
+        let mut found: Option<EarlierImport> = None;
+        for area_id in self.store.ever_with(keys::IMPORT_SOURCE, &source)? {
+            let Some((area_name, at)) = self.import_of(&area_id, &source, &mut own)? else {
+                continue;
+            };
+            let held = self
+                .held(&area_id, &mut own)?
+                .iter()
+                .filter(|p| wanted.contains(*p))
+                .count();
+            if held == 0 {
+                continue;
+            }
+            let newer = found.as_ref().is_none_or(|f| {
+                at > f.at || (at == f.at && utf16_cmp(&area_id, &f.area_id).is_gt())
+            });
+            if newer {
+                found = Some(EarlierImport {
+                    area_id,
+                    area_name,
+                    at,
+                    held,
+                });
+            }
+        }
+        Ok(found)
+    }
+
+    /// Where the Note `note_id` came from, as one of the user's own
+    /// Devices wrote it, as the Dart core's `sourceOf`; `None` for a Note
+    /// no Import made (obf-1078).
+    pub fn source_of(&self, note_id: &str) -> Result<Option<ImportedFrom>> {
+        let s = self.store;
+        let logged = s.logged_history(note_id)?;
+        let mut own = HashMap::new();
+        let path = s.latest_by_own(&logged, keys::SOURCE, &mut own)?;
+        let area = s.latest_by_own(&logged, keys::IMPORT_AREA, &mut own)?;
+        Ok(path
+            .zip(area)
+            .map(|(path, area_id)| ImportedFrom { path, area_id }))
+    }
+
+    /// The name of the Area `area_id` and when an Import of `source` made
+    /// it, as one of the user's own Devices wrote it, when it is there
+    /// and this Device may write in it; else `None`. `own` remembers
+    /// which Devices are the user's own.
+    fn import_of(
+        &self,
+        area_id: &str,
+        source: &str,
+        own: &mut HashMap<String, bool>,
+    ) -> Result<Option<(String, DateTime<Utc>)>> {
+        let s = self.store;
+        let Some(area) = Places::new(s).area_by_id(area_id)? else {
+            return Ok(None);
+        };
+        if !s.may_write_in(area_id)? {
+            return Ok(None);
+        }
+        let mut held: Option<crate::entry::Entry> = None;
+        for e in s.logged_history(area_id)? {
+            if e.field != keys::IMPORT_SOURCE || !s.written_by_own_in(&e.device, own)? {
+                continue;
+            }
+            if held
+                .as_ref()
+                .is_none_or(|h| Store::latest_wins(&e, h).is_gt())
+            {
+                held = Some(e);
+            }
+        }
+        Ok(held
+            .filter(|e| e.value.as_deref() == Some(source))
+            .map(|e| (area.name, e.date_at)))
+    }
+
+    /// The paths the Notes of the Import that made the Area `area_id`
+    /// came from, as the user's own Devices wrote them: of every such
+    /// Note, moved, in the trash or purged since as well. Read at once,
+    /// not Note by Note.
+    fn held(&self, area_id: &str, own: &mut HashMap<String, bool>) -> Result<HashSet<String>> {
+        let s = self.store;
+        let ever = s.ever_with(keys::IMPORT_AREA, area_id)?;
+        let logged = s.logged_fields_of(
+            ever.iter().map(String::as_str),
+            &[keys::IMPORT_AREA, keys::SOURCE],
+        )?;
+        let mut paths = HashSet::new();
+        for entries in logged.values() {
+            if s.latest_by_own(entries, keys::IMPORT_AREA, own)?.as_deref() != Some(area_id) {
+                continue;
+            }
+            if let Some(path) = s.latest_by_own(entries, keys::SOURCE, own)? {
+                paths.insert(path);
+            }
+        }
+        Ok(paths)
+    }
+
+    /// Where an Import of `kind` writes: the Area [`Imports::filling_in`]
+    /// names, when [`Imports::earlier`] would take it for what
+    /// [`Imports::from_source`] names, with the paths its Notes came
+    /// from; else a new Area.
+    fn target(&self, kind: Option<ImportSourceKind>) -> Result<Target> {
+        let (Some(kind), Some(from), Some(area_id)) = (kind, self.from, self.fill_in) else {
+            return Ok((None, HashSet::new()));
+        };
+        let mut own = HashMap::new();
+        if self
+            .import_of(area_id, &source_id(kind, from), &mut own)?
+            .is_none()
+        {
+            return Ok((None, HashSet::new()));
+        }
+        let held = self.held(area_id, &mut own)?;
+        Ok((Some(area_id.to_string()), held))
     }
 
     /// These Imports, `progress` hearing how far the writing is, as the
@@ -130,6 +379,21 @@ impl<'a> Imports<'a> {
             progress: Some(progress),
             ..self
         }
+    }
+
+    /// These Imports, asking `stop` before each Note they write
+    /// (obf-1078): once it says so, the Notes written stay and the
+    /// summary says how many were to be ([`ImportSummary::stopped`]).
+    pub fn stopping(self, stop: Stopping<'a>) -> Imports<'a> {
+        Imports {
+            stop: Some(stop),
+            ..self
+        }
+    }
+
+    /// Whether the hook, when there is one, says to stop.
+    fn stop_asked(&self) -> bool {
+        self.stop.is_some_and(|stop| stop())
     }
 
     /// Tells the hook, when there is one, that `written` of `of` are in.
@@ -147,7 +411,10 @@ impl<'a> Imports<'a> {
     /// file's Note is formatted, its Markdown as written; a text file's
     /// is plain; the others' are formatted, read into the Markdown subset
     /// ([`import_formats`]). A Note is dated by its file's modification
-    /// time, and by now when that is unknown or later.
+    /// time, and by now when that is unknown or later. Each Note keeps its
+    /// file's path ([`keys`]); the Area keeps the folder
+    /// [`Imports::from_source`] names; [`Imports::filling_in`] fills in an
+    /// earlier Import of it (obf-1078).
     pub fn folder(&self, area_name: &str, files: &[ImportFile]) -> Result<ImportSummary> {
         let name = area(area_name)?;
         let now = self.store.now();
@@ -195,9 +462,112 @@ impl<'a> Imports<'a> {
                 captured: at,
                 lines: None,
                 photos: Vec::new(),
+                path: Some(slashed(&file.name)),
             });
         }
-        self.notes(name, &made, not_text, too_large)
+        let skipped = ImportSummary {
+            not_text,
+            too_large,
+            ..ImportSummary::default()
+        };
+        self.write(name, &made, &skipped, Some(ImportSourceKind::Folder))
+    }
+
+    /// Makes one Note of each Markdown file of `files` in a new Area
+    /// named `area_name`, as [`Imports::folder`] makes it (obf-1056): the
+    /// file opened in the desktop's viewer and the files it links to, by
+    /// their paths in the folder their links are found in
+    /// ([`crate::obsidian`]). A wiki link to another of them becomes an
+    /// app link to its Note, `[[Name|label]]` showing its label; one to
+    /// a file not among them, or skipped, stays as written. A picture it
+    /// embeds, `![[picture.png]]` or `![alt](picture.png)`, that is among
+    /// `pictures`, by its path there, becomes a photo of the Note, the
+    /// embed left out of its text; one larger than [`MAX_PHOTO_BYTES`] is
+    /// counted as too large and stays as written. Any other file of
+    /// `files` is skipped and counted. Filling in an earlier Import of the
+    /// same file ([`Imports::filling_in`]), a link to a file that Import
+    /// made a Note of stays as written too.
+    pub fn linked(
+        &self,
+        area_name: &str,
+        files: &[ImportFile],
+        pictures: &[ImportFile],
+    ) -> Result<ImportSummary> {
+        let name = area(area_name)?;
+        let now = self.store.now();
+        let mut skipped = ImportSummary::default();
+        let picture_paths: Vec<String> = pictures.iter().map(|p| slashed(&p.name)).collect();
+        let mut read: Vec<LinkedRead> = Vec::new();
+        for file in files {
+            let path = slashed(&file.name);
+            let base = base(&path);
+            let Some((stem, MARKDOWN)) = format_of(base) else {
+                skipped.not_text += 1;
+                continue;
+            };
+            if file.bytes.len() > MAX_FILE_BYTES {
+                skipped.too_large += 1;
+                continue;
+            }
+            let Some(text) = decode(&file.bytes) else {
+                skipped.not_text += 1;
+                continue;
+            };
+            let (text, photos, large) = taken_pictures(&text, &path, pictures, &picture_paths);
+            skipped.too_large += large;
+            let at = match file.modified.map(|at| at.trunc_subsecs(6)) {
+                Some(at) if at > DateTime::UNIX_EPOCH && at <= now => at,
+                _ => now,
+            };
+            read.push((path.clone(), stem.to_string(), text, at, photos));
+        }
+        let paths: Vec<String> = read.iter().map(|r| r.0.clone()).collect();
+        let ids = read
+            .iter()
+            .map(|_| Ok(format!("note:{}", self.store.new_id()?)))
+            .collect::<Result<Vec<String>>>()?;
+        // Links only to the Notes kept: those dropped as too large are
+        // left as written, and the rest is linked anew without them.
+        let target = self.target(Some(ImportSourceKind::Markdown))?;
+        let mut linkable = vec![true; read.len()];
+        loop {
+            let notes: Vec<ImportedNote> = read
+                .iter()
+                .map(|(path, stem, text, at, photos)| {
+                    let linked = with_links(text, (&paths, &linkable, &ids));
+                    let text = titled(stem, &linked, MARKDOWN);
+                    ImportedNote {
+                        name: base(path).to_string(),
+                        text,
+                        format: MARKDOWN.to_string(),
+                        captured: *at,
+                        lines: None,
+                        photos: photos.clone(),
+                        path: Some(path.clone()),
+                    }
+                })
+                .collect();
+            let (kept, _, _) = kept(&notes, &target.1);
+            // Only ever fewer, so this ends: once every Note linked to is
+            // kept, the texts are written as they are.
+            let now_linkable: Vec<bool> = linkable
+                .iter()
+                .enumerate()
+                .map(|(i, &l)| l && kept.iter().any(|(k, _)| *k == i))
+                .collect();
+            // Every file has a name, so no Note is empty.
+            if now_linkable == linkable {
+                return self.write_as(
+                    name,
+                    &notes,
+                    &skipped,
+                    &ids,
+                    &target,
+                    Some(ImportSourceKind::Markdown),
+                );
+            }
+            linkable = now_linkable;
+        }
     }
 
     /// Writes `notes` into a new Area named `area_name`, oldest first,
@@ -224,15 +594,40 @@ impl<'a> Imports<'a> {
             too_large,
             ..ImportSummary::default()
         };
-        self.write(area_name, notes, &skipped)
+        self.write(area_name, notes, &skipped, None)
     }
 
-    /// `notes` with the files and notes `skipped` before them counted.
+    /// `notes` with the files and notes `skipped` before them counted,
+    /// of an Import of `kind`: the new Area keeps what
+    /// [`Imports::from_source`] names ([`source_id`]). Filling in
+    /// ([`Imports::filling_in`]) an earlier Import of it as
+    /// [`Imports::earlier`] takes it (there, writable, and written so by
+    /// one of the user's own Devices), they go into its Area instead, but
+    /// for those whose path a Note of that Import came from already,
+    /// counted as [`ImportSummary::already`]; with any other, as with
+    /// none, a new Area is made for every Note.
     fn write(
         &self,
         area_name: &str,
         notes: &[ImportedNote],
         skipped: &ImportSummary,
+        kind: Option<ImportSourceKind>,
+    ) -> Result<ImportSummary> {
+        let target = self.target(kind)?;
+        self.write_as(area_name, notes, skipped, &[], &target, kind)
+    }
+
+    /// As [`Imports::write`] into `target`, each note getting the id
+    /// `ids` holds at its place, a new one where it holds none
+    /// (obf-1056).
+    fn write_as(
+        &self,
+        area_name: &str,
+        notes: &[ImportedNote],
+        skipped: &ImportSummary,
+        ids: &[String],
+        (into, held): &Target,
+        kind: Option<ImportSourceKind>,
     ) -> Result<ImportSummary> {
         let name = area(area_name)?;
         if let Some(note) = notes.iter().find(|n| !KNOWN.contains(&n.format.as_str())) {
@@ -241,45 +636,34 @@ impl<'a> Imports<'a> {
                 note.format
             )));
         }
-        let mut order: Vec<(usize, &ImportedNote, DateTime<Utc>)> = notes
-            .iter()
-            .enumerate()
-            .map(|(i, n)| (i, n, n.captured.trunc_subsecs(6)))
-            .collect();
-        order.sort_by(|a, b| (a.2, &a.1.name, a.0).cmp(&(b.2, &b.1.name, b.0)));
-        let mut kept = Vec::new();
-        let mut large = skipped.too_large;
-        let mut total = 0;
-        for (_, note, at) in order.iter().rev() {
-            let mut size = StoredText::of(&note.format, &note.text, VERSION)
-                .encode()
-                .len();
-            for line in note.lines.iter().flatten() {
-                size += StoredText::plain(&line.text).encode().len();
-            }
-            if size > MAX_TEXT_BYTES || total + size > MAX_TOTAL_BYTES {
-                large += 1;
-                continue;
-            }
-            total += size;
-            kept.push((*note, *at));
-        }
+        let (kept, large, already) = kept(notes, held);
         let summary = ImportSummary {
             area_id: None,
             notes: 0,
-            too_large: large,
+            too_large: skipped.too_large + large,
             checklists: 0,
             photos: 0,
+            already,
             ..skipped.clone()
         };
         if kept.is_empty() {
             return Ok(summary);
         }
-        kept.reverse();
+        // Stopped before anything was written: no Area either.
+        if self.stop_asked() {
+            return Ok(ImportSummary {
+                stopped: Some(kept.len()),
+                ..summary
+            });
+        }
+        let kept: Vec<(&ImportedNote, DateTime<Utc>, Option<&String>)> = kept
+            .into_iter()
+            .filter_map(|(i, at)| Some((notes.get(i)?, at, ids.get(i))))
+            .collect();
         let s = self.store;
         // The bytes are kept before the log names them, each photo once.
         let mut hashes = Vec::new();
-        for (note, _) in &kept {
+        for (note, _, _) in &kept {
             let mut held: Vec<String> = Vec::new();
             for bytes in &note.photos {
                 let hash = s.put_photo(bytes)?;
@@ -289,20 +673,41 @@ impl<'a> Imports<'a> {
             }
             hashes.push(held);
         }
-        let area_id = s.batch(|| Ok(Places::new(s).add_area(&self.unused(name)?)?.id))?;
+        let area_id = match into {
+            Some(area_id) => area_id.clone(),
+            None => s.batch(|| {
+                let id = Places::new(s).add_area(&self.unused(name)?)?.id;
+                if let (Some(kind), Some(from)) = (kind, self.from) {
+                    s.append(&id, keys::IMPORT_SOURCE, Some(&source_id(kind, from)), None)?;
+                }
+                Ok(id)
+            })?,
+        };
         self.tell(0, kept.len());
-        for (i, ((note, at), held)) in kept.iter().zip(&hashes).enumerate() {
+        let mut written = kept.len();
+        for (i, ((note, at, given), photos)) in kept.iter().zip(&hashes).enumerate() {
+            if self.stop_asked() {
+                written = i;
+                break;
+            }
             s.batch(|| {
-                let id = format!("note:{}", s.new_id()?);
+                let id = match given {
+                    Some(id) => (*id).clone(),
+                    None => format!("note:{}", s.new_id()?),
+                };
                 let date = Some(*at);
-                s.append(&id, keys::TYPE, Some(keys::TYPE_NOTE), date)?;
-                s.append(&id, keys::CAPTURED, Some(&dart_iso(*at)), date)?;
+                s.append(&id, note_keys::TYPE, Some(note_keys::TYPE_NOTE), date)?;
+                s.append(&id, note_keys::CAPTURED, Some(&dart_iso(*at)), date)?;
                 let boxed = text_boxes::convert(&note.text, &note.format, || s.new_id())?;
                 let text = StoredText::of(&note.format, &boxed, VERSION).encode();
-                s.append(&id, keys::TEXT, Some(&text), date)?;
-                s.append(&id, keys::PLACE, Some(&area_id), date)?;
-                for hash in held {
-                    s.append(&id, &keys::photo(hash), Some(keys::ADDED), date)?;
+                s.append(&id, note_keys::TEXT, Some(&text), date)?;
+                s.append(&id, note_keys::PLACE, Some(&area_id), date)?;
+                if let Some(path) = &note.path {
+                    s.append(&id, keys::IMPORT_AREA, Some(&area_id), date)?;
+                    s.append(&id, keys::SOURCE, Some(path), date)?;
+                }
+                for hash in photos {
+                    s.append(&id, &note_keys::photo(hash), Some(note_keys::ADDED), date)?;
                 }
                 match &note.lines {
                     Some(lines) => self.write_lines(&id, lines, *at),
@@ -311,11 +716,13 @@ impl<'a> Imports<'a> {
             })?;
             self.tell(i + 1, kept.len());
         }
+        let made = kept.get(..written).unwrap_or_default();
         Ok(ImportSummary {
             area_id: Some(area_id),
-            notes: kept.len(),
-            checklists: kept.iter().filter(|(n, _)| n.lines.is_some()).count(),
-            photos: hashes.iter().map(Vec::len).sum(),
+            notes: written,
+            checklists: made.iter().filter(|(n, _, _)| n.lines.is_some()).count(),
+            photos: hashes.iter().take(written).map(Vec::len).sum(),
+            stopped: (written < kept.len()).then_some(kept.len()),
             ..summary
         })
     }
@@ -364,7 +771,10 @@ impl<'a> Imports<'a> {
     /// its labels are tags in a last line, a list is a Checklist with its
     /// Lines checked as in Keep, its photos are its photos. It is
     /// captured when Keep says it was made, and its checks are dated when
-    /// it was last changed.
+    /// it was last changed. Each Note keeps the path of its `.json`
+    /// ([`keys`]); the Area keeps the zip or folder
+    /// [`Imports::from_source`] names; [`Imports::filling_in`] fills in an
+    /// earlier Import of it (obf-1078).
     pub fn keep(&self, area_name: &str, entries: &[ImportFile]) -> Result<ImportSummary> {
         let name = area(area_name)?;
         let now = self.store.now();
@@ -461,9 +871,10 @@ impl<'a> Imports<'a> {
                 captured: at,
                 lines,
                 photos,
+                path: Some(slashed(&entry.name)),
             });
         }
-        self.write(name, &made, &skipped)
+        self.write(name, &made, &skipped, Some(ImportSourceKind::Keep))
     }
 
     /// `name`, or with " (2)", " (3)" and so on after it when an Area is
@@ -609,6 +1020,142 @@ fn keep_tags(labels: Option<&Value>, body: &str) -> String {
     tags.join(" ")
 }
 
+/// A Markdown file read for [`Imports::linked`]: its path, its name
+/// without the ending, its text without the pictures taken, when it is
+/// dated and its photos.
+type LinkedRead = (String, String, String, DateTime<Utc>, Vec<Vec<u8>>);
+
+/// `path` with its folders separated by `/`.
+fn slashed(path: &str) -> String {
+    path.replace('\\', "/")
+}
+
+/// `text`, of the file at `path`, without the pictures it embeds that are
+/// among `pictures` (by their `paths`), with their bytes, each once; and
+/// how many of them were too large to take, which stay as written.
+fn taken_pictures(
+    text: &str,
+    path: &str,
+    pictures: &[ImportFile],
+    paths: &[String],
+) -> (String, Vec<Vec<u8>>, usize) {
+    let mut cuts: Vec<(usize, usize, usize)> = Vec::new();
+    for link in obsidian::wiki_links(text).into_iter().filter(|l| l.embed) {
+        if let Some(found) = obsidian::file_target(&link.target, path, paths) {
+            cuts.push((link.start, link.end, found));
+        }
+    }
+    for picture in obsidian::pictures(text) {
+        if let Some(found) = obsidian::picture_target(&picture.path, path, paths) {
+            cuts.push((picture.start, picture.end, found));
+        }
+    }
+    cuts.sort_unstable();
+    let mut out = String::with_capacity(text.len());
+    let mut photos: Vec<Vec<u8>> = Vec::new();
+    let mut taken: Vec<usize> = Vec::new();
+    let mut large = 0;
+    let mut at = 0;
+    for (start, end, found) in cuts {
+        let Some(picture) = pictures.get(found) else {
+            continue;
+        };
+        if start < at {
+            continue;
+        }
+        if picture.bytes.len() > MAX_PHOTO_BYTES {
+            large += 1;
+            continue;
+        }
+        out.push_str(text.get(at..start).unwrap_or_default());
+        at = end;
+        if !taken.contains(&found) {
+            taken.push(found);
+            photos.push(picture.bytes.clone());
+        }
+    }
+    out.push_str(text.get(at..).unwrap_or_default());
+    (out, photos, large)
+}
+
+/// `text` with each wiki link to one of the files at `paths` that is
+/// `linkable` as a link to its Note, by its id in `ids`: `[shown](app
+/// link)`. Embeds and links to any other file stay as written.
+fn with_links(text: &str, (paths, linkable, ids): (&[String], &[bool], &[String])) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut at = 0;
+    for link in obsidian::wiki_links(text) {
+        if link.embed || link.target.is_empty() {
+            continue;
+        }
+        let Some(found) = obsidian::note_target(&link.target, paths) else {
+            continue;
+        };
+        let (Some(true), Some(id)) = (linkable.get(found).copied(), ids.get(found)) else {
+            continue;
+        };
+        out.push_str(text.get(at..link.start).unwrap_or_default());
+        let url = crate::app_link::AppLink::Note(id.clone()).url();
+        out.push_str(&format!("[{}]({url})", label_escaped(&link.shown())));
+        at = link.end;
+    }
+    out.push_str(text.get(at..).unwrap_or_default());
+    out
+}
+
+/// `label` as a link's words that read as written: a `\\` before each
+/// mark that could end the link or start a format in it.
+fn label_escaped(label: &str) -> String {
+    let mut out = String::with_capacity(label.len());
+    for c in label.chars() {
+        if matches!(c, '\\' | '[' | ']' | '*' | '_' | '~' | '`') {
+            out.push('\\');
+        }
+        out.push(c);
+    }
+    out
+}
+
+/// Which of `notes` an Import keeps, oldest first, by their places in
+/// `notes`, each with when it was captured; and how many it skips as too
+/// large: a text larger than [`MAX_TEXT_BYTES`], and the oldest beyond
+/// [`MAX_TOTAL_BYTES`]; and how many it leaves out before that, as their
+/// path is among the paths `held` already (obf-1078).
+fn kept(
+    notes: &[ImportedNote],
+    held: &HashSet<String>,
+) -> (Vec<(usize, DateTime<Utc>)>, usize, usize) {
+    let mut already = 0;
+    let mut order: Vec<(usize, &ImportedNote, DateTime<Utc>)> = Vec::new();
+    for (i, n) in notes.iter().enumerate() {
+        if n.path.as_ref().is_some_and(|p| held.contains(p)) {
+            already += 1;
+        } else {
+            order.push((i, n, n.captured.trunc_subsecs(6)));
+        }
+    }
+    order.sort_by(|a, b| (a.2, &a.1.name, a.0).cmp(&(b.2, &b.1.name, b.0)));
+    let mut kept = Vec::new();
+    let mut large = 0;
+    let mut total = 0;
+    for (i, note, at) in order.iter().rev() {
+        let mut size = StoredText::of(&note.format, &note.text, VERSION)
+            .encode()
+            .len();
+        for line in note.lines.iter().flatten() {
+            size += StoredText::plain(&line.text).encode().len();
+        }
+        if size > MAX_TEXT_BYTES || total + size > MAX_TOTAL_BYTES {
+            large += 1;
+            continue;
+        }
+        total += size;
+        kept.push((*i, *at));
+    }
+    kept.reverse();
+    (kept, large, already)
+}
+
 fn area(name: &str) -> Result<&str> {
     let trimmed = dart_trim(name);
     if trimmed.is_empty() {
@@ -725,3 +1272,6 @@ pub(crate) fn titled(stem: &str, text: &str, format: &str) -> String {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod fill_in_tests;

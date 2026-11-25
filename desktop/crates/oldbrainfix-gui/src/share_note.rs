@@ -1,5 +1,5 @@
 //! A Note handed to another app from the desktop (#129), as the phone's
-//! `share_note.dart` hands it to the share sheet: "Copy as text" puts the
+//! `share_note.dart` hands it to the share sheet: "Copy text" puts the
 //! Note's share text on the clipboard, with HTML beside formatted text,
 //! and "Save as Markdown…" writes it as a Markdown file with the photos
 //! and recordings this Device holds in a folder of its own beside it,

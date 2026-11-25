@@ -21,6 +21,44 @@ pub enum KeepSource {
     Folder(PathBuf),
 }
 
+impl KeepSource {
+    /// Where the export lies: its zip or its folder.
+    pub fn path(&self) -> &Path {
+        match self {
+            KeepSource::Zip(path) | KeepSource::Folder(path) => path,
+        }
+    }
+}
+
+/// The paths inside the zip or the folder of the files of `source`
+/// [`read`] reads, none of them read (obf-1078); the full text of why
+/// when it cannot be listed.
+pub fn paths(source: &KeepSource) -> Result<Vec<String>, String> {
+    match source {
+        KeepSource::Zip(zip) => zip_paths(zip).map_err(|e| format!("{}: {e}", zip.display())),
+        KeepSource::Folder(folder) => {
+            let mut paths = Vec::new();
+            list_into(folder, "", &mut paths).map_err(|e| format!("{}: {e}", folder.display()))?;
+            Ok(of_keep(paths).into_iter().map(|(name, ..)| name).collect())
+        }
+    }
+}
+
+/// The entries of the zip at `path` [`read_zip`] reads, by name.
+fn zip_paths(path: &Path) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let archive = ZipArchive::new(BufReader::new(File::open(path)?))?;
+    let names: Vec<(String, ())> = archive
+        .file_names()
+        // An entry whose name cannot be read is no file of Keep's.
+        .filter_map(|name| Some((name.ok()?.into_owned(), ())))
+        .collect();
+    Ok(of_keep(names)
+        .into_iter()
+        .map(|(name, ..)| name)
+        .filter(|name| inside(name))
+        .collect())
+}
+
 /// The files of `source` the core reads, by their paths inside the zip
 /// or the folder, with how many notes were refused for a path leaving
 /// the export (`..` or a path from the root), which a zip may name but

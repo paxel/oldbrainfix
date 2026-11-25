@@ -3,6 +3,7 @@ import 'package:flutter/rendering.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'l10n.dart';
+import 'tap_mark.dart';
 
 /// The colours of one brightness (UI laws, "Look"): a light teal ground
 /// or an anthracite one, question marks a touch darker or brighter than
@@ -49,6 +50,12 @@ class LookTones {
   static LookTones of(Brightness brightness) =>
       brightness == Brightness.dark ? dark : light;
 }
+
+/// The outlined button's tonal fill in the light look (obf-1106), set off
+/// from the light ground as the desktop's secondary buttons are: Material's
+/// `secondaryContainer` there is the ground's own tone. The dark look keeps
+/// `secondaryContainer`.
+const lightButtonFill = Color(0xFFB2DFDB);
 
 /// How much "Fat fingers" grows text, icons and tap targets (#224).
 const fatFingersScale = 1.3;
@@ -291,6 +298,7 @@ ThemeData lookTheme(
   Brightness brightness, {
   bool fatFingers = false,
   TextSize textSize = TextSize.normal,
+  TapMarkSplashFactory? tapMarks,
 }) {
   final tones = LookTones.of(brightness);
   final scheme = ColorScheme.fromSeed(
@@ -303,36 +311,70 @@ ThemeData lookTheme(
   final buttonIcon = WidgetStatePropertyAll(18 * scale);
   final density = kMinInteractiveDimension * (scale - 1) / 4;
   final grown = VisualDensity(horizontal: density, vertical: density);
+  // Every button's ink marks its taps with [tapMarks] (obf-1143); the
+  // "+" takes it through [TapMarked].
+  ButtonStyle? marked(ButtonStyle? style) => tapMarks == null
+      ? style
+      : (style ?? const ButtonStyle()).copyWith(splashFactory: tapMarks);
+  final iconButton = marked(
+    fatFingers
+        ? ButtonStyle(
+            iconSize: WidgetStatePropertyAll(icon),
+            minimumSize: WidgetStatePropertyAll(
+              Size.square(kMinInteractiveDimension * scale),
+            ),
+          )
+        : null,
+  );
+  final textButton = marked(
+    fatFingers ? ButtonStyle(iconSize: buttonIcon) : null,
+  );
+  final filledButton = marked(
+    fatFingers ? ButtonStyle(iconSize: buttonIcon) : null,
+  );
+  final elevatedButton = marked(
+    fatFingers ? ButtonStyle(iconSize: buttonIcon) : null,
+  );
   return ThemeData(
     colorScheme: scheme,
     scaffoldBackgroundColor: Colors.transparent,
-    extensions: [LookScale(scale), TextSizeScale(textSize.factor)],
+    extensions: [
+      LookScale(scale),
+      TextSizeScale(textSize.factor),
+      if (tapMarks != null) TapMarkTheme(tapMarks),
+    ],
     visualDensity: fatFingers ? grown : null,
     iconTheme: fatFingers ? IconThemeData(size: icon) : null,
     // Material 3's icon buttons take no density: their target is set
     // as their least size, 48 grown.
-    iconButtonTheme: fatFingers
-        ? IconButtonThemeData(
-            style: ButtonStyle(
-              iconSize: WidgetStatePropertyAll(icon),
-              minimumSize: WidgetStatePropertyAll(
-                Size.square(kMinInteractiveDimension * scale),
-              ),
-            ),
-          )
-        : null,
-    textButtonTheme: fatFingers
-        ? TextButtonThemeData(style: ButtonStyle(iconSize: buttonIcon))
-        : null,
-    filledButtonTheme: fatFingers
-        ? FilledButtonThemeData(style: ButtonStyle(iconSize: buttonIcon))
-        : null,
-    outlinedButtonTheme: fatFingers
-        ? OutlinedButtonThemeData(style: ButtonStyle(iconSize: buttonIcon))
-        : null,
-    elevatedButtonTheme: fatFingers
-        ? ElevatedButtonThemeData(style: ButtonStyle(iconSize: buttonIcon))
-        : null,
+    iconButtonTheme: iconButton == null
+        ? null
+        : IconButtonThemeData(style: iconButton),
+    textButtonTheme: textButton == null
+        ? null
+        : TextButtonThemeData(style: textButton),
+    filledButtonTheme: filledButton == null
+        ? null
+        : FilledButtonThemeData(style: filledButton),
+    // The outlined button, a standing action that is not the main one
+    // (UI laws, "Design system", obf-1081): a tonal fill with its 1 px
+    // outline, so it reads as a button on the question marks too.
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style:
+          OutlinedButton.styleFrom(
+            backgroundColor: brightness == Brightness.light
+                ? lightButtonFill
+                : scheme.secondaryContainer,
+            foregroundColor: scheme.onSecondaryContainer,
+            disabledBackgroundColor: scheme.onSurface.withValues(alpha: 0.12),
+          ).copyWith(
+            iconSize: fatFingers ? buttonIcon : null,
+            splashFactory: tapMarks,
+          ),
+    ),
+    elevatedButtonTheme: elevatedButton == null
+        ? null
+        : ElevatedButtonThemeData(style: elevatedButton),
     // The bar is plain ground: titles stay readable over scrolled cards.
     appBarTheme: AppBarTheme(
       backgroundColor: tones.background,
@@ -354,6 +396,16 @@ ThemeData lookTheme(
       foregroundColor: scheme.onPrimary,
       iconSize: fatFingers ? icon : null,
     ),
+    // Chips are full pills, round ends at half their height, 32 high
+    // inside their outline (UI laws, "Design system", obf-1081):
+    // Material's 8 above and below its 20 high words made them 36. The
+    // 1 px outline is in the outline colour in every state, picked too,
+    // so it shows on the cards in dark as well (obf-1115).
+    chipTheme: ChipThemeData(
+      shape: const StadiumBorder(),
+      side: BorderSide(color: scheme.outline),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+    ),
     // Text fields sit on the question marks too and must stand out.
     inputDecorationTheme: InputDecorationThemeData(
       filled: true,
@@ -361,6 +413,11 @@ ThemeData lookTheme(
     ),
   );
 }
+
+/// The heading of a card or a section, 16 medium, the one style every
+/// such heading takes (UI laws, "Spacing and type", obf-1124).
+TextStyle? sectionHeading(BuildContext context) =>
+    Theme.of(context).textTheme.titleMedium;
 
 /// The Device's theme choice as Flutter's theme mode.
 ThemeMode themeModeOf(ThemeChoice choice) => switch (choice) {
@@ -402,6 +459,41 @@ class Embossed extends StatelessWidget {
       ),
       child: child,
     );
+  }
+}
+
+/// The button of an action that deletes or removes, in a dialog's action
+/// row or a page's group (Delete, Remove, Move to trash): filled on the
+/// error colour, with its words in the colour on it (UI laws, "Design
+/// system", obf-1081), its [icon] before them where one is given.
+class DestructiveButton extends StatelessWidget {
+  final VoidCallback? onPressed;
+  final Widget child;
+  final Widget? icon;
+
+  const DestructiveButton({
+    super.key,
+    required this.onPressed,
+    required this.child,
+    this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final style = FilledButton.styleFrom(
+      backgroundColor: scheme.error,
+      foregroundColor: scheme.onError,
+    );
+    final icon = this.icon;
+    return icon == null
+        ? FilledButton(style: style, onPressed: onPressed, child: child)
+        : FilledButton.icon(
+            style: style,
+            onPressed: onPressed,
+            icon: icon,
+            label: child,
+          );
   }
 }
 
@@ -516,6 +608,48 @@ class ControlBelow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// A checkbox as a [ControlBelow]'s control: pulled to the start by the
+/// tap room around its box, so the box's edge lines up with the text
+/// above it and not 15 in from it (UI laws, "Design system": rows align
+/// on one grid, obf-1134). Its tap room stays as large.
+class StartCheckbox extends StatelessWidget {
+  /// The checkbox's own key, for finding and tapping it.
+  final Key? boxKey;
+  final bool value;
+  final ValueChanged<bool>? onChanged;
+
+  const StartCheckbox({
+    super.key,
+    this.boxKey,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final boxTheme = theme.checkboxTheme;
+    // The checkbox's own size, as Material lays it out.
+    final room =
+        switch (boxTheme.materialTapTargetSize ?? theme.materialTapTargetSize) {
+          MaterialTapTargetSize.padded => kMinInteractiveDimension,
+          MaterialTapTargetSize.shrinkWrap => kMinInteractiveDimension - 8,
+        } +
+        (boxTheme.visualDensity ?? theme.visualDensity).baseSizeAdjustment.dx;
+    final inset = (room - Checkbox.width) / 2;
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    final changed = onChanged;
+    return Transform.translate(
+      offset: Offset(rtl ? inset : -inset, 0),
+      child: Checkbox(
+        key: boxKey,
+        value: value,
+        onChanged: changed == null ? null : (on) => changed(on ?? false),
       ),
     );
   }

@@ -273,8 +273,10 @@ void main() {
     expect(find.byType(UnsortedScreen), findsOneWidget);
   });
 
-  testWidgets("a tap on an Occurrence's notification opens its Note, as "
-      'AlarmsChannel.swift tells it once (#270)', (tester) async {
+  testWidgets("a tap on an Occurrence's notification marks it on the "
+      'Agenda, as AlarmsChannel.swift tells it once (obf-1039)', (
+    tester,
+  ) async {
     store
       ..starterSetOffered = true
       ..alarmSetupDone = true;
@@ -286,10 +288,13 @@ void main() {
         rule: Recurrence.parse('FREQ=DAILY'),
       ),
     );
-    Map<String, String>? opened = {
-      'routine': routine.id,
-      'occurrence': '2026-10-24T08:00',
-    };
+    // Today's, on the clock the test runs on.
+    final now = DateTime.now();
+    final today = Occurrence(
+      Day(now.year, now.month, now.day),
+      ClockTime(8, 0),
+    ).key;
+    Map<String, String>? opened = {'routine': routine.id, 'occurrence': today};
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
           const MethodChannel('io.github.paxel.oldbrainfix/alarms'),
@@ -316,7 +321,14 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(opened, isNull);
-    expect(find.byType(NoteEditorScreen), findsOneWidget);
+    expect(find.byType(NoteEditorScreen), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byKey(ValueKey('row-${routine.id}@$today')),
+        matching: find.byKey(const ValueKey('agenda-marked')),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('on the iPhone a page pushed on the Agenda goes back with '

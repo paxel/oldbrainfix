@@ -9,6 +9,180 @@ desktop alike; **Phone** and **Desktop** hold what only one app does, and
 replace a law of Both apps where they say so. A desktop law marked
 "(draft, #196)" waits for the user's review.
 
+## Design system
+
+The building blocks every screen is made of, defined once for both apps
+(obf-1081, C24). This section stands before the three parts and binds
+the phone and the desktop alike. A screen uses these blocks and invents
+no others; a block missing here is added here first. The page that
+shows each one live was approved on 2026-11-24 (obf-1081), and each
+app builds its screens from one shared widget set.
+
+- **Everything tappable is recognisable as tappable** (obf-1081): a
+  fill, an outline, or the accent's colour on its words and icon says
+  "this does something". A label with an icon in the text's or the weak
+  text's colour, without a frame, is never the only sign of an action;
+  text in the weak colour reads as a hint, never as a button.
+
+### Buttons
+
+There are three kinds, and an action takes the first that fits.
+
+- **Filled: the main action.** At most one on a dialog or page (Save,
+  Create, Done, Use, Restore, Continue), on the accent with its words
+  in `on_accent`. An action that deletes or removes (Delete, Remove,
+  Move to trash) is filled on the error colour instead. Phone:
+  `FilledButton` / `FilledButton.icon`, and `DestructiveButton` in
+  `look.dart`. Desktop: `theme::primary`,
+  `theme::main_action` (which Ctrl+Enter also runs) and
+  `theme::destructive` in `theme.rs`. Do not use it for a second action
+  beside the main one, nor as a page's only way to leave. A page's bar
+  is the exception: Save there stays the bar's labelled button, as
+  "The bar" says, and the filled kind is for the actions inside the
+  page (obf-1105).
+- **Outlined: a standing action that is not the main one.** It has a
+  1 px outline and its words, an icon before them where one says more,
+  for example the quick note's full-width "Open in the editor"
+  (obf-1080) or the list band's "+ New Note", "View" and "Show Notes
+  by…" (obf-1067). Phone: `OutlinedButton` / `OutlinedButton.icon`,
+  which `lookTheme`'s `outlinedButtonTheme` in `look.dart` gives the
+  tonal fill with the outline. Desktop: every button egui draws (`ui.button`, `Button::new`) wears
+  the secondary look of "Buttons look like buttons" (Desktop ▸ Buttons
+  and look, #218), a tonal fill with the outline, except Cancel and
+  Close in a dialog's action row, which are text buttons without an
+  icon (`design::row_button`, obf-1102); `band_button` in
+  `app.rs` draws that frame at the band's height, and
+  `capture_choices::open_in_editor` wears it across the width
+  (obf-1081). Do not use it for the main action or in a menu.
+- **Text with icon: a lesser action inside a card or a row** ("Copy
+  text", the Frogs' "Another one"). It has no frame: the icon and the
+  words are both in the accent, which is what makes it a button, and it
+  gets a tinted ground under the finger or pointer. Phone:
+  `TextButton.icon`. Desktop: `design::text_button` in `design.rs`
+  (obf-1081), its words and icon in the accent's text colour. Do not draw it
+  in the text's or the weak colour, and do not leave out its icon. A
+  dialog's action row is the one place a text button goes without an
+  icon (Cancel, Close, Not now beside the filled main action), because
+  the row itself shows that these are its buttons; desktop:
+  `design::row_button` (obf-1102).
+- Icon-only buttons (⋮, the pencil, the view button, the format bar)
+  get a rounded ground under the pointer and the ring while focused
+  (desktop `theme::icon_button_back`, phone `IconButton`), and they
+  always have a tooltip and a screen-reader label. On the desktop the
+  count stepper's − and + wear the outlined kind's frame in place of
+  that ground (`design::framed_icon_button`, obf-1112). Menu entries stay
+  flat, links stay links, and badges keep their own look (#192).
+- **The setting badge is a block of its own** (#160, obf-1117): a
+  Note's setting in the Note editor and the Note dialog is a split box
+  with radius 8, its icon in a tinted cell on the left and its value on
+  the right, a drop-down mark after the value where a tap opens a
+  choice. It is neither a button nor a chip; the buttons beside it in a
+  group keep their own kind and shape. Phone: `setting_badges.dart`.
+  Desktop: `setting_badges.rs`.
+
+### The header band
+
+- **One band carries a list's or a picker's search** (#351, obf-1041,
+  obf-1064, obf-1088). It is filled with a tone set off from the
+  ground, has a line along its bottom, and whatever scrolls goes under
+  that line. On the desktop the band of a list of Notes has two rows:
+  back, forward and the path with the place as its title (22), then
+  the search field (its text 16), the view switch, "Show Notes by…"
+  with its chips, and "+ New Note", all one height (36), wrapping under
+  the field below 200 wide.
+- Phone: `SearchBand`, and `SearchHeaderSliver` for a list that scrolls
+  it away, followed by `SearchHeaderLine`, whose line stays under the
+  bar once the band is gone (obf-1129), in `browser.dart`; its fill is
+  `searchHeaderColour`, the
+  marks' tone (`LookTones.mark` in `look.dart`). Desktop:
+  `theme::search_band` with `theme::band_fill`, and `list_band` /
+  `band_tools` with `BandSizes` in `app.rs`.
+- Use it on every page or dialog that searches what it lists. Do not
+  use it as a decoration on a page without a search, and never put a
+  second band under it.
+
+### Cards
+
+- **A card is an embossed panel, radius 16**: the card fill, a shade
+  below and right, a highlight above and left, and a stronger lift for
+  important ones (see Cards). Phone: `Embossed` in `look.dart`. Desktop:
+  `theme::embossed`, laid out by `embossed` / `agenda_card` in `app.rs`.
+  An Area's colour runs down its left edge, 6 wide (`theme::area_band`).
+- Its kinds are a Note's card (`NoteCard`, padding 16, on the desktop
+  14; the card text is 16), a Settings section's card with its title on top
+  (obf-1085, phone `SettingsSection`), and the one card of a Checklist,
+  Shopping List or Tally, its name, description and content together
+  (obf-1071).
+- Use a card for a thing (a Note or a section of settings) that stands
+  over the question marks. Do not nest a card in a card, and do not
+  give a Section, a Line or a field a card of its own.
+
+### Chips
+
+- **A chip is a short, tappable word with rounded ends**, a 1 px
+  outline, and its fill tinted with the accent while picked (the phone
+  gives Material's chip the pill and 32 inside the outline once, in
+  `lookTheme`'s `chipTheme` in `look.dart`; the desktop
+  `design::Chip` and `design::chip` in `design.rs`, a full pill 32
+  high, in a list's band the band's 36, obf-1081). There are
+  three uses:
+  - **Filter chips** pick what a list shows and can be taken back
+    (the Session pool's tags, #220; a Routine's weekdays; the person
+    filter's kept people, whose ✕ takes them out, obf-1064). Phone:
+    `FilterChip` / `InputChip`. Desktop: `design::chip`, a kept
+    person's with `Chip::closing`.
+  - **Tag chips** start a search for a tag, and the row ends in
+    "All tags…" (obf-1074), as do the tags a typed "#…" suggests.
+    Phone: `TagChipRow` (`ActionChip`) in `tag_tree_screen.dart`.
+    Desktop: `tag_tree_view::most_used_row` and
+    `tag_tree_view::suggestions`, of `design::Chip`.
+  - **Choice chips** pick exactly one of a few short options (Theme,
+    Text size). Phone: `ChoiceChips` in `look.dart`. Desktop:
+    `chip_row` in `app.rs` (`Chip::radio`).
+- Use a chip for a short word in a row of equals. Do not use one for
+  an action with a consequence (use a button), nor for a choice with
+  details (that is a `RadioColumn` or `radio_column`).
+
+### Fields
+
+- **Fields share one height** (obf-1128): on the desktop a framed
+  single-line field is as tall as a button beside it, whatever its
+  font and the text size, its text 8 inside the outline at the sides.
+  Desktop: `theme::field`, and `theme::field_margin` for a field in
+  another font. A list's search field is the band's 36 (`band_search`
+  in `app.rs`); a field without a frame inside a card, a cell or a
+  Line keeps its own measures.
+
+### Spacing and type
+
+- **Spacing comes in steps of 4, 8, 12, 16, 24 and 32** (logical pixels
+  on the phone, points on the desktop) for the room between blocks and
+  a card's padding. Use 4 between a control's parts, 8 between chips,
+  the rows of a card or the controls of a row, 12 between groups, 16
+  for a card's padding and the page's side gutter, and 24 or 32 between
+  sections. Any other step there is a break. A block's own inner
+  measures (a button's 10 × 4 padding, a chip's, the Area band's 6) are
+  part of its look and stay as this section gives them.
+- **Text sizes**: content (a card's text, Lines, typed text) is 16 and
+  grows with Text size (#326; phone `bodyLarge` in `ContentText`,
+  desktop `theme::content`). A page's or band's title is 22 (phone
+  `titleLarge`, desktop egui's heading text style, `ui.heading`, and
+  `BandSizes::title`, both `theme::TITLE`, obf-1121). A dialog's heading is
+  Material's dialog title on the phone and 18 strong on the desktop
+  (`design::dialog_title`, obf-1125). A card's or section's heading is 16
+  medium (phone `titleMedium`, through `sectionHeading` in `look.dart`,
+  obf-1124), on the desktop strong. Strong text on the desktop is set
+  off by the theme's strong tone (`TextTones::strong`, darker than the
+  text in light, brighter in dark) and carries no colour of its own,
+  which would win over it (obf-1126). Labels and
+  buttons are 14 (phone `labelLarge` / `bodyMedium`, desktop egui's
+  body and button text styles, `theme::LABEL`). A caption, meta line
+  or hint is 12 in the weak colour (phone `bodySmall`, desktop
+  `.small()`, `theme::CAPTION`). The desktop sets these once in egui's
+  text styles (`theme::install`), grown by Text size as content is
+  (obf-1081). Fat fingers grows all of them (#224); on the phone Text
+  size grows only content.
+
 ## Both apps
 
 ### Navigation
@@ -16,7 +190,8 @@ replace a law of Both apps where they say so. A desktop law marked
 - Every browser level (Areas, Topics, Notes) has a "+" that adds the
   thing shown on that level. On the Areas list it adds an Area. **In an
   Area, a Topic and All Notes "+" offers Note, Checklist, Shopping
-  List, Tally, Session and Frog** (#161), and in an Area Topic;
+  List, Tally, Session and Frog** (#161), and in an Area New Topic
+  (obf-1014);
   Session, Frog and Topic only for who may set them up, and Tally,
   Session, Frog and Topic only in Advanced (#197). What it makes is
   filed into the Area or Topic shown, from All Notes into none: Note
@@ -72,7 +247,18 @@ replace a law of Both apps where they say so. A desktop law marked
 - **A time budget** (#339, Q753): every tap or click shows its effect
   within 100 ms, every page change within 500 ms, counted from the tap to
   the frame that shows it. A notification tapped while the app runs
-  opens its Note within the 500 ms. On the phone and on the desktop.
+  opens what it is about within the 500 ms (obf-1039). On the phone and
+  on the desktop.
+- **A button tap shows a green "!"** (obf-1143), as cat(a)log's paw:
+  every tap of a button of any kind, filled, outlined, text and icon
+  buttons and the "+", shows a green "!" 56 high above the finger, on
+  the desktop above the pointer, growing and fading out over 0.9 s,
+  silent, drawn over dialogs too, taking no touch and saying nothing to
+  a screen reader. With the system's "remove animations" it stands still
+  and goes after 0.9 s, on the phone; the desktop reads no such setting.
+  A switch in Settings ▸ Look (on the desktop Settings ▸ This computer)
+  turns it off on that Device; it is on from the start. Cards, rows, chips, switches and
+  menu entries are no buttons and show none.
 
 ### Announcements
 
@@ -83,8 +269,10 @@ replace a law of Both apps where they say so. A desktop law marked
 - An announcement goes by itself or by a tap; it is never swiped away.
   A horizontal swipe stays navigation only.
 - An announcement says only that a job finished, failed or waits; the
-  tap opens the details, or, on an offer to undo, undoes. Values never
-  go into an announcement.
+  tap opens the details, or, on an offer, does what its last word
+  names: "Undo" undoes, and "Show", after a Note made that the person
+  filter hides (obf-1070), clears the filter. Values never go into an
+  announcement.
 - A quick local success the screen already shows (copied, saved) gets
   no announcement. The one exception is the phone's offer to undo what
   was just deleted, skipped or moved to tomorrow (#268, #269; see Phone,
@@ -100,14 +288,19 @@ replace a law of Both apps where they say so. A desktop law marked
 - **Capture never asks anything and never needs unlocking.** The App
   Lock and Area Locks guard browsing, not Capture.
 - Voice recording starts at once and **ends by tapping one big stop
-  button**. No hold-to-talk, no stop on silence. After Stop, and after
+  button**. No hold-to-talk; a pause ends it only where "End a
+  recording after a pause" in Settings ▸ Capture is set on that Device
+  (obf-1053), as Stop ends it. After Stop, and after
   the photo or the pictures picked, the user is on the capture screen
   with the recording or photo on it and room to type. Leaving saves.
-- **The quick note is the text, three Nudge buttons and More, nothing
-  else** (#352): the text field at the top, under it remind me in
-  **10 min, 30 min, 1 h**, and More, which saves the Note as leaving
-  does and opens it in the full editor in its place (on the desktop the
-  Note dialog). Simple and Advanced alike, on the phone, in the desktop's
+- **The quick note is the text, three Nudge buttons and Open in the
+  editor, nothing else** (#352): the text field at the top, under it
+  remind me in **10 min, 30 min, 1 h**, and under them Open in the
+  editor, a full-width outlined button with the editor's pencil
+  (obf-1080), which saves the Note as leaving does and opens it in the
+  full editor in its place (on the desktop the Note dialog). On the phone they sit right under the text field and do
+  not move when the keyboard opens (#396); a long text scrolls and they
+  stay above the keyboard. Simple and Advanced alike, on the phone, in the desktop's
   quick note dialog and in the capture popup. No Save and no Back on
   top: Android's system Back saves, the iPhone keeps a back arrow top
   left that saves, the desktop's Esc and the dialog's cross save, each
@@ -115,9 +308,10 @@ replace a law of Both apps where they say so. A desktop law marked
   Photo, Voice, Gallery, Paste, File, the Kind, Add to Note… (there Merge
   into…), Remind me…, File into…, the Frog, the Importance and the format bar, lives
   in the full editor and the Note dialog. An entry point that starts
-  with something, voice, the camera, a picker, the clipboard, a share or
-  a list's "+", still opens the quick note with it: what it brought
-  shows above the text, and More takes it on.
+  with something, voice, the camera, a picker, the clipboard or a share,
+  still opens the quick note with it: what it brought shows above the
+  text, and Open in the editor takes it on; an Area's or a Topic's "+"
+  opens the full editor instead (obf-1140).
 - Leaving without tapping a Nudge button means 1 h. The three are
   actions, not a choice of value: a tap saves the Note with that Nudge
   time, so the single-choice law does not apply to them. Where the
@@ -140,11 +334,16 @@ replace a law of Both apps where they say so. A desktop law marked
   also when the speech model is downloaded later. They are added once:
   transcribing again adds nothing.
 - **Everything is saved together** when the user leaves the screen or
-  taps a Nudge button, Save or More. Nothing is half-saved: for an
+  taps a Nudge button, Save or Open in the editor. Nothing is half-saved: for an
   empty Note nothing is saved.
-- **A sorted Note needs no Nudge.** Opened from an Area's or Topic's
-  "+", the quick note files the Note there: the three Nudge buttons
-  become one Save and no Nudge is set; leaving saves too.
+- **A sorted Note needs no Nudge.** From an Area or a Topic a new Note
+  skips the quick note (obf-1140): who is there has taken the time to
+  sort, and its "+" ▸ Note opens the full editor, the phone's Note editor
+  and the desktop's Note dialog, on a new Note filed there without a
+  Nudge. Left with nothing in it, it makes nothing. The widgets, the
+  Agenda's "+", the lock screen, the tray, Quick note and All Notes keep
+  the quick note, and so does a file dropped onto an Area or a Topic on
+  the desktop, which files it there with one Save and no Nudge.
 
 ### Agenda
 
@@ -188,10 +387,9 @@ replace a law of Both apps where they say so. A desktop law marked
   neither Done nor skipped and this Device may check it off (#269), each
   under its heading; then **Edit schedule**, which opens the Routine or
   Reminder editor (#270), as the Routine's badge in the Note editor
-  does; History for a Routine, and Share, which hands the Routine as
-  its whole series with its end, or the Reminder, to another app as a
-  calendar file. Edit schedule, History and Share ask a Masked row's
-  Area to open first; Snooze and Not today answer it as its box does.
+  does; and History for a Routine. The row shares no calendar file
+  (obf-1014). Edit schedule and History ask a Masked row's Area to open
+  first; Snooze and Not today answer it as its box does.
 - **A Checklist without a Routine or Reminder is a group today** while
   it has open Lines or Lines checked today (#143, #208, #276): its name
   as the heading, without a box, and its open Lines under it, each with
@@ -220,10 +418,11 @@ replace a law of Both apps where they say so. A desktop law marked
 - **A quiet day shows everything and rings nothing** (obf-1044, ADR
   0053): **Quiet today** in the Agenda's menu, offered while today is
   not quiet (on the phone a bar action with a bell, in ⋮ when the bar
-  is full; on the desktop in a ⋮ last in the Agenda's bar), makes today quiet on all of the person's own Devices,
+  is full; on the desktop a button last in the Agenda's top row, which
+  reads "End quiet day" while the day is quiet, obf-1066), makes today quiet on all of the person's own Devices,
   without an announcement. While it holds, the Agenda's first line reads
-  "Quiet day until midnight" with **End**; End ends it at once and the
-  menu offers Quiet today again; at midnight the line goes by itself.
+  "Quiet day until midnight" with **End**; End ends it at once and
+  Quiet today is offered again; at midnight the line goes by itself.
   Today's rows stay as they are, each checked off on its own; nothing
   notifies, no ring, Re-nag, Heads-up, Escalation, Nudge or Changes
   Nudge, and what is left undone counts as skipped from midnight, never
@@ -352,14 +551,16 @@ replace a law of Both apps where they say so. A desktop law marked
   this week" over all of them (#191); a Note without words its photos and recordings.
   It shows no Capture Context and **none of the buttons at the bottom of
   the card** (File into, Routine, Merge, the pencil); **its ⋮ sits top
-  right** and offers after Edit File into…, Remind me… (#344), in
-  Advanced Frog and Session… (#197), and Merge into…, as far as the
-  action row would (#281): the spawns only for who may set them up
-  (ADR 0013) and Session… only on a plain Note. **On an Unsorted Note's
-  card Merge into… is named "Add to Note…"** (#308), in the action row,
-  the ⋮ and on the desktop the right-click: the same Merge, picked in
-  Add to Note… (see Dialogs and pages); the Note editor, the Note
-  dialog, the Note menu and a selection keep Merge into…. In the detailed view a Shopping List shows its open Lines,
+  right** and offers in its groups what the action row would (#281,
+  obf-1014): File into… under This Note, Remind me… (#344) and in
+  Advanced Frog and Session… (#197) under Add, and Merge into… under
+  Tidy: the spawns only for who may set them up (ADR 0013) and Session…
+  only on a plain Note. **An Unsorted Note's card names its Merge
+  "Merge into…" too** (#308, obf-1014), in the action row, the ⋮ and on
+  the desktop the right-click, as the Note editor, the Note dialog and a
+  selection do: the same Merge, its page titled Merge into… and picking
+  the Note as Add to Note… does, the Notes added to last first (see
+  Dialogs and pages). In the detailed view a Shopping List shows its open Lines,
   tickable, the struck ones folded under them ("2 struck through") until
   a tap shows them, kept open per Note on this Device. **A Tally's
   detailed view is the Tally** (#190): under its name and description
@@ -405,17 +606,19 @@ replace a law of Both apps where they say so. A desktop law marked
   off, moves the Note with the Reminder to the trash and closes the
   editor. On the desktop the same lines open the Note dialog, Done on the
   accent and "Done and move to trash" on the error colour.
-- **A card's ⋮ on the phone stays short** (#281): Send to a person,
-  Share to an app, Copy text and Export as Pack… are one entry,
-  **Share…**, after Show ticks, which opens a small menu of the four at
-  the ⋮; the Importance is not in it (the editor's badge and the
-  selection change it, #182, #273).
+- **A card's ⋮ holds Edit and the Note editor's four groups** (#281,
+  obf-1014): Edit, then **This Note ▸**, **Add ▸**, **Share ▸** and
+  **Tidy ▸**, each holding what the card offers of the editor's group
+  of that name, as the editor names it; a group with nothing this
+  Device may do is left out. On the phone the Importance is not in it
+  (the editor's badge and the selection change it, #182, #273); see
+  Phone ▸ Cards for what each group holds there.
 - **The detailed card's action row has a pencil** (#281), right before
   its ⋮: one tap opens the Note editor, as the long press and ⋮ ▸ Edit
   do. Where the card is too narrow for the whole row, as with Fat
   fingers on a small phone, the pencil and ⋮ go onto a line of their own
   under the other buttons, at the right, so no button is cut.
-- **Copy text** in a card's ⋮ (under Share… on the phone) puts the text
+- **Copy text** in a card's ⋮ (under Share ▸) puts the text
   of the Note and of each Section on the clipboard as they show, oldest first, a blank line
   between them, and says nothing (#183); a Checklist's or Shopping List's Lines come after its
   text as a Markdown task list, `- [ ] Milk`, `- [x] Eggs`, a group indented (#323).
@@ -425,8 +628,8 @@ replace a law of Both apps where they say so. A desktop law marked
   Managers); others read it. Under its meta line it says, small and
   grey, when it was last edited and by whom, once it was.
 - **A Note's History** (#193) is History on the Note editor's bar on
-  the phone (the clock with an arrow, before Merge and Move to trash)
-  and Note ▸ History on the desktop, over the Note dialog. It lists
+  the phone (the clock with an arrow, after Undo, Redo and Find) and
+  History in the ⋮ of the Note dialog on the desktop (obf-1065). It lists
   every change of the Note, **the newest first** (unlike a box's
   History, which goes oldest first): its text before and after, its
   Amends added and changed, its Lines added, renamed, checked,
@@ -476,9 +679,9 @@ replace a law of Both apps where they say so. A desktop law marked
   its schedule; its Frog (#259) while one is open or was eaten today or
   yesterday, the frog with "Open", "Eaten today" or "Eaten yesterday",
   in Simple too, its tap offering at the finger Eat now while it is open
-  and this Device may check it off and "Remove the Frog" for who may
-  manage it, which asks nothing and is undone as the Frog view's Delete
-  is (#268); for a Member an
+  and this Device may check it off and Move to trash for who may
+  manage it, which asks nothing and is undone as the Frog view's Move
+  to trash is (#268, obf-1014); for a Member an
   eaten one only shows; the text format of
   a Plain Note (#213), `text_format` with `short_text`, `format_bold` or
   `code`; Show on the Agenda for a Checklist without a Routine and for a
@@ -514,7 +717,7 @@ replace a law of Both apps where they say so. A desktop law marked
   this Device may not change a setting, its badge only shows it. A
   screen reader reads each as "setting: value" in words, an icon's value
   too. The row ends with "+",
-  whose menu at the finger offers Remind me…, Frog and Session,
+  whose menu at the finger offers Remind me…, Frog and Session…,
   there only for who may set them up; no Frog while the Note has an open
   one (#259); on a Session it offers no
   Session, and a Routine or Reminder added there runs the Session. The text, the Lines, the photos and
@@ -528,12 +731,13 @@ replace a law of Both apps where they say so. A desktop law marked
   person's picture, anywhere it shows, opens their Profile.
 - **A Note a Pack brought unclaimed says who it came from** (#164):
   "From Ann" on a weak line with `inventory_2` under the card's top row (#330),
-  in either view, until "Remove “From Ann”" in the card's ⋮ or its badge
+  in either view, until "Remove “From Ann”" in the card's ⋮ ▸ This Note or its badge
   in the Note editor takes it away.
 - **"Export as Pack…"** (#164) is in the menu of every Area and Topic,
   for anyone who may read them, in a Note card's ⋮ after Copy text
-  (under Share… on the phone, #281) and
-  on the Note editor's bar after Share to an app (`inventory_2`). It
+  (under Share ▸, #281, obf-1014) and
+  in the Note editor's Share group after Share to an app
+  (`inventory_2`, obf-1073). It
   opens the Pack's tree: Areas and Topics as headings, each Note with
   its kind's icon and its first line, under it its files with their
   sizes, their texts, its Routines, Reminders and Frog, under a Session
@@ -583,8 +787,8 @@ replace a law of Both apps where they say so. A desktop law marked
   place File into… does not list (deleted, a Topic of a closed locked
   Area, a Shared Area the Device left) is not offered among the recent
   ones either.
-- **Add to Note…** (#308), from capture, an Unsorted Note's card or an
-  answer of Ask (#316), is
+- **Add to Note…** (#308), from capture or an answer of Ask (#316), and
+  the page of an Unsorted Note's Merge into… (obf-1014), is
   a filter over the Notes, the core's search (focused on the desktop,
   not on the phone), then "Added to recently" with the last three Notes
   this Device added to, the latest first, while nothing is typed, then
@@ -639,8 +843,13 @@ replace a law of Both apps where they say so. A desktop law marked
   schedule, "Heads-ups" lists each one set ("20 min before", "1 day
   before"), earliest warning first, each with its remove ✕, and "Add
   heads-up" offers 5, 10, 15 and 30 min, 1 h, 2 h, 1 day, 2 days and
-  1 week before; an all-day schedule offers and keeps whole days only
-  (1, 2 and 3 days, 1 week). They are the person's own, on their own
+  1 week before, and "Custom…" at its end (obf-1087): a number and a
+  unit, minutes, hours, days or weeks, up to 30 days, listed as the
+  others are ("45 min before"), with its ✕; it stays when every other
+  is set, and one set already is not set twice. An all-day schedule
+  offers and keeps whole days only (1, 2 and 3 days, 1 week, and in
+  Custom… days and weeks only). The lists come from the core
+  (`heads_up_keys`). They are the person's own, on their own
   Devices: in a Shared Area a Member who may not change the Routine
   still sets their own, and nobody else sees them: the editor opens for
   them with everything else shown, not edited, and its Save keeps only
@@ -656,8 +865,9 @@ replace a law of Both apps where they say so. A desktop law marked
   Reminder and a Session show none.
 - **Send feedback shows what it sends** (#214): Settings ▸ "Send
   feedback" is a page with a field for the words, ticks for what goes
-  along (version, system and device, install method ticked at first;
-  the phone's last crash report and Notes as a Pack not) and the
+  along (version, system and device, install method ticked at first,
+  and the last notification taps while there are any (obf-1039); the
+  phone's last crash report and Notes as a Pack not) and the
   preview, the exact text sent, always above its buttons, which wait
   for words: Mail, a mail link to the developer while the text fits one,
   and on the phone Share…, the text and the Pack to the app picked, on
@@ -715,15 +925,26 @@ replace a law of Both apps where they say so. A desktop law marked
   the last column adds one. A row's number and a column's letter open
   its menu: insert, move, delete (asking once while it holds words; the
   last one deletes the table), for a column Align left, Centre and Align
-  right, and for the first column First column as headings. While a
+  right, and for the first column First column as headings. A column's
+  menu groups them (obf-1014): Insert ▸, Move ▸, Align ▸, Sort rows ▸,
+  Delete column and First column as headings; full screen Insert ▸,
+  Move ▸, Delete column, Show sorted ▸ and First column as headings. While a
   cell is edited, the format bar, where the field has one, holds only ☐,
   bold, italic, strike-through, link and code, on the cell's words.
   Every change writes the table's lines anew (ADR 0033); the Markdown
   stays the source. **Show as lines** on the grid shows that table's
   lines as text until the cursor leaves them, the field loses focus or
   Show as table is pressed. Column widths are the view's only, never
-  stored. Cards and texts that are only read show the grid and open the
-  table full screen. **Copy in the bar of the table full screen**
+  stored. Cards and texts that are only read show the grid at the text
+  size, long cells wrapping and a table wider than its room moving
+  sideways inside it, the header row and a heading first column in view;
+  a card shows the first 10 rows and "Show all N" (obf-1048). A click
+  opens the table full screen; a click on a cell of its header row sorts
+  the rows shown by that column instead, in the view only (obf-1052,
+  see Phone ▸ Text editor and Desktop ▸ Text editor and Lines). A small ⋮ at a table's top right corner
+  (obf-1050) offers Copy wherever the table shows, and Move up, Move
+  down (past the block above or below) and Delete table where the Note
+  is edited; Undo takes them back. **Copy in the bar of the table full screen**
   (#324) puts the table on the clipboard as an HTML table and, as the
   plain text, as Markdown, each box in the state it shows, the cell
   being edited written first; on the phone the HTML goes through the
@@ -802,8 +1023,9 @@ replace a law of Both apps where they say so. A desktop law marked
   rest of the Line into the new one. **Backspace at the start** of a
   Line joins it with the Line above: its text goes to the end of that
   Line, which keeps its box and state, and the Line goes, its checks
-  staying in the log; an empty Line simply goes. **No Add Line button
-  and no Add field**: Return makes new Lines.
+  staying in the log; an empty Line simply goes. Return makes new Lines,
+  and **Add a Line** under the Lines of the one card a Checklist or
+  Shopping List is (obf-1071) puts the cursor into a new empty Line.
 - **The frame around a group holds the group's own Line** and the Lines
   under it, on cards and in the editor.
 - **Nothing typed is lost on leaving**: what was typed is stored when
@@ -887,7 +1109,24 @@ replace a law of Both apps where they say so. A desktop law marked
   badge, in the editor and on a button, on the phone and the desktop
   alike.
 - **A menu shows at most seven entries** (#321, Q724); the rest go under
-  "More…".
+  "More…". Entries of one kind go under one entry that opens them as a
+  group (the card's This Note ▸, Add ▸, Share ▸, Tidy ▸, a table
+  column's Insert ▸, Move ▸, Align ▸, Sort rows ▸, Show sorted ▸,
+  obf-1014). The law covers menus of actions only; exempt are **a list
+  of choices** (Heads-up lengths, people, calendars, Shopping Lists), **a text
+  field's edit menu**, **the badge group** (This Note) and **the
+  phone's format bar's ⋮**, which holds every format without room.
+- **The names are one per action** (obf-1014): Add a part (the box it
+  opens confirms with Add), Merge into…, Find in Note wherever the
+  Note's find bar opens (Search stays for the lists and Search all
+  Notes), Move to trash (also for a Frog; "Move this Note to the
+  trash?" where it asks), Send to a person, Copy text, Open in
+  another app, Save photo (Save photo… on the desktop) and Copy photo,
+  Share as calendar file,
+  Session…, New Topic, Quick note, Share to an app, Attach a file…;
+  the card keeps Edit and the quick note Open in the editor, which
+  saves first. An Area's entry is Share with people…; the Note's menu
+  and group keep Share.
 - Errors name the cause and the fix in one sentence each.
 
 ### Spotlights
@@ -905,8 +1144,8 @@ replace a law of Both apps where they say so. A desktop law marked
   it only where a tall element leaves no room elsewhere, at most
   400 wide and 24 from the window's edges, holds one sentence of at
   most 15 words, what the element does for the person, without "tap" or
-  "click" where it can do without, then Skip and Next at its bottom
-  right, Next reading "Got it" on the screen's last tip.
+  "click" where it can do without, then No more tips, Skip and Next at
+  its bottom right, Next reading "Got it" on the screen's last tip.
 - **It never traps input**: Skip is always on the card; Skip, a tap or
   click outside the card, Esc and Back end the screen's tour and count
   its other tips as shown. A tip is counted as shown before it shows.
@@ -918,6 +1157,12 @@ replace a law of Both apps where they say so. A desktop law marked
 - The marks are this Device's (local settings), and "Show tips again"
   in the Settings brings every tip back on it. Tests, kittests and the
   screenshot generators show none; no guide frame shows a tip.
+- **They can be switched off** (obf-1060, C3): the switch "Show tips"
+  on the Settings' card Tips, on by default and kept on this Device
+  (the local setting `tipsOff`), with "Show tips again" under it. Off,
+  no screen shows a Spotlight, a new one neither, and none is counted
+  as shown; "No more tips" on every tip's card turns it off at once,
+  the rest of the tour still due. "Show tips again" turns it on.
 
 ### Look
 
@@ -948,7 +1193,9 @@ replace a law of Both apps where they say so. A desktop law marked
   cells, the Agenda's rows and Ask's answers, as they read and in the
   fields they are typed in; buttons, icons, boxes, menus, bars, headings
   of pages and the labels around the text keep their size, which stays
-  Fat fingers' alone. The step multiplies the system's font size and
+  Fat fingers' alone. On the desktop the words of labels, buttons and
+  captions grow with it too, through egui's text styles (Design system
+  ▸ Spacing and type, obf-1081); its icons keep their size. The step multiplies the system's font size and
   Fat fingers (the desktop's zoom), never replaces them, and applies
   once where content nests. A formatted text's room, a list item's
   indent and a code block's padding grow with the size it shows at, so
@@ -994,14 +1241,16 @@ replace a law of Both apps where they say so. A desktop law marked
   room, so nothing else on the screen moves. It shows only while a
   folder round or a join of this Device runs, on the desktop also while
   its paired host answers, or an Import runs (obf-1061), or an Area is
-  being deleted (obf-1093), and the app is in view; every sync shows it, also the one each minute. The sync runs beside the app (an isolate on
+  being deleted (obf-1093), or the trash is being emptied (obf-1095), and the app is in view; every sync shows it, also the one each minute. The sync runs beside the app (an isolate on
   the phone, a thread with its own connection on the desktop): the app
   stays usable and draws on. With the system's "remove animations" the
   phone's line stands still across the whole width; the desktop reads
   no such setting, so its line always moves. On the phone a screen
   reader hears "Syncing…" once each time the app comes into view, not
   with every sync; on the desktop the line is a progress indicator named
-  "Syncing…".
+  "Syncing…". A tap or click on the line, or a little above it, opens
+  the page Running (obf-1078; see Phone ▸ Dialogs and pages and Desktop ▸
+  Menu bar and keys).
 - **Deleting an Area runs beside the app** (obf-1093), in both apps:
   once the dialog is answered, the Area's row says how many of its Notes
   have gone ("Being deleted: 120 of 340 Notes moved"), a spinner in
@@ -1009,7 +1258,7 @@ replace a law of Both apps where they say so. A desktop law marked
   click or drag until the Area is gone; a failure is announced at the
   top, success is not. On the desktop it runs on a thread with its own
   connection, one Note per transaction, its Topics hidden under the
-  row; the line is named "Deleting an Area…", and the Area menu's Delete
+  row; the line is named "Deleting an Area…", and the Delete in the band's ⋮
   asks nothing for it meanwhile.
 - On the desktop the same line moves while the Agenda is read for the
   first time after the window opened (obf-1090), named "Reading the
@@ -1066,8 +1315,16 @@ replace a law of Both apps where they say so. A desktop law marked
   Capture). **The folder**, first in the Agenda's top bar, opens the
   Areas list (#221); search by text and by #tag stays inside the
   browser.
-- **The tag tree** (#267, Q623, Q639): a row "Tags" below the Areas in
-  the Areas list opens every tag of the Notes by its levels, the top
+- **Tags under the Areas list's search** (obf-1074): while its search
+  field is empty, one row of chips right under it shows the most used
+  tags, at most twelve, of every level, those more Notes carry first and
+  of as many the one first in the tag tree, and ends in "All tags…",
+  there also without a tag; a tap on a tag searches for it, as a tap on
+  a tag in a text does. Wider than the page the row moves sideways under
+  the finger. It leaves out the Notes of a locked Area while it is
+  closed, and is read only while the Areas list shows.
+- **The tag tree** (#267, Q623, Q639): "All tags…" at the end of the row
+  of tags opens every tag of the Notes by its levels, the top
   level as written (`#life`), a level below by its own part (`health`),
   indented, each with how many Notes carry it or a tag below it; the
   levels below a tag unfold by its arrow, the top level alone at first.
@@ -1141,10 +1398,17 @@ replace a law of Both apps where they say so. A desktop law marked
   the pages still follow the finger, and letting go lands at once.
 - **In an Area, a Topic and All Notes "+" fans out** its kinds (#161),
   each an icon with its words, upward from the button as the Agenda's
-  fan does.
+  fan does. Its Note opens, in an Area or a Topic, the Note editor on a
+  new Note filed there, the cursor in its text and the keyboard up, with
+  no "Add a part" (obf-1140); in All Notes, the quick note.
 
 ### Gestures
 
+- **The green "!" comes with the buttons' ink** (obf-1143): every
+  button of the look's theme, and each "+" and fan entry through
+  TapMarked, marks a tap once it is a tap, not a press that became a
+  scroll. "Show button taps" in Settings ▸ Look, under Fat fingers,
+  switches it off on this phone; tests and screenshots start without it.
 - **Tap is the primary action.** On a list row it opens the thing; on a
   checkbox it checks. **A tap on a Note card switches that card** between
   its compact and its detailed view, in place (#189); in "merge into…" it
@@ -1164,20 +1428,29 @@ replace a law of Both apps where they say so. A desktop law marked
   editor, as Edit in its ⋮ does; nothing else opens it from a card. A
   long-press on "+" of the Agenda or the lock screen opens text capture
   (#282; see Capture). A long-press never changes data by itself.
-- **An Area moves by its handle** (#280): each row of the phone's Areas
-  list carries a drag handle before ⋮, and a drag up or down on it,
-  taken at once, moves the Area in the list; a swipe sideways that
-  starts on it still moves between the pages, and a long press on the
-  row moves nothing. A screen reader moves it with the row's actions, Move
-  up, Move down, Move to the start and Move to the end. The search's
-  hits carry no handles.
+- **An Area moves while rearranging** (#280, obf-1089): the phone's
+  Areas list's ⋮ in the top bar offers Rearrange with two Areas or more.
+  Until Done, which takes ⋮'s place, leaving the page or a search, each
+  row shows a drag handle in place of its ⋮; a drag that starts anywhere
+  on the row, either way, moves the Area, a tap on a row opens nothing,
+  a swipe on it does not change the page, and the swipe left does
+  nothing; a tag's chip searches and "All tags…" opens the tag tree,
+  either ending it. Each move is kept at once. Outside of it a row has no
+  handle and a long press moves nothing. A screen reader moves an Area
+  with the row's actions, Move up, Move down, Move to the start and Move
+  to the end. The search's hits carry no handles.
 - **A horizontal swipe only navigates** (see Navigation); it never
   changes data or swipes a row or card away. The exceptions are the
   full-screen table, where a one-finger drag on its cells moves it
   sideways, as its bar does, a table wider than the editor's field
-  (#257), which a drag on it moves sideways, and a Code text in the Note editor (#213),
+  (#257), which a drag on it moves sideways, a table wider than its room
+  on a card or in a text being read (obf-1048), which a drag on its
+  cells moves sideways, as its bar does, and a Code text in the Note editor (#213),
   which a one-finger drag moves sideways; on a card a Code text is cut
-  off at the edge instead.
+  off at the edge instead; and an Area row while the Areas list
+  rearranges (obf-1089), where a drag moves the row; and the row of tags
+  under the Areas list's search while it is wider than the page
+  (obf-1074), which a drag on it moves sideways.
 - **On the iPhone a pushed page goes back with the edge swipe** (#243,
   Q570), iOS's own, from the left edge; a browser level goes back with
   a swipe right anywhere, as on Android. A page that holds its leaving,
@@ -1187,8 +1460,8 @@ replace a law of Both apps where they say so. A desktop law marked
 ### Announcements
 
 - **An offer to undo** (#268): what was just deleted on the phone and
-  can be restored says so at the top at once ("Moved to the Trash",
-  "Line deleted", "Entry deleted", "Frog moved to the Trash", "“From”
+  can be restored says so at the top at once ("Moved to the trash",
+  "Line deleted", "Entry deleted", "Frog moved to the trash", "“From”
   label removed", "Transcript removed"), and so does a Skip or Tomorrow
   made in the app ("Skipped", "The day after instead", #269), whose undo
   takes the skip back; one made on a notification offers none. A
@@ -1201,6 +1474,24 @@ replace a law of Both apps where they say so. A desktop law marked
   nothing. What it deleted stays where it always went: the Trash,
   "Removed entries", "Removed Lines", or "again" under its file; a
   "From …" label has no such place and stays gone.
+- **"+" stays whatever filter is on** (obf-1070, C13): in an Area, a
+  Topic and All Notes, "Show Notes by…" never hides it. A Note the
+  filter hides is made and opened as usual; back in the list the top
+  says "Made, hidden by the filter", ending with "Show", whose tap
+  clears the filter, as Both apps ▸ Announcements names. It is an offer as the one to undo is: it shows
+  before what waits, takes the place of the offer before, a screen
+  reader hears "Show" as the tap's hint, and left alone it goes by
+  itself after 10 seconds. With "Me" in the filter nothing is said.
+- **A restored Backup's speech model is offered** (obf-1098): right
+  after the restore, "Transcribe voice Notes on the phone?" offers the
+  model the Backup names, with **Download** and its size, or **Pick the
+  file again** for a model taken from a file, and **Not now**, which
+  drops the offer. A model fetched drops it once it is in use. A model
+  in use here already, or a phone where Whisper does not run, gets no
+  offer. Still not in place on the next start, the top says "The
+  speech model from the Backup is not on this phone yet", ending with
+  "Download" or "Pick its file", once; its tap fetches it, and Settings
+  offers it after that.
 
 ### Capture
 
@@ -1228,6 +1519,15 @@ replace a law of Both apps where they say so. A desktop law marked
   quick entry point (widget, tile, shortcut, also when the phone's key
   or gesture settings or a button-mapper app start it; no code reads a
   key) opens its capture screen directly, with no fan and no screen in between.
+- **The Agenda's fan has Editor at the top** (obf-1141), above File,
+  the entry farthest from "+", with the editor's pencil: it opens an
+  empty Note in the Note editor, the cursor in its text and the keyboard
+  up, with no "Add a part". Left by Back it is kept Unsorted with a
+  Nudge in 1 h, as the quick note's Open in the editor keeps it, and
+  shows on top of the Agenda as a Note captured there does; left with
+  nothing in it, it makes nothing. The lock screen's fan has no Editor,
+  as the editor shows the Areas; the long press on "+" stays text
+  capture.
 - **A Tally's shortcut opens its entry page directly** (#284): "Add to
   home screen" in a Tally's card's ⋮, offered where this Device may add
   entries to it, pins a shortcut named as the Tally (Android's own
@@ -1272,23 +1572,57 @@ replace a law of Both apps where they say so. A desktop law marked
   Settings ▸ Capture ▸ "Print to Old Brain Fix", in Simple and Advanced,
   says whether Android has the service on and opens Android's print
   settings, where only the user turns it on; the iPhone has no row.
-- **The quick note is the text, the Nudge buttons and More** (#142,
-  #352): nothing else, in Simple and Advanced alike, on every capture
-  path (text, Voice, Photo, Gallery, Paste, share, widget, tile,
-  shortcut, also one a phone key or gesture starts). What a path brought
-  in, a recording, photos or files, shows above the text. **More** saves
-  the Note at once, Unsorted with the default Nudge, and opens the Note
-  editor on it in place of the capture screen; leaving the editor
+- **The quick note is the text, the Nudge buttons and Open in the
+  editor** (#142, #352, obf-1080): nothing else, in Simple and Advanced
+  alike, on every capture path (text, Voice, Photo, Gallery, Paste,
+  share, widget, tile, shortcut, also one a phone key or gesture
+  starts). What a path brought in, a recording, photos or files, shows
+  above the text. **Open in the editor** saves the Note at once,
+  Unsorted with the default Nudge, and opens the Note editor on it in
+  place of the capture screen; leaving the editor
   returns to where Capture was opened from. It waits while there is
   nothing to save and is not offered behind the App Lock.
+- **The quick note takes its recording's Transcript** (obf-1082): with
+  a speech model, "Transcribing…" shows under the recording made there,
+  over the sync line's moving stretch (3 px, still across the width
+  with "remove animations"), until Whisper is done or could not make
+  it. The Transcript then goes into the text field, filling an empty
+  one or after the text as a new paragraph, the cursor left where it
+  was; while the user types it waits until typing rests for 1 s. Under
+  the recording it stays, folded under "Transcript" until a tap opens
+  it, and it stays the recording's Transcript. A Transcript still
+  waiting for the pause is saved with the text by a Nudge button, Back
+  or Open in the editor. Left before Whisper is done, the Note is saved
+  with the text as it was and the recording gets its Transcript later,
+  not the text. A recording shared in is not taken into the text.
 - **The Note editor holds what the quick note no longer shows** (#352):
-  in its bar Photo, Voice, Gallery, Paste and Add to a Shopping List
-  beside Attach file (on a phone-wide bar mostly in ⋮); its badges the
-  Kind, the place (File into…), the Importance and "+" with Remind me…,
-  in Advanced Frog and Session; Merge into… adds it to another Note; the
-  format bar rides on the keyboard. Voice records on a page of its own
+  under This Note its badges the Kind, the place (File into…) and the
+  Importance; under Add "+" with Remind me…, in Advanced Frog and
+  Session…, Voice, Photo, Gallery, Paste and Attach a file…; under Tidy
+  Merge into…, which adds it to another Note, and Add to a Shopping
+  List; the format bar rides on the keyboard.
+- **The Note editor's actions stand in four named groups** (obf-1073),
+  as in the desktop's Note dialog: **This Note**, the row of badges
+  under the text; at the page's end, after all the Note holds, **Add**
+  ("+", Voice, Photo, Gallery, Paste, Attach a file…, Add a part),
+  **Share** (Send to a person, Share to an app, Export as Pack…) and
+  **Tidy** (Merge into…, Add to a Shopping List, Move to trash, the
+  last filled on the error colour, obf-1099). Each group is a small heading, read as a
+  heading, over its compact buttons side by side, wrapping; a group
+  with nothing this Device may do shows nothing. The top bar keeps
+  Undo, Redo and Find first, then the calendar, History and Revert all
+  changes; none of the groups' actions goes into its ⋮. Voice records on a page of its own
   with the big stop button; Stop, Back and Stop on the notification keep
   the recording on the Note.
+- **A pause ends a recording only where the Device says so**
+  (obf-1053): Settings ▸ Capture ▸ "End a recording after a pause",
+  kept on this Device only, offers Off, the default, which ignores
+  pauses, and 2, 3, 5 or 10 s. Set, every voice recording on the phone,
+  the quick note's and the editor's page alike, also one the iPhone
+  goes on with locked, ends once the microphone stayed quiet that long
+  after it heard something, and is kept as Stop keeps it; a recording
+  nothing was said into yet goes on. Android ends a recording on
+  locking anyway (#368). The row shows only where the phone records.
 - **Settings ▸ Quick note** (per Device, ADR 0008) keeps only the switch
   Nudge buttons, on by default. The switches that once added File
   into…, Frog, Session or Tally, Add to a Shopping List, the Importance
@@ -1325,6 +1659,14 @@ replace a law of Both apps where they say so. A desktop law marked
   rows and the appointments' rows are as tight. Not as tight as the
   widget, whose rows lie 4 apart. With Fat fingers every one of these
   measures is 1.3 times (#224).
+- **The row a notification tap asked for is marked** (obf-1039): its
+  card on the find bar's tint (tertiary container) in a 3 dp ring of
+  the tint's strong colour (tertiary), a Missed Occurrence's line in
+  the Missed Summary alike with corners of 8, scrolled a fifth down
+  from the top or a little lower, so the heading or row above it starts
+  whole under the bar and a first row of today keeps the Today heading
+  (obf-1137); one mark at a time, gone once the app goes out of
+  sight. See Alarms and notifications.
 - **A calendar appointment's row is read only**: no checkbox, the
   calendar's colour down its side, the calendar icon and the calendar's
   name. A tap unfolds its place and description and folds them again;
@@ -1379,9 +1721,10 @@ replace a law of Both apps where they say so. A desktop law marked
 ### Cards
 
 - **A photo gets out of the Note** (#149): full screen its ⋮ offers
-  Save, Copy and Share on the phone, Save putting it into the phone's
-  Pictures in the album "Old Brain Fix" (Android 10 and later; before
-  it, Save is announced as failed with Share as the fix), and only while
+  Save photo, Copy photo and Share to an app on the phone (obf-1014),
+  Save photo putting it into the phone's Pictures in the album "Old
+  Brain Fix" (Android 10 and later; before it, Save photo is announced
+  as failed with Share to an app as the fix), and only while
   its file is on the phone. Saved and copied say nothing, nor does
   a share sheet left without an app; a failure is announced.
 - **An Attachment shows on its card** (#267, ADR 0047): each file a row
@@ -1414,8 +1757,22 @@ replace a law of Both apps where they say so. A desktop law marked
   Append for its text, Remove for the text (with the undo at the top,
   #268), Read the text again (not for a file left to a computer), and
   "Remove Attachment, keep text", asked once, where this Device may;
-  the card's ⋮ offers the last too. "Attach a file" on the editor's bar
-  picks more files.
+  the card's ⋮ ▸ Tidy offers the last too. "Attach a file…" under the
+  editor's Add (obf-1073) picks more files.
+- **What each group of a card's ⋮ holds on the phone** (obf-1014), each
+  opening as a second menu at the ⋮, one thumb's reach from the first:
+  **This Note** File into… (compact card), Show ticks, Hidden from AI,
+  Remove "From …", a Tally's Add to home screen, Make it a Tally, Make
+  it a Checklist, Make it a Shopping List, Show on the Agenda ▸ (its
+  choices in a menu of their own) and Back to a plain Note; **Add**
+  Remind me…, in Advanced Frog and Session… (compact card), Add a part
+  and a Tally's Add entry; **Share** Send to a person, Share to an app,
+  Copy text, Export as Pack…, Add to calendar and Share as calendar
+  file; **Tidy** Merge into… (compact card), Add to a Shopping List,
+  Uncheck all, Move to trash, which asks nothing and is undone at the
+  top (#268), and Remove photo, keep text and its kin, one per photo,
+  recording or file. A group past seven entries shows six and More…,
+  which opens the rest the same way.
 - **Hidden from AI** (#267, ADR 0049): a card's ⋮ and an Area's menu in
   the Areas list have the switch "Hidden from AI", the Note editor its
   badge, offered on a Note or Area in no Shared Area and, once marked,
@@ -1424,10 +1781,12 @@ replace a law of Both apps where they say so. A desktop law marked
   is hidden, a Note by its own mark or its Area's; the editor's badge
   says "Off, hidden by its Area" when only the Area hides it.
 - The editor opens only through a long press on the card, Edit in its
-  ⋮ or the pencil of a detailed card's action row (#281).
+  ⋮ or the pencil of a detailed card's action row (#281). Only a
+  search's card that lists places found opens on a tap, at its first
+  place, and a tap on a place opens the Note there (obf-1047).
 - In the Note editor a text that is only read, the Note's or a
-  Section's, selects with a long press, with Copy in the system's menu
-  (#183).
+  Section's, selects with a long press, with Copy and Find in Note in
+  the toolbar above the selection (#183, obf-1055; see Text editor).
 - **Several Notes are selected with "Select"** (#273, Q655): every Note
   list, Unsorted and its Nudge page, an Area, a Topic, All Notes, the
   search's hits and the Trash, has Select in its bar while it shows a
@@ -1463,6 +1822,13 @@ replace a law of Both apps where they say so. A desktop law marked
 - An editor with several fields is a full-screen page with Save in the
   top bar; secondary state changes are rows at the bottom of the page.
   The Note editor's settings are its badges (see Cards).
+- **A custom Heads-up** (obf-1087): "Custom…", last in the Routine
+  editor's Add heads-up menu, opens a dialog "Custom heads-up" with a
+  typed number ("How long before", "From 1 to 720." under it for hours)
+  and the units as choice chips under it, minutes, hours, days and weeks,
+  for an all-day schedule days and weeks only; Add stays off until the
+  number fits the unit, Cancel adds nothing. One set already is not set
+  twice; set, it lists like the others ("45 min before") with its ✕.
 - **Something Hidden from AI is not given away** (#267, ADR 0049):
   filing it into a Shared Area (a card, the selection, File into…),
   merging it with a Note of a Shared Area either way (a card, the
@@ -1475,6 +1841,44 @@ replace a law of Both apps where they say so. A desktop law marked
   mark is only named with the Area, and the question says the mark
   comes off in the Area's menu; one tap never shows the other Notes of
   that Area to the AI. Send and sharing an Area ask before whom.
+- **Running, last in the ⋮ of the Agenda and of the Areas list, and a
+  tap on a moving line open the page Running** (obf-1078, C21): the
+  line under a bar takes the tap a little above itself, never on the
+  bar's buttons, and the quick note's line under "Transcribing…" a
+  little above and below; the page's own line opens nothing more, and
+  while the app is locked no line opens it, as it names Areas and
+  folders; it closes when the app locks. A card for each job beside the
+  app (a sync with a Device, an Import, the Transcripts, Photo Texts and
+  Attachment Texts being read, the speech model's download or copy, an
+  Area being deleted, the trash being emptied) says what it does, how far it is when known ("120
+  of 340 Notes", "3 of 12"), "Since 14:32", what Abort does where it
+  does more or less than stop at once, and an outlined Abort, which
+  reads "Stopping…" until the job stops; with none, "Nothing runs in the
+  background." An Import stops before its next Note and keeps the Notes
+  it made, its page and the page Running say "Stopped: 120 of 340
+  imported", and the top says "Import stopped.", what it made behind
+  the tap. Deleting an Area stops before its next Note, the Area staying
+  with the Notes not moved. A sync round or join, a recording, photo or
+  file under way ends first; then the automatic syncs pause (a paired
+  Device asking hears 503 and comes back later) until Sync now, or the
+  other recordings, photos and files wait, those asked for again and a
+  recording something waits for still read; either until Go on on the
+  page or the next start. The speech model's fetch is
+  cancelled. What Abort stopped stays under "Stopped" while the app
+  runs, the paused ones first with Go on, then the newest, at most ten.
+  The search index is built within a search, so it is no job here.
+- **Empty the trash now**, last on the Trash's bar (in its ⋮ when the
+  bar is full) and not while selecting (obf-1095), is greyed while
+  nothing in the trash can go and while the trash is being emptied; what
+  can go is counted beside the app when the page opens and as the log
+  changes, never in a frame. It asks once, "Delete 128 Notes and 4
+  Routines for good? They can't come back.", a part that would say 0
+  left out, with Cancel and **Delete for good** on the error colour, and
+  cannot be undone. It runs beside the app as one batch: the line under
+  the bar moves, the page Running lists "Emptying the trash" without
+  Abort, a failure is announced at the top, success is not, and the
+  Trash reads itself again once the log changed. Notes this Device may
+  not change and Frogs stay.
 
 ### Text editor
 
@@ -1485,8 +1889,8 @@ replace a law of Both apps where they say so. A desktop law marked
   keyboard's suggestions, autocorrect, swipe typing and voice input
   work. A tap puts the cursor where the finger is (#312, Q717); there is
   no magnifier and no dragging the cursor. A long press selects a word
-  as usual, its handles drag its ends, with Copy, Cut and Delete in the
-  system's menu.
+  as usual, its handles drag its ends, with Copy, Paste, Search and
+  Delete in the toolbar above the selection.
 - The bottom row shows the cursor's line as a text field does: from
   its start, the cursor right after the text before it; a line wider
   than the row scrolls sideways only as far as keeps the cursor in
@@ -1498,10 +1902,59 @@ replace a law of Both apps where they say so. A desktop law marked
   emoji is one); held, they repeat, faster the longer they are held.
 - **A long press on the bottom row starts selecting** where the cursor
   is and never moves it. While selecting, ◀ and ▶ show in inverted
-  colours and move only the selection's moving end; the system's menu
-  offers Copy, Cut and Delete; typing replaces the selection and ends
+  colours and move only the selection's moving end; the toolbar above
+  the selection offers Copy, Paste, Find in Note and Delete; typing replaces the selection and ends
   selecting; another long press ends it with the cursor at the moving
   end.
+- **A small toolbar floats just above a selection** (obf-1055), in
+  place of the system's menu, wherever a Note's words are read or typed:
+  the Note editor's fields and Section texts, a Line, a table's cell,
+  Amend and a table's own page. It offers Copy, Paste where the field
+  may change and the clipboard holds text, Search in the Note editor,
+  and Delete where the field may change; no Cut, no Select all. A long
+  press on an empty spot of a field shows only Paste, which puts the
+  text in there, or nothing with nothing to paste. Search opens the
+  Note's find bar with the words selected as they read, their first
+  line holding any. The toolbar sits above the selection, below it
+  where there is no room, not at the finger. Other selectable texts,
+  such as an error report or a code to read out, and Capture keep the
+  system's menu; a card selects no text.
+- **Undo and Redo lead the Note editor's bar** (obf-1051, C3a): first in
+  its order, so they stay on the bar of a phone 360 wide, with Fat
+  fingers too, greyed while there is nothing to undo or redo. They go
+  step by step through everything changed since the editor opened: the
+  text and the Sections' texts, a text History brought back or a
+  Transcript or Photo Text taken over, the words a removed recording or
+  photo put into the text (obf-1084; the file stays gone), a table's cells, the Lines (typed,
+  added, deleted, checked, moved, in and out, a Shopping List's reappear
+  time) and the badges (kind between Plain Note, Checklist and Shopping
+  List, Importance, Area and Topic, text format, code language, Show on
+  the Agenda, Show ticks, Hidden from AI). Typing is one step until a
+  pause of a second, a new word after a space or a line break, or a turn
+  from typing to deleting; a format of the bar and a table's row or
+  column changed are a step each; a Line's words are one step, stored
+  first when Undo is tapped while they are typed. A step goes back through the same
+  calls that made it, the earlier value written as a new edit; what can
+  no longer go back, such as a Line a sync took away, stays as it is.
+  **"Revert all changes"**, on the bar after History, in ⋮ where the
+  bar is full, asks once, "Revert all changes?" with
+  Cancel and Revert, then takes every step back to the Note as it was
+  opened; Redo brings them back one by one. A formatted text does not go
+  back to plain, and a Tally or a Session not back to a Plain Note, so
+  those changes are no step. The history ends with the editor.
+- **The find bar's "Search all Notes"** (obf-1055), between ↓ and ✕,
+  opens the search over every Note for its words on top, as a tap on a
+  tag does, greyed while it holds none; back returns to the Note with
+  its find bar.
+- **The Amend box shows only when asked** (obf-1072, C15c): the Note
+  editor has no "Add to Note" field or button of its own. An existing
+  Note has **Add a part** (`post_add`) last under Add at the page's end
+  (obf-1073), for everyone who may Amend it, and so has a card's ⋮ ▸
+  Add (obf-1014); it opens the box "Add a part" with its format bar,
+  "What's new?" and Add. A Note
+  being made, in the editor opened by the quick note's Open in the
+  editor or a list's "+", has none; opened again later, it has. Its
+  Spotlight is the editor's last tip.
 - A screen reader reads both rows and the buttons by name, and the
   character the cursor passes.
 - **On the phone a table in the field is its grid**, never its
@@ -1514,12 +1967,72 @@ replace a law of Both apps where they say so. A desktop law marked
   its cells hold words. While a cell is edited the bottom row is hidden,
   the cell's own field shows its words, and Show as table sits on the
   bar above the keyboard while the cursor is in a table shown as lines.
+- **A table's ⋮ sits at its top right corner** (obf-1050), beside its
+  header row on a card, in a text being read and on the editor's grid,
+  and full screen above the table beside the bar that moves it sideways,
+  Copy staying in the page's bar too. It takes its own tap, never the
+  card's, the search card's or the table's, and opens at the finger.
+  It offers Copy everywhere, the same as the full screen's; on the
+  editor's grid also Move up and Move down, past the block of the text
+  above or below, greyed with none there, and Delete table, asking once
+  while its cells hold words. A block is a table, a code block, a
+  heading, the items of a list one under the other, a quote's lines or
+  a paragraph's; blank lines part them and stay where they are. A table
+  that would stand right above a paragraph or another table, which would
+  read as its rows, gets a blank line between. Each is a step of Undo.
+- **A tap on a cell of the header row sorts a table being read** by its
+  column (obf-1052), on a card, the search card's included, in a text
+  being read and full screen where it is only read: ascending,
+  descending, then as written, an arrow in that cell saying which, in the
+  view only; the Note's text stays as written and the order is forgotten
+  on leaving, a card's first 10 rows being the first in it. The tap is
+  the header row's alone, never the card's, the search card's or the
+  table's, which the rows under it keep. Full screen where the table is
+  edited, a tap on a cell of the header row edits it, the column's letter
+  offers under Show sorted ▸ Show sorted ascending, Show sorted
+  descending and Show as written, and putting in, moving or deleting a
+  row or column shows the rows as written again. On the editor's grid
+  the column's letter offers under Sort rows ▸ Sort rows by this column
+  and Sort rows by this column, descending, which rewrite the rows in the text, each a step of Undo, none when the
+  rows already stand so.
+- **A long press on a cell selects cells** (obf-1054), on the grid in
+  the Note editor's field (not on the cell being edited, whose field
+  selects its words), in a Section's text being read and full screen;
+  never on a card, which selects no text. Dragging on without lifting
+  the finger selects the rectangle from that cell to the one under it,
+  in the rows as they show; a drag that does not start with a long
+  press still moves a wide table sideways, and a tap still opens, sorts
+  or edits. On lifting, the toolbar above the cells offers Copy, and
+  Search with the words of one cell. Copy puts the cells on the
+  clipboard as a table of their own, as the table's Copy does, the
+  first row its header row, also a single cell. A tap, Copy, a scroll
+  of the page or of the rows and the table moving sideways end the
+  selection, the tap doing nothing else. A selection that starts
+  outside a table runs through its cells as through the rest of the
+  text and copies as text.
 
 ### Checklist and Shopping List Lines
 
 - **In and out** sit on the bar above the keyboard, as the format bar
   does, and put the Line with the cursor under the Line above or back
   at the top.
+- **A Checklist, Shopping List or Tally is one card** in the Note
+  editor (obf-1071, C14): its name as the heading, then its Lines and
+  **"Add a Line"** (of a Tally its setup, as before), in the card of
+  the name and in no panel of its own, without the kind as a second
+  heading. "Add a Line" is a field under the Lines, where this Device
+  may add Lines; a tap puts the cursor into a new empty Line after the
+  open Lines, on a Shopping List before the struck ones, as Return
+  would, or into the empty new Line there is already, and is no step of
+  Undo. This
+  replaces "No Add Line button and no Add field" of Both apps on the
+  phone; Return still makes new Lines.
+- **Its description shows only after "Add a description"** (obf-1071),
+  a small text button under the name where this Device may change the
+  text and the description is empty: a tap opens its field, the cursor
+  in it; left empty, the button comes back. A description that is there
+  shows as before, folded to one line until a tap. A Session keeps its
+  description field with its hint.
 
 ### The bar
 
@@ -1529,7 +2042,14 @@ replace a law of Both apps where they say so. A desktop law marked
 - **An action goes into ⋮ only when the bar is full.** A page lists its
   actions in a fixed order; the bar shows as many as fit at the width it
   has, the rest overflow into ⋮, and ⋮ exists only when it holds
-  something. ⋮ is last. Nothing adapts to use. Settings, Backups and
+  something. ⋮ is last. The one exception is the Areas list's ⋮
+  (obf-1089, obf-1096), which stands whenever nothing is searched, also
+  with fewer than two Areas, and gives way to Done while rearranging:
+  Rearrange with two Areas or more, Import… where a folder can be
+  picked, Running last; and the
+  Agenda's ⋮, which always holds Running last (obf-1078,
+  `BarAction.inMenu`) and so always stands, on a wide screen too.
+  Nothing adapts to use. Settings, Backups and
   Sync never go into ⋮; they stay behind the Profile picture. A page
   gives such an action as a `BarAction`; the bar counts a button 48
   wide, 1.3 times with Fat fingers (#224).
@@ -1545,16 +2065,50 @@ replace a law of Both apps where they say so. A desktop law marked
   is scrolled up a little; half shown, it snaps. While the field has the
   focus or a search it stays; otherwise no edge under the bar cuts the
   list. The bar sits on a band (#351, obf-1041), and the page's top bar
-  takes the band's fill, the theme's surface container, set off from the
+  takes the band's fill, the pattern's (marks') tone (obf-1081), set off from the
   page's ground in the light and the dark look, so top bar and band read
   as one header with one line under the band only; shown over the list,
-  and with the list pulled down, the cards go under it. Pages without
-  the search bar keep their top bar in the ground's colour.
+  and with the list pulled down, the cards go under it. The pages whose
+  search bar stands still over what they list, the Settings, File
+  into…, Merge into…, Add to Note… and Link to…, set it on the same
+  band, their top bar of its fill, with the line under it, so what
+  scrolls goes under the line and no edge in the page's colour cuts it
+  (obf-1088). Pages without a search bar keep their top bar in the
+  ground's colour.
 
 ### Settings
 
+- **Every Settings section is a card with its title on top** (obf-1085,
+  C28): on the phone and the desktop each section's rows sit on one
+  card under its title, Look, Units and Complexity included; a search
+  shows the card with only its matching rows.
+- **The phone's Tips card** (obf-1060, C3): the switch "Show tips", on
+  by default and kept on this Device, and "Show tips again" under it.
+  Off, no screen shows a Spotlight, a new one neither, and none is
+  counted as shown; "No more tips" on every tip's card turns it off at
+  once. "Show tips again" brings every tip back and turns the switch on.
+- **The phone's Imports are actions, not settings** (obf-1096): a
+  folder and Google Keep sit on the page Import… in the Areas list's ⋮
+  opens, each a row that shows its running Import and opens its page
+  again. Settings has no Import section; a search there for the Imports
+  shows the line "Import… is in the Areas list's ⋮", which opens the
+  Areas list. The desktop keeps File ▸ Import….
+- **An Import of a source imported before asks once** (obf-1078):
+  after the folder or the Keep export is picked and listed, and before
+  any of its files is read, when an earlier Import of the same picked
+  location made Notes of any of its paths, the phone asks "Fill in the
+  Import of <date> into <Area>?", Fill in and Import as new stacked
+  full width, Cancel below, which writes nothing and closes the
+  Import's page. Fill in adds only the items whose path that Import
+  never made into its Area, and its page and announcement say how many
+  went in and how many were imported before; with none missing, "Nothing
+  new: 340 already imported", without Open the Area. Import as new, as a
+  first Import, makes a new Area with every item. A name alone never
+  matches. On the iPhone the pickers hand no stable location yet, so
+  the question does not come there and a second Import makes a new Area.
 - **A search field sits at the top of Settings** (#282), under the bar,
-  staying there while the page scrolls; nothing focuses it on opening.
+  staying there while the page scrolls, on the band of the list pages'
+  search bar (obf-1088); nothing focuses it on opening.
   It filters to the settings whose label or detail line holds every
   word typed, in any case, in the app's language, a setting without a
   label of its own by the names of its options, each under its
@@ -1568,11 +2122,31 @@ replace a law of Both apps where they say so. A desktop law marked
 - A Nudge is a normal notification with the same snooze choices; tapping
   it opens the Nudge screen with the three oldest Unsorted cards and
   "+x".
-- **A tap on an Occurrence's notification opens the editor of its
-  Note** (#270), with Done, Snooze and Not today in its Due line, over
-  whatever the app showed; a locked Area asks to open first, and behind
-  the App Lock it opens after the unlock. A Routine or Note gone or in
-  the trash opens only the app.
+- **A tap on an Occurrence's notification, its ring's or its
+  Heads-up's, opens the Agenda with that Occurrence marked** (obf-1039,
+  Q39–Q41), from whatever page the app showed, the Areas list too,
+  within 500 ms, whether the app was running, in the background or not
+  started; Capture and the full-screen alarm stay on top of it, nothing
+  typed lost. The Agenda scrolls the row into view, a fifth down from
+  the top or a little lower so nothing is cut by the bar, and marks it
+  on the find bar's tint in a ring of its colour (tertiary) until the
+  app goes out of sight or another tap marks another; Done is its box, Snooze and Not today are in its ⋮. One
+  today's rows do not hold is marked where the Agenda lists it: in the
+  Missed Summary, as far as its card shows, or on a coming day. One the
+  Agenda lists nowhere opens the Agenda with "Already done" or
+  "Skipped" at the top when it was Done or skipped meanwhile, and with
+  nothing said otherwise. A Masked row is marked as it shows, asking
+  for no PIN. Behind the App Lock it is marked after the unlock. A
+  Routine or Note gone or in the trash shows the Agenda alone.
+- **Every notification tap goes into a trace of its own** (obf-1039):
+  the kind ("occurrence", "headsUp", "ring", "nudge", "changes",
+  "catchUp"), the Routine's id and the Occurrence's key where it has
+  them, whether the app was running, in the background or started by it
+  ("unknown" on the iPhone), when, and where the app took it; never a
+  Note's text. It keeps the last 10 taps in a file beside the crash
+  report, and Send feedback sends it along under "The last notification
+  taps", ticked at first while there are any, greyed while there are
+  none, as the desktop's clicks.
 - **On Android an Occurrence's notification has three buttons** (#269,
   Q650): Done · Snooze · Not today, as Android shows no more. Snooze
   replaces them in place with 10 min, 30 min and 1 h, and Not today with
@@ -1606,9 +2180,10 @@ replace a law of Both apps where they say so. A desktop law marked
 ### The window
 
 - The desktop window is a classic desktop window (#145): **the menu
-  bar** on top (File, Edit, View, Area, Note, AI, Sync, Help); **the
+  bar** on top (File, Edit, View, AI, Sync, Help); **the
   sidebar** on the left with the Agenda, Unsorted, All Notes, Frogs, the
-  Areas with their Topics, Tags (#267) and the Trash, marking the place shown; **the list** in
+  Areas with their Topics and the Trash, marking the place shown (the
+  tag tree opens from All Notes, obf-1074); **the list** in
   the middle. **A Note opens as a dialog over the window** (#146), one at
   a time, over the list and the sidebar but not the menu bar, which
   stays at hand for it; closing it keeps what was typed: its cross, Esc,
@@ -1627,7 +2202,8 @@ replace a law of Both apps where they say so. A desktop law marked
   window per Note: opening it again brings its window forward, and the
   Note dialog does not open a Note that has one. What is typed there is
   kept as in the dialog; its cross saves as closing the dialog does, and
-  the Undo slot is the main window's. A Note going to the trash, deleted
+  the Undo slot is the main window's, while its bar has the dialog's
+  Undo, Redo and ⋮ for its own Note's steps (obf-1051). A Note going to the trash, deleted
   or merged, here or on another Device, closes its window. The Note
   windows close, saved, as the main window closes or hides into the
   tray. **Each has "Keep on top" above the Note**, off as it opens and
@@ -1656,6 +2232,42 @@ replace a law of Both apps where they say so. A desktop law marked
   over it. It opens off in every new window and stays as switched while
   the window is open; nothing is stored, so the AI port has nothing to
   read or set.
+- **A Markdown file opens in a viewer of its own** (obf-1056, Q1–Q7):
+  from the command line (`oldbrainfix notes.md more.md`, several at
+  once, into the running app, no second app), from "Open with" for `.md`
+  and `.markdown` files on Linux, Windows and macOS, offered but never
+  made their default, and from File ▸ Open ▸ Markdown file…. A second
+  start hands its files, like a capture and `oldbrainfix open`, to the
+  running app over a local socket on Linux and macOS and over a named
+  pipe on Windows that only the user may open, a pipe run by another
+  user being handed nothing; the Finder hands them over as the open
+  documents Apple Event (Q12). It is a window beside the main one, one per file, drawn as the reading view
+  draws a Note: all of CommonMark with GitHub's tables (as obf-1048 draws
+  them), task lists, strike-through and footnotes, six heading levels,
+  the front matter as a small table of properties at the top, Obsidian's
+  callouts and highlights. Nothing goes into the store or syncs, so the
+  AI port has nothing to read or set; it shows the file again as it
+  changes on disk. `[[Name]]`, `[[Name|label]]` and `[[Name#Heading]]`
+  open Name.md in the same window at that heading, found in the nearest
+  folder above holding `.obsidian`, else the file's own, and their
+  folders; a name not found is dimmed, and nothing outside that folder is
+  read. Back and forward (the arrows at the top, Alt+Left and Alt+Right,
+  the mouse's back and forward buttons) go through the files it showed.
+  It has the find bar (Ctrl+F), selection with the right-click's Copy and
+  Find, Ctrl+Plus and Ctrl+Minus for the text size, and in ⋮ Find,
+  Open in another app and Import as Note…, which also stands in its
+  bar: it imports by the Import rules and, when the file links to others,
+  asks first "Also import the N files it links to?"; imported together,
+  their links become App links to each other's Notes, their pictures
+  photos. While an Import runs, the bar says so in its place. What the
+  Import made is announced at the top of the main window. Inside the
+  Flatpak, where only the file opened is shared, a line under the bar,
+  "Open the folder to follow its links", asks once through the folder
+  portal for the folder its links are in, for a file with links or
+  pictures only; the viewer then reads only inside that folder, finding
+  the file's copy there by its name and bytes (a folder without it is
+  asked for again), Import as Note imports that copy, and the app keeps
+  the folder while it runs, for other files whose copy it holds (Q13).
 - **Unsorted says how many Notes it holds in the sidebar** ("Unsorted
   7", #279), as the one list that asks to be emptied; no other place
   shows a count, and an empty Unsorted shows none. **An Area with Topics
@@ -1663,7 +2275,18 @@ replace a law of Both apps where they say so. A desktop law marked
   (#279), a click on it selecting nothing; this Device keeps each fold
   (ADR 0008), as lists keep theirs, Areas starting unfolded. A folded
   Area still shows the Topic shown under it, marked.
-- **Tags below the Areas opens the tag tree in the list** (#267): every
+- **Tags under All Notes' search** (obf-1074): the desktop's Areas
+  list is its sidebar, which has no search; All Notes' search, over
+  every Note as the Areas list's on the phone, has the row of tags. While
+  its field is empty, one row right under it in the band shows the most
+  used tags as on the phone (see Phone ▸ Navigation, "Tags under the
+  Areas list's search"), at most twelve, and ends in "All tags…", there
+  also without a tag; a click on a tag searches All Notes for it, and
+  each reads "Search for" its tag to a screen reader. A row wider than
+  the band leaves out the least used tags, never "All tags…". Its tags
+  are read on a thread of their own while All Notes shows, once for each
+  change, never per frame. The sidebar lists no tags.
+- **"All tags…" opens the tag tree in the list** (#267): every
   tag by its levels as on the phone (see Phone ▸ Navigation, "The tag
   tree"), each level's arrow unfolding the levels below, kept while the
   app runs; a click on a tag shows All Notes searching for it. Typing
@@ -1683,9 +2306,17 @@ replace a law of Both apps where they say so. A desktop law marked
 - **On the desktop nothing floats over a list** (#158); every list ends
   with the same room after its last card, so that card scrolls fully
   into view.
-- **On the desktop "+" sits at the end of the list's heading** (#146, #161)
-  and opens a menu of the same kinds, Note first, each with its icon and
-  words; the Agenda's and Unsorted's "+" open the quick note at once. The
+- **On the desktop "+" sits at the end of the list's heading** (#146, #161),
+  in a list of Notes last in its band's second row (obf-1064) as "+ New Note" in a button's frame (obf-1067), and opens a menu of the same kinds, Note first, each with its icon and
+  words. The Agenda's "+" and Unsorted's "+ New Note" open a small menu
+  (obf-1141): "Quick note" first, which opens the quick note, then
+  "Editor" with the editor's pencil, which opens the Note dialog on an
+  empty Unsorted Note nudged in 1 h, as the quick note's Open in the
+  editor keeps it, its text taking the keyboard, without "Add a part";
+  left empty, the Note is not kept.
+  An Area's or a Topic's "Note" opens the Note dialog on a new Note
+  filed there, its text taking the keyboard, without "Add a part"; left
+  empty, the Note is not kept (obf-1140). The
   pages open as dialogs over the window; the desktop's Session page is
   the Routine editor's, its name first, the count, rule and schedule as
   its panels.
@@ -1701,50 +2332,155 @@ replace a law of Both apps where they say so. A desktop law marked
 - **The path beside the arrows leads up the levels**, such as "Areas ›
   Household › Repairs"; a click on a level shows it, "Areas" leading to
   All Notes.
+- **A list of Notes has one header band** (obf-1064, C7, as the phone's
+  band, obf-1041): All Notes, Unsorted, an Area, a Topic and the Trash
+  start with one band on the search band's fill with its line under it
+  (`theme::search_band`), the cards scrolling under the line. Its first
+  row holds back, forward and the path, the place shown last and large
+  as the list's title; its second the search field, then the view
+  switch, "Show Notes by…" and "+", in an Area or a Topic ⋮ last
+  (obf-1065, C8, see Menu bar and keys), all at one height, the Trash's
+  the field and "Empty the trash now" (obf-1095). The view switch and "+" are icon and word in the frame
+  "Show Notes by…" has, "View" and "New Note" (obf-1067); to a screen
+  reader and in its tooltip the switch says what a click does, and
+  "+" with a menu says "Add here". The search field is as tall as those buttons, its text
+  a card's text's size, the magnifier inside it at its left and ✕ to
+  clear it inside at its right while something is typed (obf-1063).
+  A person the filter keeps is a chip with ✕ in the second row, after
+  "Show Notes by…", a click taking them out; there is no row
+  "Only Notes by". Too narrow for them beside the field, the buttons go
+  to the line under it. The band, its words, icons and heights, grows
+  with Text size (`BandSizes` in `app.rs`); for the band this replaces
+  Both apps ▸ Look, "The text has a size of its own", where bars and
+  headings keep their size. The other places keep their arrows and
+  path over their own heading.
+- **"Empty the trash now" asks once with the counts** (obf-1095): it is
+  greyed while nothing in the trash can be deleted, counted beside the
+  window whenever the log changed while the Trash shows, and while the
+  trash is being emptied. Its question names what goes, "Delete 128
+  Notes and 4 Routines for good?", a count of none left out, with
+  "They can't come back.", Cancel and **Delete for good** on the error
+  colour. The trash is then emptied beside the window, the line under
+  the menu bar and the page Running showing it; the Trash shows what
+  is left once it is done, and a failure is announced at the top.
+- **"New Note" stays whatever filter is on** (obf-1070, C13): in All
+  Notes, Unsorted, an Area and a Topic, "Show Notes by…" never hides
+  it. A Note the filter hides is made and opened as usual: the quick
+  note saves it, a Checklist or Shopping List opens in the Note dialog.
+  Back in the main window's list, not over a dialog, the top says
+  "Made, hidden by the filter" with the button "Show"; a click on it or
+  on the words clears the list's person filter. It shows before every
+  other announcement and goes by itself 10 seconds after it first
+  showed, or once the list shows another place or its filter changes.
+  With "Me" in the filter nothing is said, nor for a Note the quick
+  note's choices filed elsewhere, which this list would not show.
+- **A restored Backup's speech model is offered at the top** (obf-1098):
+  once "Backup restored." is clicked away, in the main window, the top
+  says the speech model used before is not on this computer yet, with
+  **Download**, or **Use a file of my own** for a model taken from a
+  file, and **Not now**. A click on the words or the first button
+  fetches it; the line hides while the model is fetched and goes once
+  that model is in use, so a failed download offers it again. The file
+  dialog left without a file keeps it; Not now drops it for good. A
+  model the Backup names that is in use here already is not offered.
 - **The Agenda's bar on the desktop holds All Routines and Reminders and
   New Routine or Reminder** (draft, #196): no Calendar and no Profile
   picture; the menu bar leads to the rest.
+- **Quiet today is a button last in the desktop Agenda's bar, no ⋮**
+  (obf-1066), in place of Both apps' ⋮ for it: its bell and words in
+  the framed look of a list band's buttons. While today is quiet it
+  reads **End quiet day** in the same place, its right edge and the
+  buttons before it where they were, and ends it as End on the line
+  "Quiet day until midnight" does; the line stays on top. The bar's row
+  is as tall as the button, all of it centred in it. Too narrow for it
+  beside the other buttons, as with Bigger text and icons in the
+  smallest window, it goes to the line under the bar, at the right.
 
 ### Menu bar and keys
 
+- **The menu bar holds what belongs to the window** (obf-1065, C8):
+  File, Edit, View, AI, Sync and Help. It has no Area and no Note menu;
+  an Area's or a Topic's actions are in the ⋮ of its list's band, a
+  Note's in its card's ⋮ and right-click and in the Note dialog (its
+  badges, its buttons and its bar's ⋮, which holds History). Its menus
+  keep to seven entries (#321, obf-1014): **File** holds New Note
+  (Ctrl+N; the quick note, while an Area or a Topic is shown the Note
+  dialog on a new Note filed there, obf-1140), Quick note, Import…, Open ▸ (Markdown file…, Pack…, A
+  Backup…), Export as vault… and Quit; **Edit** Undo, Cut, Copy, Paste,
+  Find in Note (Ctrl+F) where it opens the Note's find bar, else Search,
+  and Settings…; **View** Go to ▸ (Agenda, Unsorted, All Notes, Frogs,
+  All Routines and Reminders, the one shown marked), Running, Detailed
+  views, Compact views, Theme ▸ and Text size ▸. Attach a file… and
+  Save as Markdown… are the Note dialog's, under Add and Share. The
+  tray's menu has Open Old Brain Fix, Quick note, which opens the
+  capture popup, and Quit.
 - **Every menu entry acts on what it names and closes its menu**, also
-  when picked by keyboard or screen reader; the Note menu acts on the
-  Note in the Note dialog and is greyed while none is open, each entry
-  as far as the dialog offers it, but File into…, Merge into…,
-  Importance and Move to trash, in the Trash Restore in its place, act on
-  the cards selected in the list while no Note is open (#148, #273). Its keys (Ctrl+N,
-  Ctrl+F, Ctrl+M, Ctrl+Shift+M for Merge into…, Ctrl+,; Cmd on macOS)
-  stand beside the entries and work while typing, over the Note dialog
-  too, not while another dialog is open; Delete and 1 to 3 stand beside
-  Move to trash and Importance's entries while those act on the cards selected
-  (#274). Ctrl+F searches the list shown where it has a search field
+  when picked by keyboard or screen reader. The keys (Ctrl+N, Ctrl+F,
+  Ctrl+M for File into…, Ctrl+Shift+M for Merge into…, Ctrl+,; Cmd on
+  macOS) stand beside the menu bar's entries where it has them and work
+  without any entry, while typing, over the Note dialog too, not while
+  another dialog is open; Ctrl+M and Ctrl+Shift+M act on the Note in the
+  Note dialog, else on the cards selected in the list (#148, #273), and
+  Delete and 1 to 3 on the cards selected (#274). Ctrl+F searches the list shown where it has a search field
   (All Notes, Unsorted, an Area, a Topic, the Trash, whose search also
   finds its Routines, Reminders and Frogs by their Note), else All
-  Notes'; over the Settings dialog it searches the Settings (#282). On the desktop the menu bar leads to Settings, Backups and
+  Notes'; over the Note dialog and in a Note's own window it opens the
+  Note's find bar (obf-1047); over the Settings dialog it searches the
+  Settings (#282). On the desktop the menu bar leads to Settings, Backups and
   Sync in place of the Profile picture, and only Help ▸ About Old Brain
   Fix to About, which the Settings do not show (#325, Q728).
 - **View ▸ Text size** (#326, obf-1019): Normal, Larger and Largest,
   then Larger text (Ctrl+Plus, Ctrl+= too) and Smaller text
   (Ctrl+Minus), each greyed at its end; the keys work as the menu bar's
   others do, and egui's own zoom keys are off (Both apps ▸ Look).
-- **File ▸ Attach a file…** (#267) picks files of any kind and does
-  with them what a drop does (see Capture): onto the Note in the Note
-  dialog, else into the quick note for a new Note.
-- **The Area menu acts on the Area or Topic the list shows** (#279):
-  Rename (F2), Colour and icon, Share…, People, Export as Pack…, the
-  switch Hidden from AI (#267) and
-  Delete, the sidebar right-click's entries, each greyed where that
-  menu would leave it out (a Topic has no Colour and icon, Share…,
-  People or Hidden from AI, nor has an Area in a Shared Area that is not
-  marked), and all of them while no Area or Topic shows or a dialog
-  lies over the list, the Note dialog included, so that none acts on a
-  place behind it. F2 rests in a text field and while a menu is open.
-  The sidebar's right-click stays, and keeps New Topic. Move up
-  (Alt+Up) and Move down (Alt+Down) move the Area shown one place in
-  the person's own order (#280), for whoever is in it, greyed for a
-  Topic and at the ends, where the right-click leaves them out; they
-  rest while a text field has the keyboard, so in a Checklist's Line
-  they move the Line instead (#283).
+- **View ▸ Running and a click on the line under the menu bar open the
+  page Running** (obf-1078, C21): never greyed, a Page dialog as the
+  Settings, listing each job beside the window (a sync with a Device, an
+  Import, the Transcripts, Photo Texts and Attachment Texts being read,
+  the speech model's download, an Area being deleted, the trash being
+  emptied, a Pack being
+  opened, the Agenda's first read) with what it does, how far it is when
+  known ("120 of 340 Notes"), "Since 14:32", and Abort, which stops it at
+  its next safe point and reads "Stopping…" until then; with none, "Nothing
+  runs in the background." An Import stops before its next Note and keeps
+  the Notes it made; the page says "Stopped: 120 of 340 imported" and the
+  top "Import stopped.", what it made behind the click. Deleting an Area
+  stops before its next Note, the Area staying with the Notes not moved.
+  A sync round or answer, a Transcript or a Photo Text under way is not
+  cut and ends first; then the automatic syncs pause (a paired Device
+  asking is told to come back later) until Sync now, or the other
+  recordings, photos and files wait, until Go on on the page or the next
+  start. The Agenda's first read has no Abort, nor has emptying the
+  trash, which deletes all of it at once or nothing. What Abort stopped stays
+  listed under "Stopped" while the app runs, the newest first, at most
+  ten. The line takes the click a little above and below itself, never on
+  the menus.
+- **Attach a file…** (#267) picks files of any kind and does with them
+  what a drop does (see Capture): under Add in the Note dialog onto its
+  Note, in a card's Add ▸ onto the card's Note (obf-1014).
+- **An Area's menu is the same in the sidebar and the band** (#279,
+  obf-1065, obf-1014): a right-click on an Area in the sidebar and the
+  ⋮ last in its list band's second row ("More for this Area" to a
+  screen reader) offer New Topic (in Advanced), **Name, colour and
+  icon…** (F2), **Share with people…**, Move ▸ (Move up with Alt+Up,
+  Move down with Alt+Down), Export as Pack…, the switch Hidden from AI
+  (#267) and Delete, seven entries. The right-click leaves out what this
+  Device may not do there, the band's ⋮ greys it, and greys all of it
+  while a dialog lies over the list, the Note dialog included, so that
+  none acts on a place behind it; its keys rest there too. A Topic's
+  right-click and band ⋮ ("More for this Topic") offer Rename (F2),
+  Export as Pack… and Delete. F2 rests in a text field and while a menu
+  is open. Name, colour and icon… is one dialog: the name, the colours
+  and the icons, each marked as it is picked, kept with Save or Enter
+  and dropped with Cancel. Share with people… is offered to whoever
+  manages the Area and to everyone in a Shared Area: it lists the
+  Area's people with their roles first, where it is shared, a Manager
+  changing them and taking them out there, then for who manages it the
+  role, Show code and "Someone not nearby"; a Member sees the people
+  and Close. Move up and Move down move the Area shown one place in the
+  person's own order (#280), for whoever is in it, greyed or left out at
+  the ends; they rest while a text field has the keyboard, so in a
+  Checklist's Line they move the Line instead (#283).
 - **The sidebar's Areas are dragged by their rows** (#280, Q676): a
   line shows the gap the Area goes into; let go where it stands or
   away from the Areas, it stays and nothing is written. A card dropped
@@ -1755,8 +2491,10 @@ replace a law of Both apps where they say so. A desktop law marked
   Ask… (Ctrl+K, #267), the Ask panel and its provider's card, and does
   the desktop answer the phone's questions. The AI port works either
   way. Ask… shows the Ask panel, AI settings… opens the page with every
-  AI setting, and Review the AI Task shows the review of the AI Task
-  that waits, greyed while none waits or the port is open.
+  AI setting, and Review the AI Task shows the review of the AI Task,
+  never greyed (obf-1077): with no change yet it says "No changes yet",
+  and while the port is open "Close the port" stands in for Accept all
+  and Reject all, under the changes so far.
 - **The AI settings are one page** (#335, Q748): a Page dialog like
   the Settings, with "AI (experimental)" on top, under it the
   provider's card only while it is on, then the AI port's card with its
@@ -1764,7 +2502,18 @@ replace a law of Both apps where they say so. A desktop law marked
   its place, which opens the page with the arrow back to the Settings;
   the Settings' search finds the row by the words of every setting on
   the page. The announcement of the open AI port opens the page at the
-  port's card.
+  port's card. The standing line at the top says "AI port open" or "AI
+  Task waits for review", no word of a pause: sync goes on (obf-1076),
+  the drafts sent nowhere until Accept. On every page and dialog it
+  offers "Review (3 changes)" while the AI Task holds changes, which
+  closes the dialogs over the list and opens the review, and with
+  none yet "Close the port" (obf-1075, C18); the count is the one
+  value an announcement holds, replacing "Values never go into an
+  announcement" for this line. A Note window shows the line alone.
+  The review marks each change a
+  later edit synced in touches: one of the user's other Devices' as
+  staying, another person's, in the warning colour, as written over by
+  Accept.
 - **The Ask panel is a place in the list** (#267, ADR 0051), reached
   by Ask… and Ctrl+K, which also work while typing and over the Note
   dialog and put the cursor into its question field. Under its heading
@@ -1781,9 +2530,9 @@ replace a law of Both apps where they say so. A desktop law marked
   the cursor at its end to be asked again after the whole thread, then
   its answer as a formatted text whose links open their Notes, "From
   these Notes" and "Also read" with each Note's title as a link, and a
-  row of Copy as text, Keep as Note, then "Kept as a Note" opening it,
+  row of Copy text, Keep as Note, then "Kept as a Note" opening it,
   Add to Note… and Save as Markdown…, the desktop's Share to an app
-  (#316): Copy as text and Save as Markdown… hand on the answer alone as
+  (#316): Copy text and Save as Markdown… hand on the answer alone as
   Markdown with HTML beside, the file named after the question; Add to
   Note… adds the question and answer, as Keep as Note keeps them, to the
   Note picked as a Section, then "Added to “…”" opens that Note; Copy
@@ -1797,7 +2546,8 @@ replace a law of Both apps where they say so. A desktop law marked
   opens in the Note dialog over the panel, which stays. A follow-up is
   asked after the earlier answers; Start over drops them, and so does
   showing another place. While an AI Task waits, a line says that its
-  changes wait for review with sync, beside Review. The provider's
+  changes wait for review and stay on this computer until decided,
+  beside Review. The provider's
   card in the AI settings sits before the AI port's: the protocol as
   radio buttons, the base URL only for an OpenAI-compatible provider
   with its error under it, the model, the API key hidden as typed, and
@@ -1812,7 +2562,10 @@ replace a law of Both apps where they say so. A desktop law marked
   nothing waits; Ctrl+Z works over the list and the Note dialog but not
   in a text field, where it undoes the typing. Only the last one waits;
   cards selected and moved to the trash or merged together come back
-  with one (#273).
+  with one (#273). Over the Note dialog and in a Note's own window they
+  take back the Note's last step instead (obf-1051), unless the window's
+  undo came after it, and Ctrl+Shift+Z and Ctrl+Y outside a text field
+  are its Redo.
 - **The keys work the card lists** (#274, Q657): over a Note list's
   cards, with no dialog, menu or Note dialog on top and no field or
   other widget holding the keyboard, Up and Down select the next card
@@ -1849,7 +2602,7 @@ replace a law of Both apps where they say so. A desktop law marked
   a one-line field of a dialog takes it; Ctrl+B and Ctrl+I make bold
   and italic while the Note's text is edited.
 - **Esc closes what lies on top** (draft, #196): a menu, a photo or
-  table full screen, the top dialog, the quick note keeping what was
+  table full screen, a Note's find bar (obf-1047), the top dialog, the quick note keeping what was
   typed, a Note window's reading view (#322), and over the list without a
   dialog the cards selected.
 - **The keyboard stays in the dialog on top** (draft, #196): while the
@@ -1892,7 +2645,7 @@ replace a law of Both apps where they say so. A desktop law marked
   with its words beside the box, its detail in a small weak line under
   it, in place of the phone's switch on its own line. A short single
   choice is a wrapping row of choice chips (`app::chip_row`, the weekday
-  pills' look), a radio group of radio buttons to a screen reader, Tab
+  chips' look, `design::Chip`), a radio group of radio buttons to a screen reader, Tab
   and the arrows moving between them, Space or Enter picking one; a
   long one is a column of radio buttons (`app::radio_column`), as in
   Both apps (#226); the Sync dialog's "Bundle for",
@@ -1901,7 +2654,9 @@ replace a law of Both apps where they say so. A desktop law marked
 - **The question Hidden from AI is a dialog** (#267), asked as on the
   phone (Phone ▸ Dialogs and pages, "Something Hidden from AI is not
   given away"): before the Send dialog
-  and the Share dialog open, and when File into…, a drag onto an Area,
+  and the Share dialog open (Share with people… on an Area shared
+  already opens with its people, the invite asking instead,
+  obf-1014), and when File into…, a drag onto an Area,
   Merge into… or Export as Pack… is refused, with Cancel and "Show to
   the AI" on the accent, which takes the marks off and does again what
   was asked; a Note hidden by another Area's mark only names that Area,
@@ -1913,6 +2668,53 @@ replace a law of Both apps where they say so. A desktop law marked
   stands beside its words; Save… saves the file where the user says, in
   place of Share…; "Add … to People" takes the person in and keeps the
   dialog open.
+- **A custom Heads-up is a small dialog over the Routine editor**
+  (obf-1087): "Custom heads-up" with "How long before" over a number
+  field, "From 1 to 720." small under it for hours, the units as a
+  `chip_row` under that, starting at minutes, at days on an all-day
+  schedule; Cancel and Add, Add greyed until the number fits the unit,
+  Enter in the field adding as Add does. Esc and a click beside it
+  close it and add nothing, the editor staying open under it; back
+  does nothing while it shows.
+- **An Import of a source imported before asks once** (obf-1078): after
+  File ▸ Import… picks a folder or a Google Keep export, or the
+  Markdown viewer's Import as Note… is asked, the Import lists the
+  items' paths beside the window, and when an earlier Import of the same
+  folder, zip or file made Notes of any of them, the main window asks
+  "Fill in the Import of <day> into <Area>?" (coming forward for the
+  viewer) with Cancel, "Import as new" and "Fill in" on the accent.
+  Fill in puts only the items never made into that Area, and "Import
+  finished." says behind the click how many went in and how many were
+  imported before; with none missing the top says "Nothing new to
+  import.", behind the click "Nothing new: 340 already imported.", and
+  no Area is made. Import as new makes a new Area with every item, as
+  a first Import does. Cancel, Esc and a click beside it import
+  nothing and say nothing; another dialog in its place puts the
+  question off until it closes. A first Import asks nothing.
+- **A search field over what it lists sits on a band** (obf-1088, as
+  the phone's): the Settings', File into…'s, Merge into…'s, Add to
+  Note…'s and Link to…'s field, and the main window's over a list of
+  Notes (there the whole header band, see The window), stand on a band of the marks' tone across the width with a
+  separator's line along its bottom (`theme::search_band`), and the
+  list starts right at the line, so what scrolls goes under the line
+  and no edge in the page's or the dialog's colour cuts it.
+- **The Note dialog's buttons stand in four named groups** (obf-1073,
+  C16), as in the phone's Note editor, in a Note's own window too:
+  **This Note**, the badges under the Note's text (Kind, Importance,
+  Area and Topic, Captured, Show on the Agenda, Hidden from AI and the
+  others a Note has), with Make it a Tally in Advanced; at the dialog's
+  end, after the Note's files, Sections and Linked from, **Add** ("+"
+  with Remind me…, Frog and Session…, Voice, Paste, Attach a file…, Add
+  a part), **Share** (Send to a person, Copy text, Save as Markdown…,
+  Export as Pack…) and
+  **Tidy** (Merge into…, Add to a Shopping List, Move to trash in the
+  error colour). Each group is a small strong heading, read as a
+  heading, over its compact buttons side by side, wrapping; the groups
+  stand side by side where the dialog is wide enough, else one under
+  another. A group with nothing this Device may do shows nothing, and
+  a Note in the trash shows This Note and Restore only. While a
+  recording runs, its time and the big stop button stand over the
+  groups. The desktop takes no photo, so Add has no Photo.
 
 ### Cards and selection
 
@@ -1927,20 +2729,30 @@ replace a law of Both apps where they say so. A desktop law marked
   another place drop the selection. Up, Down, Shift and Ctrl+A select
   from the keyboard (#274, see Menu bar and keys). A double-click, Edit
   or Enter opens the Note dialog.
+- **A card's menu has the Note dialog's groups** (obf-1014): the ⋮
+  and the right-click are one menu in both views, **Edit**, Open in its
+  own window, then **This Note ▸** (File into…, Importance ▸ Important,
+  Normal or Unimportant, Kind ▸ with Make it a Checklist, Make it a
+  Shopping List and Back to a plain Note, a list's Show on the Agenda ▸,
+  Remove “From …”, Show ticks and Hidden from AI), **Add ▸** (Remind me…,
+  in Advanced Frog while the Note has no open Frog and Session… on a
+  plain Note, Attach a file… and Add a part, which opens the Note dialog
+  with its Amend box), **Share ▸** (Send to a person, Copy text, Save as
+  Markdown…, Export as Pack…) and **Tidy ▸** (Merge into…, a Checklist's
+  Uncheck all, Move to trash in the error colour), each entry only where
+  this Device may do it and a group without one left out. Voice, Paste
+  and Add to a Shopping List act on the Note open and stay in the
+  dialog.
 - **A selection is acted on from a card's right-click** (#273, Q656):
-  its menu offers, after File into…, Merge into… (on an Unsorted Note's
-  card Add to Note…, #308) and Importance ▸
-  Important, Normal or Unimportant, and Move to trash last, each only on
-  a card this Device may change; a card in the Trash has no ⋮, and its
-  right-click offers Restore alone. Between File into… and Merge into…
-  stand Remind me…, in Advanced Frog while the Note has no
-  open Frog and Session… on a plain Note, as in the phone's compact ⋮
-  (#281), only for who may set them up (ADR 0013) and for that card
-  alone, selected or not; the ⋮ and the right-click are one menu in
-  both views. On a selected card each acts on all
+  File into…, Importance ▸, Merge into… (on an Unsorted Note's card
+  picked as a capture picks its Note, #308) and Move to trash, each only
+  on a card this Device may change; a card in the Trash has no ⋮, and
+  its right-click offers Restore alone. Remind me…, Frog and Session…
+  (#281) are only for who may set them up (ADR 0013) and for that card
+  alone, selected or not. On a selected card each acts on all
   the cards selected, on another on that card alone, as File into…
-  does, and the Note menu offers the same while no Note is open (see
-  Menu bar and keys). Merge into… opens the Note picker with every Note,
+  does, and Ctrl+M, Ctrl+Shift+M, Delete and 1 to 3 do the same while
+  no Note is open (see Menu bar and keys). Merge into… opens the Note picker with every Note,
   the selected ones included, and a selected Note picked takes the
   others in, all in one go, the list staying shown; Move to trash asks
   nothing. A Note this Device may not change stays as it is, without an
@@ -1955,13 +2767,13 @@ replace a law of Both apps where they say so. A desktop law marked
   while nothing is selected, and Select all, which selects that whole
   text; the right-click and the menu keep the selection. The cards in
   the list stay click-to-select. A Section this Device may edit has its
-  own field and format bar there. "Copy as text" in a card's right-click menu, the
-  Note menu and the dialog is the desktop's "Copy text": the Note and
+  own field and format bar there. "Copy text" in a card's menu and
+  the dialog puts on the clipboard the Note and
   its Sections as they show, a list's Lines as a Markdown task list
   (#323), with HTML beside it, the boxes as glyphs.
 - **Cards move into an Area or Topic together** (#148): dragged onto it
   in the sidebar, which outlines the row under the pointer, or with
-  File into… from the card's right-click, the Note menu or Ctrl+M,
+  File into… from the card's right-click or Ctrl+M,
   whose dialog names how many go. A selected card takes the selection
   along; one outside it goes alone. A card this Device may not move
   stays where it is; the announcement says so without numbers, its
@@ -1988,17 +2800,17 @@ replace a law of Both apps where they say so. A desktop law marked
   waits for them. In the Note dialog each file has Replace Note text,
   Append to Note text, Remove generated text (Ctrl+Z brings it back),
   Read the text again for a file of a kind with text, and "Remove
-  Attachment, keep text", asked once; "Attach a file…" under the files
-  picks more. The card's menu has none of these, as it has none for a
+  Attachment, keep text", asked once; "Attach a file…" under Add
+  (obf-1073) picks more. The card's menu has none of these, as it has none for a
   photo.
 - **Hidden from AI on the desktop** (#267, ADR 0049): a card's ⋮ and
-  right-click, an Area's right-click in the sidebar and the Area menu
-  have the checkbox "Hidden from AI", the Note dialog its badge, offered
+  right-click under This Note ▸, an Area's right-click in the sidebar
+  and the ⋮ of its band have the checkbox "Hidden from AI", the Note dialog its badge, offered
   as on the phone (Phone ▸ Cards) and read as the menu opens; the badge
   says "Off, hidden by its Area" while only another mark hides it.
 - **A photo gets out of the Note** (#149): on the desktop a right-click
-  on a photo in the Note editor or full screen offers "Save image as…",
-  "Copy image" and "Open in another program". Saved and copied say
+  on a photo in the Note editor or full screen offers "Save photo…",
+  "Copy photo" and "Open in another app" (obf-1014). Saved and copied say
   nothing; a failure is announced.
 - **The Agenda's rows are tight** (#208): on the desktop a row's card
   has 6 above and below its content, 6 between cards and 2 between a
@@ -2008,19 +2820,25 @@ replace a law of Both apps where they say so. A desktop law marked
 ### Capture
 
 - **On the desktop** the capture popup and the window's quick note
-  dialog, which File ▸ New Note, Ctrl+N and "+" open (#146), are the
-  quick note (#352): the text, then, once something is typed or held,
-  More and the Nudge buttons, nothing else; desktop Settings ▸ Quick
-  note keeps only Nudge buttons. More saves the Note and opens it in the
+  dialog, which File ▸ New Note, Ctrl+N and "Quick note" in the Agenda's
+  and Unsorted's "+" open (#146, obf-1141), are the quick note; while an Area or a Topic is
+  shown, File ▸ New Note and Ctrl+N open the Note dialog on a new Note
+  filed there instead, as its "+ New Note ▸ Note" does (obf-1140), and
+  only files dropped onto it open a quick note that files the Note
+  there, with one Save in place of the Nudge buttons. The
+  quick note holds (#352) the text, then, once something is typed or held,
+  the Nudge buttons and under them Open in the editor, nothing else;
+  desktop Settings ▸ Quick note keeps only Nudge buttons. Open in the
+  editor saves the Note and opens it in the
   window's Note dialog in place of the dialog; in the popup it closes
   the popup and opens the Note there in the window, brought back from
-  the tray. The Note dialog holds Record voice, Paste (in a row with
-  Attach a file…), Add to a Shopping List (at the bottom, between Merge
+  the tray. The Note dialog holds Voice, Paste and Attach a file… under
+  Add (obf-1073), Add to a Shopping List under Tidy (between Merge
   into… and Move to trash; its lists as radio buttons, the one used last
   at the top; with one list a single entry naming it, "Add to Weekly",
-  #276), the badges and the format bar. Files dropped onto the window,
-  and File ▸ Attach a file… with no Note open, open the quick note
-  dialog and wait in it above the text (#267): a picture as a photo, a
+  #276), the badges under This Note and the format bar. Files dropped
+  onto the window open the quick note dialog and wait in it above the
+  text (#267): a picture as a photo, a
   sound file as a voice recording, any other file as an Attachment, each
   named on its own line; Ctrl+V in the empty field holds a pasted
   picture the same way. **A file dropped onto the Note dialog goes onto
@@ -2031,6 +2849,16 @@ replace a law of Both apps where they say so. A desktop law marked
   and announced; the others are. Leaving the dialog by its cross, Esc,
   Alt+Left, the mouse's back button or a click beside it keeps what is
   typed, nudged in 1 h.
+- **A pause ends a recording only where the computer says so**
+  (obf-1053): desktop Settings ▸ Capture, a card of its own with "End a
+  recording after a pause", kept on this computer only under the
+  phone's key, offers Off, the default, which ignores pauses, and 2, 3,
+  5 or 10 s as chips. Set as Voice starts, the recording ends
+  once the microphone stayed under 2 % of full scale at its peak that
+  long after it heard something louder, and is kept on the Note as Stop
+  keeps it, the Note dialog staying open; one nothing was said into yet
+  goes on, and a level that cannot be told counts as no quiet. The card
+  shows only where the computer records.
 
 ### Text editor and Lines
 
@@ -2056,6 +2884,129 @@ replace a law of Both apps where they say so. A desktop law marked
   and the handle move one among the open Lines as they show; a struck
   Line has no handle nor Move up and Move down, the keys do nothing in
   it, and no open Line goes among the struck ones.
+- **The Note dialog's bar has Undo, Redo and ⋮** (obf-1051), before
+  "Open in its own window" and the cross, and so has a Note's own window
+  before "Reading view", which shows none. They go step by step through
+  everything changed since the Note opened: its text, its tables' cells,
+  its Sections' texts, the words a removed recording or photo put into
+  them (obf-1084; the file stays gone, an empty text stays as it is now),
+  its Lines (their checks too, as on the phone), its
+  Area and Topic and its badges, each greyed while it has
+  nothing to do. Typing is one step until it rests for a second, a new
+  word begins, its field is left or saved, or anything else is done; a
+  table's menu (insert, move, delete, align, and what ⋮ of a table adds)
+  is a step of its own after the cell typed before it. A step is written
+  back as an edit writes it, nothing deleted. In ⋮, **Revert all
+  changes**, greyed while nothing changed, and, in the Note dialog only,
+  **History** (#193, obf-1065), which the menu bar's Note menu had.
+  Revert all changes asks once ("Revert all
+  changes?", Cancel and Revert) and brings the Note back to how it
+  opened; Redo then makes the changes again one by one. In a text field
+  Ctrl+Z, Ctrl+Shift+Z and Ctrl+Y stay the field's own, for its typing;
+  once Undo, Redo or Revert wrote a field, its own history is forgotten.
+  A formatted text stays formatted (ADR 0033), and a Tally or Session made
+  or unmade, or a change written elsewhere meanwhile, starts the steps
+  again from there. A box ticked in a text is a check-off with its own
+  history (ADR 0035), no step; a captured detail removed after its
+  question has no way back. A step that also waits for Ctrl+Z, as a Line
+  deleted, goes from there once the bar's Undo takes it back. Nothing is
+  stored: the steps go as the Note closes.
+- **A Checklist, Shopping List or Tally is one card** in the Note
+  dialog and a Note's own window (obf-1071, C14), as on the phone: its
+  name as the heading, then its Lines and **"Add a Line"** (of a Tally
+  its setup, "Fields" over it, as before), in the card of the name,
+  without the kind as a second heading. "Add a Line" is a small row
+  under the Lines, a plus icon and its words, where this Device may add
+  Lines: a click puts the keyboard into a new empty Line at the end, on
+  a Shopping List before the struck ones, and is no step of Undo; while an empty new Line waits it does not
+  show, and left unused the Line goes as any empty one. This replaces
+  "No Add Line button and no Add field" of Both apps on the desktop
+  too; Return still makes new Lines. **Its description shows only
+  after "Add a description"**, a small weak text button under the name
+  where this Device may change the text and the description is empty:
+  a click opens its field with the keyboard in it, as Enter in the name
+  does; left empty, the button comes back and nothing is written. A
+  description that is there shows as before, folded to its first line
+  until a click. A Session keeps its empty description field with its
+  hint.
+- **The Amend box shows only when asked** (obf-1072, C15): the Note
+  dialog and a Note's own window show no format bar, "What's new?" nor
+  "Add" on their own. A Note just made and opened there, a
+  Checklist, a Shopping List or a Note by "+" (obf-1140) or a Note by
+  the quick note's "Open in the editor", has no "Add a part" while that dialog stays open;
+  opened again later, it has it. Where this Device may amend the Note,
+  **"Add a part"** stands last under Add (obf-1073); a click opens the
+  box in its place, above the groups Add, Share and Tidy, its field
+  taking the keyboard, and opening it is no step of Undo; Add a part in
+  a card's Add ▸ opens the Note dialog with the box so (obf-1014).
+  The box stays while it holds text and goes once "Add" added
+  the Section or the Note is left, which adds what was typed, as ever.
+- **A table's ⋮ sits beside its top right corner** (obf-1050) wherever
+  a table is drawn on the desktop: on a card, in a Section, in the Note
+  dialog's text as it reads and on its grid while edited, in the reading
+  view, in the Markdown viewer, and full screen at the end of the bar,
+  Copy staying in the bar. The table gives up the ⋮'s room, so it never
+  covers a cell. It takes its own click, never the card's or the
+  table's, and opens under it. It offers Copy everywhere, as the full
+  screen's Copy; in the Note dialog and a Note's own window, where the
+  text is edited, also Move up and Move down past the block above or
+  below (the phone's blocks, see Phone ▸ Text editor), greyed with none
+  there, and Delete table, asking "Delete the table?" once while a cell
+  holds words. Move and Delete are each a step of the bar's Undo; done
+  on the text as it reads, the text is then edited, its cursor outside
+  the table.
+- **A click on a cell of the header row sorts a table being read** by
+  its column (obf-1052), as on the phone: on a card, the search's
+  included, in a Section, in the reading view, in the Markdown viewer
+  and full screen where it is only read: ascending, descending, then as
+  written, an arrow in that cell saying which and a screen reader
+  hearing "Sorted ascending" or "Sorted descending", in the view only;
+  the Note's text stays as written, a card's first 10 rows are the first
+  in that order, and the order is forgotten once the table is not drawn.
+  The click is the header row's alone, never the card's or the table's,
+  which the rows under it keep. In the Note dialog's text as it reads, a
+  click on the header row edits the cell, as on any row. Full screen
+  where the table is edited, the column's letter offers Show sorted ▸
+  with Show sorted ascending, Show sorted descending and Show as
+  written, and putting in, moving or deleting a row or column shows the
+  rows as written again. On the Note dialog's grid the column's letter
+  offers Sort rows ▸ with Sort rows by this column and Sort rows by this
+  column, descending, which rewrite the rows in the text, each a step
+  of the bar's Undo, none when the rows already stand so. **A column's
+  menu keeps to seven entries** (obf-1014): on the grid Insert ▸ (to the
+  left, to the right), Move ▸ (left, right), Align ▸ (left, Centre,
+  right), Sort rows ▸, Delete column and First column as headings; full
+  screen Insert ▸, Move ▸, Delete column, Show sorted ▸ and First column
+  as headings. A row's menu stays flat.
+- **A drag that starts on a cell selects cells** (obf-1054), as the
+  phone's long press does: in a text only read in the Note dialog, in
+  the reading view, in the Markdown viewer, on the Note dialog's grid
+  (not in the cell being edited, whose field selects its words, the
+  cell edited being left as the drag starts) and full screen; never on a
+  card, whose text selects nothing, nor in the Note dialog's text as it
+  reads, a click on which edits it. The cells from the one pressed to
+  the one under the pointer, in the rows as they show, are tinted; the
+  pointer past the table's edge stays on its last row or column.
+  Shift+click selects from the cell selected first to the one clicked,
+  one cell where none is, also on a cell of the header row, a link, a
+  tag or a box, which then sort, open and tick nothing, as they do for
+  a click while cells are selected. A click and a drag that does not
+  start on a cell still open, sort, edit and select words as before;
+  Shift with the wheel still moves a wide table, keeping the cells
+  selected, its bar still moves it too, and a column's border on the
+  grid still drags it. Ctrl+C (Cmd on macOS) and Copy in the right-click
+  menu of a text only read (obf-1055), and of a cell selected on the
+  grid and full screen, put the cells on the clipboard as a table of
+  their own, as the table's Copy does: HTML beside Markdown, the first
+  row selected its header row, the line marking the first column as
+  headings only while that column is selected, each box as it shows,
+  one cell as a table of one cell. Where the menu has Find in Note, it takes
+  the words of one cell, greyed for more. A click on the table and Esc
+  end the selection, each doing nothing else; a press beside the cells,
+  on the table's bar too, ends it as well, doing what it does. A
+  selection that starts outside a table runs through its cells as
+  through the rest of the text and copies as text; Select all selects
+  words, never cells.
 - **A right-click in a text field opens its menu at the pointer**
   (#253): every field one types into has Cut, Copy, Paste and Select
   all, Cut and Copy greyed without a selection or in a password field,
@@ -2066,6 +3017,16 @@ replace a law of Both apps where they say so. A desktop law marked
   the selection keeps it, and the field keeps the cursor through the
   menu, so nothing it does on losing the cursor happens. Cut, Copy and
   Paste work as their keys do. No spelling entries.
+  In the Note dialog and a Note's own window the menu also has
+  **Find in Note** (obf-1055, obf-1014) after Paste, greyed without a
+  selection: it opens the Note's find bar with the words selected, as
+  they read, its lines one line. A text only read there (#255) has Copy,
+  Find in Note and Select all, no Paste; in the Markdown viewer the
+  entry reads Find, as its ⋮ does. No field outside the Note open
+  offers it, and a
+  card's right-click stays its ⋮ menu. The find bar has **Search all
+  Notes**, an icon button beside ✕, greyed while its field is empty: All
+  Notes' search finds its words in the main window.
 - **A selection scrolls while it is dragged** (#256): in every text
   field and in the Note dialog's texts that are only read, while the
   button is held the wheel scrolls and the selection follows the
@@ -2085,12 +3046,13 @@ replace a law of Both apps where they say so. A desktop law marked
   it, keeping the hotkey. The field stays for typing a chord, also one
   with Super, which the window does not hear off macOS.
 - **The Settings dialog is a column of cards** (draft, #196): each card
-  embossed as a Note's, its heading strong on top (This computer,
-  Alarms, Nudges, Units, Agenda, History, Features, …), its settings
+  embossed as a Note's, its heading strong on top (This computer, Tips,
+  Capture, Alarms, Nudges, Units, Agenda, History, Features, …), its settings
   under it, each with its small weak detail line.
 - **A search field sits at the top of the Settings dialog** (#282),
-  under its heading and above the intro line, staying there while the
-  cards scroll; nothing focuses it on opening, so Alt+Left and Esc keep
+  under its heading, on the band of the desktop's fixed search fields
+  (see Dialogs, obf-1088), staying there while the cards, the intro line
+  first, scroll under its line; nothing focuses it on opening, so Alt+Left and Esc keep
   leaving, and Ctrl+F while the Settings show puts the cursor into it.
   It filters as on the phone (Phone ▸ Settings): every word typed in a
   setting's label, detail line or, without a label of its own, its
@@ -2112,7 +3074,9 @@ replace a law of Both apps where they say so. A desktop law marked
   the keyboard focus a step further with a 2 px ring. The main action of
   a dialog or page (Save, Create, Done, Use, Restore, Continue) is
   on the accent with its text in `on_accent`; Delete, Remove and Move to
-  Trash are on the error colour; every other button is secondary. The
+  Trash are on the error colour; Cancel and Close in a dialog's action
+  row are text buttons without an icon (Design system ▸ Buttons,
+  obf-1102); every other button is secondary. The
   text on every fill is at least 4.5:1. Links stay links, entries of a
   menu stay flat, icon-only buttons (⋮, Edit, the view button, the
   format bar) get the same rounded background under the pointer and the
@@ -2125,6 +3089,20 @@ replace a law of Both apps where they say so. A desktop law marked
   or Dark, kept on this computer. The question marks move in parallax
   as on the phone, but the desktop reads no "remove animations"
   setting yet, so its parallax never stops.
+- **On the desktop the green "!" comes with a pointer's click**
+  (obf-1143): a button clicked with the mouse, of egui's own or the
+  design set's, the "+" and icon buttons among them, shows Material's
+  priority_high in green above the pointer, 1.6 times its height above
+  the click as on the phone, kept inside the window, over the Note
+  dialog, the modal dialogs and the menus, in the Note windows, the
+  Markdown viewers and the capture popup too. A card, a row (a Frog's,
+  a Tally entry's, a Session's pick), a chip, a checkbox, a switch and
+  a menu's entry show none, nor does a click by the keyboard or a
+  screen reader, which has no pointer to stand above. As the parallax,
+  it always grows and fades, the desktop reading no "remove
+  animations". "Show button taps", the phone's words, is a switch in
+  Settings ▸ This computer, the desktop having no Look card, after Text
+  size; it is kept on this computer only, as the phone keeps it.
 
 ### Notifications
 
@@ -2137,11 +3115,25 @@ replace a law of Both apps where they say so. A desktop law marked
   time?", Tomorrow only for an Occurrence of today or later. On macOS it
   has no buttons; there is no full-screen alarm. A click on the Nudge
   opens the window on Unsorted, in place of the phone's Nudge screen.
-- **A click on an Occurrence's notification opens its Note dialog**
-  (#270), the body or "Open Old Brain Fix" alike: the window comes up
-  with the Note dialog of its Note and its Due line, over whatever it
-  showed; a Routine editor or Tally form open stays over it with its
-  draft. A Routine or Note gone or in the trash opens only the window.
+- **A click on a notification brings the window before the other apps
+  and opens what it is about** (obf-1039), on Linux, Windows and macOS
+  alike, the body or "Open Old Brain Fix" alike, and the notification
+  goes. A Reminder's or Routine's opens the Agenda with that Occurrence
+  scrolled into view and outlined in the accent colour: today's row, a
+  later day's, else its Routine in the Missed Summary. Listed nowhere,
+  as one Done or skipped meanwhile, the Agenda opens with "Already
+  done" or "Skipped" at the top; one still open that no day shows, as a
+  weekly one of yesterday, opens its Note dialog over the Agenda, its
+  Due line answering it. Done, Snooze and Not today are in the
+  row's ⋮ and right-click menu; Done also is its box. The outline goes
+  once the Agenda is left. The Note open is kept and closed first; a
+  Routine editor or Tally form stays over the Agenda with its draft. The
+  Catch-up Notification's click opens the Agenda, the Nudge's Unsorted.
+- **Every click on a notification is traced** (obf-1039): when, the
+  notification's kind and ids, the button, whether the window showed or
+  waited in the tray, and where it went, never a Note's text; the last
+  eight, in memory while the app runs. Send feedback offers them as
+  "Notification clicks", ticked, while there are any.
 
 ### What the desktop does not have
 

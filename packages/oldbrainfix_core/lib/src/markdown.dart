@@ -51,10 +51,12 @@
 library;
 
 import 'app_link.dart';
+import 'findings.dart';
 import 'text_boxes.dart';
 import 'text_tags.dart';
 
 part 'markdown_table.dart';
+part 'markdown_table_sort.dart';
 
 /// What a line of a formatted text is.
 enum MarkdownBlockKind {

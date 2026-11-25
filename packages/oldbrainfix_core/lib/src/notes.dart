@@ -510,11 +510,13 @@ class Note {
 
   /// The hashes of its photos that were removed while their Photo Text
   /// stays, in the order they were added; the text is in [photoTexts].
+  /// Only versions before obf-1084 removed one so; a removal now puts the
+  /// text into the Note's text.
   final List<String> removedPhotos;
 
   /// The hashes of its voice recordings that were removed while their
   /// Transcript stays, in the order they were added; the text is in
-  /// [transcripts].
+  /// [transcripts]. Only versions before obf-1084 removed one so.
   final List<String> removedRecordings;
 
   /// The hashes of its voice recordings whose Transcript was removed
@@ -646,6 +648,45 @@ class Note {
   String get wordlessName => wordless == Wordless.file
       ? (attachments.firstOrNull ?? removedAttachments.first).name
       : '';
+
+  /// The name the Note is shown by where only its words fit: on cards,
+  /// the Agenda, in the calendar and in notifications (obf-1049). Its text
+  /// as it reads ([visibleText]) while it has any; else the first line of
+  /// [calendarText], the Transcript or Photo Text it goes by; empty when it
+  /// has none of them, and then it is titled by [wordless]. Nothing of it
+  /// is copied into the Note.
+  String get shownName {
+    final visible = visibleText;
+    if (visible.trim().isNotEmpty) return visible;
+    return _standIn.split(RegExp(r'\r?\n')).first.trim();
+  }
+
+  /// What a calendar entry of the Note reads, its first line the entry's
+  /// title and the whole its description: its text as it reads while it
+  /// has any; else the first Transcript of its recordings, else the first
+  /// Photo Text of its photos, removed ones included, each in the order
+  /// added (obf-1049); empty when it has none of them.
+  String get calendarText {
+    final visible = visibleText;
+    return visible.trim().isNotEmpty ? visible : _standIn;
+  }
+
+  /// The first Transcript with words, else the first Photo Text with
+  /// words, trimmed; empty when there is none.
+  String get _standIn {
+    for (final (hashes, texts) in [
+      (recordings, transcripts),
+      (removedRecordings, transcripts),
+      (photos, photoTexts),
+      (removedPhotos, photoTexts),
+    ]) {
+      for (final hash in hashes) {
+        final text = texts[hash]?.trim() ?? '';
+        if (text.isNotEmpty) return text;
+      }
+    }
+    return '';
+  }
 }
 
 /// A dated part of a Note, added by Amend or Merge (CONTEXT.md).
@@ -995,9 +1036,9 @@ class Notes {
   }
 
   /// Whether this Device may remove the attached file [hash] of the Note
-  /// [noteId], a merged one included, and keep its Attachment Text, as for
-  /// [mayRemovePhoto]: the file has one that is not empty, and the Note is
-  /// this Device's to change.
+  /// [noteId], a merged one included, and keep its Attachment Text beside
+  /// the Note: the file has one that is not empty, and the Note is this
+  /// Device's to change.
   bool mayRemoveAttachment(String noteId, String hash) {
     final note = byId(noteId);
     return note != null &&
@@ -1007,8 +1048,9 @@ class Notes {
   }
 
   /// Removes the attached file [hash] from the Note [noteId] and keeps its
-  /// Attachment Text, which search still finds, as [removePhoto] does
-  /// (ADR 0020). Refused unless [mayRemoveAttachment].
+  /// Attachment Text beside the Note, which search still finds (ADR 0020);
+  /// unlike a photo's text it does not go into the Note's text. Refused
+  /// unless [mayRemoveAttachment].
   void removeAttachment(String noteId, String hash) {
     _requireAttached(noteId, hash);
     if (!mayRemoveAttachment(noteId, hash)) {
@@ -1139,48 +1181,58 @@ class Notes {
   }
 
   /// Whether this Device may remove the photo [hash] of the Note
-  /// [noteId], a merged one included, and keep its Photo Text: the photo
-  /// has one that is not empty, and the Note is this Device's to change
-  /// ([SharedAreas.mayChange]).
+  /// [noteId], a merged one included, and keep its Photo Text in the
+  /// Note's text: the photo has one that is not empty, the Note's text is
+  /// in a format known here (ADR 0018), and the Note is this Device's to
+  /// change ([SharedAreas.mayChange]).
   bool mayRemovePhoto(String noteId, String hash) {
     final note = byId(noteId);
     return note != null &&
         note.photos.contains(hash) &&
         _hasText(note.photoTexts[hash]) &&
+        note.textEditable &&
         store.mayChange(noteId);
   }
 
   /// Whether this Device may remove the voice recording [hash] of the
-  /// Note [noteId], a merged one included, and keep its Transcript, as
-  /// for [mayRemovePhoto].
+  /// Note [noteId], a merged one included, and keep its Transcript in the
+  /// Note's text, as for [mayRemovePhoto].
   bool mayRemoveRecording(String noteId, String hash) {
     final note = byId(noteId);
     return note != null &&
         note.recordings.contains(hash) &&
         _hasText(note.transcripts[hash]) &&
+        note.textEditable &&
         store.mayChange(noteId);
   }
 
   /// Removes the photo [hash] from the Note [noteId] and keeps its Photo
-  /// Text, which search still finds (ADR 0020). The edit syncs like any
-  /// other; every Device lets the bytes go once no Note refers to them.
-  /// Refused unless [mayRemovePhoto].
+  /// Text as a paragraph of the Note's own text, edited or deleted as
+  /// typed text is (ADR 0020, obf-1084); no Photo Text is left. The edit
+  /// syncs like any other; every Device lets the bytes go once no Note
+  /// refers to them. Refused unless [mayRemovePhoto].
   void removePhoto(String noteId, String hash) {
-    if (byId(noteId)?.photos.contains(hash) != true) {
+    final note = byId(noteId);
+    if (note == null || !note.photos.contains(hash)) {
       throw ArgumentError.value(hash, 'hash', 'not a photo of $noteId');
     }
     if (!mayRemovePhoto(noteId, hash)) {
       throw StateError('the photo $hash of $noteId may not be removed here');
     }
-    store.append(noteId, NoteKeys.photo(hash), null);
+    store.batch(() {
+      _keepInText(note, note.photoTexts[hash] ?? '');
+      store.append(noteId, NoteKeys.ocr(hash), null);
+      store.append(noteId, NoteKeys.photo(hash), null);
+    });
     store.dropRemovedBlobs();
   }
 
   /// Removes the voice recording [hash] from the Note [noteId] and keeps
-  /// its Transcript, as [removePhoto] does. Refused unless
-  /// [mayRemoveRecording].
+  /// its Transcript as a paragraph of the Note's own text, as
+  /// [removePhoto] does. Refused unless [mayRemoveRecording].
   void removeRecording(String noteId, String hash) {
-    if (byId(noteId)?.recordings.contains(hash) != true) {
+    final note = byId(noteId);
+    if (note == null || !note.recordings.contains(hash)) {
       throw ArgumentError.value(hash, 'hash', 'not a recording of $noteId');
     }
     if (!mayRemoveRecording(noteId, hash)) {
@@ -1188,8 +1240,26 @@ class Notes {
         'the recording $hash of $noteId may not be removed here',
       );
     }
-    store.append(noteId, NoteKeys.audio(hash), null);
+    store.batch(() {
+      _keepInText(note, note.transcripts[hash] ?? '');
+      store.append(noteId, NoteKeys.transcript(hash), null);
+      store.append(noteId, NoteKeys.audio(hash), null);
+    });
     store.dropRemovedBlobs();
+  }
+
+  /// Adds the Transcript or Photo Text [words] of a file removed from
+  /// [note] to its text (obf-1084): a paragraph of its own after the
+  /// text, a blank line between, or the whole text when it has none.
+  /// Into a formatted text it goes escaped, reading as itself, as
+  /// [takeOver] writes it.
+  void _keepInText(Note note, String words) {
+    final taken = TextFormats.literal(note.textFormat, words);
+    final text = note.text;
+    edit(
+      note.id,
+      text.trim().isEmpty ? taken : '${text.trimRight()}\n\n$taken',
+    );
   }
 
   /// Whether this Device may remove the Photo Text of the photo [hash]
@@ -1860,23 +1930,47 @@ class Notes {
   void purgeTrash() {
     final now = store.clock().toUtc();
     store.batch(() {
-      for (final id in store.entitiesOfType(NoteKeys.typeNote)) {
-        final note = byId(id);
-        // A merged Note goes with its target, never on its own.
-        final at = note == null || note.isMerged ? null : purgeAt(note);
-        // What this Device may not change in a Shared Area waits for
-        // someone who may: written here, it would be ignored every time.
-        if (at == null || now.isBefore(at) || !store.mayChange(id)) continue;
-        // A merged Note's Section is the Note itself; both keep their
-        // type under the same key.
-        for (final section in sections(id)) {
-          if (store.mayChange(section.id)) {
-            store.append(section.id, SectionKeys.type, null);
-          }
-        }
-        store.append(id, NoteKeys.type, null);
+      for (final id in purgeable(due: now)) {
+        purge(id);
       }
     });
+  }
+
+  /// The Notes in the trash a purge removes, by id: with [due], those
+  /// that have been there for [trashKeep] by then; without, every one,
+  /// as "Empty the trash now" removes them (obf-1095).
+  @internal
+  List<String> purgeable({DateTime? due}) => [
+    for (final id in store.entitiesOfType(NoteKeys.typeNote))
+      // A merged Note goes with its target, never on its own.
+      if (byId(id) case final note? when !note.isMerged)
+        if (purgeAt(note) case final at? when due == null || !due.isBefore(at))
+          // In the trash in the log, not only in a change still to be
+          // accepted or rejected (ADR 0022): rejected, it is back.
+          if (store.logged(id, NoteKeys.trashed) != null)
+            // What this Device may not change in a Shared Area waits for
+            // someone who may: written here, it would be ignored every
+            // time.
+            if (store.mayChange(id)) id,
+  ];
+
+  /// Purges the Note [id] with its Sections, the Notes merged into it
+  /// included, given as [sections] reads them where they were read for
+  /// many Notes at once; returns the entities it took the type of, the
+  /// Note last. The log keeps their entries.
+  @internal
+  List<String> purge(String id, {List<Section>? sections}) {
+    final gone = <String>[];
+    // A merged Note's Section is the Note itself; both keep their type
+    // under the same key.
+    for (final section in sections ?? this.sections(id)) {
+      if (store.mayChange(section.id)) {
+        store.append(section.id, SectionKeys.type, null);
+        gone.add(section.id);
+      }
+    }
+    store.append(id, NoteKeys.type, null);
+    return gone..add(id);
   }
 
   /// The Note [id], trashed or not, or null when there is none.

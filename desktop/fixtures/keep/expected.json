@@ -1,5 +1,5 @@
 {
-  "now": "2026-01-02T10:00:35.000Z",
+  "now": "2026-01-02T10:00:42.000Z",
   "device": "65b60673d6ed884bf01c2c222d82ada0",
   "areas": [
     {
@@ -178,6 +178,7 @@
       "note:00000000000000000000000000000003"
     ],
     "müller": [],
+    "MULLER": [],
     "called": [],
     "loop": [],
     " e ": [
@@ -199,6 +200,30 @@
       "note:00000000000000000000000000000003",
       "note:00000000000000000000000000000002"
     ]
+  },
+  "findings": {
+    "MULLER": {},
+    "dentist": {
+      "note:00000000000000000000000000000003": [
+        {
+          "cell": null,
+          "context": "Dentist",
+          "contextEnd": 7,
+          "contextStart": 0,
+          "end": 7,
+          "key": "",
+          "line": 0,
+          "part": "text",
+          "section": null,
+          "start": 0
+        }
+      ]
+    },
+    "receipt": {},
+    "called": {},
+    "loop": {},
+    "lease": {},
+    "rent due": {}
   },
   "conflicts": []
 }

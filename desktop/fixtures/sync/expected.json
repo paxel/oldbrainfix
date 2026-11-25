@@ -242,6 +242,7 @@
     ],
     "x-ray": [],
     "müller": [],
+    "MULLER": [],
     "called": [],
     "loop": [],
     " e ": [
@@ -264,6 +265,30 @@
     "topic:starter-meetings": [
       "note:00000000000000000000000000000002"
     ]
+  },
+  "findings": {
+    "MULLER": {},
+    "dentist": {
+      "note:00000000000000000000000000000002": [
+        {
+          "cell": null,
+          "context": "Call the dentist",
+          "contextEnd": 16,
+          "contextStart": 9,
+          "end": 16,
+          "key": "",
+          "line": 0,
+          "part": "text",
+          "section": null,
+          "start": 9
+        }
+      ]
+    },
+    "receipt": {},
+    "called": {},
+    "loop": {},
+    "lease": {},
+    "rent due": {}
   },
   "conflicts": [
     {

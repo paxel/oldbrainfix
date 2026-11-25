@@ -1,8 +1,8 @@
 //! The text's own size driven headless (#326, obf-1019): normal, larger
 //! and largest, in View ▸ Text size, in Settings ▸ This computer and by
 //! Ctrl+Plus and Ctrl+Minus, kept at the ends and across a restart; the
-//! text of Notes and the Agenda's rows grow, buttons and boxes keep their
-//! size, egui's zoom stays that of "Bigger text and icons", and the
+//! text of Notes and the Agenda's rows grow, the words of labels and
+//! buttons with them (obf-1081), boxes keep their size, egui's zoom stays that of "Bigger text and icons", and the
 //! smallest window holds it all at largest with Bigger text and icons on.
 
 // A test may unwrap, expect, panic and index, its helpers too (#229).
@@ -195,7 +195,8 @@ fn the_settings_pick_a_step_beside_bigger_text_and_icons() -> TestResult {
 }
 
 #[test]
-fn a_notes_text_and_the_agendas_rows_grow_while_buttons_and_boxes_keep_their_size() -> TestResult {
+fn a_notes_text_the_agendas_rows_and_the_buttons_words_grow_while_boxes_keep_their_size()
+-> TestResult {
     let store = store()?;
     Notes::new(&store).capture("Buy milk", None, None)?;
     Routines::new(&store).create("Take pills", &daily()?)?;
@@ -211,7 +212,7 @@ fn a_notes_text_and_the_agendas_rows_grow_while_buttons_and_boxes_keep_their_siz
             .next()
             .map(|n| n.rect())
             .ok_or("a box")?;
-        Ok((note.width(), menu.height(), row.width(), tick.size()))
+        Ok((note.width(), menu.width(), row.width(), tick.size()))
     };
     let (note, menu, row, tick) = measure(TextSize::Normal)?;
     for size in [TextSize::Larger, TextSize::Largest] {
@@ -225,7 +226,10 @@ fn a_notes_text_and_the_agendas_rows_grow_while_buttons_and_boxes_keep_their_siz
             (grown_row / row - factor).abs() < 0.08,
             "{size:?}: a row's words {row} → {grown_row}"
         );
-        assert_eq!(grown_menu, menu, "{size:?}: the menu bar keeps its size");
+        assert!(
+            grown_menu > menu + 1.0,
+            "{size:?}: the menu bar's words grow with it (obf-1081), {menu} → {grown_menu}"
+        );
         assert_eq!(grown_tick, tick, "{size:?}: a box keeps its size");
     }
     Ok(())
@@ -307,5 +311,33 @@ fn ctrl_plus_grows_the_text_shown_at_once_and_rests_over_the_settings() -> TestR
     press(&mut harness, Key::Plus);
     assert_eq!(kept(&store), TextSize::Larger);
     assert_eq!(harness.ctx.zoom_factor(), 1.0);
+    Ok(())
+}
+
+#[test]
+fn quiet_today_goes_under_the_agendas_bar_where_the_bar_has_no_room_for_it() -> TestResult {
+    let store = store()?;
+    DeviceSettings::new(&store).set_fat_fingers(true)?;
+    let pills = "Take the evening pills with water";
+    Routines::new(&store).create(pills, &daily()?)?;
+    DeviceSettings::new(&store).set_text_size(TextSize::Largest)?;
+    let harness = window(&store, Selection::Agenda, MIN_WINDOW);
+    let scale = harness.ctx.pixels_per_point();
+    let edge = harness.ctx.content_rect().right() * scale;
+    let quiet = harness.get_by_label("Quiet today").rect();
+    let all = harness.get_by_label("All Routines and Reminders").rect();
+    let more = harness
+        .query_all_by_label(&format!("More for {pills}"))
+        .map(|n| n.rect().right())
+        .reduce(f32::max)
+        .ok_or("a row's menu")?;
+    assert!(
+        quiet.right() <= edge,
+        "Quiet today ends at {}",
+        quiet.right()
+    );
+    assert!(more <= edge, "a row's menu ends at {more}");
+    // On the line under the bar, at its right.
+    assert!(quiet.top() >= all.bottom());
     Ok(())
 }

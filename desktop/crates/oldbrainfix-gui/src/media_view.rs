@@ -309,16 +309,16 @@ pub enum Viewed {
 /// How a photo is handed out of a Note (#149).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Out {
-    /// "Save image as…": its file where the user says.
+    /// "Save photo…": its file where the user says.
     SaveAs,
-    /// "Copy image": the picture on the clipboard.
+    /// "Copy photo": the picture on the clipboard.
     Copy,
-    /// "Open in another program": the system's program for pictures.
+    /// "Open in another app": the system's program for pictures.
     Open,
 }
 
-/// The right-click menu of the photo `resp`: "Save image as…", "Copy
-/// image" and "Open in another program" (#149). The one picked comes
+/// The right-click menu of the photo `resp`: "Save photo…", "Copy
+/// photo" and "Open in another app" (#149, obf-1014). The one picked comes
 /// back; the menu closes on it, also when picked with the keyboard.
 fn out_menu(resp: &egui::Response, t: &L10n) -> Option<Out> {
     let mut asked = None;
@@ -326,8 +326,8 @@ fn out_menu(resp: &egui::Response, t: &L10n) -> Option<Out> {
         let text = ui.visuals().text_color();
         for (out, label) in [
             (Out::SaveAs, t.save_image_as()),
-            (Out::Copy, t.copy_image()),
-            (Out::Open, t.open_in_another_program()),
+            (Out::Copy, t.copy_photo()),
+            (Out::Open, t.open_in_other_app()),
         ] {
             if ui.button(RichText::new(label).color(text)).clicked() {
                 asked = Some(out);
@@ -355,14 +355,37 @@ fn close_button(ui: &mut Ui, t: &L10n, rect: egui::Rect) -> bool {
 }
 
 /// A Transcript or Photo Text `said` whole on a full card, dimmed under
-/// its small `label`, so it never reads as typed text (#114).
-fn labelled(ui: &mut Ui, label: &str, said: RichText) {
+/// its small `label`, so it never reads as typed text (#114); the places
+/// a search found in it marked (obf-1047). A line that is no text of the
+/// file, as "Transcribing…", comes as a [`Said::Line`] instead.
+fn labelled(ui: &mut Ui, label: &str, said: Said<'_>) {
     let weak = ui.visuals().weak_text_color();
     ui.vertical(|ui| {
         ui.spacing_mut().item_spacing.y = 2.0;
         ui.label(RichText::new(label).small().color(weak));
-        ui.label(said.color(weak));
+        match said {
+            Said::Text(said) => {
+                crate::find_marks::said_label(ui, said, weak, false);
+            }
+            Said::Line(line) => {
+                ui.label(line.color(weak));
+            }
+        }
     });
+}
+
+/// What shows under a recording or photo: its text, or a line in its
+/// place such as "Transcribing…".
+enum Said<'a> {
+    Text(&'a str),
+    Line(Box<RichText>),
+}
+
+impl Said<'_> {
+    /// `line` in italics, in a text's place.
+    fn line(line: &str) -> Said<'static> {
+        Said::Line(Box::new(RichText::new(line).italics()))
+    }
 }
 
 /// The photos and voice recordings of a Note or Section in full on a
@@ -387,12 +410,12 @@ pub fn whole_media(
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     let mut shown = Vec::new();
-    let said = |texts: &BTreeMap<String, String>, hash: &String| {
+    fn said<'a>(texts: &'a BTreeMap<String, String>, hash: &str) -> Option<Said<'a>> {
         texts
             .get(hash)
             .filter(|s| !s.trim().is_empty())
-            .map(RichText::new)
-    };
+            .map(|s| Said::Text(s))
+    }
     for hash in photos {
         if let Some(rect) = card_photo(ui, t, (&mut *cache, store), hash) {
             shown.push((hash.clone(), rect));
@@ -412,11 +435,9 @@ pub fn whole_media(
             ui.label(RichText::new(t.voice_recording()).color(text));
         });
         let line = match transcripts.get(hash) {
-            Some(said) if said.is_empty() => Some(RichText::new(t.no_words_heard()).italics()),
-            Some(said) => Some(RichText::new(said)),
-            None if transcribing == Some(hash.as_str()) => {
-                Some(RichText::new(t.transcribing()).italics())
-            }
+            Some(said) if said.is_empty() => Some(Said::line(t.no_words_heard())),
+            Some(said) => Some(Said::Text(said)),
+            None if transcribing == Some(hash.as_str()) => Some(Said::line(t.transcribing())),
             None => None,
         };
         if let Some(line) = line {
@@ -572,9 +593,7 @@ pub fn photos(
         // A photo without text, or not read yet, shows none.
         let said = photo_texts.get(hash);
         if let Some(said) = said.filter(|s| !s.trim().is_empty()) {
-            crate::read_text::shown(ui, |ui| {
-                crate::read_text::label(ui, egui::Label::new(RichText::new(said).color(weak)))
-            });
+            crate::find_marks::said_label(ui, said, weak, true);
         }
         if let Some(asked) = generated_buttons(ui, t, hash, said, offered, true) {
             clicked = Some(Photo::Text(asked));
@@ -611,13 +630,7 @@ pub fn removed_texts(
         let Some(said) = said.filter(|s| !s.trim().is_empty()) else {
             continue;
         };
-        if selects {
-            crate::read_text::shown(ui, |ui| {
-                crate::read_text::label(ui, egui::Label::new(RichText::new(said).color(weak)))
-            });
-        } else {
-            ui.label(RichText::new(said).color(weak));
-        }
+        crate::find_marks::said_label(ui, said, weak, selects);
         if let Some(asked) = generated_buttons(ui, t, hash, Some(said), offers(hash, photo), photo)
         {
             clicked = Some((photo, asked));
@@ -681,22 +694,26 @@ pub fn recordings(
             ui.label(RichText::new(t.voice_recording()).color(text));
         });
         let line = match transcripts.get(hash) {
-            Some(said) if said.is_empty() => Some(RichText::new(t.no_words_heard()).italics()),
-            Some(said) => Some(RichText::new(said)),
-            None if transcribing == Some(hash.as_str()) => {
-                Some(RichText::new(t.transcribing()).italics())
-            }
+            Some(said) if said.is_empty() => Some(Said::line(t.no_words_heard())),
+            Some(said) => Some(Said::Text(said)),
+            None if transcribing == Some(hash.as_str()) => Some(Said::line(t.transcribing())),
             None => None,
         };
-        if let Some(line) = line {
-            // In the Note dialog it selects to be copied (#255).
-            if selects {
+        // In the Note dialog it selects to be copied (#255); the places
+        // found marked (obf-1047).
+        match line {
+            Some(Said::Text(said)) => {
+                crate::find_marks::said_label(ui, said, weak, selects);
+            }
+            Some(Said::Line(line)) if selects => {
                 crate::read_text::shown(ui, |ui| {
                     crate::read_text::label(ui, egui::Label::new(line.color(weak)))
                 });
-            } else {
+            }
+            Some(Said::Line(line)) => {
                 ui.label(line.color(weak));
             }
+            None => {}
         }
         let offered = offers(hash);
         let said = transcripts.get(hash);
@@ -737,31 +754,14 @@ fn speed_button(ui: &mut Ui, t: &L10n, speed: f64) -> Option<f64> {
     chosen.filter(|&chosen| chosen != speed)
 }
 
-/// What the microphone's button asked for.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Voice {
-    Record,
-    /// The big stop button: end the recording and hold it on the
-    /// capture, with the rest, until the Note is saved.
-    Stop,
-}
-
-/// The microphone's button, or while `recording` runs, how long it has
-/// run and the one big stop button.
-pub fn voice_button(ui: &mut Ui, t: &L10n, recording: Option<Duration>) -> Option<Voice> {
+/// How long the recording has run, `elapsed`, and the one big stop
+/// button, which ends it and holds it on the Note; whether it was
+/// clicked. The Note dialog's Voice starts it (obf-1073).
+pub fn recording_stop(ui: &mut Ui, t: &L10n, elapsed: Duration) -> bool {
     let text = ui.visuals().text_color();
-    let Some(elapsed) = recording else {
-        let mic = ui.horizontal(|ui| {
-            icons::show(ui, icons::MIC, 20.0, text);
-            ui.button(RichText::new(t.record_voice()).color(text))
-                .clicked()
-        });
-        return mic.inner.then_some(Voice::Record);
-    };
     // The elapsed time moves on every second.
     ui.ctx().request_repaint_after(Duration::from_millis(500));
     let seconds = elapsed.as_secs();
-    let mut stop = false;
     ui.horizontal(|ui| {
         icons::show(ui, icons::MIC, 22.0, ui.visuals().error_fg_color);
         ui.label(
@@ -776,10 +776,7 @@ pub fn voice_button(ui: &mut Ui, t: &L10n, recording: Option<Duration>) -> Optio
     });
     let big = egui::Button::new(RichText::new(t.stop_recording()).size(18.0).color(text))
         .min_size(egui::vec2(ui.available_width(), 44.0));
-    if ui.add(big).clicked() {
-        stop = true;
-    }
-    stop.then_some(Voice::Stop)
+    ui.add(big).clicked()
 }
 
 /// What the speech model's card asked for.
@@ -802,7 +799,7 @@ pub fn speech_card(ui: &mut Ui, t: &L10n, model: &SpeechModel) -> Option<Speech>
     let weak = ui.visuals().weak_text_color();
     let error = ui.visuals().error_fg_color;
     let mut asked = None;
-    ui.label(RichText::new(t.speech_model_title()).strong().color(text));
+    ui.label(RichText::new(t.speech_model_title()).strong());
     ui.label(RichText::new(t.speech_model_intro()).color(weak));
     ui.label(
         RichText::new(t.speech_model_source_models())
@@ -856,7 +853,7 @@ pub fn speech_card(ui: &mut Ui, t: &L10n, model: &SpeechModel) -> Option<Speech>
     }
     let idle = !matches!(status, Status::Fetching { .. });
     let chosen = model.chosen();
-    ui.label(RichText::new(t.speech_model_choice()).strong().color(text));
+    ui.label(RichText::new(t.speech_model_choice()).strong());
     for (option, title, detail) in [
         (
             WhisperModel::Base,

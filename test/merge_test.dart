@@ -8,6 +8,7 @@ import 'package:oldbrainfix/src/note_card.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'editor_actions.dart';
 import 'reveal.dart';
 
 void main() {
@@ -46,11 +47,11 @@ void main() {
     await tap(tester, find.byTooltip('All Notes'));
   }
 
-  /// The "merge into…" button on the card showing [text], named "Add to
-  /// Note…" on an Unsorted Note's card (#308).
+  /// The "merge into…" button on the card showing [text], so named on an
+  /// Unsorted Note's card too (obf-1014).
   Finder mergeOn(String text, {bool unsorted = false}) => find.descendant(
     of: find.ancestor(of: find.text(text), matching: find.byType(NoteCard)),
-    matching: find.byTooltip(unsorted ? 'Add to Note…' : 'Merge into…'),
+    matching: find.byTooltip('Merge into…'),
   );
 
   List<String> cards() => [
@@ -68,7 +69,9 @@ void main() {
     await tester.longPress(find.text('nees mor sauce'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'need more sauce');
-    await tap(tester, find.byTooltip('Merge into…'));
+    // The field shows its caret first, before the page goes down to Tidy.
+    await tester.pump();
+    await tapEditorAction(tester, find.byKey(const ValueKey('editor-merge')));
 
     expect(find.byType(MergeIntoScreen), findsOneWidget);
     expect(cards(), ['sauce']);

@@ -13,6 +13,7 @@ import 'note_selection.dart';
 import 'page_bar.dart';
 import 'routine_editor_screen.dart';
 import 'system_bars.dart';
+import 'tap_mark.dart';
 
 /// Every Note as a diary of cards, newest first, Unsorted ones included
 /// and those of closed locked Areas left out; reached from the top of
@@ -115,13 +116,24 @@ class _AllNotesScreenState extends State<AllNotesScreen>
       newKinds(widget.notes.store, null),
     );
     if (!mounted || kind == null) return;
-    await makeNew(
+    final made = await makeNew(
       context,
       widget.notes,
       widget.places,
       kind,
       onChanged: () {
         if (mounted) _reload();
+      },
+    );
+    if (!mounted) return;
+    sayIfFilterHides(
+      context,
+      widget.notes.store,
+      made,
+      _people,
+      show: () {
+        // "Show" clears the filter (obf-1070).
+        if (mounted) _filter(PersonFilter.everyone);
       },
     );
   }
@@ -201,10 +213,12 @@ class _AllNotesScreenState extends State<AllNotesScreen>
           floatingActionButton: !adds
               ? null
               : Builder(
-                  builder: (button) => FloatingActionButton(
-                    tooltip: t.addHere,
-                    onPressed: () => _add(button),
-                    child: const Icon(Icons.add),
+                  builder: (button) => TapMarked(
+                    child: FloatingActionButton(
+                      tooltip: t.addHere,
+                      onPressed: () => _add(button),
+                      child: const Icon(Icons.add),
+                    ),
                   ),
                 ),
         ),

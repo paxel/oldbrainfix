@@ -1279,7 +1279,7 @@ fn the_panel_copies_a_real_answer_and_adds_it_to_a_note() -> TestResult {
 
     // Copy as text: the answer's Markdown, the HTML beside it.
     harness
-        .get_by_role_and_label(egui::accesskit::Role::Button, t.copy_as_text())
+        .get_by_role_and_label(egui::accesskit::Role::Button, t.copy_text())
         .click();
     harness.run();
     {

@@ -512,6 +512,7 @@
       "note:00000000000000000000000000000005"
     ],
     "müller": [],
+    "MULLER": [],
     "called": [
       "note:00000000000000000000000000000005"
     ],
@@ -530,5 +531,83 @@
     "4711": []
   },
   "searchWithin": {},
+  "findings": {
+    "MULLER": {},
+    "dentist": {
+      "note:00000000000000000000000000000005": [
+        {
+          "cell": null,
+          "context": "Dentist number",
+          "contextEnd": 7,
+          "contextStart": 0,
+          "end": 7,
+          "key": "",
+          "line": 0,
+          "part": "text",
+          "section": null,
+          "start": 0
+        },
+        {
+          "cell": null,
+          "context": "Dentist on Tuesday",
+          "contextEnd": 7,
+          "contextStart": 0,
+          "end": 7,
+          "key": "",
+          "line": 0,
+          "part": "text",
+          "section": "note:00000000000000000000000000000001",
+          "start": 0
+        }
+      ]
+    },
+    "receipt": {},
+    "called": {
+      "note:00000000000000000000000000000005": [
+        {
+          "cell": null,
+          "context": "Called, all set",
+          "contextEnd": 6,
+          "contextStart": 0,
+          "end": 6,
+          "key": "",
+          "line": 0,
+          "part": "text",
+          "section": "section:00000000000000000000000000000006",
+          "start": 0
+        }
+      ]
+    },
+    "loop": {
+      "note:00000000000000000000000000000007": [
+        {
+          "cell": null,
+          "context": "Loop one",
+          "contextEnd": 4,
+          "contextStart": 0,
+          "end": 4,
+          "key": "",
+          "line": 0,
+          "part": "text",
+          "section": null,
+          "start": 0
+        },
+        {
+          "cell": null,
+          "context": "Loop two",
+          "contextEnd": 4,
+          "contextStart": 0,
+          "end": 4,
+          "key": "",
+          "line": 0,
+          "part": "text",
+          "section": "note:00000000000000000000000000000008",
+          "start": 0
+        }
+      ]
+    },
+    "lease": {},
+    "rent due": {}
+  },
   "conflicts": []
 }

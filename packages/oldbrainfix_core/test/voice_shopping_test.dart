@@ -125,6 +125,65 @@ void main() {
       expect(lists.owedTo(voice.id), isNull);
     });
 
+    test('makes the lines of a Transcript its text holds no Line, as the '
+        'quick note puts it there, but adds the items said (obf-1082)', () {
+      final voice = notes.capture(
+        'Sugar\n\n Salt and tea ',
+        recordings: [_recording(1)],
+      );
+      notes.addRecording(voice.id, _recording(2));
+      final [first, second] = notes.byId(voice.id)!.recordings;
+      notes.setTranscript(voice.id, first, 'Salt and tea');
+      notes.setTranscript(voice.id, second, 'Milk und Honey');
+      lists.addVoiceCapture(list, voice.id, _wall);
+      expect(shown(), ['Flour', 'Sugar', 'Salt', 'tea', 'Milk', 'Honey']);
+      expect(lists.owedTo(voice.id), isNull);
+      expect(notes.byId(voice.id)?.text, 'Sugar\n\n Salt and tea ');
+    });
+
+    test('adds the items said of a Transcript its text holds once the '
+        'other recording is transcribed', () {
+      final voice = notes.capture('Salt and tea', recordings: [_recording(1)]);
+      notes.addRecording(voice.id, _recording(2));
+      final [first, second] = notes.byId(voice.id)!.recordings;
+      notes.setTranscript(voice.id, first, 'Salt and tea');
+      lists.addVoiceCapture(list, voice.id, _wall);
+      expect(shown(), ['Flour']);
+      notes.setTranscript(voice.id, second, 'Milk');
+      lists.addOwedLines(voice.id, _wall);
+      expect(shown(), ['Flour', 'Salt', 'tea', 'Milk']);
+    });
+
+    test('adds none of a Transcript its text held as a Line before it '
+        'came', () {
+      final voice = notes.capture('Tea and jam', recordings: [_recording(1)]);
+      lists.addVoiceCapture(list, voice.id, _wall);
+      notes.setTranscript(voice.id, voice.recordings.single, 'Tea and jam');
+      lists.addOwedLines(voice.id, _wall);
+      expect(shown(), ['Flour', 'Tea and jam']);
+      expect(lists.owedTo(voice.id), isNull);
+    });
+
+    test('brings back the struck Lines its text and its Transcript both '
+        'name', () {
+      for (final text in ['Milk', 'Eggs']) {
+        lists.check(lists.add(list, text, _wall), _wall);
+      }
+      expect(shown(), ['Flour', '~Milk', '~Eggs']);
+      final voice = notes.capture('Milk\nEggs', recordings: [_recording(1)]);
+      notes.setTranscript(voice.id, voice.recordings.single, 'Milk\nEggs');
+      lists.addVoiceCapture(list, voice.id, _wall);
+      expect(shown(), ['Flour', 'Milk', 'Eggs']);
+    });
+
+    test('adds a Transcript held only in part of a line of its text', () {
+      final voice = notes.capture('Milchreis', recordings: [_recording(1)]);
+      lists.addVoiceCapture(list, voice.id, _wall);
+      notes.setTranscript(voice.id, voice.recordings.single, 'Milch');
+      lists.addOwedLines(voice.id, _wall);
+      expect(shown(), ['Flour', 'Milchreis', 'Milch']);
+    });
+
     test('waits for every recording, then adds them in their order', () {
       final voice = notes.capture('', recordings: [_recording(1)]);
       notes.addRecording(voice.id, _recording(2));

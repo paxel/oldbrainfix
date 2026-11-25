@@ -138,6 +138,11 @@ class AutoSync extends ChangeNotifier {
   final syncing = ValueNotifier<bool>(false);
   var _working = 0;
 
+  /// Whether Abort on the page Running paused the automatic syncs
+  /// (obf-1078), until [goOn] or the next start.
+  bool get paused => _paused;
+  var _paused = false;
+
   final _schedule = AutoSyncSchedule();
 
   /// Where discovery last heard each Device.
@@ -332,8 +337,11 @@ class AutoSync extends ChangeNotifier {
       store,
       name: name,
       onSession: _hostSession,
-      // A joiner's entries merge where the joins do (#225).
-      merging: (request) => runner.host(store, request, name: name),
+      // A joiner's entries merge where the joins do (#225); paused on
+      // the page Running (obf-1078), it comes back later on its own.
+      merging: (request) => _paused
+          ? Future.value((const HostResponse.status(503), null))
+          : runner.host(store, request, name: name),
     );
     if (_disposed) {
       await started.stop();
@@ -454,10 +462,29 @@ class AutoSync extends ChangeNotifier {
     _arm();
   }
 
+  /// Pauses the automatic syncs (obf-1078): a folder round or a join
+  /// under way cannot be cut in the middle and ends; after it, none
+  /// starts on its own, and a paired Device asking to sync is told to
+  /// come back later, until [goOn] or the next start.
+  void pause() {
+    if (_paused || _disposed) return;
+    _paused = true;
+    _timer?.cancel();
+    notifyListeners();
+  }
+
+  /// Ends the pause [pause] began, syncing every Device at once.
+  void goOn() {
+    if (!_paused || _disposed) return;
+    _paused = false;
+    notifyListeners();
+    _wantAll();
+  }
+
   /// Sets the timer for the next Device due, while the app shows.
   void _arm() {
     _timer?.cancel();
-    if (!_open || _disposed || _running) return;
+    if (!_open || _disposed || _running || _paused) return;
     final next = _schedule.next(_devices);
     if (next == null) return;
     final wait = next.difference(clock());
@@ -467,10 +494,10 @@ class AutoSync extends ChangeNotifier {
   }
 
   Future<void> _run() async {
-    if (_running || _disposed) return;
+    if (_running || _disposed || _paused) return;
     _running = true;
     try {
-      while (!_disposed) {
+      while (!_disposed && !_paused) {
         final devices = store.autoSyncDevices();
         final due = _schedule.take(_devices, clock());
         if (due.isEmpty) break;
@@ -485,6 +512,8 @@ class AutoSync extends ChangeNotifier {
         final name = await deviceName();
         for (final device in devices) {
           if (_disposed) return;
+          // Paused meanwhile: the Device after the one under way waits.
+          if (_paused) break;
           if (!due.contains(device.id)) continue;
           final found = _found[device.id];
           // Where mDNS found it, else at its address by hand, else where

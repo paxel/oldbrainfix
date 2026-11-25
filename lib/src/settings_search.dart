@@ -140,7 +140,7 @@ class SettingsHeading extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.fromLTRB(24, 16, 24, 4),
-    child: Text(text, style: Theme.of(context).textTheme.titleMedium),
+    child: Text(text, style: sectionHeading(context)),
   );
 }
 

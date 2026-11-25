@@ -11,6 +11,12 @@ import 'package:oldbrainfix/src/nudge_screen.dart';
 import 'package:oldbrainfix/src/agenda_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+/// The text field of the Note editor.
+final editorText = find.descendant(
+  of: find.byKey(const ValueKey('note-text')),
+  matching: find.byType(TextField),
+);
+
 void main() {
   late Store store;
   late Places places;
@@ -123,6 +129,10 @@ void main() {
     testWidgets('finds Note text everywhere on one page; ✕ clears', (
       tester,
     ) async {
+      // Room for every card with the places found under it (obf-1047).
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
       capture('sauce in the kitchen', kitchen.id);
       capture('sauce at work', work.id);
       capture('nees mor sauce');
@@ -167,9 +177,10 @@ void main() {
       expect(find.text('Kitchen'), findsNothing);
       // The Topic's Note is marked with its Topic.
       expect(find.text('Household / Kitchen'), findsOneWidget);
+      // The card's text, drawn with the places found (obf-1047).
       final kitchenCard = tester.widget<NoteCard>(
         find.ancestor(
-          of: find.text('sauce in the kitchen'),
+          of: find.text('sauce in the kitchen', findRichText: true).first,
           matching: find.byType(NoteCard),
         ),
       );
@@ -196,6 +207,10 @@ void main() {
     testWidgets('a search across every Area names each hit\'s place', (
       tester,
     ) async {
+      // Room for every card with the places found under it (obf-1047).
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
       capture('sauce in the kitchen', kitchen.id);
       capture('sauce at work', work.id);
       capture('nees mor sauce');
@@ -288,8 +303,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('addFan-note')));
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), 'nees mor sauce');
-      await tester.tap(find.byKey(const ValueKey('captureSave')));
+      // The full editor, not the quick note (obf-1140); Back saves.
+      await tester.enterText(editorText, 'nees mor sauce');
+      await tester.pageBack();
       await tester.pumpAndSettle();
 
       expect(cardTexts(tester), ['nees mor sauce']);
@@ -312,20 +328,20 @@ void main() {
       final note = find.byKey(const ValueKey('addFan-note'));
       expect(tester.getRect(note).bottom, lessThanOrEqualTo(plus.top));
       expect((tester.getCenter(note) - plus.center).distance, lessThan(200));
-      expect(find.text('Topic'), findsOneWidget);
+      expect(find.text('New Topic'), findsOneWidget);
       expect(find.byType(BottomSheet), findsNothing);
 
       await tester.tap(note);
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), 'nees mor sauce');
-      await tester.tap(find.byKey(const ValueKey('captureSave')));
+      await tester.enterText(editorText, 'nees mor sauce');
+      await tester.pageBack();
       await tester.pumpAndSettle();
       expect(cardTexts(tester), ['nees mor sauce']);
       expect(notes.all().single.place, home.id);
 
       await tester.tap(find.byTooltip('Add here'));
       await tester.pumpAndSettle();
-      await open(tester, 'Topic');
+      await open(tester, 'New Topic');
       await tester.enterText(
         find.descendant(
           of: find.byType(AlertDialog),

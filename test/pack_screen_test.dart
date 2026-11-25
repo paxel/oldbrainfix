@@ -11,6 +11,7 @@ import 'package:oldbrainfix/src/pack_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'bundle_test.dart' show FakeBundles;
+import 'card_menu.dart';
 import 'fake_profile.dart';
 
 void main() {
@@ -235,7 +236,7 @@ void main() {
           matching: find.byKey(const ValueKey('note-menu')),
         ),
       );
-      await tap(tester, find.byKey(const ValueKey('note-share-menu')));
+      await tap(tester, find.byKey(const ValueKey('note-group-share')));
       await tap(tester, find.byKey(const ValueKey('note-pack')));
       expect(find.byType(PackExportScreen), findsOneWidget);
       expect(find.text('Training'), findsWidgets);
@@ -350,6 +351,13 @@ void main() {
       expect(find.byKey(const ValueKey('pack-add-person')), findsOneWidget);
       final claim = find.byKey(const ValueKey('pack-claim'));
       expect(tester.widget<Checkbox>(claim).value, isTrue);
+      // The box's edge under the text's start (obf-1134).
+      await tester.ensureVisible(claim);
+      await tester.pumpAndSettle();
+      expect(
+        tester.getCenter(claim).dx - Checkbox.width / 2,
+        tester.getTopLeft(find.text('Claim as mine')).dx,
+      );
       final pack = store.openPack(annsPack(profile: true)).pack;
       for (final key in pack.allKeys()) {
         expect(ticked(tester, key), isTrue, reason: key);
@@ -378,6 +386,7 @@ void main() {
           matching: find.byKey(const ValueKey('note-menu')),
         ),
       );
+      await openCardGroup(tester, 'note-remove-pack-from');
       await tap(tester, find.byKey(const ValueKey('note-remove-pack-from')));
       expect(store.packFrom(water.id), isNull);
       expect(find.byKey(ValueKey('pack-from-${water.id}')), findsNothing);

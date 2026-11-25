@@ -126,14 +126,14 @@ fn the_agenda_rows_menu_snoozes_and_skips_and_ctrl_z_takes_the_skip_back() -> Te
     let (store, _now, id) = plants()?;
     let mut harness = window(&store, Selection::Agenda);
     more(&mut harness, PLANTS)?;
-    // Each under its heading, before History and Share.
+    // Each under its heading, before History; no calendar file
+    // (obf-1014).
     assert!(shows(&harness, "Snooze"));
     assert!(shows(&harness, "Not today"));
-    for label in [
-        "10 min", "30 min", "1 h", "Skip", "Tomorrow", "History", "Share",
-    ] {
+    for label in ["10 min", "30 min", "1 h", "Skip", "Tomorrow", "History"] {
         assert!(offers(&harness, label), "{label} is offered");
     }
+    assert!(!offers(&harness, "Share"));
     let before = store.now();
     click(&mut harness, "30 min")?;
     let key = oldbrainfix_core::alarms::snooze_key(&id, &at(monday(), 8));

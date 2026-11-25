@@ -44,6 +44,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get text => 'Text';
 
   @override
+  String get captureFanEditor => 'Editor';
+
+  @override
   String get captureFanClose => 'Close';
 
   @override
@@ -81,6 +84,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get newArea => 'New Area';
+
+  @override
+  String get rearrangeAreas => 'Rearrange';
+
+  @override
+  String get rearrangeDone => 'Done';
 
   @override
   String get newTopic => 'New Topic';
@@ -285,6 +294,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String get nothingFound => 'No Note matches.';
 
   @override
+  String findingsMore(int count) {
+    return '+$count more';
+  }
+
+  @override
+  String get findInNote => 'Find in Note';
+
+  @override
+  String findCount(int at, int count) {
+    return '$at of $count';
+  }
+
+  @override
+  String get findNone => 'Not in this Note';
+
+  @override
+  String get findPrevious => 'Previous place found';
+
+  @override
+  String get findNext => 'Next place found';
+
+  @override
+  String get findClose => 'Close the find bar';
+
+  @override
   String get noNotesHere => 'No Notes here yet. Tap + to add one.';
 
   @override
@@ -312,7 +346,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get amendHint => 'What\'s new?';
 
   @override
+  String get addAPart => 'Add a part';
+
+  @override
   String get add => 'Add';
+
+  @override
+  String get editorGroupThisNote => 'This Note';
+
+  @override
+  String get editorGroupTidy => 'Tidy';
 
   @override
   String get moveToTrash => 'Move to trash';
@@ -322,6 +365,65 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get trashEmpty => 'The trash is empty.';
+
+  @override
+  String get trashEmptyNow => 'Empty the trash now';
+
+  @override
+  String trashEmptyNotes(int notes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      notes,
+      locale: localeName,
+      other: 'Delete $notes Notes for good? They can\'t come back.',
+      one: 'Delete 1 Note for good? It can\'t come back.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String trashEmptyRoutines(int routines) {
+    String _temp0 = intl.Intl.pluralLogic(
+      routines,
+      locale: localeName,
+      other: 'Delete $routines Routines for good? They can\'t come back.',
+      one: 'Delete 1 Routine for good? It can\'t come back.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String trashEmptyBoth(int notes, int routines) {
+    String _temp0 = intl.Intl.pluralLogic(
+      notes,
+      locale: localeName,
+      other: '$notes Notes',
+      one: '1 Note',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      routines,
+      locale: localeName,
+      other: '$routines Routines',
+      one: '1 Routine',
+    );
+    return 'Delete $_temp0 and $_temp1 for good? They can\'t come back.';
+  }
+
+  @override
+  String get deleteForGood => 'Delete for good';
+
+  @override
+  String get trashEmptyFailed => 'The trash could not be emptied.';
+
+  @override
+  String get trashEmptyFailedTitle => 'Trash not emptied';
+
+  @override
+  String get trashEmptyFailedCause =>
+      'The Notes in the trash could not be deleted for good.';
+
+  @override
+  String get trashEmptyFailedFix =>
+      'What was not deleted stays in the trash. Try again.';
 
   @override
   String get restore => 'Restore';
@@ -630,6 +732,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get more => 'More';
 
   @override
+  String unitMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'minutes',
+      one: 'minute',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String unitHours(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'hours',
+      one: 'hour',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String unitDays(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -880,6 +1004,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get occurrenceFromDayBefore => 'From the day before';
 
   @override
+  String get notificationAlreadyDone => 'Already done';
+
+  @override
+  String get notificationSkipped => 'Skipped';
+
+  @override
   String get alarmsBanner =>
       'Alarms may come late or not at all: a permission is missing. Tap to fix it.';
 
@@ -1021,6 +1151,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get removeHeadsUp => 'Remove heads-up';
+
+  @override
+  String get headsUpCustom => 'Custom…';
+
+  @override
+  String get headsUpCustomTitle => 'Custom heads-up';
+
+  @override
+  String get headsUpCustomCount => 'How long before';
+
+  @override
+  String headsUpCustomRange(int most) {
+    return 'From 1 to $most.';
+  }
 
   @override
   String headsUpMinutesBefore(int minutes) {
@@ -1290,9 +1434,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get moreCaptureContext => 'More about the capture';
 
   @override
-  String get recordVoice => 'Record voice';
-
-  @override
   String get recording => 'Recording…';
 
   @override
@@ -1430,6 +1571,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String speechOfferMobileData(int megabytes) {
     return 'You are on mobile data. The download uses $megabytes MB of it.';
   }
+
+  @override
+  String speechOfferRestored(String model) {
+    return 'The Backup names the speech model used before: $model. Download it once. It downloads in the background while you go on, and Settings offers it any time later.';
+  }
+
+  @override
+  String speechOfferRestoredFile(String model) {
+    return 'The Backup names the speech model used before: $model. It came from a file of your own: pick that file again. Settings offers it any time later.';
+  }
+
+  @override
+  String get speechOfferPickAgain => 'Pick the file again';
+
+  @override
+  String get speechRestoredDownload =>
+      'The speech model from the Backup is not on this phone yet. Download';
+
+  @override
+  String get speechRestoredPick =>
+      'The speech model from the Backup is not on this phone yet. Pick its file';
 
   @override
   String get transcribing => 'Transcribing…';
@@ -1729,6 +1891,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get fatFingersDetail =>
       'Text, icons and buttons show 1.3 times their size, on top of the system\'s font size, on the Agenda\'s widget too.';
+
+  @override
+  String get tapMarks => 'Show button taps';
+
+  @override
+  String get tapMarksDetail =>
+      'A green \"!\" shows above the finger for a moment when a button takes a tap.';
 
   @override
   String get textSize => 'Text size';
@@ -2377,7 +2546,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bundleNoApp => 'No app here can take the bundle.';
 
   @override
-  String get shareArea => 'Share…';
+  String get shareArea => 'Share with people…';
 
   @override
   String get areaShared => 'Shared';
@@ -2664,7 +2833,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Accepting moves it and its Routines and Reminders to the trash, alarms off. You can restore it from there.';
 
   @override
-  String get sentItemAcceptCancel => 'Move to the trash';
+  String get sentItemAcceptCancel => 'Move to trash';
 
   @override
   String get sentItemTrashed =>
@@ -2693,7 +2862,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get backupsIntro =>
-      'A Backup is an encrypted file of all your Areas, Notes, photos, voice recordings, Routines and their history. Only your passphrase, or the recovery key on the Recovery Sheet, opens it. This Device\'s settings stay out, except the playback speed. All your Devices share one passphrase and one recovery key, and each writes Backups of its own.';
+      'A Backup is an encrypted file of all your Areas, Notes, photos, voice recordings, Routines and their history. Only your passphrase, or the recovery key on the Recovery Sheet, opens it. It also holds this Device\'s settings and which speech model it uses, not the model itself. The App Lock, the Area Locks, the alarm sound, the paired Devices, the shared folder and the Backup folder stay out: set them again after a restore. All your Devices share one passphrase and one recovery key, and each writes Backups of its own.';
 
   @override
   String get backupPassphrase => 'Passphrase';
@@ -2857,7 +3026,7 @@ class AppLocalizationsEn extends AppLocalizations {
       other: '$count changes',
       one: '1 change',
     );
-    return 'Restored: $_temp0. Set alarms and locks again, choose the Backup folder again, and pair your other Devices again.';
+    return 'Restored: $_temp0. Set the App Lock, the Area Locks and the alarm sound again, choose the Backup folder again, and pair your other Devices again.';
   }
 
   @override
@@ -3056,6 +3225,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get personFilterShowing => 'Only Notes by';
 
   @override
+  String get madeHiddenByFilter => 'Made, hidden by the filter';
+
+  @override
+  String get showHidden => 'Show';
+
+  @override
   String get personTheirNotes => 'Their Notes';
 
   @override
@@ -3097,7 +3272,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addToCalendar => 'Add to calendar';
 
   @override
-  String get deleteNoteQuestion => 'Delete this Note?';
+  String get deleteNoteQuestion => 'Move this Note to the trash?';
 
   @override
   String get deleteNoteDetail => 'It stays in the trash for 30 days.';
@@ -3107,15 +3282,16 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Delete this Note and its $count Routines and Reminders?',
-      one: 'Delete this Note and its 1 Routine?',
+      other:
+          'Move this Note and its $count Routines and Reminders to the trash?',
+      one: 'Move this Note and its 1 Routine to the trash?',
     );
     return '$_temp0';
   }
 
   @override
   String get deleteNoteReminderQuestion =>
-      'Delete this Note and its 1 Reminder?';
+      'Move this Note and its 1 Reminder to the trash?';
 
   @override
   String get removeRecordingKeepText => 'Remove recording, keep text';
@@ -3125,14 +3301,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get removeRecordingQuestion =>
-      'Remove this recording and keep its Transcript?';
+      'Remove this recording and keep its words in the text?';
 
   @override
   String get removePhotoQuestion =>
-      'Remove this photo and keep its Photo Text?';
+      'Remove this photo and keep its words in the text?';
 
   @override
   String get removeMediaDetail =>
+      'The file goes from all your Devices and from everyone you share the Note\'s Area with. Its words go into the text, to be edited or deleted like typed text.';
+
+  @override
+  String get removeAttachmentDetail =>
       'The file goes from all your Devices and from everyone you share the Note\'s Area with. The text stays on the Note.';
 
   @override
@@ -3640,7 +3820,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get deleteFrogQuestion =>
-      'Delete this Frog? It stays in the trash. Its Note stays.';
+      'Move this Frog to the trash? Its Note stays.';
 
   @override
   String get frogOpen => 'Open';
@@ -4734,9 +4914,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shareToApp => 'Share to an app';
 
   @override
-  String get shareNote => 'Share…';
-
-  @override
   String get noteNotShared => 'The Note was not shared.';
 
   @override
@@ -5073,10 +5250,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tableCopy => 'Copy';
 
   @override
+  String get tableMore => 'More for the table';
+
+  @override
+  String get tableUp => 'Move up';
+
+  @override
+  String get tableDown => 'Move down';
+
+  @override
+  String get tableDelete => 'Delete table';
+
+  @override
   String get tableOpen => 'Open the table';
 
   @override
   String get tableSideways => 'Move the table sideways';
+
+  @override
+  String tableShowAll(int count) {
+    return 'Show all $count';
+  }
 
   @override
   String tableRow(int number) {
@@ -5161,6 +5355,48 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get tableSort => 'Sort by this column';
+
+  @override
+  String get tableSortedUp => 'Sorted ascending';
+
+  @override
+  String get tableSortedDown => 'Sorted descending';
+
+  @override
+  String get tableShowSortedUp => 'Show sorted ascending';
+
+  @override
+  String get tableShowSortedDown => 'Show sorted descending';
+
+  @override
+  String get tableShowAsWritten => 'Show as written';
+
+  @override
+  String get tableSortRows => 'Sort rows by this column';
+
+  @override
+  String get tableSortRowsDown => 'Sort rows by this column, descending';
+
+  @override
+  String get tableInsertMenu => 'Insert';
+
+  @override
+  String get tableMoveMenu => 'Move';
+
+  @override
+  String get tableAlignMenu => 'Align';
+
+  @override
+  String get tableSortRowsMenu => 'Sort rows';
+
+  @override
+  String get tableShowSortedMenu => 'Show sorted';
+
+  @override
+  String get menuMore => 'More…';
+
+  @override
   String get pairCodeNeedsUpdate =>
       'This code comes from a newer Old Brain Fix. Update Old Brain Fix on this Device, then try again.';
 
@@ -5195,7 +5431,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsQuickNoteDetail =>
-      'The quick note shows the text, the three Nudge buttons and More, which opens the full editor. Photo, Voice, Gallery, Paste, File and everything that sorts the Note are in the full editor.';
+      'The quick note shows the text, the three Nudge buttons and Open in the editor, which opens the full editor. Photo, Voice, Gallery, Paste, File and everything that sorts the Note are in the full editor.';
 
   @override
   String get quickNoteFormatBar => 'Format bar';
@@ -5211,13 +5447,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get quickNoteSchedule => 'Frog, Session or Tally';
 
   @override
-  String get copyPhoto => 'Copy';
+  String get copyPhoto => 'Copy photo';
 
   @override
-  String get savePhoto => 'Save';
-
-  @override
-  String get sharePhoto => 'Share';
+  String get savePhoto => 'Save photo';
 
   @override
   String get photoSaveFailed => 'The photo was not saved.';
@@ -5274,6 +5507,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsImport => 'Import';
+
+  @override
+  String get areasImport => 'Import…';
+
+  @override
+  String get settingsImportMoved => 'Import… is in the Areas list\'s ⋮';
 
   @override
   String get importFolder => 'Import a folder';
@@ -5457,6 +5696,44 @@ class AppLocalizationsEn extends AppLocalizations {
       'You can leave this page. The Import goes on beside the app, and the top of the screen says when it is done.';
 
   @override
+  String importFillInAsk(String date, String area) {
+    return 'Fill in the Import of $date into $area? Only what that Import did not bring in is added there.';
+  }
+
+  @override
+  String get importFillIn => 'Fill in';
+
+  @override
+  String get importAsNew => 'Import as new';
+
+  @override
+  String importFilledIn(int count, String area) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Notes went into the Area $area.',
+      one: '1 Note went into the Area $area.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String importAlready(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count were imported before and are left out.',
+      one: '1 was imported before and is left out.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String importNothingNew(int count) {
+    return 'Nothing new: $count already imported';
+  }
+
+  @override
   String settingBadgeLabel(String setting, String value) {
     return '$setting: $value';
   }
@@ -5472,6 +5749,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noteName => 'Name';
+
+  @override
+  String get addALine => 'Add a Line';
+
+  @override
+  String get addADescription => 'Add a description';
 
   @override
   String get noteDescription => 'Description';
@@ -5618,7 +5901,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'The old text is back. The History keeps every version.';
 
   @override
-  String get features => 'What Old Brain Fix offers';
+  String get features => 'Complexity';
 
   @override
   String get featuresDetail =>
@@ -5654,11 +5937,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get helpQuickStart3 =>
-      'Type a task in +, tap More, then + and Remind me…; set its time and tap Save.';
+      'Type a task in +, tap Open in the editor, then + and Remind me…; set its time and tap Save.';
 
   @override
   String get helpQuickStart4 =>
-      'Type a habit in +, tap More, then + and Remind me…; pick Every …, set when, and Save.';
+      'Type a habit in +, tap Open in the editor, then + and Remind me…; pick Every …, set when, and Save.';
 
   @override
   String get helpQuickStart5 =>
@@ -5690,7 +5973,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get helpQuickStartDesktop3 =>
-      'Reminder: in the quick note, type, click More, then + and Remind me…; set its time and click Save.';
+      'Reminder: in the quick note, type, click Open in the editor, then + and Remind me…; set its time and click Save.';
 
   @override
   String get helpQuickStartDesktop4 =>
@@ -6014,6 +6297,23 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get feedbackTaps => 'The last notification taps';
+
+  @override
+  String get feedbackTapsNone => 'None so far.';
+
+  @override
+  String feedbackTapsKept(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count taps, without the Notes\' text',
+      one: '1 tap, without the Notes\' text',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get feedbackNotes => 'Notes as a Pack';
 
   @override
@@ -6071,7 +6371,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get undo => 'Undo';
 
   @override
-  String get undoNoteTrashed => 'Moved to the Trash';
+  String get undoNoteTrashed => 'Moved to the trash';
 
   @override
   String get undoLineDeleted => 'Line deleted';
@@ -6080,13 +6380,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get undoEntryDeleted => 'Entry deleted';
 
   @override
-  String get undoFrogTrashed => 'Frog moved to the Trash';
+  String get undoFrogTrashed => 'Frog moved to the trash';
 
   @override
-  String get undoRoutineTrashed => 'Routine moved to the Trash';
+  String get undoRoutineTrashed => 'Routine moved to the trash';
 
   @override
-  String get undoReminderTrashed => 'Reminder moved to the Trash';
+  String get undoReminderTrashed => 'Reminder moved to the trash';
 
   @override
   String get undoPackFromRemoved => '“From” label removed';
@@ -6235,6 +6535,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tagFold => 'Hide the tags below';
 
   @override
+  String get allTags => 'All tags…';
+
+  @override
   String get hiddenFromAi => 'Hidden from AI';
 
   @override
@@ -6255,7 +6558,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get file => 'File';
 
   @override
-  String get attachFile => 'Attach a file';
+  String get attachFile => 'Attach a file…';
 
   @override
   String get attachmentTextLabel => 'Attachment Text';
@@ -6739,10 +7042,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get spotDone => 'Got it';
 
   @override
+  String get spotNoMoreTips => 'No more tips';
+
+  @override
   String get settingsShowTips => 'Show tips again';
 
   @override
   String get settingsShowTipsDone => 'Each screen shows its tips again.';
+
+  @override
+  String get settingsTips => 'Tips';
+
+  @override
+  String get settingsTipsSwitch => 'Show tips';
+
+  @override
+  String get settingsTipsSwitchDetail =>
+      'Each screen explains its buttons once.';
 
   @override
   String get spotAgendaPlus =>
@@ -6774,7 +7090,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get spotCaptureMore =>
-      'More saves the Note and opens it in the full editor.';
+      'Open in the editor saves the Note and opens it in the full editor.';
+
+  @override
+  String get captureOpenInEditor => 'Open in the editor';
 
   @override
   String get spotEditorKind =>
@@ -6795,6 +7114,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get spotEditorLinkedFrom =>
       'Linked from lists the Notes whose links lead to this one.';
+
+  @override
+  String get spotEditorAddPart =>
+      'Add a part puts something new under the Note, with its own time.';
 
   @override
   String get spotAreaSearch => 'Search finds the Notes filed here.';
@@ -6840,4 +7163,147 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get spotSettingsGrammar =>
       'Add grammar… colours code in one more language, on all your Devices.';
+
+  @override
+  String get spotSettingsTipsSwitch =>
+      'Switched off, no screen shows a tip; No more tips does the same.';
+
+  @override
+  String get editorUndo => 'Undo';
+
+  @override
+  String get editorRedo => 'Redo';
+
+  @override
+  String get revertAllChanges => 'Revert all changes';
+
+  @override
+  String get revertAllQuestion => 'Revert all changes?';
+
+  @override
+  String get revertAllBody =>
+      'The Note goes back to how it was when it was opened. Redo brings the changes back one by one.';
+
+  @override
+  String get revertAllConfirm => 'Revert';
+
+  @override
+  String get recordingPause => 'End a recording after a pause';
+
+  @override
+  String get recordingPauseDetail =>
+      'Ends a voice recording on its own once you have said nothing this long, and keeps it as Stop does. Off: pauses are ignored.';
+
+  @override
+  String get recordingPauseOff => 'Off';
+
+  @override
+  String recordingPauseSeconds(int seconds) {
+    return '$seconds s';
+  }
+
+  @override
+  String get jobsTitle => 'Running';
+
+  @override
+  String get jobsNone => 'Nothing runs in the background.';
+
+  @override
+  String jobsSince(String time) {
+    return 'Since $time';
+  }
+
+  @override
+  String get jobsAbort => 'Abort';
+
+  @override
+  String get jobsStopping => 'Stopping…';
+
+  @override
+  String get jobsStopped => 'Stopped';
+
+  @override
+  String get jobsGoOn => 'Go on';
+
+  @override
+  String get jobsSync => 'Sync with a Device';
+
+  @override
+  String get jobsSyncAbort =>
+      'The sync under way ends first. Then this Device does not sync on its own until Sync now, Go on or the next start.';
+
+  @override
+  String get jobsSyncPaused =>
+      'Paused: this Device does not sync on its own until Sync now, Go on or the next start.';
+
+  @override
+  String jobsImport(String name) {
+    return 'Import of $name';
+  }
+
+  @override
+  String get jobsImportAbort => 'The Notes imported so far stay.';
+
+  @override
+  String jobsImportStopped(int done, int count) {
+    return 'Stopped: $done of $count imported';
+  }
+
+  @override
+  String get jobsImportEnded => 'Import stopped.';
+
+  @override
+  String get jobsTranscripts => 'Transcribing recordings';
+
+  @override
+  String get jobsPhotoTexts => 'Reading the text in photos';
+
+  @override
+  String get jobsAttachmentTexts => 'Reading attached files';
+
+  @override
+  String jobsRead(int done, int count) {
+    return '$done of $count';
+  }
+
+  @override
+  String get jobsReadAbort =>
+      'The one being read ends first. The others wait until Go on or the next start.';
+
+  @override
+  String get jobsReadStopped =>
+      'Stopped: the others wait until Go on or the next start.';
+
+  @override
+  String get jobsModelDownload => 'Downloading the speech model';
+
+  @override
+  String get jobsModelCopy => 'Copying the speech model';
+
+  @override
+  String get jobsModelStopped =>
+      'Stopped. The Settings offer the speech model again.';
+
+  @override
+  String jobsAreaDeletion(String name) {
+    return 'Deleting the Area $name';
+  }
+
+  @override
+  String get jobsAreaAbort =>
+      'The Notes moved so far stay where they went. The Area stays with the others.';
+
+  @override
+  String jobsAreaStopped(int moved, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Stopped: $moved of $count Notes moved',
+      one: 'Stopped: $moved of 1 Note moved',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get jobsTrashEmptying => 'Emptying the trash';
 }

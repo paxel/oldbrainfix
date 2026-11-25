@@ -160,4 +160,58 @@ void main() {
       expect(announcements.visible, isNull);
     });
   });
+
+  group('another offer (obf-1070)', () {
+    testWidgets('shows its word at its end, and its tap runs it without '
+        'counting an undo', (tester) async {
+      await pumpApp(tester);
+      var shown = 0;
+      announcements.offer('Made, hidden by the filter', 'Show', () => shown++);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('announcement-offer')), findsOneWidget);
+      expect(find.byKey(const ValueKey('announcement-undo')), findsNothing);
+      expect(
+        tester.getRect(find.text('Show')).left,
+        greaterThan(
+          tester.getRect(find.text('Made, hidden by the filter')).right,
+        ),
+      );
+      final strip = tester.widget<Semantics>(
+        find.ancestor(
+          of: find.text('Made, hidden by the filter'),
+          matching: find.byWidgetPredicate(
+            (w) => w is Semantics && w.properties.liveRegion == true,
+          ),
+        ),
+      );
+      expect(strip.properties.hintOverrides?.onTapHint, 'Show');
+
+      await tester.tap(find.text('Show'));
+      await tester.pumpAndSettle();
+      expect(shown, 1);
+      expect(announcements.undone.value, 0);
+      expect(find.text('Made, hidden by the filter'), findsNothing);
+    });
+
+    testWidgets('goes by itself after ten seconds, before what waits, and '
+        'takes the place of an offer to undo', (tester) async {
+      await pumpApp(tester);
+      var shown = 0;
+      var undone = 0;
+      announcements
+        ..announce('Saved')
+        ..offerUndo('Line deleted', () => undone++)
+        ..offer('Made, hidden by the filter', 'Show', () => shown++);
+      await tester.pumpAndSettle();
+      expect(find.text('Made, hidden by the filter'), findsOneWidget);
+      expect(find.text('Line deleted'), findsNothing);
+      await tester.pump(const Duration(seconds: 9));
+      expect(find.text('Made, hidden by the filter'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+      expect(find.text('Made, hidden by the filter'), findsNothing);
+      expect((shown, undone), (0, 0));
+      expect(find.text('Saved'), findsOneWidget);
+    });
+  });
 }

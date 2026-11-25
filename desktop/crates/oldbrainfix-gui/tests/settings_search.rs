@@ -248,3 +248,25 @@ fn a_word_of_any_ai_setting_finds_the_row_that_opens_the_ai_settings() -> TestRe
     assert!(!shows(&harness, t.ai_settings_detail()));
     Ok(())
 }
+
+#[test]
+fn the_tips_card_holds_show_tips_and_show_tips_again_under_it() -> TestResult {
+    let mut harness = settings("en")?;
+    let exactly = |harness: &Harness<'_, App>, label: &str| {
+        harness
+            .query_all_by(|n| n.label().as_deref() == Some(label))
+            .next()
+            .map(|n| n.rect())
+    };
+    let switch = exactly(&harness, "Show tips").ok_or("no Show tips")?;
+    let again = exactly(&harness, "Show tips again").ok_or("no Show tips again")?;
+    assert!(switch.max.y <= again.min.y);
+    assert!(shows(&harness, "Each screen explains its buttons once."));
+    // Found by the switch's detail line, under the card's heading.
+    search(&mut harness, "explains buttons");
+    assert!(shows(&harness, "Tips"));
+    assert!(exactly(&harness, "Show tips").is_some());
+    assert!(exactly(&harness, "Show tips again").is_none());
+    assert!(!shows(&harness, "This computer"));
+    Ok(())
+}

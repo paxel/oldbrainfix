@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
+import 'found_marks.dart';
+import 'import_run.dart' show ReaderBusy;
 import 'l10n.dart';
 import 'ocr_platform.dart' show GeneratedTextLabel;
 import 'place_names.dart';
@@ -276,9 +278,14 @@ enum ModelOutcome {
 /// once per start before anything is transcribed, fetched on request,
 /// and kept only when it is one of the [WhisperModel]s. A model fetched
 /// takes the place of the one in use only once it is checked, so the
-/// one before is gone then and not earlier.
+/// one before is gone then and not earlier. With a [store] it keeps the
+/// model in use there and how it came, which a Backup carries
+/// (obf-1098), and drops a restored Backup's offer of that model.
 class SpeechModel extends ChangeNotifier {
   final SpeechPlatform platform;
+
+  /// Where the model in use is noted; none in tests that need no Backup.
+  final Store? store;
 
   late final StreamSubscription<ModelProgress> _progressing;
   var _status = ModelStatus.checking;
@@ -289,7 +296,7 @@ class SpeechModel extends ChangeNotifier {
   var _cancelling = false;
   var _disposed = false;
 
-  SpeechModel(this.platform) {
+  SpeechModel(this.platform, {this.store}) {
     _progressing = platform.progress.listen((progress) {
       _progress = progress;
       _changed();
@@ -313,7 +320,8 @@ class SpeechModel extends ChangeNotifier {
 
   /// Looks whether a model is here and whether it is one of the pinned
   /// ones; a model that is not is dropped, and so is a fetch cut off
-  /// when the app was last closed.
+  /// when the app was last closed. A model in place from before the
+  /// choice was noted counts as downloaded.
   Future<void> check() async {
     _current = null;
     _set(ModelStatus.checking);
@@ -321,9 +329,35 @@ class SpeechModel extends ChangeNotifier {
     await platform.discard();
     final hash = await platform.modelHash();
     _current = WhisperModel.byHash(hash);
-    if (_current != null) return _set(ModelStatus.ready);
+    if (_current != null) {
+      _note(_current, SpeechModelSource.download, kept: true);
+      return _set(ModelStatus.ready);
+    }
     if (hash != null) await platform.remove();
+    _note(null, SpeechModelSource.download);
     _set(ModelStatus.missing);
+  }
+
+  /// Notes [model] as the one in use, come by [source], or that there
+  /// is none (null); with [kept], a source noted for it already stays.
+  /// An offer of the model in use is dropped.
+  void _note(
+    WhisperModel? model,
+    SpeechModelSource source, {
+    bool kept = false,
+  }) {
+    final store = this.store;
+    if (store == null || _disposed) return;
+    final noted = store.speechModelChoice;
+    final choice = model == null
+        ? null
+        : kept && noted?.name == model.name
+        ? noted
+        : (name: model.name, source: source);
+    if (noted != choice) store.speechModelChoice = choice;
+    if (model != null && store.speechModelOffer?.name == model.name) {
+      store.dropSpeechModelOffer();
+    }
   }
 
   /// Downloads [model] from its release asset and, once it is checked,
@@ -377,6 +411,10 @@ class SpeechModel extends ChangeNotifier {
         : ModelOutcome.mismatch;
     if (outcome == ModelOutcome.installed) {
       _current = fetched;
+      _note(
+        fetched,
+        target == null ? SpeechModelSource.file : SpeechModelSource.download,
+      );
     } else {
       await platform.discard();
     }
@@ -451,6 +489,33 @@ class Transcriber extends ChangeNotifier {
   /// The recording being transcribed, by its hash; null while none is.
   String? get current => _current;
 
+  /// Since when it transcribes without a rest, and how many of how many
+  /// recordings it took meanwhile; null while it rests (obf-1078).
+  ReaderBusy? get busy => _busy;
+  ReaderBusy? _busy;
+
+  /// Whether Abort on the page Running stopped it (obf-1078): the
+  /// recording under way ends and is kept; of the others, only those
+  /// asked for again or waited for are transcribed, until [goOn] or the
+  /// next start.
+  bool get stopped => _stopped;
+  var _stopped = false;
+
+  /// Stops it as [stopped] says.
+  void stop() {
+    if (_stopped || _disposed) return;
+    _stopped = true;
+    notifyListeners();
+  }
+
+  /// Transcribes the recordings waiting again, after [stop].
+  void goOn() {
+    if (!_stopped || _disposed) return;
+    _stopped = false;
+    notifyListeners();
+    _kick();
+  }
+
   /// Names the Starter Set's places and the app's words in the language
   /// of [t] in the prompts from now on.
   void setTexts(AppLocalizations t) => _texts = t;
@@ -516,20 +581,35 @@ class Transcriber extends ChangeNotifier {
     _running = true;
     _again = false;
     Completer<bool>? waiting;
+    var took = 0;
     try {
       while (!_disposed && model.current != null) {
         final asked = _asked.isEmpty ? null : _asked.removeAt(0);
         waiting = asked?.done;
+        final left = notes
+            .untranscribed()
+            .where((r) => !_skipped.contains(r.hash))
+            .toList();
+        // Stopped, only what someone waits for is taken (obf-1078).
         final next = asked == null
-            ? notes
-                  .untranscribed()
-                  .where((r) => !_skipped.contains(r.hash))
-                  .firstOrNull
+            ? _stopped
+                  ? left.where((r) => _waiting.containsKey(r.hash)).firstOrNull
+                  : left.firstOrNull
             : (noteId: asked.noteId, hash: asked.hash);
         if (next == null) break;
         final bytes = notes.recordingBytes(next.hash);
         String? text;
         if (bytes != null) {
+          _busy = (
+            since: _busy?.since ?? DateTime.now(),
+            done: took,
+            of:
+                took +
+                1 +
+                _asked.length +
+                (_stopped ? 0 : left.length - (asked == null ? 1 : 0)),
+          );
+          took++;
           _current = next.hash;
           notifyListeners();
           final lead = prompts();
@@ -569,6 +649,10 @@ class Transcriber extends ChangeNotifier {
       waiting?.complete(false);
       // Without a model, or gone: nothing asked for is transcribed.
       if (_disposed || model.current == null) _dropAsked();
+      if (_busy != null) {
+        _busy = null;
+        if (!_disposed) notifyListeners();
+      }
     }
     if (_again) _kick();
   }
@@ -703,8 +787,16 @@ class _TranscriptTextState extends State<TranscriptText> {
       _ when _transcribing => Text(t.transcribing, style: quiet),
       null => Text(t.transcribing, style: quiet),
       '' => Text(t.noWordsHeard, style: quiet),
-      _ => Text(
+      // The places a search or the find bar found in it (obf-1047).
+      _ => foundText(
+        context,
         text,
+        FindScope.of(
+          context,
+          widget.noteId,
+          FindingPart.transcript,
+          widget.hash,
+        ),
         maxLines: compact ? 3 : null,
         overflow: compact ? TextOverflow.ellipsis : null,
         style: labelled

@@ -215,54 +215,63 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
 
   Widget _pool(AppLocalizations t) {
     final error = TextStyle(color: Theme.of(context).colorScheme.error);
-    return EditorPanel(
+    // A headed group in the page's one card (obf-1118).
+    return Column(
       key: const ValueKey('session-pool'),
-      heading: t.sessionPool,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(t.sessionPoolExplain),
-          SessionPoolTags(draft: _draft, onChanged: () => setState(() {})),
-          Material(
-            type: MaterialType.transparency,
-            child: Column(
-              children: [
-                for (final id in _draft.shown)
-                  CheckboxListTile(
-                    key: ValueKey('session-pool-$id'),
-                    contentPadding: EdgeInsets.zero,
-                    controlAffinity: ListTileControlAffinity.leading,
-                    value: _draft.chosen.contains(id),
-                    title: Text(switch (_draft.notes[id]) {
-                      final note? => noteText(t, note),
-                      null => t.noteGone,
-                    }),
-                    onChanged: (on) => setState(
-                      () => on ?? false
-                          ? _draft.chosen.add(id)
-                          : _draft.chosen.remove(id),
-                    ),
-                  ),
-                // Making one stays inside the list, on this page.
-                ListTile(
-                  key: const ValueKey('session-new-tally'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(t.sessionPool, style: sectionHeading(context)),
+        const SizedBox(height: 8),
+        Text(t.sessionPoolExplain),
+        SessionPoolTags(draft: _draft, onChanged: () => setState(() {})),
+        Material(
+          type: MaterialType.transparency,
+          child: Column(
+            children: [
+              for (final id in _draft.shown)
+                CheckboxListTile(
+                  key: ValueKey('session-pool-$id'),
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.add),
-                  title: Text(t.newTally),
-                  onTap: _newTally,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  value: _draft.chosen.contains(id),
+                  title: Text(switch (_draft.notes[id]) {
+                    final note? => noteText(t, note),
+                    null => t.noteGone,
+                  }),
+                  onChanged: (on) => setState(
+                    () => on ?? false
+                        ? _draft.chosen.add(id)
+                        : _draft.chosen.remove(id),
+                  ),
                 ),
-              ],
-            ),
+              // Making one stays inside the list, on this page. In the
+              // accent with a chevron: it opens the Tally's page
+              // (obf-1108).
+              ListTile(
+                key: const ValueKey('session-new-tally'),
+                contentPadding: EdgeInsets.zero,
+                iconColor: Theme.of(context).colorScheme.primary,
+                leading: const Icon(Icons.add),
+                title: Text(
+                  t.newTally,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: _newTally,
+              ),
+            ],
           ),
-          SessionPoolHidden(draft: _draft),
-          if (_draft.checked && _draft.pool.isEmpty)
-            Text(
-              t.sessionPoolMissing,
-              key: const ValueKey('session-pool-error'),
-              style: error,
-            ),
-        ],
-      ),
+        ),
+        SessionPoolHidden(draft: _draft),
+        if (_draft.checked && _draft.pool.isEmpty)
+          Text(
+            t.sessionPoolMissing,
+            key: const ValueKey('session-pool-error'),
+            style: error,
+          ),
+      ],
     );
   }
 
@@ -292,49 +301,59 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
         body: ListView(
           padding: clearOfSystemBars(context, const EdgeInsets.all(16)),
           children: [
-            if (widget.noteId == null)
-              EditorPanel(
-                child: TextField(
-                  key: const ValueKey('session-form-name'),
-                  controller: _name,
-                  focusNode: _nameFocus,
-                  autofocus: true,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: InputDecoration(
-                    labelText: t.kindName,
-                    errorText: _nameMissing ? t.kindNameMissing : null,
+            // One card for the page, its fields in headed groups
+            // (obf-1118).
+            EditorPanel(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (widget.noteId == null) ...[
+                    TextField(
+                      key: const ValueKey('session-form-name'),
+                      controller: _name,
+                      focusNode: _nameFocus,
+                      autofocus: true,
+                      textCapitalization: TextCapitalization.sentences,
+                      decoration: InputDecoration(
+                        labelText: t.kindName,
+                        errorText: _nameMissing ? t.kindNameMissing : null,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  _pool(t),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      SettingBadge(
+                        key: const ValueKey('session-form-count'),
+                        setting: t.sessionCount,
+                        icon: Icons.tag,
+                        value: t.sessionPicks(_draft.count),
+                        onTap: (_) => _editCount(),
+                      ),
+                      SettingBadge(
+                        key: const ValueKey('session-form-rule'),
+                        setting: t.sessionRule,
+                        icon: sessionRuleBadgeIcon,
+                        value: rule,
+                        valueIcon: sessionRuleIcon(_draft.rule),
+                        onTap: (_) => _editRule(),
+                      ),
+                      if (widget.noteId == null)
+                        SettingBadge(
+                          key: const ValueKey('session-form-schedule'),
+                          setting: t.sessionSchedule,
+                          icon: Icons.event_repeat,
+                          value: scheduleText(t, locale, _schedule.schedule),
+                          onTap: (_) => _editSchedule(),
+                        ),
+                    ],
                   ),
-                ),
+                ],
               ),
-            _pool(t),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                SettingBadge(
-                  key: const ValueKey('session-form-count'),
-                  setting: t.sessionCount,
-                  icon: Icons.tag,
-                  value: t.sessionPicks(_draft.count),
-                  onTap: (_) => _editCount(),
-                ),
-                SettingBadge(
-                  key: const ValueKey('session-form-rule'),
-                  setting: t.sessionRule,
-                  icon: sessionRuleBadgeIcon,
-                  value: rule,
-                  valueIcon: sessionRuleIcon(_draft.rule),
-                  onTap: (_) => _editRule(),
-                ),
-                if (widget.noteId == null)
-                  SettingBadge(
-                    key: const ValueKey('session-form-schedule'),
-                    setting: t.sessionSchedule,
-                    icon: Icons.event_repeat,
-                    value: scheduleText(t, locale, _schedule.schedule),
-                    onTap: (_) => _editSchedule(),
-                  ),
-              ],
             ),
           ],
         ),

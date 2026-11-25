@@ -10,6 +10,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../l10n/app_localizations.dart';
 import 'app_links.dart';
 import 'box_ids.dart';
+import 'cell_selection.dart';
+import 'found_marks.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'person_screen.dart';
@@ -537,10 +539,20 @@ TextStyle tagStyle(BuildContext context, [TextStyle? style]) =>
 /// one block, never ending inside it ([snapOutOfTables]). With [grid] the
 /// field draws each table as what [grid] gives, the grid it is edited in
 /// (#257); the table [rawTable] shows as its lines, edited as text.
+///
+/// The places of [found] are drawn on a tint (obf-1047), the current one
+/// on a stronger one, in a table's grid too.
 class TagTextController extends TextEditingController {
   final bool hideMarks;
 
   TagTextController({super.text, this.hideMarks = false});
+
+  /// The places the find bar found in [text] (obf-1047). Set, they show
+  /// once the field is built again, as the page that sets them does: no
+  /// listener of the text hears of them.
+  FoundMarks? found;
+
+  bool get _finds => !(found?.isEmpty ?? true);
 
   bool _markdown = false;
 
@@ -671,7 +683,7 @@ class TagTextController extends TextEditingController {
       final spans = grammar == null
           ? const <CodeSpan>[]
           : codeSpans(grammar, text);
-      if (spans.isEmpty) {
+      if (spans.isEmpty && !_finds) {
         return super.buildTextSpan(
           context: context,
           style: mono,
@@ -681,7 +693,7 @@ class TagTextController extends TextEditingController {
       return _colouredCode(context, mono, spans, composing);
     }
     final runs = tagRuns(text);
-    if (_markdown || runs.isNotEmpty) {
+    if (_markdown || runs.isNotEmpty || _finds) {
       return _formatted(context, style, composing, runs);
     }
     final tags = Markdown.plainTags(text);
@@ -733,11 +745,13 @@ class TagTextController extends TextEditingController {
   ) {
     final text = this.text;
     final brightness = Theme.of(context).brightness;
+    final marks = found;
     final cuts = <int>{
       0,
       text.length,
       for (final span in spans) ...[span.start, span.end],
       if (composing.isValid) ...[composing.start, composing.end],
+      for (final (a, b) in marks?.ranges ?? const <(int, int)>[]) ...[a, b],
     }.where((at) => at >= 0 && at <= text.length).toList()..sort();
     var next = 0;
     final children = <InlineSpan>[];
@@ -752,15 +766,19 @@ class TagTextController extends TextEditingController {
           : null;
       final composed =
           composing.isValid && composing.start <= from && to <= composing.end;
+      final plain = colour == null && !composed
+          ? null
+          : TextStyle(
+              color: colour,
+              decoration: composed ? TextDecoration.underline : null,
+            );
       children.add(
         TextSpan(
           text: text.substring(from, to),
-          style: colour == null && !composed
-              ? null
-              : TextStyle(
-                  color: colour,
-                  decoration: composed ? TextDecoration.underline : null,
-                ),
+          style: switch (marks?.at(from, to)) {
+            final current? => foundStyle(context, plain, current: current),
+            null => plain,
+          },
         ),
       );
     }
@@ -815,10 +833,12 @@ class TagTextController extends TextEditingController {
   static const _id = 4096;
   static const _grid = 8192;
   static const _codeLine = 16384;
+  static const _found = 32768;
+  static const _foundNow = 65536;
 
   /// Above the other bits: a code block's character's [CodeColour], one
   /// more than its index, or 0.
-  static const _colourShift = 15;
+  static const _colourShift = 17;
 
   /// The text formatted, character for character: each one gets the bits
   /// of what it is, and neighbours with the same bits share a span. A
@@ -973,6 +993,12 @@ class TagTextController extends TextEditingController {
       }
     }
     if (composing.isValid) set(composing.start, composing.end, _composing);
+    // The places the find bar found.
+    if (found case final marks?) {
+      for (final (i, (a, b)) in marks.ranges.indexed) {
+        set(a, b, i == marks.current ? _foundNow : _found);
+      }
+    }
     // A table's grid stands for its first character; the others are word
     // joiners, which take no room and keep the grid on its line.
     final grids = <int, (int, MarkdownTable)>{};
@@ -1017,6 +1043,8 @@ class TagTextController extends TextEditingController {
                         format: TextFormats.markdown,
                         style: style,
                         ticking: _boxes,
+                        found: found?.shifted(-table.start),
+                        tableMenu: false,
                       ),
                     ),
                   ),
@@ -1094,6 +1122,19 @@ class TagTextController extends TextEditingController {
           : null,
       decoration: lines.isEmpty ? null : TextDecoration.combine(lines),
     );
+    if (has(_found) || has(_foundNow)) {
+      // Found: on its tint; a mark and an id are drawn as they are.
+      final tinted = has(_foundNow)
+          ? TextStyle(
+              backgroundColor: scheme.tertiary,
+              color: scheme.onTertiary,
+            )
+          : TextStyle(
+              backgroundColor: scheme.tertiaryContainer,
+              color: scheme.onTertiaryContainer,
+            );
+      if (!has(_id) && !has(_mark)) return style.merge(tinted);
+    }
     if (has(_id)) {
       return style.copyWith(
         fontSize: 0.01,
@@ -1200,12 +1241,25 @@ int storedOffset(List<ShownBox> boxes, int shown) {
 /// link, and a web address in code, a code block or a link, which is
 /// none ([Markdown.autolinks]).
 ///
-/// A table is drawn as a grid, made smaller to fit the width, its header
-/// row in bold, its boxes as in a line. A tap on it opens it full screen
-/// ([openTable]) in the text as stored ([source]), where [tableEdit]
-/// changes it; it is only read there without one. A compact line
+/// A table is drawn as a grid at the text's size, its header row in bold,
+/// its boxes as in a line, each column as wide as its words up to a
+/// bound, a longer cell wrapping (obf-1048). A table wider than its room
+/// moves sideways with a drag on it or by its bar, its first column
+/// staying while it holds headings. With [rows] a table shows its header
+/// and that many rows under it, and "Show all" unfolds the rest in
+/// place; a table holding [unfoldAt] shows all of them. A tap on it opens
+/// it full screen ([openTable]) in the text as stored ([source]), where
+/// [tableEdit] changes it; it is only read there without one. Its ⋮ at
+/// its top right corner copies it (obf-1050). A compact line
 /// ([maxLines]) of a table shows the words of its row.
+///
+/// The places of [found], in [text] as it shows, are drawn on a tint
+/// (obf-1047), in a table's cells too; its current one on a stronger one.
 class MarkedText extends StatefulWidget {
+  /// How many rows under its header a table on a card shows before
+  /// "Show all" (obf-1048).
+  static const cardRows = 10;
+
   final String text;
   final String format;
   final int? start;
@@ -1218,6 +1272,26 @@ class MarkedText extends StatefulWidget {
   final BoxTicking? ticking;
   final TableEditing? tableEdit;
   final String? language;
+
+  /// How many rows under its header each table shows folded; all when
+  /// null.
+  final int? rows;
+
+  /// An offset in [text], such as a search hit's (obf-1047): the table
+  /// holding it shows all its rows.
+  final int? unfoldAt;
+
+  /// The places a search or the find bar found in [text] (obf-1047).
+  final FoundMarks? found;
+
+  /// Whether each table has its ⋮ with Copy (obf-1050); not where the
+  /// text is drawn only for a field that takes the taps.
+  final bool tableMenu;
+
+  /// Whether a long press on a cell of a table selects a rectangle of
+  /// cells to copy (obf-1054): in a text being read in the Note editor,
+  /// not on a card, which selects no text.
+  final bool selectCells;
 
   const MarkedText(
     this.text, {
@@ -1233,6 +1307,11 @@ class MarkedText extends StatefulWidget {
     this.ticking,
     this.tableEdit,
     this.language,
+    this.rows,
+    this.unfoldAt,
+    this.found,
+    this.tableMenu = true,
+    this.selectCells = false,
   }) : assert(
          boxes == null || source != null || tableEdit == null,
          'a table is changed in the text as stored, its ids in it',
@@ -1251,6 +1330,9 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
 
   @override
   BoxTicking? get _ticking => widget.ticking;
+
+  @override
+  FoundMarks? get _marks => widget.found;
 
   _FoundIn? _found;
 
@@ -1293,7 +1375,11 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
       for (final tag in found.tags)
         if (tag.start >= from && tag.end <= to) tag,
     ];
-    if (boxes.isEmpty && tags.isEmpty && links.isEmpty) {
+    final marks = widget.found;
+    if (boxes.isEmpty &&
+        tags.isEmpty &&
+        links.isEmpty &&
+        (marks == null || marks.isEmpty)) {
       return Text(
         text.substring(from, to),
         style: widget.style,
@@ -1308,7 +1394,8 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
       widget.style ?? DefaultTextStyle.of(context).style,
     );
     // Boxes, tags and web addresses never overlap: a glyph is no tag
-    // character, and neither is a box or a tag inside an address.
+    // character, and neither is a box or a tag inside an address. A tag
+    // or an address a place found touches is drawn found as a whole.
     final parts = <({int start, int end, List<InlineSpan> spans})>[
       for (final (start, end) in links)
         (
@@ -1319,7 +1406,12 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
               context,
               start,
               end,
-              widget.style ?? DefaultTextStyle.of(context).style,
+              _foundOver(
+                context,
+                start,
+                end,
+                widget.style ?? DefaultTextStyle.of(context).style,
+              ),
             ),
           ],
         ),
@@ -1333,19 +1425,27 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
         (
           start: tag.start,
           end: tag.end,
-          spans: [_tagSpan(context, t, tag, highlighted, onSearch)],
+          spans: [
+            _tagSpan(
+              context,
+              t,
+              tag,
+              _foundOver(context, tag.start, tag.end, highlighted),
+              onSearch,
+            ),
+          ],
         ),
     ]..sort((a, b) => a.start.compareTo(b.start));
     var at = from;
     final spans = <InlineSpan>[];
     for (final part in parts) {
       if (part.start > at) {
-        spans.add(TextSpan(text: text.substring(at, part.start)));
+        spans.addAll(foundSpans(context, text, at, part.start, marks));
       }
       spans.addAll(part.spans);
       at = part.end;
     }
-    if (to > at) spans.add(TextSpan(text: text.substring(at, to)));
+    if (to > at) spans.addAll(foundSpans(context, text, at, to, marks));
     return Text.rich(
       TextSpan(children: spans),
       style: widget.style,
@@ -1368,9 +1468,15 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
         .copyWith(fontFamily: 'monospace');
     // The whole text is read, so what began before [from] reads so.
     final grammar = codeGrammars(context).byScope(widget.language);
-    final coloured = grammar == null
+    final marks = widget.found;
+    final painted = grammar == null
         ? null
         : colouredCode(context, text, codeSpans(grammar, text), from, to);
+    final coloured = painted != null
+        ? markSpans(context, painted, from, marks)
+        : marks == null || marks.isEmpty
+        ? null
+        : foundSpans(context, text, from, to, marks);
     final lines = coloured == null
         ? Text(
             text.substring(from, to),
@@ -1573,9 +1679,30 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
     final start = first ?? 0;
     final end = first == null ? 0 : last;
     final grammar = codeGrammars(context).forFence(code.language);
-    final coloured = grammar == null
+    // The places found, from the text to where they lie in its lines.
+    final marks = widget.found;
+    FoundMarks? inLines;
+    if (marks != null && !marks.isEmpty) {
+      final ranges = <(int, int)>[];
+      int? current;
+      for (final (i, (a, b)) in marks.ranges.indexed) {
+        for (final MapEntry(key: l, value: at) in starts.entries) {
+          final line = found.blocks[l];
+          if (a < line.start || a > line.end) continue;
+          if (i == marks.current) current = ranges.length;
+          ranges.add((at + a - line.start, at + b - line.start));
+        }
+      }
+      inLines = FoundMarks(ranges, current);
+    }
+    final painted = grammar == null
         ? null
         : colouredCode(context, all, codeSpans(grammar, all), start, end);
+    final coloured = painted != null
+        ? markSpans(context, painted, start, inLines)
+        : inLines == null
+        ? null
+        : foundSpans(context, all, start, end, inLines);
     final scheme = Theme.of(context).colorScheme;
     final grow = _grown(context, base.fontSize ?? 14);
     final style = codeStyle(
@@ -1671,8 +1798,7 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
     );
   }
 
-  /// [table] as a grid, made smaller when it is wider than the room it
-  /// has; a tap opens it full screen.
+  /// [table] as a grid at the text's size; a tap opens it full screen.
   Widget _table(
     BuildContext context,
     MarkdownTable table,
@@ -1680,77 +1806,54 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
     List<DrawnBox> boxes,
     List<FoundTag> tags,
   ) {
-    final scheme = Theme.of(context).colorScheme;
-    final bold = base.copyWith(fontWeight: FontWeight.bold);
-    final grid = Table(
-      defaultColumnWidth: const IntrinsicColumnWidth(),
-      border: TableBorder.all(color: scheme.outline),
-      children: [
-        for (final (r, row) in table.rows.indexed)
-          TableRow(
-            decoration: r == 0
-                ? BoxDecoration(color: scheme.surfaceContainerHighest)
-                : null,
-            children: [
-              for (final (c, cell) in row.cells.indexed)
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  child: Text.rich(
-                    TextSpan(
-                      children: [
-                        for (final span in cell.spans)
-                          ..._inlineOf(
-                            context,
-                            span,
-                            r == 0 || (c == 0 && table.headingColumn)
-                                ? bold
-                                : base,
-                            boxes,
-                            tags,
-                          ),
-                      ],
-                    ),
-                    textAlign: cellAlign(table.aligns[c]),
-                    softWrap: false,
-                  ),
-                ),
-            ],
-          ),
-      ],
-    );
     final found = _foundIn;
     final edit = widget.tableEdit;
     final ticking = widget.ticking;
-    return Semantics(
-      container: true,
-      onTapHint: context.t.tableOpen,
-      child: GestureDetector(
-        key: ValueKey('table-${table.firstLine}'),
-        behavior: HitTestBehavior.opaque,
-        onTap: () => unawaited(
-          openTable(
-            context,
-            text: found.stored(widget.source),
-            at: found.storedAt(table.start),
-            edit: edit,
-            ticking: ticking,
-          ),
+    final at = widget.unfoldAt;
+    return _ReadTable(
+      key: ValueKey('table-${table.firstLine}'),
+      table: table,
+      base: base,
+      rows: widget.rows,
+      unfold: at != null && at >= table.start && at <= table.end,
+      cell: (context, r, c, style) => Text.rich(
+        TextSpan(
+          children: [
+            for (final span in table.rows[r].cells[c].spans)
+              ..._inlineOf(context, span, style, boxes, tags),
+          ],
         ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: AlignmentDirectional.centerStart,
-              child: grid,
-            ),
-          ),
+        style: style,
+        textAlign: cellAlign(table.aligns[c]),
+      ),
+      onOpen: () => unawaited(
+        openTable(
+          context,
+          text: found.stored(widget.source),
+          at: found.storedAt(table.start),
+          edit: edit,
+          ticking: ticking,
         ),
       ),
+      onCopy: widget.tableMenu
+          ? () => copyTable(
+              context,
+              text: found.stored(widget.source),
+              at: found.storedAt(table.start),
+              ticking: ticking,
+            )
+          : null,
+      onCopyCells: widget.selectCells
+          ? (rows, left, right) => copyCells(
+              context,
+              text: found.stored(widget.source),
+              at: found.storedAt(table.start),
+              rows: rows,
+              left: left,
+              right: right,
+              ticking: ticking,
+            )
+          : null,
     );
   }
 
@@ -1794,6 +1897,381 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
       ],
     ),
   );
+}
+
+/// A table of a formatted text being read (obf-1048): each column as
+/// wide as its widest shown cell's words, no wider than
+/// [TableScreen.widest] or the room, a longer cell wrapping; wider than
+/// its room it moves sideways with a drag on its cells or by its bar,
+/// the first column staying while it holds headings. With [rows] it shows
+/// its header and that many rows under it, and "Show all" under it
+/// unfolds the rest in place; [unfold] shows all of them. Only the rows
+/// shown are measured and built. A tap opens it ([onOpen]); its ⋮ at its
+/// top right corner offers Copy ([onCopy], obf-1050), none without it.
+/// A tap on a column's heading sorts the rows by it instead (obf-1052),
+/// ascending, then descending, then as written, in the view only: the
+/// first rows shown are the first in that order, and it is forgotten
+/// with the view. With [onCopyCells] a long press on a cell selects a
+/// rectangle of cells to copy (obf-1054, [CellSelection]), given as the
+/// rows' indices in the table in the order shown and the columns from
+/// and to; a tap then ends it before anything else.
+class _ReadTable extends StatefulWidget {
+  final MarkdownTable table;
+  final TextStyle base;
+  final int? rows;
+  final bool unfold;
+
+  /// The words of the cell in row [r] and column [c] in [style].
+  final Widget Function(BuildContext context, int r, int c, TextStyle style)
+  cell;
+  final VoidCallback onOpen;
+  final Future<void> Function()? onCopy;
+  final Future<void> Function(List<int> rows, int left, int right)? onCopyCells;
+
+  const _ReadTable({
+    super.key,
+    required this.table,
+    required this.base,
+    required this.rows,
+    required this.unfold,
+    required this.cell,
+    required this.onOpen,
+    this.onCopy,
+    this.onCopyCells,
+  });
+
+  @override
+  State<_ReadTable> createState() => _ReadTableState();
+}
+
+class _ReadTableState extends State<_ReadTable> {
+  /// The room around a cell's words, sideways and up and down.
+  static const _across = 8.0;
+  static const _down = 4.0;
+
+  final _offset = ValueNotifier<double>(0);
+  final _cells = GlobalKey<CellSelectionState>();
+  late bool _unfolded = widget.unfold;
+  List<double> _widths = const [];
+
+  /// How the rows show sorted, and the rows in that order by their index
+  /// in the table, the header row first.
+  TableSort? _sort;
+  late List<int> _order = tableRowOrder(widget.table, null);
+
+  /// How many rows show, the header row included.
+  int get _shown {
+    final rows = widget.table.rows.length;
+    final folded = widget.rows;
+    if (_unfolded || folded == null) return rows;
+    return math.min(rows, folded + 1);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _measure();
+  }
+
+  @override
+  void didUpdateWidget(_ReadTable old) {
+    super.didUpdateWidget(old);
+    if (widget.unfold && !old.unfold) _unfolded = true;
+    if (!identical(old.table, widget.table)) {
+      if (_sort case (:final column, descending: _)
+          when column >= widget.table.columns) {
+        _sort = null;
+      }
+      _order = tableRowOrder(widget.table, _sort);
+      _cells.currentState?.clear();
+    }
+    if (!identical(old.table, widget.table) ||
+        old.base != widget.base ||
+        old.rows != widget.rows ||
+        widget.unfold != old.unfold) {
+      _measure();
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _offset.addListener(_moved);
+  }
+
+  @override
+  void dispose() {
+    _offset.dispose();
+    super.dispose();
+  }
+
+  /// The cells selected end as the table moves sideways.
+  void _moved() => _cells.currentState?.clear();
+
+  /// Each column as wide as its widest shown cell's words in bold, within
+  /// bounds.
+  void _measure() {
+    final table = widget.table;
+    final bold = widget.base.copyWith(fontWeight: FontWeight.bold);
+    final scaler = MediaQuery.textScalerOf(context);
+    final direction = Directionality.of(context);
+    double width(String words) {
+      final painter = TextPainter(
+        text: TextSpan(text: words, style: bold),
+        textDirection: direction,
+        textScaler: scaler,
+        maxLines: 1,
+      )..layout();
+      final width = painter.width;
+      painter.dispose();
+      return width;
+    }
+
+    final shown = _shown;
+    final order = _order;
+    _widths = [
+      for (var c = 0; c < table.columns; c++)
+        [
+                  for (var r = 0; r < shown; r++)
+                    width(table.rows[order[r]].cells[c].visible),
+                ]
+                .fold(0.0, math.max)
+                .clamp(
+                  TableScreen.narrowest - 2 * _across,
+                  TableScreen.widest - 2 * _across,
+                ) +
+            2 * _across +
+            (_sort?.column == c
+                ? tableSortRoom(scaler, widget.base.fontSize ?? 14)
+                : 0),
+    ];
+  }
+
+  /// A tap on the heading of [column]: the rows show sorted by it
+  /// ascending, then descending, then as written.
+  void _sortBy(int column) => setState(() {
+    _cells.currentState?.clear();
+    _sort = nextTableSort(_sort, column);
+    _order = tableRowOrder(widget.table, _sort);
+    _measure();
+  });
+
+  void _unfoldAll() => setState(() {
+    _unfolded = true;
+    _measure();
+  });
+
+  /// A tap ends the cells selected, else it does [then].
+  void _tapped(VoidCallback then) {
+    if (_cells.currentState?.clear() ?? false) return;
+    then();
+  }
+
+  /// The rows of [cells] by their index in the table, in the order shown.
+  List<int> _rowsOf(CellRect cells) => [
+    for (var r = cells.top; r <= cells.bottom && r < _order.length; r++)
+      _order[r],
+  ];
+
+  /// The words of [cells] as they show, a space between them.
+  String _wordsOf(CellRect cells) {
+    final rows = widget.table.rows;
+    return [
+      for (final r in _rowsOf(cells))
+        for (var c = cells.left; c <= cells.right; c++)
+          if (rows[r].cells[c].visible.trim() case final words
+              when words.isNotEmpty)
+            words,
+    ].join(' ');
+  }
+
+  /// The ⋮ at [at] (global): Copy.
+  Future<void> _menu(Offset at) async {
+    final picked = await showTableMenu(context, at);
+    if (!mounted || picked != TableAction.copy) return;
+    await widget.onCopy?.call();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    final table = widget.table;
+    final hidden = table.rows.length - _shown;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: widget.onCopy == null
+              ? LayoutBuilder(builder: _grid)
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Flexible(child: LayoutBuilder(builder: _grid)),
+                    TableMenuButton(
+                      key: ValueKey('table-menu-${table.firstLine}'),
+                      onMenu: (at) => unawaited(_menu(at)),
+                    ),
+                  ],
+                ),
+        ),
+        if (hidden > 0)
+          TextButton(
+            key: ValueKey('table-show-all-${table.firstLine}'),
+            onPressed: _unfoldAll,
+            child: Text(t.tableShowAll(table.rows.length - 1)),
+          ),
+      ],
+    );
+  }
+
+  Widget _grid(BuildContext context, BoxConstraints constraints) {
+    final t = context.t;
+    final table = widget.table;
+    final room = constraints.maxWidth;
+    final first = table.headingColumn ? 1 : 0;
+    // A column is never wider than the room, the one that stays no wider
+    // than half of it: the others need room to move past it.
+    final widths = [
+      for (final (c, w) in _widths.indexed)
+        math.min(w, c < first ? room / 2 : room),
+    ];
+    final fixed = first == 1 ? widths[0] : 0.0;
+    var moving = 0.0;
+    for (var c = first; c < table.columns; c++) {
+      moving += widths[c];
+    }
+    final rest = math.max(0.0, room - fixed);
+    final most = math.max(0.0, moving - rest);
+    final rows = [
+      for (var r = 0; r < _shown; r++) _row(context, r, widths, first, most),
+    ];
+    final grid = Semantics(
+      container: true,
+      onTapHint: t.tableOpen,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _tapped(widget.onOpen),
+        // A drag on the cells moves a table wider than its room under the
+        // finger; one that fits leaves the swipe to the page.
+        onHorizontalDragUpdate: most > 0
+            ? (d) => _offset.value = (_offset.value - d.delta.dx).clamp(0, most)
+            : null,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (most > 0)
+              TableSidewaysBar(
+                key: ValueKey('table-sideways-${table.firstLine}'),
+                offset: _offset,
+                most: most,
+                room: rest,
+                whole: moving,
+                label: t.tableSideways,
+              ),
+            ...rows,
+          ],
+        ),
+      ),
+    );
+    final copy = widget.onCopyCells;
+    if (copy == null) return grid;
+    return CellSelection(
+      key: _cells,
+      onCopy: (cells) => copy(_rowsOf(cells), cells.left, cells.right),
+      words: _wordsOf,
+      child: grid,
+    );
+  }
+
+  /// The row shown [shown]th of the table: its first column stays when it
+  /// holds headings ([first] is 1), the others move by the offset up to
+  /// [most].
+  Widget _row(
+    BuildContext context,
+    int shown,
+    List<double> widths,
+    int first,
+    double most,
+  ) {
+    final table = widget.table;
+    final r = _order[shown];
+    final cells = [
+      for (var c = first; c < table.columns; c++)
+        SizedBox(width: widths[c], child: _cellAt(context, r, c, shown)),
+    ];
+    return IntrinsicHeight(
+      key: ValueKey('table-${table.firstLine}-row-$r'),
+      child: Row(
+        mainAxisSize: most > 0 ? MainAxisSize.max : MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (first == 1)
+            SizedBox(width: widths[0], child: _cellAt(context, r, 0, shown)),
+          if (most > 0)
+            Expanded(
+              child: TableShifted(
+                offset: _offset,
+                most: most,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: cells,
+                ),
+              ),
+            )
+          else
+            ...cells,
+        ],
+      ),
+    );
+  }
+
+  /// The cell in row [r] of the table and column [c], the row shown
+  /// [shown]th.
+  Widget _cellAt(BuildContext context, int r, int c, int shown) {
+    final scheme = Theme.of(context).colorScheme;
+    final table = widget.table;
+    final heading = r == 0 || (c == 0 && table.headingColumn);
+    final base = widget.base;
+    final style = heading ? base.copyWith(fontWeight: FontWeight.bold) : base;
+    final words = widget.cell(context, r, c, style);
+    final sort = _sort;
+    final sorted = r == 0 && sort != null && sort.column == c;
+    final cell = SelectableCell(
+      cell: (row: shown, column: c),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: heading ? scheme.surfaceContainerHighest : null,
+          border: Border.all(color: scheme.outline, width: 0.5),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: _across,
+            vertical: _down,
+          ),
+          child: sorted
+              ? TableSortedHeading(
+                  words: words,
+                  descending: sort.descending,
+                  size: base.fontSize ?? 14,
+                )
+              : words,
+        ),
+      ),
+    );
+    if (r != 0) return cell;
+    // The header row's tap sorts, before the table's and the card's.
+    return TableSortTap(
+      key: ValueKey('table-${table.firstLine}-sort-$c'),
+      onSort: () => _tapped(() => _sortBy(c)),
+      descending: sorted ? sort.descending : null,
+      child: cell,
+    );
+  }
 }
 
 /// How a cell of a column that lines up as [align] sets its words.
@@ -1864,6 +2342,9 @@ class MarkedCell extends StatefulWidget {
   final TextAlign textAlign;
   final BoxTicking? ticking;
 
+  /// The places found in [text] (obf-1047).
+  final FoundMarks? found;
+
   const MarkedCell(
     this.text,
     this.cell, {
@@ -1874,6 +2355,7 @@ class MarkedCell extends StatefulWidget {
     this.style,
     this.textAlign = TextAlign.start,
     this.ticking,
+    this.found,
   });
 
   @override
@@ -1889,6 +2371,9 @@ class _MarkedCellState extends State<MarkedCell> with _InlineSpans {
 
   @override
   BoxTicking? get _ticking => widget.ticking;
+
+  @override
+  FoundMarks? get _marks => widget.found;
 
   // A table's cell grows with the Device's text size too (#326, obf-1019).
   @override
@@ -1920,6 +2405,21 @@ mixin _InlineSpans<T extends StatefulWidget> on State<T> {
   String get _source;
   List<(int, int)> get _addresses;
   BoxTicking? get _ticking;
+
+  /// The places found in [_source] (obf-1047).
+  FoundMarks? get _marks;
+
+  /// [style] as found where [start] to [end] of [_source] touches a
+  /// place found, else as it is.
+  TextStyle _foundOver(
+    BuildContext context,
+    int start,
+    int end,
+    TextStyle style,
+  ) => switch (_marks?.at(start, end)) {
+    final current? => foundStyle(context, style, current: current),
+    null => style,
+  };
 
   // What is drawn anew follows one of these: the taps of the links
   // drawn before go with them.
@@ -1969,14 +2469,25 @@ mixin _InlineSpans<T extends StatefulWidget> on State<T> {
     switch (span.kind) {
       case MarkdownSpanKind.text when span.contentStart > span.start:
         // An escaped character.
-        out.add(TextSpan(text: span.text, style: style, recognizer: link));
+        out.add(
+          TextSpan(
+            text: span.text,
+            style: _foundOver(context, span.start, span.end, style),
+            recognizer: link,
+          ),
+        );
       case MarkdownSpanKind.text:
         _literal(context, span.start, span.end, style, link, boxes, tags, out);
       case MarkdownSpanKind.code:
         out.add(
           TextSpan(
             text: span.text,
-            style: codeStyle(scheme, style),
+            style: _foundOver(
+              context,
+              span.start,
+              span.end,
+              codeStyle(scheme, style),
+            ),
             recognizer: link,
           ),
         );
@@ -2057,7 +2568,18 @@ mixin _InlineSpans<T extends StatefulWidget> on State<T> {
     ];
     final parts = <({int start, int end, List<InlineSpan> spans})>[
       for (final (from, to) in addresses)
-        (start: from, end: to, spans: [_addressSpan(context, from, to, style)]),
+        (
+          start: from,
+          end: to,
+          spans: [
+            _addressSpan(
+              context,
+              from,
+              to,
+              _foundOver(context, from, to, style),
+            ),
+          ],
+        ),
       for (final box in boxes)
         if (box.start >= start &&
             box.end <= end &&
@@ -2075,16 +2597,32 @@ mixin _InlineSpans<T extends StatefulWidget> on State<T> {
               start: tag.start,
               end: tag.end,
               spans: [
-                _tagSpan(context, t, tag, tagStyle(context, style), onSearch),
+                _tagSpan(
+                  context,
+                  t,
+                  tag,
+                  _foundOver(
+                    context,
+                    tag.start,
+                    tag.end,
+                    tagStyle(context, style),
+                  ),
+                  onSearch,
+                ),
               ],
             ),
     ]..sort((a, b) => a.start.compareTo(b.start));
     var at = start;
+    final marks = _marks;
     for (final part in parts) {
       if (part.start > at) {
-        out.add(
-          TextSpan(
-            text: text.substring(at, part.start),
+        out.addAll(
+          foundSpans(
+            context,
+            text,
+            at,
+            part.start,
+            marks,
             style: style,
             recognizer: link,
           ),
@@ -2094,8 +2632,16 @@ mixin _InlineSpans<T extends StatefulWidget> on State<T> {
       at = part.end;
     }
     if (end > at) {
-      out.add(
-        TextSpan(text: text.substring(at, end), style: style, recognizer: link),
+      out.addAll(
+        foundSpans(
+          context,
+          text,
+          at,
+          end,
+          marks,
+          style: style,
+          recognizer: link,
+        ),
       );
     }
   }

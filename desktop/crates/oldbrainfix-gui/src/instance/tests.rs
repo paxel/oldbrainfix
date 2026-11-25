@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use super::*;
@@ -263,4 +264,177 @@ fn a_file_to_open_goes_to_the_running_window() -> std::io::Result<()> {
     let opened = opened.lock().map(|o| o.clone()).unwrap_or_default();
     assert_eq!(opened, [file]);
     Ok(())
+}
+
+#[test]
+fn several_markdown_files_go_to_the_running_app_one_after_another() -> std::io::Result<()> {
+    let dir = tempfile::tempdir()?;
+    let socket = dir.path().join("instance.sock");
+    let files = [dir.path().join("Garden.md"), dir.path().join("Roses.md")];
+    let opened = Arc::new(Mutex::new(Vec::new()));
+    let into = opened.clone();
+    let (tx, rx) = std::sync::mpsc::channel();
+    listen(
+        &socket,
+        tx,
+        Box::new(|| {}),
+        (
+            Box::new(|_| Ok(())),
+            Box::new(|_| Ok(String::new())),
+            Box::new(move |path| {
+                if let Ok(mut held) = into.lock() {
+                    held.push(path.to_path_buf());
+                }
+            }),
+        ),
+    )?;
+    for file in &files {
+        assert!(hand_over_file(&socket, file));
+    }
+    let wait = std::time::Duration::from_secs(5);
+    assert_eq!(rx.recv_timeout(wait).ok(), Some(Command::Open));
+    assert_eq!(rx.recv_timeout(wait).ok(), Some(Command::Open));
+    let opened = opened.lock().map(|o| o.clone()).unwrap_or_default();
+    assert_eq!(opened, files);
+    Ok(())
+}
+
+/// A running app of the version of this build, over a named pipe's
+/// frames as on Windows (Q12), served on a socket pair: the start's end,
+/// with the captured texts, the files opened and the commands it got.
+type Framed = (
+    std::os::unix::net::UnixStream,
+    Arc<Mutex<Vec<String>>>,
+    Arc<Mutex<Vec<PathBuf>>>,
+    std::sync::mpsc::Receiver<Command>,
+);
+
+fn framed() -> std::io::Result<Framed> {
+    let (start, mut app) = std::os::unix::net::UnixStream::pair()?;
+    let (texts, files) = (
+        Arc::new(Mutex::new(Vec::new())),
+        Arc::new(Mutex::new(Vec::new())),
+    );
+    let (into_texts, into_files) = (texts.clone(), files.clone());
+    let (tx, rx) = std::sync::mpsc::channel();
+    let running = Running::new(
+        "0.8.0",
+        tx,
+        Box::new(|| {}),
+        (
+            Box::new(move |text| {
+                if text == "fail" {
+                    return Err("the log is locked".into());
+                }
+                into_texts
+                    .lock()
+                    .map_err(|e| e.to_string())?
+                    .push(text.to_string());
+                Ok(())
+            }),
+            Box::new(|path| Ok(format!("{} came in.", path.display()))),
+            Box::new(move |path| {
+                if let Ok(mut held) = into_files.lock() {
+                    held.push(path.to_path_buf());
+                }
+            }),
+        ),
+    );
+    std::thread::spawn(move || serve_framed(&running, &mut app));
+    Ok((start, texts, files, rx))
+}
+
+const WAIT: Duration = Duration::from_secs(5);
+
+#[test]
+fn over_frames_a_text_is_captured_and_answered_as_over_the_socket() -> std::io::Result<()> {
+    let (start, texts, _, rx) = framed()?;
+    let answer = exchange_framed(start, TEXT, "buy milk\nand bread\n", WAIT);
+    assert_eq!(answer.as_deref().map(said), Some(Ok(String::new())));
+    assert_eq!(
+        texts.lock().map(|t| t.clone()).unwrap_or_default(),
+        ["buy milk\nand bread\n"]
+    );
+    let (start, _, _, _) = framed()?;
+    let answer = exchange_framed(start, TEXT, "fail", WAIT);
+    assert_eq!(
+        answer.as_deref().map(said),
+        Some(Err("the log is locked".into()))
+    );
+    assert!(rx.try_recv().is_err());
+    Ok(())
+}
+
+#[test]
+fn over_frames_the_version_an_import_a_file_and_a_wish_are_answered() -> std::io::Result<()> {
+    let (start, _, _, _) = framed()?;
+    assert_eq!(
+        exchange_framed(start, VERSION, "", WAIT).as_deref(),
+        Some("0.8.0")
+    );
+    let (start, _, _, _) = framed()?;
+    let answer = exchange_framed(start, IMPORT, "/home/a b.obfsync", WAIT);
+    assert_eq!(
+        answer.as_deref().map(said),
+        Some(Ok("/home/a b.obfsync came in.".into()))
+    );
+    let (start, _, files, rx) = framed()?;
+    // A file is not answered: the frame comes back empty.
+    let answer = exchange_framed(start, FILE, "/home/Garden notes.md", WAIT);
+    assert_eq!(answer.as_deref(), Some(""));
+    assert_eq!(rx.recv_timeout(WAIT).ok(), Some(Command::Open));
+    assert_eq!(
+        files.lock().map(|f| f.clone()).unwrap_or_default(),
+        [PathBuf::from("/home/Garden notes.md")]
+    );
+    let (start, _, _, rx) = framed()?;
+    assert_eq!(
+        exchange_framed(start, word(Some(Command::Capture)), "", WAIT).as_deref(),
+        Some("")
+    );
+    assert_eq!(rx.recv_timeout(WAIT).ok(), Some(Command::Capture));
+    Ok(())
+}
+
+#[test]
+fn a_frame_holds_any_bytes_and_a_broken_one_is_refused() -> std::io::Result<()> {
+    let mut out = Vec::new();
+    write_frame(&mut out, b"text\nline one\n\n0\n")?;
+    assert_eq!(out, b"17\ntext\nline one\n\n0\n");
+    assert_eq!(read_frame(&mut out.as_slice())?, b"text\nline one\n\n0\n");
+    // Cut short, no length, too long.
+    assert!(read_frame(&mut b"16\ntext".as_slice()).is_err());
+    assert!(read_frame(&mut b"text\n".as_slice()).is_err());
+    assert!(read_frame(&mut b"99999999999999999999999\n".as_slice()).is_err());
+    assert!(read_frame(&mut format!("{}\n", MAX_FRAME + 1).as_bytes()).is_err());
+    Ok(())
+}
+
+#[test]
+fn an_app_that_never_answers_is_waited_for_no_longer_than_asked() -> std::io::Result<()> {
+    let (start, _quiet) = std::os::unix::net::UnixStream::pair()?;
+    let asked = std::time::Instant::now();
+    assert_eq!(
+        exchange_framed(start, VERSION, "", Duration::from_millis(200)),
+        None
+    );
+    assert!(asked.elapsed() < Duration::from_secs(3));
+    Ok(())
+}
+
+#[test]
+fn each_users_pipe_has_a_name_of_its_own_every_version_works_out_alike() {
+    let own = Path::new(r"C:\Users\Ada\AppData\Roaming\oldbrainfix\data\instance.sock");
+    let other = Path::new(r"C:\Users\Bob\AppData\Roaming\oldbrainfix\data\instance.sock");
+    let name = pipe_name(own);
+    assert!(name.starts_with(r"\\.\pipe\io.github.paxel.oldbrainfix-"));
+    assert_eq!(name, pipe_name(own));
+    assert_ne!(name, pipe_name(other));
+    // FNV-1a, fixed, so an update finds the pipe of the app before it.
+    assert_eq!(
+        pipe_name(Path::new("")),
+        r"\\.\pipe\io.github.paxel.oldbrainfix-cbf29ce484222325"
+    );
+    // No backslash after the prefix, which a pipe's name may not hold.
+    assert!(!name.trim_start_matches(r"\\.\pipe\").contains('\\'));
 }

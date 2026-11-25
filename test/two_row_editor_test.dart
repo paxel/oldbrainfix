@@ -9,6 +9,7 @@ import 'package:oldbrainfix/src/text_marks_view.dart';
 import 'package:oldbrainfix/src/two_row_text_field.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'add_a_part.dart';
 import 'open_capture.dart';
 
 void main() {
@@ -595,8 +596,9 @@ void main() {
         const TextSelection(baseOffset: 6, extentOffset: 8),
       );
       await tester.pumpAndSettle();
+      // The toolbar above a selection, Cut not in it (obf-1055).
       expect(find.text('Copy'), findsOneWidget);
-      expect(find.text('Cut'), findsOneWidget);
+      expect(find.text('Cut'), findsNothing);
       expect(find.text('Delete'), findsOneWidget);
 
       await press(tester, back);
@@ -785,18 +787,7 @@ void main() {
       // Amend asks in a dialog, its field focused at once.
       tester.view.resetViewInsets();
       await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(
-        find.text('Add to Note'),
-        200,
-        scrollable: find
-            .descendant(
-              of: find.byType(NoteEditorScreen),
-              matching: find.byType(Scrollable),
-            )
-            .first,
-      );
-      await tester.tap(find.text('Add to Note'));
-      await tester.pumpAndSettle();
+      await addAPart(tester);
       tester.view.viewInsets = const FakeViewPadding(bottom: 900);
       await tester.pumpAndSettle();
       expect(bar, findsOneWidget);

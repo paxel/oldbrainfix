@@ -6,12 +6,13 @@
 //! from theirs (#107, #144).
 
 use egui::{
-    Color32, ColorImage, FontId, Id, Rect, RichText, Sense, Stroke, StrokeKind, TextEdit,
-    TextureHandle, TextureOptions, Ui, WidgetInfo, WidgetType,
+    Color32, ColorImage, FontId, Id, Rect, RichText, Sense, Stroke, StrokeKind, TextureHandle,
+    TextureOptions, Ui, WidgetInfo, WidgetType,
 };
 use oldbrainfix_core::CardTaken;
 use oldbrainfix_core::profile::{self, Profile, ProfileChoice};
 
+use crate::design;
 use crate::icons;
 use crate::l10n::L10n;
 use crate::media::pixels;
@@ -344,9 +345,9 @@ pub fn header(
         });
     });
     ui.add_space(8.0);
-    ui.label(RichText::new(t.profile_name()).strong().color(text));
+    ui.label(RichText::new(t.profile_name()).strong());
     let field = ui.add(
-        TextEdit::singleline(&mut view.name)
+        crate::theme::field(ui, &mut view.name)
             .id(Id::new("profile name"))
             .hint_text(t.profile_no_name())
             .desired_width(320.0),
@@ -369,7 +370,7 @@ pub fn header(
 pub fn card_section(ui: &mut Ui, t: &L10n, saved: bool, actions: &mut Vec<ProfileAction>) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
-    ui.label(RichText::new(t.profile_card_title()).strong().color(text));
+    ui.label(RichText::new(t.profile_card_title()).strong());
     ui.label(
         RichText::new(t.profile_card_send_detail())
             .small()
@@ -406,7 +407,7 @@ pub fn add_person(ui: &mut Ui, t: &L10n, form: &mut CardForm, actions: &mut Vec<
     let text = ui.visuals().text_color();
     ui.label(RichText::new(t.person_add_link()).color(text));
     let field = ui.add(
-        TextEdit::singleline(&mut form.link)
+        crate::theme::field(ui, &mut form.link)
             .id(Id::new("profile card link"))
             .desired_width(320.0),
     );
@@ -451,7 +452,7 @@ pub fn card_answer(t: &L10n, taken: CardTaken) -> Option<&str> {
 /// card too long for a QR says to send the link instead.
 pub fn qr_page(ui: &mut Ui, t: &L10n, link: &str) {
     let text = ui.visuals().text_color();
-    ui.heading(RichText::new(t.profile_qr_title()).color(text));
+    crate::design::dialog_title(ui, t.profile_qr_title());
     let drawn = ui
         .vertical_centered(|ui| {
             crate::sync_view::qr(
@@ -483,7 +484,7 @@ pub fn question_form(
     actions: &mut Vec<ProfileAction>,
 ) {
     let text = ui.visuals().text_color();
-    ui.heading(RichText::new(t.profile_which_title()).color(text));
+    crate::design::dialog_title(ui, t.profile_which_title());
     ui.label(RichText::new(t.profile_which_text()).color(text));
     let (own_view, other_view) = views;
     let choices = [
@@ -510,7 +511,7 @@ pub fn question_form(
                 avatar(ui, view, profile, 56.0, name);
                 ui.add_space(12.0);
                 ui.vertical(|ui| {
-                    ui.label(RichText::new(name).strong().color(text));
+                    ui.label(RichText::new(name).strong());
                     ui.label(RichText::new(code).monospace().color(text));
                     ui.label(
                         RichText::new(place)
@@ -541,7 +542,7 @@ pub fn question_form(
 pub fn square_page(ui: &mut Ui, t: &L10n, square: &mut Square, actions: &mut Vec<ProfileAction>) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
-    ui.heading(RichText::new(t.profile_crop_title()).color(text));
+    crate::design::dialog_title(ui, t.profile_crop_title());
     ui.label(RichText::new(t.profile_crop_hint()).color(weak));
     ui.add_space(8.0);
     let texture = match &square.texture {
@@ -613,7 +614,7 @@ pub fn square_page(ui: &mut Ui, t: &L10n, square: &mut Square, actions: &mut Vec
         if theme::main_action(ui, true, t.profile_crop_use()) {
             actions.push(ProfileAction::UseSquare);
         }
-        if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+        if design::row_button(ui, t.cancel()).clicked() {
             actions.push(ProfileAction::CancelSquare);
         }
     });

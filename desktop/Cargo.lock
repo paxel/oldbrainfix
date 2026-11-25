@@ -3348,7 +3348,7 @@ dependencies = [
 
 [[package]]
 name = "oldbrainfix-core"
-version = "0.7.2"
+version = "0.8.0"
 dependencies = [
  "argon2",
  "base64 0.22.1",
@@ -3382,7 +3382,7 @@ dependencies = [
 
 [[package]]
 name = "oldbrainfix-gui"
-version = "0.7.2"
+version = "0.8.0"
 dependencies = [
  "arboard",
  "ashpd",
@@ -3402,10 +3402,14 @@ dependencies = [
  "mac-notification-sys",
  "ndarray",
  "notify-rust",
+ "objc2 0.6.4",
+ "objc2-app-kit 0.3.2",
+ "objc2-foundation 0.3.2",
  "oldbrainfix-core",
  "oldbrainfix-l10n",
  "oldbrainfix-whisper",
  "parking_lot",
+ "pulldown-cmark",
  "qrcode",
  "rfd",
  "rodio",
@@ -3426,7 +3430,7 @@ dependencies = [
 
 [[package]]
 name = "oldbrainfix-l10n"
-version = "0.7.2"
+version = "0.8.0"
 dependencies = [
  "serde_json",
  "tempfile",
@@ -3434,7 +3438,7 @@ dependencies = [
 
 [[package]]
 name = "oldbrainfix-pdf"
-version = "0.7.2"
+version = "0.8.0"
 dependencies = [
  "crc32fast",
  "flate2",
@@ -3443,7 +3447,7 @@ dependencies = [
 
 [[package]]
 name = "oldbrainfix-whisper"
-version = "0.7.2"
+version = "0.8.0"
 dependencies = [
  "cmake",
  "hex",
@@ -3838,6 +3842,17 @@ name = "profiling"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d595e54a326bc53c1c197b32d295e14b169e3cfeaa8dc82b529f947fba6bcf5"
+
+[[package]]
+name = "pulldown-cmark"
+version = "0.13.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3db2be46835f013dd3f4fa7f5f7402c537787b54ebb6fe2b94bbdd7e2669bb7b"
+dependencies = [
+ "bitflags 2.13.2",
+ "memchr",
+ "unicase",
+]
 
 [[package]]
 name = "pxfm"
@@ -5180,6 +5195,12 @@ dependencies = [
  "tempfile",
  "windows-sys 0.61.2",
 ]
+
+[[package]]
+name = "unicase"
+version = "2.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "357cc3acc6a036009fd6c973ed009037c732d60d0b4f6c673e9041497482a28f"
 
 [[package]]
 name = "unicode-general-category"

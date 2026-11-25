@@ -8,8 +8,9 @@
 //! nothing at all.
 //!
 //! The quick note, the capture popup and the window's quick note dialog,
-//! shows only the text, the Nudge buttons and More (#352); the Note
-//! dialog does the rest once the Note is saved. Both save through
+//! shows only the text, the Nudge buttons and Open in the editor (#352,
+//! obf-1080); the Note dialog does the rest once the Note is saved. Both
+//! save through
 //! [`save`], so the two cannot tell this apart. The Kind (#310) applies
 //! to the typed text only: with nothing typed the Note stays a Plain
 //! Note. With a Shopping List set (#124), each line typed becomes a Line
@@ -25,7 +26,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use chrono::Duration;
-use egui::{Key, Modifiers, RichText, Ui};
+use egui::{Atom, Button, Id, Key, Modifiers, Response, RichText, Ui, Vec2};
 use oldbrainfix_core::{
     Checklists, DeviceSettings, Error, Frogs, Importance, NewFile, Note, Notes, Routines, Schedule,
     SessionRule, Sessions, ShoppingLists, Store, Tallies, TallyRule, WallClock, markdown,
@@ -35,6 +36,7 @@ use oldbrainfix_core::{
 use crate::app::Wall;
 use crate::attachment_view::HeldFile;
 use crate::enrich::Said;
+use crate::icons;
 use crate::l10n::L10n;
 
 /// A Session's pool, count, weekdays' own counts and rule as plain
@@ -391,9 +393,10 @@ fn formatted(store: &Store, note: &Note) -> oldbrainfix_core::Result<()> {
 }
 
 /// What a Shopping List is called where it is picked: the first line of
-/// its text, "Shopping List" while that is blank.
+/// its text, else of its Transcript or Photo Text ([`Note::shown_name`],
+/// obf-1049), "Shopping List" while that is blank.
 pub fn shopping_title(t: &L10n, note: &Note) -> String {
-    match note.visible_text().trim().split('\n').next().map(str::trim) {
+    match note.shown_name().trim().split('\n').next().map(str::trim) {
         Some(title) if !title.is_empty() => title.to_string(),
         _ => t.shopping_heading().to_string(),
     }
@@ -443,7 +446,7 @@ pub fn shopping_picker(
         }
         return None;
     }
-    ui.label(RichText::new(t.add_to_shopping_list()).strong().color(text));
+    ui.label(RichText::new(t.add_to_shopping_list()).strong());
     let mut picked = None;
     for (id, title) in lists {
         let on = current == Some(id.as_str());
@@ -460,8 +463,9 @@ pub fn shopping_picker(
 }
 
 /// What this Device's quick note, its dialog in the window and the
-/// popup, shows besides its text and More (#142, #352, ADR 0008): the
-/// Nudge buttons until switched off in Settings ▸ Quick note.
+/// popup, shows besides its text and Open in the editor (#142, #352,
+/// ADR 0008): the Nudge buttons until switched off in Settings ▸ Quick
+/// note.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct QuickNote {
     pub nudge_buttons: bool,
@@ -515,6 +519,33 @@ pub fn nudge_key(ui: &Ui, nudges: bool) -> Option<Duration> {
         i.consume_key(Modifiers::COMMAND, Key::Enter)
             .then(Notes::default_nudge)
     })
+}
+
+/// The quick note's Open in the editor (obf-1080), under the Nudge
+/// buttons or their Save: a full-width outlined button, the tonal fill
+/// with the outline (obf-1081), with the editor's pencil before its
+/// words, greyed unless `enabled`. Its caller saves
+/// the Note and opens it in the Note dialog.
+pub fn open_in_editor(ui: &mut Ui, t: &L10n, enabled: bool) -> Response {
+    let text = ui.visuals().text_color();
+    let pencil = Id::new("open in the editor pencil");
+    ui.add_enabled_ui(enabled, |ui| {
+        // The pencil and the words in the middle of the width.
+        let atoms = (
+            Atom::grow(),
+            Atom::custom(pencil, Vec2::splat(18.0)),
+            RichText::new(t.capture_open_in_editor()).color(text),
+            Atom::grow(),
+        );
+        let shown = Button::new(atoms)
+            .min_size(egui::vec2(ui.available_width(), 0.0))
+            .atom_ui(ui);
+        if let Some(rect) = shown.rect(pencil) {
+            icons::paint(ui.painter(), rect, icons::EDIT, text);
+        }
+        shown.response
+    })
+    .inner
 }
 
 /// Makes each line of the text of the saved Note `note_id` a Line of the

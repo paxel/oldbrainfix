@@ -495,6 +495,8 @@ fn a_link_gets_the_address_typed() -> TestResult {
 fn add_to_note_has_the_format_bar_without_the_mark() -> TestResult {
     let (store, note) = with_note("Shop", "plain")?;
     let mut harness = editor(&store, &note);
+    // Its box shows once asked (obf-1072).
+    click(&mut harness, "Add a part")?;
     // ☐ only over the Note's text, the rest over both fields.
     assert_eq!(
         harness
@@ -525,12 +527,19 @@ fn add_to_note_has_the_format_bar_without_the_mark() -> TestResult {
     click(&mut harness, "Set link")?;
     let added = amend_field(&harness).ok_or("the Amend field")?;
     assert!(added.contains("milk](https://example.org)"), "{added}");
-    click(&mut harness, "Add to Note")?;
+    click(&mut harness, "Add")?;
     let sections = Notes::new(&store).sections(&note)?;
     assert_eq!(sections.len(), 1);
     assert_eq!(sections[0].text, added);
     assert_eq!(sections[0].text_format, MARKDOWN);
-    assert_eq!(amend_field(&harness).as_deref(), Some(""));
+    // Added, its box goes (obf-1072).
+    assert_eq!(amend_field(&harness), None);
+    assert!(
+        harness
+            .query_all_by_role_and_label(Role::Button, "Add a part")
+            .next()
+            .is_some()
+    );
     Ok(())
 }
 

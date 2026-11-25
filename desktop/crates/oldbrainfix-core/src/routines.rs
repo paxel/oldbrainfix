@@ -130,6 +130,91 @@ pub mod heads_up_keys {
                 .join(",")
         })
     }
+
+    /// The Heads-ups the Routine editor offers for a timed schedule, in
+    /// minutes: 5, 10, 15 and 30 min, 1 h, 2 h, 1 day, 2 days and 1 week.
+    pub const TIMED_CHOICES: [i64; 9] = [5, 10, 15, 30, 60, 120, 1440, 2880, 10080];
+    /// Those for an all-day schedule, which takes whole days only: 1, 2
+    /// and 3 days and 1 week.
+    pub const ALL_DAY_CHOICES: [i64; 4] = [1440, 2880, 4320, 10080];
+
+    /// The Heads-ups the editor offers for a schedule all-day or not;
+    /// "Custom…" follows them (obf-1087).
+    pub fn choices(all_day: bool) -> &'static [i64] {
+        if all_day {
+            &ALL_DAY_CHOICES
+        } else {
+            &TIMED_CHOICES
+        }
+    }
+
+    /// The units a custom Heads-up is given in: all four for a timed
+    /// schedule, days and weeks for an all-day one (obf-1087).
+    pub fn units(all_day: bool) -> &'static [super::HeadsUpUnit] {
+        use super::HeadsUpUnit::{Days, Weeks};
+        if all_day {
+            &[Days, Weeks]
+        } else {
+            &super::HeadsUpUnit::ALL
+        }
+    }
+
+    /// A custom Heads-up of `count` `unit`s in minutes, as [`HEADS_UPS`]
+    /// holds it (obf-1087); `None` when `count` is not from 1 to
+    /// [`super::HeadsUpUnit::most`], or `unit` is not one of [`units`]
+    /// for the schedule.
+    pub fn minutes_of(count: i64, unit: super::HeadsUpUnit, all_day: bool) -> Option<i64> {
+        if !units(all_day).contains(&unit) || !(1..=unit.most()).contains(&count) {
+            return None;
+        }
+        Some(count * unit.in_minutes())
+    }
+}
+
+/// A unit a custom Heads-up is given in (obf-1087).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum HeadsUpUnit {
+    Minutes,
+    Hours,
+    Days,
+    Weeks,
+}
+
+impl HeadsUpUnit {
+    /// Every unit, in the Dart core's `HeadsUpUnit.values` order.
+    pub const ALL: [HeadsUpUnit; 4] = [
+        HeadsUpUnit::Minutes,
+        HeadsUpUnit::Hours,
+        HeadsUpUnit::Days,
+        HeadsUpUnit::Weeks,
+    ];
+
+    /// How many minutes one of it is.
+    pub const fn in_minutes(self) -> i64 {
+        match self {
+            HeadsUpUnit::Minutes => 1,
+            HeadsUpUnit::Hours => 60,
+            HeadsUpUnit::Days => 1440,
+            HeadsUpUnit::Weeks => 10080,
+        }
+    }
+
+    /// The most of it a Heads-up can be, so it lies no further ahead than
+    /// [`heads_up_keys::MAX_MINUTES`]: 43200 minutes, 720 hours, 30 days
+    /// or 4 weeks.
+    pub const fn most(self) -> i64 {
+        heads_up_keys::MAX_MINUTES / self.in_minutes()
+    }
+
+    /// Its name as the Dart core's `HeadsUpUnit.name` spells it.
+    pub const fn name(self) -> &'static str {
+        match self {
+            HeadsUpUnit::Minutes => "minutes",
+            HeadsUpUnit::Hours => "hours",
+            HeadsUpUnit::Days => "days",
+            HeadsUpUnit::Weeks => "weeks",
+        }
+    }
 }
 
 /// Something to be done on a schedule, spawned from a Note (CONTEXT.md).
@@ -585,6 +670,20 @@ impl<'a> Routines<'a> {
     /// are in, before the first and after each, as the Dart core's
     /// `trashNotes`.
     pub fn trash_notes(&self, notes: &[Note], progress: &dyn Fn(usize, usize)) -> Result<()> {
+        self.trash_notes_stopping(notes, progress, &|| false)
+            .map(drop)
+    }
+
+    /// As [`Routines::trash_notes`], asking `stop` before each Note
+    /// (obf-1078): once it says so, the Notes in the trash stay there, the
+    /// others where they are, and it answers `false`; `true` once all are
+    /// in.
+    pub fn trash_notes_stopping(
+        &self,
+        notes: &[Note],
+        progress: &dyn Fn(usize, usize),
+        stop: &dyn Fn() -> bool,
+    ) -> Result<bool> {
         let mut by_note: HashMap<String, Vec<Routine>> = HashMap::new();
         for routine in self.all()? {
             if let Some(note) = self.note(&routine)? {
@@ -593,6 +692,9 @@ impl<'a> Routines<'a> {
         }
         progress(0, notes.len());
         for (i, note) in notes.iter().enumerate() {
+            if stop() {
+                return Ok(false);
+            }
             self.store.batch(|| {
                 let at = dart_iso(self.store.now());
                 self.store
@@ -607,7 +709,7 @@ impl<'a> Routines<'a> {
             })?;
             progress(i + 1, notes.len());
         }
-        Ok(())
+        Ok(true)
     }
 
     /// Brings the Note `note_id` back from the trash, with the Routines

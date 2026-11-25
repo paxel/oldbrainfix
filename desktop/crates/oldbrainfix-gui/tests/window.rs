@@ -416,18 +416,21 @@ fn a_typed_thought_is_captured_with_the_nudge_picked() -> TestResult {
         Some(dart_iso(now + Duration::minutes(30)))
     );
 
-    // Inside a Topic the Note is filed there, sorted: one Save instead
-    // of the Nudge times, and Ctrl+Enter saves it without a Nudge (#113).
+    // Inside a Topic Ctrl+N opens the Note dialog on a Note filed there,
+    // sorted, without a Nudge (#113, obf-1140); Esc keeps what is typed.
     harness.get_by_label("Kitchen").click();
     harness.run();
     harness.key_press_modifiers(Modifiers::COMMAND, Key::N);
     harness.run();
-    typing(&harness).type_text("  Buy descaler ");
+    harness.run();
+    assert!(!harness.state().quick_note_open());
+    assert!(harness.state().note_open());
+    typing(&harness).type_text("Buy descaler");
     harness.run();
     assert!(harness.query_by_label("30 min").is_none());
-    assert!(harness.query_by_label("Ctrl+Enter saves it.").is_some());
-    harness.key_press_modifiers(Modifiers::COMMAND, Key::Enter);
+    harness.key_press(Key::Escape);
     harness.run();
+    assert!(!harness.state().note_open());
     let descaler = find(harness.state(), "Buy descaler")?;
     assert_eq!(descaler.place, Some(place(harness.state(), "Kitchen")?));
     assert_eq!(nudge(&harness, &descaler.id)?, None);
@@ -509,11 +512,13 @@ fn a_text_in_an_unknown_format_shows_as_it_is_and_is_never_overwritten() -> Test
     harness.key_press_modifiers(Modifiers::COMMAND, Key::Enter);
     harness.run();
     // Amend adds a Section and leaves the text as it is.
+    harness.get_by_label("Add a part").click();
+    harness.run();
     field(&harness, "What's new?").click();
     harness.run();
     typing(&harness).type_text("Oat milk too");
     harness.run();
-    harness.get_by_label("Add to Note").click();
+    harness.get_by_label("Add").click();
     harness.run();
     let sections = Notes::new(harness.state().store()).sections(&id)?;
     assert_eq!(sections.len(), 1);
@@ -639,11 +644,13 @@ fn a_note_is_amended_weighed_trashed_restored_and_merged() -> TestResult {
     harness.run();
     assert_eq!(note(&harness, &kettle)?.importance, Importance::Important);
 
+    harness.get_by_label("Add a part").click();
+    harness.run();
     field(&harness, "What's new?").click();
     harness.run();
     typing(&harness).type_text("Vinegar works");
     harness.run();
-    harness.get_by_label("Add to Note").click();
+    harness.get_by_label("Add").click();
     harness.run();
     let sections = Notes::new(harness.state().store()).sections(&kettle)?;
     assert_eq!(sections.len(), 1);
@@ -652,7 +659,7 @@ fn a_note_is_amended_weighed_trashed_restored_and_merged() -> TestResult {
     // Deleting asks nothing (#268); Ctrl+Z brings the Note back.
     harness.get_by_label("Move to trash").click();
     harness.run();
-    assert!(!shows(&harness, "Delete this Note?"));
+    assert!(!shows(&harness, "Move this Note to the trash?"));
     assert!(note(&harness, &kettle)?.is_trashed());
     harness.key_press_modifiers(Modifiers::COMMAND, Key::Z);
     harness.run();
@@ -759,33 +766,45 @@ fn areas_and_topics_are_made_renamed_and_given_a_look() -> TestResult {
     harness.run();
     assert!(shows(&harness, "Garden shed"));
 
-    menu(&mut harness, "Garden shed", "Rename");
-    harness.key_press_modifiers(Modifiers::COMMAND, Key::A);
-    harness.run();
-    typing(&harness).type_text("Shed");
-    harness.run();
-    harness.get_by_label("Save").click();
-    harness.run();
-    assert!(shows(&harness, "Shed"));
-    assert!(!shows(&harness, "Garden shed"));
-    let shed = place(harness.state(), "Shed")?;
-
-    menu(&mut harness, "Shed", "Colour and icon");
-    harness.get_by_label("6A1B9A").click();
-    harness.run();
-    harness.get_by_label("kids").click();
-    harness.run();
+    // Its name, colour and icon in one dialog, kept with Save (obf-1014).
+    let shed = place(harness.state(), "Garden shed")?;
     let look = |h: &Harness<'_, App>| -> Result<_, Box<dyn std::error::Error>> {
         let area = Places::new(h.state().store()).area_by_id(&shed)?;
         Ok(area.map(|a| (a.colour, a.icon)))
     };
+    menu(&mut harness, "Garden shed", "Name, colour and icon…");
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::A);
+    harness.run();
+    typing(&harness).type_text("Shed");
+    harness.run();
+    harness.get_by_label("6A1B9A").click();
+    harness.run();
+    harness.get_by_label("kids").click();
+    harness.run();
+    // Nothing is kept before Save.
+    assert_eq!(look(&harness)?, Some((None, None)));
+    harness.get_by_label("Save").click();
+    harness.run();
+    assert!(shows(&harness, "Shed"));
+    assert!(!shows(&harness, "Garden shed"));
     assert_eq!(
         look(&harness)?,
         Some((Some("6A1B9A".into()), Some("kids".into())))
     );
+    // Cancel keeps none of it.
+    menu(&mut harness, "Shed", "Name, colour and icon…");
     harness.get_by_label("No icon").click();
     harness.run();
-    harness.get_by_label("Close").click();
+    harness.get_by_label("Cancel").click();
+    harness.run();
+    assert_eq!(
+        look(&harness)?,
+        Some((Some("6A1B9A".into()), Some("kids".into())))
+    );
+    menu(&mut harness, "Shed", "Name, colour and icon…");
+    harness.get_by_label("No icon").click();
+    harness.run();
+    harness.get_by_label("Save").click();
     harness.run();
     assert_eq!(look(&harness)?, Some((Some("6A1B9A".into()), None)));
 
@@ -806,12 +825,12 @@ fn areas_and_topics_are_made_renamed_and_given_a_look() -> TestResult {
 
     // A starter renamed to what it shows stays as it was, translatable.
     let entries = harness.state().store().all_entries()?.len();
-    menu(&mut harness, "Household", "Rename");
+    menu(&mut harness, "Household", "Name, colour and icon…");
     harness.get_by_label("Save").click();
     harness.run();
     assert_eq!(harness.state().store().all_entries()?.len(), entries);
     // Cancel changes nothing either.
-    menu(&mut harness, "Shed", "Rename");
+    menu(&mut harness, "Shed", "Name, colour and icon…");
     harness.get_by_label("Cancel").click();
     harness.run();
     assert!(shows(&harness, "Shed"));
@@ -826,10 +845,10 @@ fn a_pick_by_keyboard_or_screen_reader_closes_the_menus_of_areas_and_topics() ->
         .get_by_role_and_label(Role::Button, "Household")
         .click_secondary();
     harness.run();
-    assert!(shows(&harness, "Colour and icon"));
+    assert!(shows(&harness, "Name, colour and icon…"));
     harness.get_by_label("New Topic").click_accesskit();
     harness.run();
-    assert!(!shows(&harness, "Colour and icon"));
+    assert!(!shows(&harness, "Name, colour and icon…"));
     harness.get_by_label("Cancel").click();
     harness.run();
     harness
@@ -985,7 +1004,7 @@ fn the_editor_speaks_german() -> TestResult {
         "Bereich und Thema: Unsortiert",
         "Zusammenführen mit …",
         "In den Papierkorb",
-        "Zur Notiz hinzufügen",
+        "Teil hinzufügen",
     ] {
         assert!(shows(&harness, label), "{label}");
     }
@@ -1024,7 +1043,8 @@ fn an_areas_level_adds_topics() -> TestResult {
     // In the menu of "+" (#161).
     harness.get_by_label("Add here").click();
     harness.run();
-    harness.get_by_label("Topic").click();
+    // New Topic, as in an Area's menu (obf-1014, C12).
+    harness.get_by_label("New Topic").click();
     harness.run();
     assert!(shows(&harness, "New Topic"));
     typing(&harness).type_text("Homework");

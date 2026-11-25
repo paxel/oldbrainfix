@@ -18,8 +18,10 @@ import 'calendar_platform.dart';
 import 'checklist_view.dart';
 import 'context_platform.dart';
 import 'drafts.dart';
+import 'edit_history.dart';
 import 'failure_dialog.dart';
 import 'file_platform.dart';
+import 'found_marks.dart';
 import 'frogs_screen.dart';
 import 'hidden_from_ai_view.dart';
 import 'home_shortcuts.dart';
@@ -29,6 +31,7 @@ import 'location.dart';
 import 'look.dart';
 import 'merge_into_screen.dart';
 import 'note_card.dart';
+import 'note_find.dart';
 import 'note_history_screen.dart';
 import 'occurrence_answers.dart';
 import 'ocr_platform.dart';
@@ -40,6 +43,7 @@ import 'place_names.dart';
 import 'profile.dart' show profileDisplayName;
 import 'routine_editor_screen.dart';
 import 'schedule_text.dart';
+import 'selection_toolbar.dart';
 import 'sent_item_screen.dart';
 import 'session_editor.dart';
 import 'session_note.dart';
@@ -62,14 +66,21 @@ import 'voice_recorder.dart';
 
 /// Opens the editor of [note]; returns once the user left it, or once it
 /// moved on to the next of [sorting]. With [typeLines] the cursor starts
-/// in a new Line of a list after its open ones (#161, #276).
+/// in a new Line of a list after its open ones (#161, #276). With [find]
+/// it opens with its find bar finding the search's words, at the place
+/// the search found (obf-1047). [made] says the Note is being made
+/// (obf-1072). With [typeText] the cursor starts in its text, the
+/// keyboard up (obf-1140).
 Future<void> openNote(
   BuildContext context,
   Notes notes,
   Places places,
   Note note, {
   bool typeLines = false,
+  bool typeText = false,
   UnsortedShown? sorting,
+  NoteFind? find,
+  bool made = false,
 }) => Navigator.of(context).push(
   MaterialPageRoute<void>(
     builder: (_) => NoteEditorScreen(
@@ -78,7 +89,10 @@ Future<void> openNote(
       drafts: DraftsScope.of(context),
       noteId: note.id,
       typeLines: typeLines,
+      typeText: typeText,
       sorting: sorting,
+      find: find,
+      made: made,
     ),
   ),
 );
@@ -107,7 +121,7 @@ NoteCalendar noteCalendar(
           context,
           CalendarEvent.ofText(
             note.id,
-            typed.isEmpty ? noteText(t, note) : typed,
+            typed.isEmpty ? noteCalendarText(t, note) : typed,
           ),
         ),
       ),
@@ -192,14 +206,16 @@ void removePackFrom(BuildContext context, Store store, String noteId) {
 }
 
 /// Asks once whether the photo ([photo]) or voice recording [hash] of
-/// the Note or Section [noteId] goes while its text stays, with the verb
-/// on the button in the error colour, and removes it; whether it did.
+/// the Note or Section [noteId] goes while its words go into the text
+/// there (obf-1084), with the verb on the button in the error colour,
+/// and removes it; whether it did. [removing] runs just before.
 Future<bool> removeMedia(
   BuildContext context,
   Notes notes,
   String noteId,
   String hash, {
   required bool photo,
+  VoidCallback? removing,
 }) async {
   final confirmed = await showDialog<bool>(
     context: context,
@@ -215,6 +231,7 @@ Future<bool> removeMedia(
       ? notes.mayRemovePhoto(noteId, hash)
       : notes.mayRemoveRecording(noteId, hash);
   if (confirmed != true || !allowed) return false;
+  removing?.call();
   if (photo) {
     notes.removePhoto(noteId, hash);
   } else {
@@ -236,7 +253,7 @@ Future<bool> removeAttachment(
     context: context,
     builder: (context) => _RemoveDialog(
       title: context.t.removeFileQuestion,
-      detail: context.t.removeMediaDetail,
+      detail: context.t.removeAttachmentDetail,
     ),
   );
   // A sync while the dialog was open may have taken it already.
@@ -619,8 +636,13 @@ TableEditing? tableEdit(Notes notes, PlacedNote placed, VoidCallback changed) {
 /// Sections, each with its own Capture Context. A Section this Device may
 /// edit, while the Note is not in the trash, is edited in a field of its
 /// own as the Note's text is and saved with it; the others are only read,
-/// their text selected and copied with a long press (#183). "Add to
-/// Note" amends it; the "+" badge spawns a Routine, Reminder, Frog or
+/// their text selected and copied with a long press (#183). Under the
+/// text its badges stand under the heading This Note, and at the page's
+/// end its actions under Add, Share and Tidy, the groups of the desktop's
+/// Note dialog (obf-1073); the bar keeps Undo, Redo, Find, the calendar,
+/// History and Revert. "Add a
+/// part" among its actions opens the box that amends it, not on a Note
+/// being made (obf-1072); the "+" badge spawns a Routine, Reminder, Frog or
 /// Session from it, as the card's menu does; the calendar button adds it,
 /// or its Routines and Reminders, to the calendar; the send button sends
 /// it as a Sent Item; "merge into…" merges it into another Note; the
@@ -635,8 +657,9 @@ TableEditing? tableEdit(Notes notes, PlacedNote placed, VoidCallback changed) {
 ///
 /// A Note of a kind (#188), a Checklist, Shopping List or Tally, shows its
 /// text as its name, a heading, and its description under it, folded to
-/// one line until a tap; then the kind's content, its Lines or its Tally,
-/// and the rest under it. Its kind badge changes the kind.
+/// one line until a tap, "Add a description" while it has none; then the
+/// kind's content in the same card (obf-1071), its Lines and "Add a Line"
+/// or its Tally, and the rest under it. Its kind badge changes the kind.
 ///
 /// Under each Transcript and Photo Text, "Replace Note text" and "Append
 /// to Note text" take it over into the text of its Note or Section, and
@@ -667,11 +690,25 @@ class NoteEditorScreen extends StatefulWidget {
   /// (#276).
   final bool typeLines;
 
+  /// Whether the cursor starts in the Note's text, the keyboard up: a
+  /// Note just made by the "+" of an Area or a Topic (obf-1140).
+  final bool typeText;
+
   /// The Unsorted Notes of the list the Note was opened from (#313): once
   /// a step here sorts it, the editor shows the next of them, and the
   /// Agenda once none is left. Null where it was opened from anywhere
   /// else.
   final UnsortedShown? sorting;
+
+  /// The words of a search to open the find bar with and the place to
+  /// show (obf-1047); the find bar is closed when null.
+  final NoteFind? find;
+
+  /// Whether the Note is being made: opened from the quick note's Open in
+  /// the editor, a list's "+" (obf-1072) or the "+" of an Area or a
+  /// Topic (obf-1140). Such a Note has no "Add a
+  /// part"; adding a part is for an existing Note, opened again.
+  final bool made;
 
   const NoteEditorScreen({
     super.key,
@@ -680,12 +717,20 @@ class NoteEditorScreen extends StatefulWidget {
     required this.drafts,
     required this.noteId,
     this.typeLines = false,
+    this.typeText = false,
     this.sorting,
+    this.find,
+    this.made = false,
   });
 
   @override
   State<NoteEditorScreen> createState() => _NoteEditorScreenState();
 }
+
+/// The texts of the Note editor's fields: the Note's as typed, of a
+/// Note of a kind its name and description joined, and each Section's
+/// by its id.
+typedef _Texts = ({String note, Map<String, String> sections});
 
 class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// Its tags are highlighted as they are typed (ADR 0032), a formatted
@@ -825,15 +870,60 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// the Note.
   List<Note> _toShopping = const [];
 
+  /// The find bar (obf-1047): whether it shows, the words it finds, the
+  /// places it found in the page's order and the one shown, and those
+  /// drawn outside the fields, as [FindScope] holds them.
+  var _finding = false;
+  final _findWords = TextEditingController();
+  final _findFocus = FocusNode();
+  List<NoteHit> _hits = const [];
+  var _hitAt = 0;
+  Map<(String, FindingPart, String), FoundMarks> _findMarks = const {};
+
+  /// The texts of the fields as [_hits] were found in them: the cursor
+  /// moving finds nothing anew.
+  String _foundIn = '';
+  final _scroll = ScrollController();
+
+  /// What is selected in each Section's text only read, by its id: the
+  /// words Search in the toolbar above it finds (obf-1055).
+  final _readSelected = <String, String>{};
+
+  /// Undo and Redo of what changed since the editor opened (obf-1051).
+  final _history = EditHistory();
+
+  /// The texts as the fields held them after their last change: what
+  /// the next change changes.
+  _Texts _texts = (note: '', sections: const {});
+
+  /// Whether the editor puts text into the fields itself, as it shows
+  /// what is stored: no typing for Undo.
+  var _quiet = 0;
+
   @override
   void initState() {
     super.initState();
     _load();
     _show();
-    _text.addListener(_typed);
+    if (widget.find case final find?) {
+      _finding = true;
+      _findWords.text = find.query;
+      _findAll();
+      if (find.at case final at?) _hitAt = NoteHit.indexOf(_hits, at);
+      _showHits();
+      WidgetsBinding.instance.addPostFrameCallback((_) => _revealHit());
+    }
+    _texts = _fieldTexts();
+    _text
+      ..addListener(_typed)
+      ..addListener(_findTyped)
+      ..addListener(_textChanged);
     _name
       ..addListener(_typed)
-      ..addListener(_nameTyped);
+      ..addListener(_nameTyped)
+      ..addListener(_findTyped)
+      ..addListener(_textChanged);
+    _history.addListener(_historyChanged);
     _descriptionFocus.addListener(_descriptionFocused);
     _lifecycle = AppLifecycleListener(onStateChange: _lifecycleChanged);
     // Fire and forget: a draft cut off mid-write reads as none, and
@@ -869,12 +959,16 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   @override
   void dispose() {
     _announcements?.undone.removeListener(_undone);
+    _history.dispose();
     _draftTimer?.cancel();
     _lifecycle.dispose();
     _text.dispose();
     _name.dispose();
     _descriptionFocus.dispose();
     _pasteEmpty.dispose();
+    _findWords.dispose();
+    _findFocus.dispose();
+    _scroll.dispose();
     _sessionDraft?.dispose();
     for (final field in _sectionTexts.values) {
       field.dispose();
@@ -889,6 +983,159 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         state == AppLifecycleState.hidden) {
       setState(_saveText);
     }
+  }
+
+  /// The texts of the fields now: the Note's as typed, and each
+  /// Section's by its id.
+  _Texts _fieldTexts() => (
+    note: _typedText,
+    sections: {
+      for (final MapEntry(key: id, value: field) in _sectionTexts.entries)
+        id: field.text,
+    },
+  );
+
+  /// A field changed: what was typed is a change for Undo (obf-1051),
+  /// unless the editor put it there itself or a box only got its id.
+  void _textChanged() {
+    final before = _texts;
+    final now = _texts = _fieldTexts();
+    if (_quiet > 0 || _history.running) return;
+    final change = _changeOf(before, now);
+    if (change == null) return;
+    _history.typed(
+      undo: () => _putTexts(before),
+      redo: () => _putTexts(now),
+      change: change.change,
+      wordStart: change.wordStart,
+    );
+  }
+
+  /// What was typed from [before] to [now], in the first text that
+  /// changed other than in its boxes' ids; null for nothing.
+  static ({TypedChange change, bool wordStart})? _changeOf(
+    _Texts before,
+    _Texts now,
+  ) {
+    final pairs = [
+      (before.note, now.note),
+      for (final MapEntry(key: id, value: text) in now.sections.entries)
+        if (before.sections[id] case final old?) (old, text),
+    ];
+    for (final (old, text) in pairs) {
+      if (old == text) continue;
+      final (a, b) = (withoutIds(old), withoutIds(text));
+      if (a != b) return typedChange(a, b);
+    }
+    return null;
+  }
+
+  /// Puts [texts] back into the fields, the cursor where they changed.
+  void _putTexts(_Texts texts) {
+    if (_named) {
+      _putText(_name, NoteKinds.name(texts.note));
+      _putText(_text, NoteKinds.description(texts.note));
+    } else {
+      _putText(_text, texts.note);
+    }
+    for (final MapEntry(key: id, value: text) in texts.sections.entries) {
+      if (_sectionTexts[id] case final field?) _putText(field, text);
+    }
+  }
+
+  /// Puts [text] into [field], the cursor after what changed. Outside
+  /// what changed the field keeps its own text, the ids of its boxes in
+  /// it (ADR 0035): a box stored meanwhile keeps its ticks.
+  static void _putText(TextEditingController field, String text) {
+    final old = field.text;
+    final (a, b) = (withoutIds(old), withoutIds(text));
+    if (a == b) return;
+    var head = 0;
+    while (head < a.length &&
+        head < b.length &&
+        a.codeUnitAt(head) == b.codeUnitAt(head)) {
+      head++;
+    }
+    var tail = 0;
+    while (tail < a.length - head &&
+        tail < b.length - head &&
+        a.codeUnitAt(a.length - 1 - tail) ==
+            b.codeUnitAt(b.length - 1 - tail)) {
+      tail++;
+    }
+    final kept = old.substring(0, idFreeOffset(old, head));
+    final from = idFreeOffset(text, head);
+    final to = idFreeOffset(text, b.length - tail);
+    final put = to > from ? text.substring(from, to) : '';
+    field.value = TextEditingValue(
+      text: kept + put + old.substring(idFreeOffset(old, a.length - tail)),
+      selection: TextSelection.collapsed(offset: kept.length + put.length),
+    );
+  }
+
+  /// Runs [put], which puts what is stored into the fields: no typing.
+  void _quietly(VoidCallback put) {
+    _quiet++;
+    try {
+      put();
+    } finally {
+      _quiet--;
+    }
+  }
+
+  /// Undo or Redo became possible or no longer is.
+  void _historyChanged() {
+    if (mounted) setState(() {});
+  }
+
+  /// Undo in the top bar (obf-1051): what was typed into a Line and not
+  /// stored yet is stored first, as a step of its own, then the last step
+  /// goes back. The fields' typing is not written first: what is taken
+  /// back never reaches the log.
+  void _undo() {
+    _lines.keep();
+    _history.undo();
+    _afterSteps();
+  }
+
+  void _redo() {
+    _lines.keep();
+    _history.redo();
+    _afterSteps();
+  }
+
+  /// "Revert all changes" in ⋮: after one question every step goes back,
+  /// to the Note as it was opened; Redo brings them back one by one.
+  Future<void> _revertAll() async {
+    final t = context.t;
+    final sure = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(t.revertAllQuestion),
+        content: Text(t.revertAllBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(t.cancel),
+          ),
+          TextButton(
+            key: const ValueKey('revert-all-confirm'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(t.revertAllConfirm),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || sure != true) return;
+    _lines.keep();
+    _history.revertAll();
+    _afterSteps();
+  }
+
+  /// Shows the Note as the steps left it, the fields as they hold it.
+  void _afterSteps() {
+    if (!mounted) return;
+    setState(_load);
   }
 
   void _typed() {
@@ -997,7 +1244,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final setAt = widget.notes.textSetAt(widget.noteId);
     if (note == null || setAt == null || !note.textEditable) return;
     if (draft.saved.isAfter(setAt) && draft.text.trim() != note.text) {
-      if (_typedText == _asTyped(note.text)) _setTyped(draft.text);
+      if (_typedText == _asTyped(note.text)) {
+        _quietly(() => _setTyped(draft.text));
+      }
     } else {
       unawaited(widget.drafts.delete(widget.noteId));
     }
@@ -1159,6 +1408,248 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         (note?.boxes.isNotEmpty ?? false) ||
         _sections.any((section) => section.boxes.isNotEmpty);
     _loadSectionTexts(editable: note != null && !note.isTrashed);
+    // What the find bar found, in the Note as read now.
+    if (_finding) _findAll();
+  }
+
+  /// Opens the find bar (obf-1047), finding [words] when given, else what
+  /// it found last, the cursor in its field; open, the cursor goes there.
+  /// The magnifier in the top bar opens it.
+  void _openFind([String words = '']) {
+    setState(() {
+      if (words.isNotEmpty) {
+        _findWords.text = words;
+        _hitAt = 0;
+      }
+      _finding = true;
+      _findAll();
+    });
+    if (words.isEmpty) {
+      _findFocus.requestFocus();
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _revealHit());
+    }
+  }
+
+  /// Closes the find bar: nothing is drawn as found any more.
+  void _closeFind() {
+    setState(() {
+      _finding = false;
+      _hits = const [];
+      _hitAt = 0;
+      _foundIn = '';
+      _showHits();
+    });
+  }
+
+  /// The find bar's words changed: their first place shows.
+  void _findChanged(String _) {
+    setState(() {
+      _hitAt = 0;
+      _findAll();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _revealHit());
+  }
+
+  /// ↑ or ↓ in the find bar: the place [by] before or after the one shown,
+  /// from the last on to the first and back.
+  void _stepHit(int by) {
+    if (_hits.isEmpty) return;
+    final from = _hitAt;
+    setState(() {
+      _hitAt = (_hitAt + by) % _hits.length;
+      _showHits();
+    });
+    final down = _hitAt > from;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _revealHit(down));
+  }
+
+  /// Scrolls the place shown into sight; a folded description it lies in
+  /// unfolds first, without the cursor.
+  void _revealHit([bool down = true]) {
+    if (!mounted || _hits.isEmpty) return;
+    final hit = _hits[_hitAt];
+    if (_named && identical(hit.field, _text) && !_descriptionOpen) {
+      setState(() => _descriptionOpen = true);
+      WidgetsBinding.instance.addPostFrameCallback((_) => _revealHit(down));
+      return;
+    }
+    unawaited(revealFound(context, _scroll, down: down));
+  }
+
+  /// A field's text changed: what the find bar finds is found anew in
+  /// it. A move of the cursor finds nothing anew.
+  void _findTyped() {
+    if (!_finding || !mounted || _findSource() == _foundIn) return;
+    setState(_findAll);
+  }
+
+  /// The texts of all the fields, as [_foundIn] keeps them.
+  String _findSource() => [
+    _name.text,
+    _text.text,
+    for (final field in _sectionTexts.values) field.text,
+  ].join('\u0000');
+
+  /// Finds the find bar's words in the Note as the page shows it, the
+  /// fields as they hold their texts now, in the page's order: the
+  /// Note's text, then, for a plain Note, its Sections, then its photos'
+  /// Photo Texts, its recordings' Transcripts and its files' names and
+  /// Attachment Texts; a Note of a kind's Sections come last. Each
+  /// Section is its text and then its media.
+  void _findAll() {
+    _foundIn = _findSource();
+    final note = _placed?.note;
+    final query = _findWords.text;
+    if (note == null || query.trim().isEmpty) {
+      _hits = const [];
+      _hitAt = 0;
+      _showHits();
+      return;
+    }
+    final format = note.textFormat;
+    List<NoteHit> media(
+      String? section, {
+      required List<String> photos,
+      required List<String> removedPhotos,
+      required Map<String, String> photoTexts,
+      required List<String> recordings,
+      required List<String> removedRecordings,
+      required Map<String, String> transcripts,
+      required List<Attachment> files,
+      required List<Attachment> removedFiles,
+      required Map<String, String> fileTexts,
+    }) {
+      List<NoteHit> find(FindingPart part, String key, String text) =>
+          NoteHit.inText(
+            text,
+            TextFormats.plain,
+            query,
+            part: part,
+            key: key,
+            section: section,
+          );
+      return [
+        for (final hash in [...photos, ...removedPhotos])
+          ...find(FindingPart.photoText, hash, photoTexts[hash] ?? ''),
+        for (final hash in [...recordings, ...removedRecordings])
+          ...find(FindingPart.transcript, hash, transcripts[hash] ?? ''),
+        for (final file in files) ...[
+          ...find(FindingPart.fileName, file.hash, file.name),
+          ...find(
+            FindingPart.attachmentText,
+            file.hash,
+            fileTexts[file.hash] ?? '',
+          ),
+        ],
+        for (final file in removedFiles)
+          ...find(
+            FindingPart.attachmentText,
+            file.hash,
+            fileTexts[file.hash] ?? '',
+          ),
+      ];
+    }
+
+    List<NoteHit> ofSection(Section section) => [
+      if (_sectionTexts[section.id] case final field?)
+        ...NoteHit.inField(
+          field,
+          section.textFormat,
+          query,
+          section: section.id,
+        )
+      else
+        ...NoteHit.inText(
+          section.shownText,
+          section.textFormat,
+          query,
+          part: FindingPart.text,
+          section: section.id,
+        ),
+      ...media(
+        section.id,
+        photos: section.photos,
+        removedPhotos: section.removedPhotos,
+        photoTexts: section.photoTexts,
+        recordings: section.recordings,
+        removedRecordings: section.removedRecordings,
+        transcripts: section.transcripts,
+        files: section.attachments,
+        removedFiles: section.removedAttachments,
+        fileTexts: section.attachmentTexts,
+      ),
+    ];
+    final hits = [
+      if (_named) ...[
+        ...NoteHit.inField(_name, format, query),
+        ...NoteHit.inField(
+          _text,
+          format,
+          query,
+          shift: TextBoxes.shown(_name.text).text.length + 1,
+        ),
+      ] else ...[
+        ...NoteHit.inField(_text, format, query),
+        for (final section in _sections) ...ofSection(section),
+      ],
+      ...media(
+        null,
+        photos: note.photos,
+        removedPhotos: note.removedPhotos,
+        photoTexts: note.photoTexts,
+        recordings: note.recordings,
+        removedRecordings: note.removedRecordings,
+        transcripts: note.transcripts,
+        files: note.attachments,
+        removedFiles: note.removedAttachments,
+        fileTexts: note.attachmentTexts,
+      ),
+      if (_named)
+        for (final section in _sections) ...ofSection(section),
+    ];
+    _hits = hits;
+    _hitAt = hits.isEmpty ? 0 : _hitAt.clamp(0, hits.length - 1);
+    _showHits();
+  }
+
+  /// Hands the places found to the fields and to [_findMarks], the one
+  /// shown as the current one; they show once the page is built again.
+  void _showHits() {
+    final inFields = <TagTextController, List<(int, int)>>{};
+    final currents = <TagTextController, int>{};
+    final elsewhere = <Finding>[];
+    int? current;
+    for (final (i, hit) in _hits.indexed) {
+      if (hit.field case final field?) {
+        final list = inFields.putIfAbsent(field, () => []);
+        if (i == _hitAt) currents[field] = list.length;
+        list.add((hit.start, hit.end));
+        continue;
+      }
+      if (i == _hitAt) current = elsewhere.length;
+      elsewhere.add(
+        Finding(
+          part: hit.part,
+          key: hit.key,
+          section: hit.section,
+          start: hit.start,
+          end: hit.end,
+          line: 0,
+          cell: null,
+          context: '',
+          contextStart: 0,
+          contextEnd: 0,
+        ),
+      );
+    }
+    for (final field in [_name, _text, ..._sectionTexts.values]) {
+      field.found = switch (inFields[field]) {
+        final ranges? => FoundMarks(ranges, currents[field]),
+        null => null,
+      };
+    }
+    _findMarks = foundMarksOf(widget.noteId, elsewhere, current: current);
   }
 
   /// Gives each Section this Device may edit its field, and only those
@@ -1186,7 +1677,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         section.id,
         () => TagTextController(hideMarks: _twoRows)
           ..markdown = section.textFormat == TextFormats.markdown
-          ..text = section.text,
+          ..text = section.text
+          ..addListener(_findTyped)
+          ..addListener(_textChanged),
       );
       field.boxes = _sectionTicking[section.id];
     }
@@ -1237,6 +1730,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// the Note's field and its Sections'.
   Future<void> _openHistory() async {
     _saveText();
+    final stored = _storedTexts();
     final used = await openNoteHistory(
       context,
       widget.notes,
@@ -1244,6 +1738,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       widget.noteId,
     );
     if (!mounted || !used) return;
+    _recordStored(stored);
     setState(() {
       _load();
       _show();
@@ -1267,7 +1762,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _name.markdown = markdown;
     _text.code = !_named && note?.textFormat == TextFormats.code;
     _text.codeLanguage = note?.codeLanguage;
-    _setTyped(note?.text ?? '');
+    _quietly(() => _setTyped(note?.text ?? ''));
   }
 
   /// Writes the text when it changed; a blank text keeps the old one.
@@ -1348,7 +1843,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// boxes with their ids, so the next save keeps them and their ticks
   /// (ADR 0035); the cursor stays where it was in the text around it, the
   /// spaces around the text as typed.
-  void _takeStored(TagTextController field, String? stored) {
+  void _takeStored(TagTextController field, String? stored) =>
+      _quietly(() => _keepStored(field, stored));
+
+  void _keepStored(TagTextController field, String? stored) {
     if (stored == null) return;
     final value = field.value;
     final typed = value.text;
@@ -1426,8 +1924,31 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// this Note on this Device.
   void _toggleTicks() {
     final store = widget.notes.store;
-    setShowsTicks(store, widget.noteId, !showsTicks(store, widget.noteId));
+    final before = showsTicks(store, widget.noteId);
+    setShowsTicks(store, widget.noteId, !before);
+    _history.record(
+      undo: () => setShowsTicks(store, widget.noteId, before),
+      redo: () => setShowsTicks(store, widget.noteId, !before),
+    );
     _reload();
+  }
+
+  /// Switches Hidden from AI with [toggle], the badge's (#267), as a
+  /// step for Undo.
+  void _toggleHiddenFromAi(VoidCallback toggle) {
+    final store = widget.notes.store;
+    final id = widget.noteId;
+    final before = store.isMarkedHiddenFromAi(id);
+    toggle();
+    final after = store.isMarkedHiddenFromAi(id);
+    if (before == after) return;
+    void put(bool on) {
+      if (store.isMarkedHiddenFromAi(id) == on) return;
+      if (on && !store.mayHideFromAi(id)) return;
+      store.setHiddenFromAi(id, on);
+    }
+
+    _history.record(undo: () => put(before), redo: () => put(after));
   }
 
   /// The "Show on the Agenda" badge's editor of a Shopping List (#186)
@@ -1455,12 +1976,25 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       ),
     );
     if (!mounted || picked == null) return;
+    final before = agenda.shows;
     agenda.choose(picked);
+    if (before == picked) return;
+    _history.record(
+      undo: () => _onAgenda?.choose(before),
+      redo: () => _onAgenda?.choose(picked),
+    );
   }
 
   void _setImportance(Importance picked) {
     _saveText();
+    final before = _placed?.note.importance;
     widget.notes.setImportance(widget.noteId, picked);
+    if (before != null && before != picked) {
+      _history.record(
+        undo: () => widget.notes.setImportance(widget.noteId, before),
+        redo: () => widget.notes.setImportance(widget.noteId, picked),
+      );
+    }
     _reload();
   }
 
@@ -1666,10 +2200,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 children: [
                   formats(context),
                   const SizedBox(height: 16),
-                  Text(
-                    t.codeLanguage,
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
+                  Text(t.codeLanguage, style: sectionHeading(context)),
                   // A language this Device does not know is kept: none
                   // is marked until another is picked.
                   RadioColumn<String>(
@@ -1703,7 +2234,14 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// Writes the language the Code text is coloured by, [scope] or none
   /// for an empty one (obf-1036), and shows it so.
   void _setCodeLanguage(String scope) {
+    final before = _placed?.note.codeLanguage ?? '';
     widget.notes.setCodeLanguage(widget.noteId, scope);
+    if (before != scope) {
+      _history.record(
+        undo: () => _setCodeLanguage(before),
+        redo: () => _setCodeLanguage(scope),
+      );
+    }
     setState(_load);
     _text.codeLanguage = _placed?.note.codeLanguage;
   }
@@ -1716,9 +2254,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     // The person's own grammars too (obf-1037).
     final grammars = widget.notes.store.grammars;
     final guess = grammars.guess(_pastedCode) ?? grammars.guess(_text.text);
-    if (guess != null) {
-      widget.notes.setCodeLanguage(widget.noteId, guess.scope);
-    }
+    if (guess != null) _setCodeLanguage(guess.scope);
     _setFormat(TextFormats.code);
   }
 
@@ -1726,7 +2262,18 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// so.
   void _setFormat(String format) {
     _saveText();
+    final before = _placed?.note.textFormat;
     widget.notes.setFormat(widget.noteId, format);
+    // A formatted text never becomes plain again (ADR 0033): that step
+    // has no way back.
+    if (before != null &&
+        before != format &&
+        !(before == TextFormats.plain && format == TextFormats.markdown)) {
+      _history.record(
+        undo: () => _setFormat(before),
+        redo: () => _setFormat(format),
+      );
+    }
     _offersCode = false;
     setState(_load);
     _show();
@@ -1743,6 +2290,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final before = _sortingBefore();
     final notes = widget.notes;
     final id = widget.noteId;
+    final from = _kind;
+    final text = notes.byId(id)?.text;
     final changed = switch ((_kind, kind)) {
       (NoteKind.session, NoteKind.plain) => _unmakeSession(),
       (NoteKind.shoppingList, NoteKind.plain) => shoppingListToPlain(notes, id),
@@ -1754,7 +2303,61 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       (_, NoteKind.checklist || NoteKind.shoppingList) => _switchList(),
       _ => false,
     };
+    // Between a Plain Note and the two lists there is a way back
+    // (obf-1051); out of a Tally or a Session there is none here.
+    const lists = {NoteKind.plain, NoteKind.checklist, NoteKind.shoppingList};
+    if (changed && lists.contains(from) && lists.contains(kind)) {
+      final after = notes.byId(id)?.text;
+      _history.record(
+        undo: () => _putKind(kind, from, text, fromText: false),
+        redo: () => _putKind(from, kind, after, fromText: true),
+      );
+    }
     if (!mounted || !changed || _movedOn(before)) return;
+    setState(_load);
+    _show();
+  }
+
+  /// Makes the Note of the kind [from] the kind [to] again for Undo and
+  /// Redo, with [text] as its text then; a plain text becomes a list as
+  /// "Make it a list" made it with [fromText], else its first line
+  /// staying its name.
+  void _putKind(
+    NoteKind from,
+    NoteKind to,
+    String? text, {
+    required bool fromText,
+  }) {
+    final notes = widget.notes;
+    final store = notes.store;
+    final id = widget.noteId;
+    if (NoteKinds(store).of(id) != from) return;
+    _saveText();
+    final lists = Checklists(store);
+    final shopping = ShoppingLists(store);
+    switch ((from, to)) {
+      case (NoteKind.shoppingList, NoteKind.plain):
+        shoppingListToPlain(notes, id);
+      case (NoteKind.checklist, NoteKind.plain):
+        checklistToPlain(notes, id);
+      case (NoteKind.plain, NoteKind.checklist) when lists.mayMake(id):
+        fromText ? lists.makeFromText(id) : lists.make(id);
+      case (NoteKind.plain, NoteKind.shoppingList) when shopping.mayMake(id):
+        fromText ? shopping.makeFromText(id) : shopping.make(id);
+      case (NoteKind.checklist || NoteKind.shoppingList, _):
+        _switchList();
+      default:
+        return;
+    }
+    final note = notes.byId(id);
+    if (text != null &&
+        text.trim().isNotEmpty &&
+        note != null &&
+        note.textEditable &&
+        note.text != text &&
+        store.mayChange(id)) {
+      notes.edit(id, text);
+    }
     setState(_load);
     _show();
   }
@@ -1821,7 +2424,39 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     ),
   );
 
-  /// The "+" badge's menu at the finger [at]: Remind me…, Frog and
+  /// Where the finger went down on the Add group's "+" last, for its
+  /// menu to open there.
+  Offset? _addAt;
+
+  /// The Add group's "+" (obf-1117): an outlined button, as the others
+  /// of its group are, its words for the screen reader and the tooltip;
+  /// its menu opens at the finger, at its middle for a screen reader's
+  /// tap.
+  Widget _addButton(AppLocalizations t) => Builder(
+    builder: (context) => Listener(
+      onPointerDown: (event) => _addAt = event.position,
+      child: Tooltip(
+        message: t.routineOrReminder,
+        excludeFromSemantics: true,
+        child: OutlinedButton(
+          key: const ValueKey('badge-add'),
+          onPressed: () {
+            final box = context.findRenderObject() as RenderBox?;
+            final at =
+                _addAt ??
+                (box == null
+                    ? Offset.zero
+                    : box.localToGlobal(box.size.center(Offset.zero)));
+            _addAt = null;
+            unawaited(_addMenu(at));
+          },
+          child: Icon(Icons.add, size: 18, semanticLabel: t.routineOrReminder),
+        ),
+      ),
+    ),
+  );
+
+  /// The "+" button's menu at the finger [at]: Remind me…, Frog and
   /// Session, each spawned as the card's menu does; on a Session Note no
   /// Session, as a Routine of it runs it already (#191); no Frog while
   /// one is open (#259); in Simple only Remind me… (#197, #344).
@@ -1850,7 +2485,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           if (advanced &&
               _kind != NoteKind.session &&
               _placed?.note.textFormat != TextFormats.code)
-            (Spawn.session, const Icon(Icons.event_repeat), t.session),
+            (Spawn.session, const Icon(Icons.event_repeat), t.spawnSession),
         ])
           PopupMenuItem(
             key: ValueKey('spawn-${spawn.name}'),
@@ -1936,7 +2571,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// as its icon and its value, an icon for a fixed set of values, short
   /// text otherwise (#192), a tap opening its small editor; a setting
   /// that does not apply has none. The kind comes first, in words (#310);
-  /// "+" ends it.
+  /// "+" leads the Add group at the page's end (obf-1073).
   Widget _badges(
     PlacedNote placed,
     DateFormat when,
@@ -2089,24 +2724,191 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 ? t.hiddenFromAiByArea
                 : t.settingOff,
             valueIcon: switchIcon(on),
-            onTap: (_) =>
-                _editSwitch(t.hiddenFromAi, hiddenFromAiIcon, on, toggle),
-          ),
-        // In a Shared Area only a Manager sets them up (ADR 0013).
-        if (schedules)
-          Spotlight(
-            id: 'editor-remind',
-            child: SettingBadge(
-              key: const ValueKey('badge-add'),
-              setting: t.routineOrReminder,
-              icon: Icons.add,
-              value: null,
-              onTap: _addMenu,
+            onTap: (_) => _editSwitch(
+              t.hiddenFromAi,
+              hiddenFromAiIcon,
+              on,
+              () => _toggleHiddenFromAi(toggle),
             ),
           ),
       ],
     );
   }
+
+  /// The Note's actions at the end of the page in three of the four
+  /// groups the desktop's Note dialog has (obf-1073), This Note, its
+  /// badges, standing under the text: **Add**, "+" with Remind me…,
+  /// Voice, Photo, Gallery, Paste, Attach a file and Add a part;
+  /// **Share**, Send to a person, Share to an app and Export as Pack…;
+  /// **Tidy**, Merge into…, Add to a Shopping List and Move to trash. A
+  /// group with nothing this Device may do shows nothing.
+  List<Widget> _groups(
+    AppLocalizations t,
+    PlacedNote placed,
+    Note note,
+    bool editable,
+  ) {
+    final (
+      :changes,
+      :schedules,
+      amends: _,
+      note: _,
+      area: _,
+      topic: _,
+      author: _,
+    ) = placed;
+    final photos = PhotoScope.of(context);
+    return [
+      ?_group(const ValueKey('editor-group-add'), t.add, [
+        // In a Shared Area only a Manager sets them up (ADR 0013).
+        if (schedules) Spotlight(id: 'editor-remind', child: _addButton(t)),
+        if (changes) ...[
+          // What the quick note offered before (#352).
+          if (VoiceScope.of(context).available)
+            _groupButton(
+              key: const ValueKey('editor-voice'),
+              label: t.voice,
+              onPressed: () => unawaited(_record()),
+              icon: Icons.mic_none,
+            ),
+          if (photos.available)
+            _groupButton(
+              key: const ValueKey('editor-photo'),
+              label: t.photo,
+              onPressed: () => unawaited(_takePhoto()),
+              icon: Icons.photo_camera_outlined,
+            ),
+          if (photos.pickable)
+            _groupButton(
+              key: const ValueKey('editor-gallery'),
+              label: t.gallery,
+              onPressed: () => unawaited(_pickPhotos()),
+              icon: Icons.photo_library_outlined,
+            ),
+          if (photos.pasteable && editable)
+            _groupButton(
+              key: const ValueKey('editor-paste'),
+              label: t.paste,
+              onPressed: () => unawaited(_paste()),
+              icon: Icons.content_paste,
+            ),
+          if (FileScope.of(context).pickable)
+            _groupButton(
+              key: const ValueKey('attach-file'),
+              label: t.attachFile,
+              onPressed: () => unawaited(_attachFile()),
+              icon: Icons.attach_file,
+            ),
+        ],
+        // Opens the Amend box, only when asked (obf-1072); in a Shared
+        // Area also for a Member, who changes only their own Notes
+        // (ADR 0013).
+        if (_amends && !widget.made)
+          Spotlight(
+            id: 'editor-add-part',
+            child: _groupButton(
+              key: const ValueKey('editor-add-part'),
+              label: t.addAPart,
+              onPressed: () => unawaited(_amend()),
+              icon: Icons.post_add,
+            ),
+          ),
+      ]),
+      ?_group(const ValueKey('editor-group-share'), t.share, [
+        _groupButton(
+          key: const ValueKey('send-note-file'),
+          label: t.sendToPerson,
+          onPressed: () {
+            _saveText();
+            unawaited(sendNoteFile(context, widget.notes.store, widget.noteId));
+          },
+          icon: Icons.send_outlined,
+        ),
+        _groupButton(
+          key: const ValueKey('share-note'),
+          label: t.shareToApp,
+          onPressed: () {
+            _saveText();
+            unawaited(shareNoteToApp(context, widget.notes, widget.noteId));
+          },
+          icon: Icons.share_outlined,
+        ),
+        _groupButton(
+          key: const ValueKey('pack-note'),
+          label: t.exportAsPack,
+          onPressed: () {
+            _saveText();
+            unawaited(exportPack(context, widget.notes.store, widget.noteId));
+          },
+          icon: Icons.inventory_2_outlined,
+        ),
+      ]),
+      ?_group(const ValueKey('editor-group-tidy'), t.editorGroupTidy, [
+        if (changes) ...[
+          _groupButton(
+            key: const ValueKey('editor-merge'),
+            label: t.mergeInto,
+            onPressed: _merge,
+            icon: Icons.call_merge,
+          ),
+          ?_shoppingAction(t, note, changes),
+          _groupButton(
+            key: const ValueKey('editor-trash'),
+            label: t.moveToTrash,
+            onPressed: _trash,
+            icon: Icons.delete_outline,
+            warns: true,
+          ),
+        ],
+      ]),
+    ];
+  }
+
+  /// One group of [_groups] under its [heading], its [children] side by
+  /// side where they fit; none without children.
+  Widget? _group(Key key, String heading, List<Widget> children) =>
+      children.isEmpty
+      ? null
+      : Padding(
+          key: key,
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // A heading of its own for a screen reader, not read as a
+              // part of the first button.
+              Semantics(
+                container: true,
+                header: true,
+                child: Text(heading, style: sectionHeading(context)),
+              ),
+              const SizedBox(height: 8),
+              Wrap(spacing: 8, runSpacing: 8, children: children),
+            ],
+          ),
+        );
+
+  /// A compact button of a group (obf-1073), its icon and its words;
+  /// [warns] fills it on the error colour, as Delete (obf-1099).
+  Widget _groupButton({
+    required Key key,
+    required String label,
+    required VoidCallback? onPressed,
+    required IconData icon,
+    bool warns = false,
+  }) => warns
+      ? DestructiveButton(
+          key: key,
+          onPressed: onPressed,
+          icon: Icon(icon, size: 18),
+          child: Text(label),
+        )
+      : OutlinedButton.icon(
+          key: key,
+          onPressed: onPressed,
+          icon: Icon(icon, size: 18),
+          label: Text(label),
+        );
 
   /// The text format badge [badge], with the tip of the code language
   /// (obf-1043) while its format dialog offers one: a Code text this
@@ -2141,7 +2943,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 
   /// The Frog badge's menu at the finger [at]: Eat now while it is open
-  /// and this Device may check it off, Remove the Frog for who may
+  /// and this Device may check it off, Move to trash for who may
   /// manage it (ADR 0013), which the announcement at the top undoes, as
   /// in the Frog view (#268).
   Future<void> _frogMenu(
@@ -2181,7 +2983,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               children: [
                 const Icon(Icons.delete_outline),
                 const SizedBox(width: 12),
-                Flexible(child: Text(t.frogRemove)),
+                Flexible(child: Text(t.moveToTrash)),
               ],
             ),
           ),
@@ -2202,9 +3004,51 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     if (note == null) return;
     _saveText();
     final before = _sortingBefore();
+    final store = widget.notes.store;
+    final marked = store.hiddenFromAiBy(widget.noteId);
     if (await fileNote(context, widget.notes, widget.places, note)) {
-      if (!mounted || _movedOn(before)) return;
+      if (!mounted) return;
+      final was = note.place;
+      final now = widget.notes.byId(widget.noteId)?.place;
+      // The marks Hidden from AI that "Show to the AI" took off to file
+      // it into a Shared Area (#267): Undo puts them back once the Note
+      // is out of it again, Redo takes them off again first.
+      final shown = [
+        for (final mark in marked)
+          if (!store.isMarkedHiddenFromAi(mark)) mark,
+      ];
+      if (was != now) {
+        _history.record(
+          undo: () {
+            _putPlace(was);
+            if (widget.notes.byId(widget.noteId)?.place != was) return;
+            for (final mark in shown) {
+              if (store.mayHideFromAi(mark)) store.setHiddenFromAi(mark, true);
+            }
+          },
+          redo: () {
+            for (final mark in shown) {
+              store.setHiddenFromAi(mark, false);
+            }
+            _putPlace(now);
+          },
+        );
+      }
+      if (_movedOn(before)) return;
       _reload();
+    }
+  }
+
+  /// Files the Note into [place] again, or none for Unsorted, where this
+  /// Device may (obf-1051).
+  void _putPlace(String? place) {
+    final notes = widget.notes;
+    final id = widget.noteId;
+    if (notes.byId(id)?.place == place || !notes.store.mayChange(id)) return;
+    if (place == null) {
+      if (notes.mayUnfile(id)) notes.unfile(id);
+    } else if (widget.places.isPlace(place)) {
+      notes.file(id, place);
     }
   }
 
@@ -2308,42 +3152,53 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 
   /// Removes the photo ([photo]) or recording [hash] of the Note or
-  /// Section [id] after asking once; its text stays.
+  /// Section [id] after asking once; its words go into the text there,
+  /// which the fields then show, as one step for Undo (obf-1084).
   Future<void> _removeMedia(String id, String hash, bool photo) async {
     _saveText();
+    var stored = _storedTexts();
     final removed = await removeMedia(
       context,
       widget.notes,
       id,
       hash,
       photo: photo,
+      // What a sync wrote while the dialog was open is no part of it.
+      removing: () => stored = _storedTexts(),
     );
     if (!mounted || !removed) return;
-    _reload();
+    _recordStored(stored);
+    _showStored(id);
   }
 
   /// The button under the photo ([photo]) or recording [hash] of the
-  /// Note or Section [id] that removes it and keeps its text; none when
-  /// it may not go.
+  /// Note or Section [id] that removes it and keeps its words in the
+  /// text; none when it may not go.
   List<Widget> _removeButton(String id, String hash, {required bool photo}) {
     if (!_removable.contains((id, hash))) return const [];
     final t = context.t;
     return [
-      Align(
-        alignment: Alignment.centerLeft,
-        child: TextButton.icon(
-          key: ValueKey('remove:$hash'),
-          onPressed: () => _removeMedia(id, hash, photo),
-          icon: Icon(
-            photo ? Icons.hide_image_outlined : Icons.mic_off_outlined,
-          ),
-          label: Text(
-            photo ? t.removePhotoKeepText : t.removeRecordingKeepText,
-          ),
-        ),
+      _groupButton(
+        key: ValueKey('remove:$hash'),
+        label: photo ? t.removePhotoKeepText : t.removeRecordingKeepText,
+        onPressed: () => _removeMedia(id, hash, photo),
+        icon: photo ? Icons.hide_image_outlined : Icons.mic_off_outlined,
+        warns: true,
       ),
     ];
   }
+
+  /// The actions under a generated text, its photo, recording or file
+  /// (obf-1107): side by side where they fit, wrapping, as a group's
+  /// buttons; none without [buttons].
+  List<Widget> _actionRow(List<Widget> buttons) => buttons.isEmpty
+      ? const []
+      : [
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Wrap(spacing: 8, runSpacing: 8, children: buttons),
+          ),
+        ];
 
   /// Makes the Transcript or Photo Text [generated] the text of the Note
   /// or Section [id], or adds it on a line of its own after the text
@@ -2352,19 +3207,78 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _saveText();
     final target = widget.notes.byId(id);
     if (target == null || !target.textEditable) return;
+    final stored = _storedTexts();
     // Into a formatted text it goes escaped, reading as itself.
     widget.notes.takeOver(id, generated, append: append);
+    _recordStored(stored);
+    _showStored(id);
+  }
+
+  /// Reads the Note again and puts the stored text of the Note or
+  /// Section [id] into its field, or the next save would put the old one
+  /// back.
+  void _showStored(String id) {
     setState(_load);
     if (id == widget.noteId) _show();
-    // A Section's field shows the text it has now, or the next save
-    // would put the old one back.
     if ((_sectionTexts[id], widget.notes.section(id)) case (
       final field?,
       final section?,
     )) {
-      field
-        ..markdown = section.textFormat == TextFormats.markdown
-        ..text = section.text;
+      field.markdown = section.textFormat == TextFormats.markdown;
+      _quietly(() => field.text = section.text);
+    }
+  }
+
+  /// The texts of the Note and of its Sections as stored, by id.
+  Map<String, String> _storedTexts() => {
+    if (widget.notes.byId(widget.noteId) case final note?) note.id: note.text,
+    for (final section in widget.notes.sections(widget.noteId))
+      section.id: section.text,
+  };
+
+  /// Takes what changed in the stored texts since [before] as a step for
+  /// Undo (obf-1051), such as a text History brought back or a
+  /// Transcript taken over: Undo writes the earlier ones as new edits.
+  void _recordStored(Map<String, String> before) {
+    final after = _storedTexts();
+    final was = <String, String>{};
+    final now = <String, String>{};
+    for (final MapEntry(key: id, value: text) in after.entries) {
+      if (before[id] case final old? when old != text) {
+        was[id] = old;
+        now[id] = text;
+      }
+    }
+    if (was.isEmpty) return;
+    _history.record(undo: () => _putStored(was), redo: () => _putStored(now));
+  }
+
+  /// Writes [texts], by the id of the Note or a Section, where this
+  /// Device may, and shows them in the fields.
+  void _putStored(Map<String, String> texts) {
+    _saveText();
+    final notes = widget.notes;
+    for (final MapEntry(key: id, value: text) in texts.entries) {
+      if (text.trim().isEmpty) continue;
+      if (id == widget.noteId) {
+        final note = notes.byId(id);
+        if (note == null ||
+            !note.textEditable ||
+            note.text == text ||
+            !notes.store.mayChange(id)) {
+          continue;
+        }
+        notes.edit(id, text);
+      } else if (notes.mayEditSection(id) && notes.section(id)?.text != text) {
+        notes.editSection(id, text);
+      }
+    }
+    setState(_load);
+    _show();
+    for (final section in _sections) {
+      if (_sectionTexts[section.id] case final field?) {
+        _takeStored(field, section.text);
+      }
     }
   }
 
@@ -2395,15 +3309,14 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       String hash,
       IconData icon,
       String label,
-      VoidCallback? run,
-    ) => Align(
-      alignment: Alignment.centerLeft,
-      child: TextButton.icon(
-        key: ValueKey('$key:$hash'),
-        onPressed: run,
-        icon: Icon(icon),
-        label: Text(label),
-      ),
+      VoidCallback? run, {
+      bool warns = false,
+    }) => _groupButton(
+      key: ValueKey('$key:$hash'),
+      label: label,
+      onPressed: run,
+      icon: icon,
+      warns: warns,
     );
     List<Widget> takeOver(String hash, String? text) => [
       if (text != null &&
@@ -2435,47 +3348,56 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           text: texts[file.hash],
         ),
         AttachmentText(file: file, text: texts[file.hash]),
-        ...takeOver(file.hash, texts[file.hash]),
-        if (_fileTextRemovable.contains((id, file.hash)))
-          button(
-            'remove-text',
-            file.hash,
-            Icons.backspace_outlined,
-            t.removeGeneratedText,
-            () {
-              _saveText();
-              if (removeAttachmentText(context, widget.notes, id, file.hash)) {
-                _reload();
-              }
-            },
-          ),
-        if (_fileReadable.contains((id, file.hash)))
-          button(
-            'again',
-            file.hash,
-            Icons.refresh,
-            t.readTextAgain,
-            _remaking.contains((id, file.hash))
-                ? null
-                : () => _readFileAgain(id, file.hash),
-          ),
-        if (_fileRemovable.contains((id, file.hash)))
-          button(
-            'remove',
-            file.hash,
-            Icons.link_off,
-            t.removeFileKeepText,
-            () async {
-              _saveText();
-              final gone = await removeAttachment(
-                context,
-                widget.notes,
-                id,
-                file.hash,
-              );
-              if (mounted && gone) _reload();
-            },
-          ),
+        ..._actionRow([
+          ...takeOver(file.hash, texts[file.hash]),
+          if (_fileTextRemovable.contains((id, file.hash)))
+            button(
+              'remove-text',
+              file.hash,
+              Icons.backspace_outlined,
+              t.removeGeneratedText,
+              () {
+                _saveText();
+                if (removeAttachmentText(
+                  context,
+                  widget.notes,
+                  id,
+                  file.hash,
+                )) {
+                  _reload();
+                }
+              },
+              warns: true,
+            ),
+          if (_fileReadable.contains((id, file.hash)))
+            button(
+              'again',
+              file.hash,
+              Icons.refresh,
+              t.readTextAgain,
+              _remaking.contains((id, file.hash))
+                  ? null
+                  : () => _readFileAgain(id, file.hash),
+            ),
+          if (_fileRemovable.contains((id, file.hash)))
+            button(
+              'remove',
+              file.hash,
+              Icons.link_off,
+              t.removeFileKeepText,
+              () async {
+                _saveText();
+                final gone = await removeAttachment(
+                  context,
+                  widget.notes,
+                  id,
+                  file.hash,
+                );
+                if (mounted && gone) _reload();
+              },
+              warns: true,
+            ),
+        ]),
       ],
       // Removed, the file shows no more; its text stays.
       for (final file in removed) ...[
@@ -2485,7 +3407,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           label: file.name.isEmpty ? t.attachmentTextLabel : file.name,
           child: AttachmentText(file: file, text: texts[file.hash]),
         ),
-        ...takeOver(file.hash, texts[file.hash]),
+        ..._actionRow(takeOver(file.hash, texts[file.hash])),
       ],
     ];
   }
@@ -2579,7 +3501,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// photo or file, which no Line holds, no Section and nothing spawned
   /// from it, while there is a list to add to. With one list it names it,
   /// "Add to Weekly", and adds at once (#276).
-  BarAction? _shoppingAction(AppLocalizations t, Note note, bool changes) {
+  Widget? _shoppingAction(AppLocalizations t, Note note, bool changes) {
     final lists = _toShopping;
     if (!changes ||
         lists.isEmpty ||
@@ -2594,7 +3516,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       return null;
     }
     final only = lists.length == 1 ? lists.single : null;
-    return BarAction(
+    return _groupButton(
       key: const ValueKey('add-to-shopping'),
       label: only == null
           ? t.addToShoppingList
@@ -2701,7 +3623,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 
   /// The buttons under the Photo Text ([photo]) or Transcript [text] of
-  /// [hash] of the Note or Section [id], one per line: Replace and Append
+  /// [hash] of the Note or Section [id], for [_actionRow]: Replace and Append
   /// for a text that says something, Remove for one this Device may
   /// remove, and again while the file is here and an engine runs. Only
   /// "again" shows for a removed text.
@@ -2720,16 +3642,19 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           }
         : SpeechScope.of(context)?.model.current != null;
     final remaking = _remaking.contains((id, hash));
-    Widget button(String key, IconData icon, String label, VoidCallback? run) =>
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            key: ValueKey('$key:$hash'),
-            onPressed: run,
-            icon: Icon(icon),
-            label: Text(label),
-          ),
-        );
+    Widget button(
+      String key,
+      IconData icon,
+      String label,
+      VoidCallback? run, {
+      bool warns = false,
+    }) => _groupButton(
+      key: ValueKey('$key:$hash'),
+      label: label,
+      onPressed: run,
+      icon: icon,
+      warns: warns,
+    );
     return [
       if (text != null &&
           text.trim().isNotEmpty &&
@@ -2753,21 +3678,19 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           Icons.backspace_outlined,
           t.removeGeneratedText,
           () => _removeGenerated(id, hash, photo),
+          warns: true,
         ),
       if (engine && _remakeable.contains((id, hash)))
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            key: ValueKey('again:$hash'),
-            onPressed: remaking ? null : () => _makeAgain(id, hash, photo),
-            icon: remaking
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.refresh),
-            label: Text(photo ? t.readTextAgain : t.transcribeAgain),
-          ),
+        OutlinedButton.icon(
+          key: ValueKey('again:$hash'),
+          onPressed: remaking ? null : () => _makeAgain(id, hash, photo),
+          icon: remaking
+              ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.refresh, size: 18),
+          label: Text(photo ? t.readTextAgain : t.transcribeAgain),
         ),
     ];
   }
@@ -2833,6 +3756,20 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         )
       else if (section.text.isNotEmpty)
         SelectionArea(
+          onSelectionChanged: (content) =>
+              _readSelected[section.id] = content?.plainText ?? '',
+          // The toolbar above a selection, Copy and Search (obf-1055).
+          contextMenuBuilder: (context, region) => selectionToolbar(
+            context,
+            anchors: region.contextMenuAnchors,
+            system: region.contextMenuButtonItems,
+            words: selectionWords(
+              _readSelected[section.id] ?? '',
+              TextFormats.plain,
+            ),
+            hide: region.hideToolbar,
+            onSearch: _openFind,
+          ),
           child: MarkedText(
             section.shownText,
             format: section.textFormat,
@@ -2840,6 +3777,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             boxes: section.boxes,
             source: section.text,
             ticking: _sectionTicking[section.id],
+            // What the find bar found in it (obf-1047).
+            found: _findMarks[(section.id, FindingPart.text, '')],
+            // A long press on a cell selects cells to copy (obf-1054).
+            selectCells: true,
           ),
         ),
       for (final hash in section.photos) ...[
@@ -2855,13 +3796,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           hash: hash,
           photoText: section.photoTexts[hash],
         ),
-        ..._generatedButtons(
-          section.id,
-          hash,
-          section.photoTexts[hash],
-          photo: true,
-        ),
-        ..._removeButton(section.id, hash, photo: true),
+        ..._actionRow([
+          ..._generatedButtons(
+            section.id,
+            hash,
+            section.photoTexts[hash],
+            photo: true,
+          ),
+          ..._removeButton(section.id, hash, photo: true),
+        ]),
       ],
       for (final hash in section.removedPhotos) ...[
         PhotoText(
@@ -2870,11 +3813,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           hash: hash,
           photoText: section.photoTexts[hash],
         ),
-        ..._generatedButtons(
-          section.id,
-          hash,
-          section.photoTexts[hash],
-          photo: true,
+        ..._actionRow(
+          _generatedButtons(
+            section.id,
+            hash,
+            section.photoTexts[hash],
+            photo: true,
+          ),
         ),
       ],
       for (final hash in section.recordings) ...[
@@ -2887,13 +3832,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           transcript: section.transcripts[hash],
           compact: false,
         ),
-        ..._generatedButtons(
-          section.id,
-          hash,
-          section.transcripts[hash],
-          photo: false,
-        ),
-        ..._removeButton(section.id, hash, photo: false),
+        ..._actionRow([
+          ..._generatedButtons(
+            section.id,
+            hash,
+            section.transcripts[hash],
+            photo: false,
+          ),
+          ..._removeButton(section.id, hash, photo: false),
+        ]),
       ],
       for (final hash in section.removedRecordings) ...[
         TranscriptText(
@@ -2903,11 +3850,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           transcript: section.transcripts[hash],
           compact: false,
         ),
-        ..._generatedButtons(
-          section.id,
-          hash,
-          section.transcripts[hash],
-          photo: false,
+        ..._actionRow(
+          _generatedButtons(
+            section.id,
+            hash,
+            section.transcripts[hash],
+            photo: false,
+          ),
         ),
       ],
       // A merged Note's files travel with it (ADR 0047).
@@ -2934,14 +3883,21 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// and under it its description, small and weak, folded to one line
   /// while it is not edited; a tap unfolds it, and puts the cursor in it
   /// where this Device may change it ([editable]), else only shows it
-  /// whole. An empty one that may change is a field with its hint.
+  /// whole. An empty one that may change is "Add a description" on a
+  /// Checklist, Shopping List or Tally (obf-1071), which opens its field
+  /// until the cursor leaves it empty, and a field with its hint on a
+  /// Session.
   Widget _nameAndDescription(Note note, {required bool editable}) {
     final t = context.t;
     final theme = Theme.of(context);
     final weak = theme.colorScheme.onSurfaceVariant;
     final small = theme.textTheme.bodyMedium?.copyWith(color: weak);
     final description = _text.text;
-    final open = _descriptionOpen || (editable && description.isEmpty);
+    // A list's or Tally's empty one waits for "Add a description"
+    // (obf-1071); a Session's is a field with its hint.
+    final asked = _kind != NoteKind.session;
+    final open =
+        _descriptionOpen || (editable && description.isEmpty && !asked);
     final Widget shown;
     if (open) {
       shown = Row(
@@ -2978,6 +3934,21 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               icon: Icon(Icons.expand_less, color: weak),
             ),
         ],
+      );
+    } else if (description.isEmpty && editable) {
+      shown = Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: TextButton.icon(
+          key: const ValueKey('note-description-add'),
+          style: TextButton.styleFrom(
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            textStyle: theme.textTheme.bodyMedium,
+          ),
+          onPressed: _openDescription,
+          icon: const Icon(Icons.add),
+          label: Text(t.addADescription),
+        ),
       );
     } else if (description.isEmpty) {
       // Only read and empty: nothing to show.
@@ -3137,12 +4108,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 onAnswer: (answer) => _answer(open, answer),
               ),
               if (changes && open.routine.isReminder && _routines.length == 1)
-                OutlinedButton(
+                // It moves to the trash: filled on the error colour, as
+                // Delete (obf-1099).
+                DestructiveButton(
                   key: const ValueKey('open-done-trash'),
-                  // It moves to the trash: the error colour, as Delete.
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Theme.of(context).colorScheme.error,
-                  ),
                   onPressed: () => _checkOff(open, trash: true),
                   child: Text(t.doneAndTrash),
                 ),
@@ -3159,9 +4128,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     if (placed == null) return Scaffold(appBar: AppBar());
     final (:note, :area, :topic, :changes, schedules: _, amends: _, author: _) =
         placed;
-    // In a Shared Area a Member changes only their own Notes, and only a
-    // Manager their Routines (ADR 0013); Amend stays.
-    final amends = _amends;
     final editable = changes && note.textEditable;
     final when = DateFormat.yMd(Localizations.localeOf(context).toString())
         .add_Hm();
@@ -3179,328 +4145,352 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         _lines.leave();
         _saveText();
       },
-      child: Scaffold(
-        appBar: pageBar(
-          context,
-          title: t.noteTitle,
-          actions: [
-            BarAction(
-              key: const ValueKey('send-note-file'),
-              label: t.sendToPerson,
-              onPressed: () {
-                _saveText();
-                unawaited(
-                  sendNoteFile(context, widget.notes.store, widget.noteId),
-                );
-              },
-              icon: Icons.send_outlined,
-            ),
-            BarAction(
-              key: const ValueKey('share-note'),
-              label: t.shareToApp,
-              onPressed: () {
-                _saveText();
-                unawaited(shareNoteToApp(context, widget.notes, widget.noteId));
-              },
-              icon: Icons.share_outlined,
-            ),
-            BarAction(
-              key: const ValueKey('pack-note'),
-              label: t.exportAsPack,
-              onPressed: () {
-                _saveText();
-                unawaited(
-                  exportPack(context, widget.notes.store, widget.noteId),
-                );
-              },
-              icon: Icons.inventory_2_outlined,
-            ),
-            CalendarButton(choices: _calendarChoices),
-            BarAction(
-              key: const ValueKey('note-history'),
-              label: t.historyTitle,
-              onPressed: _openHistory,
-              icon: Icons.history,
-            ),
-            if (changes) ...[
-              // What the quick note offered before (#352).
-              if (PhotoScope.of(context).available)
-                BarAction(
-                  key: const ValueKey('editor-photo'),
-                  label: t.photo,
-                  onPressed: () => unawaited(_takePhoto()),
-                  icon: Icons.photo_camera_outlined,
-                ),
-              if (VoiceScope.of(context).available)
-                BarAction(
-                  key: const ValueKey('editor-voice'),
-                  label: t.voice,
-                  onPressed: () => unawaited(_record()),
-                  icon: Icons.mic_none,
-                ),
-              if (PhotoScope.of(context).pickable)
-                BarAction(
-                  key: const ValueKey('editor-gallery'),
-                  label: t.gallery,
-                  onPressed: () => unawaited(_pickPhotos()),
-                  icon: Icons.photo_library_outlined,
-                ),
-              if (PhotoScope.of(context).pasteable && editable)
-                BarAction(
-                  key: const ValueKey('editor-paste'),
-                  label: t.paste,
-                  onPressed: () => unawaited(_paste()),
-                  icon: Icons.content_paste,
-                ),
-              if (FileScope.of(context).pickable)
-                BarAction(
-                  key: const ValueKey('attach-file'),
-                  label: t.attachFile,
-                  onPressed: () => unawaited(_attachFile()),
-                  icon: Icons.attach_file,
-                ),
+      child: EditHistoryScope(
+        history: _history,
+        child: Scaffold(
+          appBar: pageBar(
+            context,
+            title: t.noteTitle,
+            actions: [
+              // First, so they stay on the bar of the narrowest phone
+              // (obf-1051).
               BarAction(
-                label: t.mergeInto,
-                onPressed: _merge,
-                icon: Icons.call_merge,
+                key: const ValueKey('editor-undo'),
+                label: t.editorUndo,
+                onPressed: _history.canUndo ? _undo : null,
+                icon: Icons.undo,
               ),
-              ?_shoppingAction(t, note, changes),
               BarAction(
-                label: t.moveToTrash,
-                onPressed: _trash,
-                icon: Icons.delete_outline,
+                key: const ValueKey('editor-redo'),
+                label: t.editorRedo,
+                onPressed: _history.canRedo ? _redo : null,
+                icon: Icons.redo,
+              ),
+              // Finds words in the Note, with or without a search (obf-1047).
+              BarAction(
+                key: const ValueKey('find-in-note'),
+                label: t.findInNote,
+                onPressed: _openFind,
+                icon: Icons.search,
+              ),
+              CalendarButton(choices: _calendarChoices),
+              BarAction(
+                key: const ValueKey('note-history'),
+                label: t.historyTitle,
+                onPressed: _openHistory,
+                icon: Icons.history,
+              ),
+              BarAction(
+                key: const ValueKey('editor-revert'),
+                label: t.revertAllChanges,
+                onPressed: _history.canUndo
+                    ? () => unawaited(_revertAll())
+                    : null,
+                icon: Icons.settings_backup_restore,
               ),
             ],
-          ],
-        ),
-        body: ListView(
-          padding: clearOfSystemBars(context, const EdgeInsets.all(16)),
-          children: [
-            if (!note.textEditable) ...[
-              const NewerFormatNote(key: ValueKey('note-newer-format')),
-              const SizedBox(height: 8),
-            ],
-            ..._openLines(t, changes),
-            ValueListenableBuilder(
-              valueListenable: _pasteEmpty,
-              builder: (context, empty, _) => empty
-                  ? Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Text(
-                        t.pasteEmpty,
-                        key: const ValueKey('paste-empty'),
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    )
-                  : const SizedBox.shrink(),
-            ),
-            // The Note's text and its Sections read on as one text, each
-            // Section under a tear line, in no box of its own (#307).
-            Embossed(
-              strong: note.importance == Importance.important,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (_named)
-                      _nameAndDescription(note, editable: editable)
-                    else
-                      TwoRowTextField(
-                        key: const ValueKey('note-text'),
-                        controller: _text,
-                        twoRows: _twoRows,
-                        readOnly: !editable,
-                        // ☐ goes in at the cursor; a tap on a box ticks it,
-                        // also where the text is only read (ADR 0035).
-                        boxes: true,
-                        bar: widget.notes.store.advanced,
-                        onBox: _tapBox,
-                        // The first format is written at once (ADR 0033).
-                        formats: true,
-                        onFormatted: () => setState(_saveText),
-                        // A paste that looks like code offers it (#213).
-                        onCodePasted:
-                            editable &&
-                                _kind == NoteKind.plain &&
-                                note.textFormat != TextFormats.code
-                            ? (pasted) => setState(() {
-                                _offersCode = true;
-                                _pastedCode = pasted;
-                              })
-                            : null,
-                        style: Theme.of(context).textTheme.bodyLarge,
-                        decoration: const InputDecoration(
-                          filled: false,
-                          border: InputBorder.none,
-                        ),
-                      ),
-                    // A Note of a kind keeps them below, as its diary part
-                    // (#188).
-                    if (!_named) ...[
-                      for (final (i, section) in _sections.indexed)
-                        ..._sectionPart(i, section, note, when),
-                      if (_sections.isNotEmpty) const SizedBox(height: 16),
-                    ],
-                  ],
+          ),
+          body: Column(
+            children: [
+              if (_finding)
+                FindBar(
+                  controller: _findWords,
+                  focusNode: _findFocus,
+                  at: _hitAt,
+                  count: _hits.length,
+                  onChanged: _findChanged,
+                  onPrevious: () => _stepHit(-1),
+                  onNext: () => _stepHit(1),
+                  onClose: _closeFind,
+                  onSearchAll: TagSearchScope.of(context) == null
+                      ? null
+                      : _searchAll,
                 ),
-              ),
-            ),
-            if (_offersCode && !_named) _codeOffer(t),
-            // The kind's content right under its name (#188): nothing
-            // while the Note is no Checklist, Shopping List or Tally.
-            ChecklistSection(
-              notes: widget.notes,
-              noteId: widget.noteId,
-              typed: _lines,
-              startLine: widget.typeLines,
-            ),
-            ShoppingSection(
-              notes: widget.notes,
-              noteId: widget.noteId,
-              typed: _lines,
-              startLine: widget.typeLines,
-            ),
-            if (_kind == NoteKind.tally) const SizedBox(height: 16),
-            TallySetup(notes: widget.notes, noteId: widget.noteId),
-            if (_sessionDraft case final draft?) ...[
-              const SizedBox(height: 16),
-              SessionNoteSetup(
-                draft: draft,
-                changes: _setsUp,
-                onChanged: _sessionChanged,
-                onNewTally: _newPoolTally,
-              ),
-            ],
-            // A list's or Tally's panel keeps its own space under it.
-            if (!_named) const SizedBox(height: 16),
-            _badges(placed, when, place, colour),
-            // Its past runs (#264), under its settings.
-            if (_sessionDraft != null) ...[
-              const SizedBox(height: 16),
-              EditorPanel(
-                heading: context.t.sessionRuns,
-                child: SessionRuns(notes: widget.notes, noteId: widget.noteId),
-              ),
-            ],
-            for (final hash in note.photos) ...[
-              const SizedBox(height: 16),
-              NotePhoto(
-                key: ValueKey(hash),
-                hash: hash,
-                onTap: () => viewPhoto(context, hash),
-              ),
-              PhotoText(
-                key: ValueKey('ocr:$hash'),
-                noteId: note.id,
-                hash: hash,
-                photoText: note.photoTexts[hash],
-              ),
-              ..._generatedButtons(
-                note.id,
-                hash,
-                note.photoTexts[hash],
-                photo: true,
-              ),
-              ..._removeButton(note.id, hash, photo: true),
-            ],
-            // Removed, the file shows no more; its text stays.
-            for (final hash in note.removedPhotos) ...[
-              PhotoText(
-                key: ValueKey('ocr:$hash'),
-                noteId: note.id,
-                hash: hash,
-                photoText: note.photoTexts[hash],
-              ),
-              ..._generatedButtons(
-                note.id,
-                hash,
-                note.photoTexts[hash],
-                photo: true,
-              ),
-            ],
-            for (final hash in note.recordings) ...[
-              const SizedBox(height: 16),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: RecordingButton(
-                  key: ValueKey(hash),
-                  hash: hash,
-                  compact: false,
-                ),
-              ),
-              TranscriptText(
-                key: ValueKey('transcript:$hash'),
-                noteId: note.id,
-                hash: hash,
-                transcript: note.transcripts[hash],
-                compact: false,
-              ),
-              ..._generatedButtons(
-                note.id,
-                hash,
-                note.transcripts[hash],
-                photo: false,
-              ),
-              ..._removeButton(note.id, hash, photo: false),
-            ],
-            for (final hash in note.removedRecordings) ...[
-              TranscriptText(
-                key: ValueKey('transcript:$hash'),
-                noteId: note.id,
-                hash: hash,
-                transcript: note.transcripts[hash],
-                compact: false,
-              ),
-              ..._generatedButtons(
-                note.id,
-                hash,
-                note.transcripts[hash],
-                photo: false,
-              ),
-            ],
-            ..._fileParts(
-              note.id,
-              note.attachments,
-              note.attachmentTexts,
-              note.removedAttachments,
-            ),
-            // A Note of a kind's Sections, its diary part under all else
-            // (#188), each under a tear line in no box, its text where
-            // the text above begins (#307).
-            if (_named)
-              for (final (i, section) in _sections.indexed)
-                Padding(
-                  key: ValueKey('section:${section.id}'),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: _sectionPart(i, section, note, when),
+              Expanded(
+                child: FindScope(
+                  marks: _findMarks,
+                  child: SelectionSearchScope(
+                    onSearch: _openFind,
+                    child: _body(
+                      t,
+                      placed,
+                      note,
+                      editable,
+                      when,
+                      place,
+                      colour,
+                    ),
                   ),
                 ),
-            // At the Note's end, after its Sections (obf-1035).
-            if (_linkedFrom.isEmpty)
-              LinkedFrom(linking: _linkedFrom)
-            else
-              Spotlight(
-                id: 'editor-linked-from',
-                child: LinkedFrom(linking: _linkedFrom),
               ),
-            const SizedBox(height: 24),
-            if (amends)
-              Align(
-                alignment: Alignment.centerLeft,
-                child: FilledButton.tonalIcon(
-                  onPressed: _amend,
-                  icon: const Icon(Icons.add),
-                  label: Text(t.amend),
-                ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  /// "Search all Notes" in the find bar (obf-1055): the search over every
+  /// Note for its words opens on top, as a tap on a tag does (ADR 0032);
+  /// back comes back to this Note.
+  void _searchAll() {
+    final words = _findWords.text.trim();
+    if (words.isEmpty) return;
+    _saveText();
+    TagSearchScope.of(context)?.call(context, words);
+  }
+
+  /// The page under the top bar and the find bar.
+  Widget _body(
+    AppLocalizations t,
+    PlacedNote placed,
+    Note note,
+    bool editable,
+    DateFormat when,
+    String place,
+    Color? colour,
+  ) {
+    final changes = placed.changes;
+    return ListView(
+      controller: _scroll,
+      padding: clearOfSystemBars(context, const EdgeInsets.all(16)),
+      children: [
+        if (!note.textEditable) ...[
+          const NewerFormatNote(key: ValueKey('note-newer-format')),
+          const SizedBox(height: 8),
+        ],
+        ..._openLines(t, changes),
+        ValueListenableBuilder(
+          valueListenable: _pasteEmpty,
+          builder: (context, empty, _) => empty
+              ? Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    t.pasteEmpty,
+                    key: const ValueKey('paste-empty'),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                )
+              : const SizedBox.shrink(),
+        ),
+        // The Note's text and its Sections read on as one text, each
+        // Section under a tear line, in no box of its own (#307).
+        Embossed(
+          strong: note.importance == Importance.important,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_named)
+                  _nameAndDescription(note, editable: editable)
+                else
+                  TwoRowTextField(
+                    key: const ValueKey('note-text'),
+                    controller: _text,
+                    twoRows: _twoRows,
+                    readOnly: !editable,
+                    autofocus: widget.typeText && editable,
+                    // ☐ goes in at the cursor; a tap on a box ticks it,
+                    // also where the text is only read (ADR 0035).
+                    boxes: true,
+                    bar: widget.notes.store.advanced,
+                    onBox: _tapBox,
+                    // The first format is written at once (ADR 0033).
+                    formats: true,
+                    onFormatted: () => setState(_saveText),
+                    // A paste that looks like code offers it (#213).
+                    onCodePasted:
+                        editable &&
+                            _kind == NoteKind.plain &&
+                            note.textFormat != TextFormats.code
+                        ? (pasted) => setState(() {
+                            _offersCode = true;
+                            _pastedCode = pasted;
+                          })
+                        : null,
+                    style: Theme.of(context).textTheme.bodyLarge,
+                    decoration: const InputDecoration(
+                      filled: false,
+                      border: InputBorder.none,
+                    ),
+                  ),
+                // The kind's content right under its name, in the same
+                // card (#188, obf-1071): nothing while the Note is no
+                // Checklist, Shopping List or Tally.
+                ChecklistSection(
+                  key: const ValueKey('checklist-section'),
+                  notes: widget.notes,
+                  noteId: widget.noteId,
+                  typed: _lines,
+                  startLine: widget.typeLines,
+                ),
+                ShoppingSection(
+                  key: const ValueKey('shopping-section'),
+                  notes: widget.notes,
+                  noteId: widget.noteId,
+                  typed: _lines,
+                  startLine: widget.typeLines,
+                ),
+                TallySetup(
+                  key: const ValueKey('tally-section'),
+                  notes: widget.notes,
+                  noteId: widget.noteId,
+                ),
+                // A Note of a kind keeps them below, as its diary part
+                // (#188).
+                if (!_named) ...[
+                  for (final (i, section) in _sections.indexed)
+                    ..._sectionPart(i, section, note, when),
+                  if (_sections.isNotEmpty) const SizedBox(height: 16),
+                ],
+              ],
+            ),
+          ),
+        ),
+        if (_offersCode && !_named) _codeOffer(t),
+        if (_sessionDraft case final draft?) ...[
+          const SizedBox(height: 16),
+          SessionNoteSetup(
+            draft: draft,
+            changes: _setsUp,
+            onChanged: _sessionChanged,
+            onNewTally: _newPoolTally,
+          ),
+        ],
+        // A Session's panels keep their own space under them.
+        if (_sessionDraft == null) const SizedBox(height: 16),
+        ?_group(
+          const ValueKey('editor-group-this-note'),
+          t.editorGroupThisNote,
+          [_badges(placed, when, place, colour)],
+        ),
+        // Its past runs (#264), under its settings.
+        if (_sessionDraft != null) ...[
+          const SizedBox(height: 16),
+          EditorPanel(
+            heading: context.t.sessionRuns,
+            child: SessionRuns(notes: widget.notes, noteId: widget.noteId),
+          ),
+        ],
+        for (final hash in note.photos) ...[
+          const SizedBox(height: 16),
+          NotePhoto(
+            key: ValueKey(hash),
+            hash: hash,
+            onTap: () => viewPhoto(context, hash),
+          ),
+          PhotoText(
+            key: ValueKey('ocr:$hash'),
+            noteId: note.id,
+            hash: hash,
+            photoText: note.photoTexts[hash],
+          ),
+          ..._actionRow([
+            ..._generatedButtons(
+              note.id,
+              hash,
+              note.photoTexts[hash],
+              photo: true,
+            ),
+            ..._removeButton(note.id, hash, photo: true),
+          ]),
+        ],
+        // Removed, the file shows no more; its text stays.
+        for (final hash in note.removedPhotos) ...[
+          PhotoText(
+            key: ValueKey('ocr:$hash'),
+            noteId: note.id,
+            hash: hash,
+            photoText: note.photoTexts[hash],
+          ),
+          ..._actionRow(
+            _generatedButtons(
+              note.id,
+              hash,
+              note.photoTexts[hash],
+              photo: true,
+            ),
+          ),
+        ],
+        for (final hash in note.recordings) ...[
+          const SizedBox(height: 16),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: RecordingButton(
+              key: ValueKey(hash),
+              hash: hash,
+              compact: false,
+            ),
+          ),
+          TranscriptText(
+            key: ValueKey('transcript:$hash'),
+            noteId: note.id,
+            hash: hash,
+            transcript: note.transcripts[hash],
+            compact: false,
+          ),
+          ..._actionRow([
+            ..._generatedButtons(
+              note.id,
+              hash,
+              note.transcripts[hash],
+              photo: false,
+            ),
+            ..._removeButton(note.id, hash, photo: false),
+          ]),
+        ],
+        for (final hash in note.removedRecordings) ...[
+          TranscriptText(
+            key: ValueKey('transcript:$hash'),
+            noteId: note.id,
+            hash: hash,
+            transcript: note.transcripts[hash],
+            compact: false,
+          ),
+          ..._actionRow(
+            _generatedButtons(
+              note.id,
+              hash,
+              note.transcripts[hash],
+              photo: false,
+            ),
+          ),
+        ],
+        ..._fileParts(
+          note.id,
+          note.attachments,
+          note.attachmentTexts,
+          note.removedAttachments,
+        ),
+        // A Note of a kind's Sections, its diary part under all else
+        // (#188), each under a tear line in no box, its text where
+        // the text above begins (#307).
+        if (_named)
+          for (final (i, section) in _sections.indexed)
+            Padding(
+              key: ValueKey('section:${section.id}'),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: _sectionPart(i, section, note, when),
+              ),
+            ),
+        // At the Note's end, after its Sections (obf-1035).
+        if (_linkedFrom.isEmpty)
+          LinkedFrom(linking: _linkedFrom)
+        else
+          Spotlight(
+            id: 'editor-linked-from',
+            child: LinkedFrom(linking: _linkedFrom),
+          ),
+        // What may be done with it, after all it holds (obf-1073).
+        const SizedBox(height: 8),
+        ..._groups(t, placed, note, editable),
+        const SizedBox(height: 8),
+      ],
     );
   }
 }
@@ -3601,7 +4591,7 @@ class EditorPanel extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (heading case final heading?) ...[
-              Text(heading, style: Theme.of(context).textTheme.titleSmall),
+              Text(heading, style: sectionHeading(context)),
               const SizedBox(height: 8),
             ],
             child,
@@ -3632,11 +4622,8 @@ class _RemoveDialog extends StatelessWidget {
           onPressed: () => Navigator.of(context).pop(),
           child: Text(t.cancel),
         ),
-        TextButton(
+        DestructiveButton(
           key: const ValueKey('remove-media-confirm'),
-          style: TextButton.styleFrom(
-            foregroundColor: Theme.of(context).colorScheme.error,
-          ),
           onPressed: () => Navigator.of(context).pop(true),
           child: Text(t.remove),
         ),
@@ -3684,7 +4671,7 @@ class _AmendDialogState extends State<_AmendDialog> {
         viewInsets: media.viewInsets.copyWith(bottom: below),
       ),
       child: AlertDialog(
-        title: Text(t.amend),
+        title: Text(t.addAPart),
         content: TwoRowTextField(
           controller: _text,
           twoRows: widget.twoRows,

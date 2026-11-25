@@ -26,6 +26,7 @@ import 'package:oldbrainfix/src/nudge_screen.dart';
 import 'package:oldbrainfix/src/photo_platform.dart';
 import 'package:oldbrainfix/src/ring_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
+import 'package:oldbrainfix/src/running.dart';
 import 'package:oldbrainfix/src/trash_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -181,8 +182,8 @@ void main() {
       expect(find.text('Call the vet'), findsWidgets);
     });
 
-    testWidgets("an Occurrence's notification tapped opens its Note only "
-        'after the unlock (#270)', (tester) async {
+    testWidgets("an Occurrence's notification tapped marks its row on the "
+        'Agenda only after the unlock (obf-1039)', (tester) async {
       final routine = routines.create('Call the vet', daily(10));
       alarms.tapOccurrence((
         routineId: routine.id,
@@ -190,12 +191,20 @@ void main() {
       ));
       await start(tester);
 
+      final marked = find.byKey(const ValueKey('agenda-marked'));
       expect(lockScreen, findsOneWidget);
-      expect(find.byType(NoteEditorScreen), findsNothing);
+      expect(marked, findsNothing);
       await tester.enterText(find.byKey(const ValueKey('lockPin')), pin);
       await tap(tester, find.byKey(const ValueKey('unlockPin')));
       expect(lockScreen, findsNothing);
-      expect(find.byType(NoteEditorScreen), findsOneWidget);
+      expect(find.byType(NoteEditorScreen), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byKey(ValueKey('row-${routine.id}@2026-10-24T10:00')),
+          matching: marked,
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('opens with biometrics where they are on', (tester) async {
@@ -351,6 +360,37 @@ void main() {
       expect(notes.all().single.text, 'long thought');
     });
 
+    testWidgets('the page Running goes when it locks again, also over '
+        'Capture, and opens nothing while locked (obf-1078)', (tester) async {
+      await start(tester);
+      await tester.enterText(find.byKey(const ValueKey('lockPin')), pin);
+      await tap(tester, find.byKey(const ValueKey('unlockPin')));
+      await tap(tester, find.byKey(const ValueKey('bar-more')));
+      await tap(tester, find.byKey(const ValueKey('running')));
+      expect(find.byType(RunningScreen), findsOneWidget);
+
+      await away(tester, const Duration(minutes: 5));
+      expect(tester.takeException(), isNull);
+      expect(lockScreen, findsOneWidget);
+      expect(find.byType(RunningScreen, skipOffstage: false), findsNothing);
+
+      await tester.enterText(find.byKey(const ValueKey('lockPin')), pin);
+      await tap(tester, find.byKey(const ValueKey('unlockPin')));
+      await openTextCapture(tester);
+      // As a tap on the line under Capture's bar does.
+      openRunning(tester.element(find.byType(CaptureScreen)));
+      await tester.pumpAndSettle();
+      expect(find.byType(RunningScreen), findsOneWidget);
+      await away(tester, const Duration(minutes: 5));
+      expect(tester.takeException(), isNull);
+      expect(find.byType(RunningScreen, skipOffstage: false), findsNothing);
+      expect(find.byType(CaptureScreen), findsOneWidget);
+
+      openRunning(tester.element(find.byType(CaptureScreen)));
+      await tester.pumpAndSettle();
+      expect(find.byType(RunningScreen, skipOffstage: false), findsNothing);
+    });
+
     testWidgets('keeps a share open in Capture over the browser when it '
         'locks again, and the browser goes', (tester) async {
       notes.capture('secret plan');
@@ -451,17 +491,19 @@ void main() {
     testWidgets('asks for the PIN before its menu does anything', (
       tester,
     ) async {
-      lockedDoctor();
+      final (:doctor, note: _, routine: _) = lockedDoctor();
       await start(tester);
       await tap(tester, find.byTooltip(en.browseTooltip));
+      // The Area's own ⋮, not the list's in the top bar (obf-1096).
+      final menu = find.byKey(ValueKey('area-menu-${doctor.id}'));
 
-      await tap(tester, find.byIcon(Icons.more_vert));
+      await tap(tester, menu);
       await tap(tester, find.text(en.rename));
       expect(find.byKey(const ValueKey('pinField')), findsOneWidget);
       await tap(tester, find.widgetWithText(TextButton, en.cancel));
       expect(find.text(en.rename), findsNothing, reason: 'no name asked');
 
-      await tap(tester, find.byIcon(Icons.more_vert));
+      await tap(tester, menu);
       await tap(tester, find.text(en.rename));
       await enterPin(tester, pin);
       expect(find.byKey(const ValueKey('pinField')), findsNothing);
@@ -490,7 +532,8 @@ void main() {
       await tester.enterText(find.byType(TextField), 'Pill');
       await tester.pump(BrowserSearchField.pause);
       await tester.pumpAndSettle();
-      expect(find.text('Pills for the cat'), findsOneWidget);
+      // On the card and among the places found under it (obf-1047).
+      expect(find.text('Pills for the cat'), findsNWidgets(2));
       expect(find.text('Pills'), findsNothing);
 
       await tap(tester, find.byTooltip(en.allNotesTitle));
@@ -555,8 +598,10 @@ void main() {
       expect(find.byType(RoutineEditorScreen), findsOneWidget);
     });
 
-    testWidgets("asks for the PIN before a tap on a locked Area's "
-        'notification opens its Note (#270)', (tester) async {
+    testWidgets("a tap on a locked Area's notification marks its Masked "
+        'row, asking for no PIN and showing nothing of it (obf-1039)', (
+      tester,
+    ) async {
       final (:routine, doctor: _, note: _) = lockedDoctor();
       await start(tester);
 
@@ -565,30 +610,39 @@ void main() {
         occurrenceKey: '2026-10-24T10:00',
       ));
       await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('pinField')), findsOneWidget);
+      expect(find.byKey(const ValueKey('pinField')), findsNothing);
       expect(find.byType(NoteEditorScreen), findsNothing);
-      await enterPin(tester, pin);
-      expect(find.byType(NoteEditorScreen), findsOneWidget);
-      expect(find.text('Pills'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(ValueKey('row-${routine.id}@2026-10-24T10:00')),
+          matching: find.byKey(const ValueKey('agenda-marked')),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Pills'), findsNothing);
     });
 
-    testWidgets('asks for the PIN before a Masked row shares its file', (
-      tester,
-    ) async {
+    testWidgets("asks for the PIN before a Masked row's History opens; "
+        'the row shares no calendar file (obf-1014)', (tester) async {
       final (:routine, doctor: _, note: _) = lockedDoctor();
       await start(tester);
 
       await tap(tester, find.byKey(ValueKey('row-menu-${routine.id}')).first);
-      await tap(tester, find.text(en.share));
+      expect(find.text(en.share), findsNothing);
+      await tap(tester, find.byKey(const ValueKey('row-history')));
       expect(find.byKey(const ValueKey('pinField')), findsOneWidget);
       await tap(tester, find.widgetWithText(TextButton, en.cancel));
-      expect(calendar.shared, isEmpty, reason: 'the title stays hidden');
+      expect(
+        find.text('Pills'),
+        findsNothing,
+        reason: 'the title stays hidden',
+      );
 
       await tap(tester, find.byKey(ValueKey('row-menu-${routine.id}')).first);
-      await tap(tester, find.text(en.share));
+      await tap(tester, find.byKey(const ValueKey('row-history')));
       await enterPin(tester, pin);
-      final (_, ics) = calendar.shared.single;
-      expect(ics, contains('SUMMARY:Pills'));
+      expect(find.byKey(const ValueKey('pinField')), findsNothing);
+      expect(find.text(en.historyTitle), findsWidgets);
     });
 
     testWidgets('shows a Reminder Masked as "Private Reminder"', (

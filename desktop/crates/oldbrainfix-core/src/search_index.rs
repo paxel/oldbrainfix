@@ -1,7 +1,8 @@
 //! The full-text index of what search reads (ADR 0048), as the Dart
 //! core's `SearchIndex` keeps it: beside the log in the same database, a
-//! row for every entry that wrote a text search reads, in lower case as
-//! search lowers it, in an FTS5 table with the trigram tokenizer.
+//! row for every entry that wrote a text search reads, folded as search
+//! folds it ([`crate::findings::fold`]), in an FTS5 table with the
+//! trigram tokenizer.
 //!
 //! It only narrows: it names every entity one of whose texts ever held a
 //! query, and search reads those as they are now, so an entry that no
@@ -16,18 +17,19 @@ use std::collections::{HashMap, HashSet};
 use rusqlite::{Connection, params};
 
 use crate::Result;
+use crate::findings::fold;
 use crate::notes::{Attachment, keys};
-use crate::search::lower_case;
 use crate::store::Store;
 use crate::tallies::keys as tally_keys;
 use crate::text_boxes;
 use crate::text_format::{self, StoredText};
 
-/// The version of what the rows hold; another one is built anew.
-pub(crate) const VERSION: i64 = 1;
+/// The version of what the rows hold; another one is built anew. 2: the
+/// texts folded, no longer only lowered (obf-1047).
+pub(crate) const VERSION: i64 = 2;
 
-/// The entities whose texts, at some time, held `wanted`, in lower case
-/// and not blank, and those the shown pending sets change: every entity
+/// The entities whose texts, at some time, held `wanted`, folded and not
+/// empty, and those the shown pending sets change: every entity
 /// whose text holds it now, and maybe more. `None` when the index cannot
 /// be used, such as a SQLite without FTS5: search then reads every Note.
 pub(crate) fn candidates(store: &Store, wanted: &str) -> Option<HashSet<String>> {
@@ -41,8 +43,8 @@ pub(crate) fn candidates(store: &Store, wanted: &str) -> Option<HashSet<String>>
     Some(found)
 }
 
-/// What the index holds of the entry that wrote `value` to `field`, in
-/// lower case: every way search reads such a text, a line apart, or
+/// What the index holds of the entry that wrote `value` to `field`,
+/// folded: every way search reads such a text, a line apart, or
 /// `None` for a field search does not read. A `text` is read as a Note's
 /// with its boxes as written, a Section's and a Line's.
 pub(crate) fn text_of(field: &str, value: &str) -> Option<String> {
@@ -63,18 +65,18 @@ pub(crate) fn text_of(field: &str, value: &str) -> Option<String> {
                 forms.push(form);
             }
         }
-        return Some(lower_case(&forms.join("\n")));
+        return Some(fold(&forms.join("\n")));
     }
     if field == tally_keys::LINE
         || field.starts_with(keys::TRANSCRIPT_PREFIX)
         || field.starts_with(keys::OCR_PREFIX)
         || field.starts_with(keys::FILE_TEXT_PREFIX)
     {
-        return Some(lower_case(value));
+        return Some(fold(value));
     }
     field
         .strip_prefix(keys::FILE_PREFIX)
-        .map(|hash| lower_case(&Attachment::read(hash, value).name))
+        .map(|hash| fold(&Attachment::read(hash, value).name))
 }
 
 /// The entities of the rows holding `wanted`.

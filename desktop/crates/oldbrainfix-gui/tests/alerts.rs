@@ -17,9 +17,10 @@ use oldbrainfix_core::{
     SigningKey, Store, WireEntry,
 };
 use oldbrainfix_gui::alerts::{
-    Alerts, CATCH_UP_KEY, CHANGES_KEY, DONE, NOT_TODAY, NUDGE_KEY, Notice, OPEN, OccurrenceWanted,
-    SKIP, SNOOZE, SNOOZE_10, TOMORROW, Tap, occurrence_key,
+    AgendaWanted, Alerts, CATCH_UP_KEY, CHANGES_KEY, DONE, NOT_TODAY, NUDGE_KEY, Notice, OPEN,
+    OccurrenceWanted, SKIP, SNOOZE, SNOOZE_10, TOMORROW, Tap, occurrence_key,
 };
+use oldbrainfix_gui::click_trace::ClickTrace;
 use oldbrainfix_gui::l10n::L10n;
 use oldbrainfix_gui::notify::{Recorded, RecordingNotifier};
 use oldbrainfix_gui::ring::{OWN_SOUND, RecordingRinger};
@@ -440,31 +441,55 @@ fn snooze_and_not_today_show_their_choices_in_place_and_skip_stops_the_alarm() -
 }
 
 /// A click on an Occurrence's notification, or its "Open Old Brain Fix",
-/// opens the window with its Note (#270); the Nudge's and the Catch-up
-/// Notification's only the window, an answer neither.
+/// opens the window on the Agenda with the Occurrence (obf-1039); the
+/// Catch-up Notification's on the Agenda, the Nudge's only the window
+/// here, an answer neither. Each tap goes into the trace.
 #[test]
-fn a_click_on_an_occurrences_notification_asks_for_its_note() -> TestResult {
+fn a_click_on_an_occurrences_notification_asks_for_it_on_the_agenda() -> TestResult {
     let (store, clock) = store()?;
     let record = RecordingNotifier::default();
     let mut alerts = alerts(&record);
     let wanted: OccurrenceWanted = Arc::new(Mutex::new(None));
     alerts.set_occurrence_wanted(wanted.clone());
+    let trace = ClickTrace::default();
+    alerts.set_trace(trace.clone());
     let pills = pills(&store)?;
     let eight = Occurrence::new(Day::new(2026, 10, 26), ClockTime::new(8, 0));
     let key = occurrence_key(&pills, &eight);
-    let held = |wanted: &OccurrenceWanted| wanted.lock().map(|w| w.clone()).ok().flatten();
+    let taken = |wanted: &OccurrenceWanted| wanted.lock().ok().and_then(|mut w| w.take());
+    // It rang at 08:00.
+    clock.set("2026-10-26T07:00:05.000Z")?;
+    alerts.tick(&store, &berlin)?;
     let at = clock.set("2026-10-26T07:01:00.000Z")?;
-    for other in [NUDGE_KEY, CATCH_UP_KEY, CHANGES_KEY] {
+    for other in [NUDGE_KEY, CHANGES_KEY] {
         alerts.apply(&store, &berlin, &tap(other, OPEN, at))?;
-        assert_eq!(held(&wanted), None, "{other}");
+        assert_eq!(taken(&wanted), None, "{other}");
     }
+    alerts.apply(&store, &berlin, &tap(CATCH_UP_KEY, OPEN, at))?;
+    assert_eq!(taken(&wanted), Some(AgendaWanted::Agenda));
     alerts.apply(&store, &berlin, &tap(&key, SNOOZE, at))?;
-    assert_eq!(held(&wanted), None);
+    assert_eq!(taken(&wanted), None);
     assert!(alerts.open_requested, "the Nudge's click opened the window");
     alerts.open_requested = false;
     alerts.apply(&store, &berlin, &tap(&key, OPEN, at))?;
-    assert_eq!(held(&wanted), Some(pills));
+    assert_eq!(taken(&wanted), Some(AgendaWanted::Occurrence(pills, eight)));
     assert!(alerts.open_requested);
+    let traced: Vec<(String, String, Option<String>)> = trace
+        .clicks()
+        .into_iter()
+        .map(|c| (c.key, c.action, c.went))
+        .collect();
+    assert_eq!(traced.len(), 5);
+    // The answer is noted here, where the clicks went the window notes.
+    assert_eq!(
+        traced.get(3),
+        Some(&(
+            key.clone(),
+            SNOOZE.to_string(),
+            Some("its choices shown".to_string())
+        ))
+    );
+    assert_eq!(traced.get(4), Some(&(key, OPEN.to_string(), None)));
     Ok(())
 }
 
@@ -831,5 +856,23 @@ fn a_heads_up_missed_while_not_running_never_shows_late() -> TestResult {
     clock.set("2026-10-26T18:43:00.000Z")?;
     alerts(&record).tick(&store, &berlin)?;
     assert!(shown(&record.take()).iter().all(|n| n.key != key));
+    Ok(())
+}
+
+#[test]
+fn a_click_on_a_notification_closes_it() -> TestResult {
+    // obf-1039: until 0.8 it stayed, on macOS too.
+    let (store, clock) = store()?;
+    let record = RecordingNotifier::default();
+    let mut alerts = alerts(&record);
+    let pills = pills(&store)?;
+    let eight = Occurrence::new(Day::new(2026, 10, 26), ClockTime::new(8, 0));
+    let key = occurrence_key(&pills, &eight);
+    clock.set("2026-10-26T07:00:05.000Z")?;
+    alerts.tick(&store, &berlin)?;
+    record.take();
+    let at = clock.set("2026-10-26T07:01:00.000Z")?;
+    alerts.apply(&store, &berlin, &tap(&key, OPEN, at))?;
+    assert!(record.take().contains(&Recorded::Closed(key)));
     Ok(())
 }

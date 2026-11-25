@@ -4,8 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/agenda_screen.dart';
 import 'package:oldbrainfix/src/app.dart';
+import 'package:oldbrainfix/src/line_editing.dart';
 import 'package:oldbrainfix/src/look.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
+import 'package:oldbrainfix/src/routine_editor_screen.dart'
+    show deviceWallClock;
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'reveal.dart';
@@ -120,18 +123,44 @@ void main() {
       expect(tester.getTopLeft(folded).dy, greaterThanOrEqualTo(name));
       expect(
         tester.getTopLeft(key(content)).dy,
-        greaterThan(tester.getBottomLeft(folded).dy),
+        greaterThanOrEqualTo(tester.getBottomLeft(folded).dy),
       );
+      // A list or Tally is one card, its content in the card of its name
+      // and in no panel of its own (obf-1071).
+      final card = find.ancestor(
+        of: key('note-name'),
+        matching: find.byType(Embossed),
+      );
+      expect(
+        find.descendant(of: card, matching: key(content)),
+        kind == NoteKind.session ? findsNothing : findsOneWidget,
+      );
+      if (kind != NoteKind.session) {
+        expect(
+          find.ancestor(of: key(content), matching: find.byType(EditorPanel)),
+          findsNothing,
+        );
+      }
+      // Measured on the page, as This Note's heading may push the
+      // badges out of sight of the content (obf-1073).
+      final page = tester.state<ScrollableState>(find.byType(Scrollable).first);
+      final contentEnd =
+          tester.getBottomLeft(key(content)).dy + page.position.pixels;
       await reveal(tester, key('note-badges'));
       expect(
-        tester.getTopLeft(key('note-badges')).dy,
-        greaterThanOrEqualTo(tester.getBottomLeft(key(content)).dy),
+        tester.getTopLeft(key('note-badges')).dy + page.position.pixels,
+        greaterThanOrEqualTo(contentEnd),
       );
+      // Measured on the page too: a long content may take the badges
+      // out of the list once the Section is in view.
+      final badgesEnd =
+          tester.getBottomLeft(key('note-badges')).dy + page.position.pixels;
       final section = notes.sections(id).single.id;
       await reveal(tester, key('section-text:$section'));
       expect(
-        tester.getTopLeft(key('section-text:$section')).dy,
-        greaterThan(tester.getBottomLeft(key('note-badges')).dy),
+        tester.getTopLeft(key('section-text:$section')).dy +
+            page.position.pixels,
+        greaterThan(badgesEnd),
       );
       // In no box, under a tear line (#307).
       expect(
@@ -145,11 +174,10 @@ void main() {
         tester.getBottomLeft(key('tear:$section')).dy,
         lessThanOrEqualTo(tester.getTopLeft(key('section-text:$section')).dy),
       );
-      await reveal(tester, find.text('Add to Note'));
-      expect(
-        tester.getTopLeft(find.text('Add to Note')).dy,
-        greaterThan(tester.getBottomLeft(key('section-text:$section')).dy),
-      );
+      // No Amend box or button under it: "Add a part" opens it
+      // (obf-1072).
+      expect(find.text('Add to Note'), findsNothing);
+      expect(find.text("What's new?"), findsNothing);
       expect(tester.takeException(), isNull);
     });
   }
@@ -266,21 +294,71 @@ void main() {
       expect(notes.byId(id)!.text, 'Trip\nfor two\n$description');
     });
 
-    testWidgets('an empty description is a field with its hint', (
+    testWidgets('an empty description is "Add a description", which opens '
+        'its field, the cursor in it; left empty it is the button again', (
       tester,
     ) async {
       final id = notes.capture('Trip\nPassport').id;
       Checklists(store).make(id);
       await edit(tester, id);
+      expect(key('note-description'), findsNothing);
+      expect(
+        find.descendant(
+          of: key('note-description-add'),
+          matching: find.text('Add a description'),
+        ),
+        findsOneWidget,
+      );
+      // A text button with its icon (obf-1104).
+      expect(
+        find.descendant(
+          of: key('note-description-add'),
+          matching: find.byIcon(Icons.add),
+        ),
+        findsOneWidget,
+      );
+      await tap(tester, key('note-description-add'));
+      expect(key('note-description-add'), findsNothing);
       expect(typedIn(tester, 'note-description'), '');
       expect(
         widgetOf(tester, 'note-description').decoration?.hintText,
         'Description',
       );
-      await tap(tester, field('note-description'));
+      expect(widgetOf(tester, 'note-description').focusNode!.hasFocus, isTrue);
+
+      // Left empty: the button again.
+      await tap(tester, field('note-name'));
+      expect(key('note-description'), findsNothing);
+      expect(key('note-description-add'), findsOneWidget);
+
+      await tap(tester, key('note-description-add'));
       await tester.enterText(field('note-description'), 'Bring snacks');
       await leave(tester);
       expect(notes.byId(id)!.text, 'Trip\nBring snacks');
+    });
+
+    testWidgets('a Session\'s empty description stays a field with its '
+        'hint', (tester) async {
+      final id = notes.capture('Morning').id;
+      final pool = notes.capture('Stretch').id;
+      Tallies(store).addField(pool, name: 'Times', unit: 'times');
+      Sessions(store)
+          .make(id, pool: [pool], count: 1, rule: SessionRule.rolling);
+      await edit(tester, id);
+      expect(key('note-description-add'), findsNothing);
+      expect(typedIn(tester, 'note-description'), '');
+    });
+
+    testWidgets('a text only read shows no "Add a description"', (
+      tester,
+    ) async {
+      final id = notes.capture('Trip\nPassport').id;
+      Checklists(store).make(id);
+      store.append(id, NoteKeys.text, '{"format":"x-future","text":"Trip"}');
+      await edit(tester, id);
+      expect(widgetOf(tester, 'note-name').readOnly, isTrue);
+      expect(key('note-description-add'), findsNothing);
+      expect(key('note-description'), findsNothing);
     });
   });
 
@@ -326,6 +404,161 @@ void main() {
     expect(key('note-description-folded'), findsOneWidget);
     await leave(tester);
     expect(notes.textSetAt(id), setAt);
+  });
+
+  group('"Add a Line"', () {
+    /// The field of the Line [shown] keyed [prefix], `new-1` for the
+    /// first new one.
+    Finder lineField(String prefix, String shown) => find.descendant(
+      of: key('$prefix-field-$shown'),
+      matching: find.byType(TextField),
+    );
+
+    for (final prefix in ['checklist', 'shopping']) {
+      testWidgets(
+        'of a ${prefix == 'checklist' ? 'Checklist' : 'Shopping '
+                  'List'} puts the cursor into a new Line after the Lines, once',
+        (tester) async {
+          final semantics = tester.ensureSemantics();
+          final id = notes.capture('Trip\nPassport\nTickets').id;
+          if (prefix == 'checklist') {
+            Checklists(store).make(id);
+          } else {
+            ShoppingLists(store).make(id);
+          }
+
+          /// The ids and texts of its Lines.
+          List<(String, String)> stored() => prefix == 'checklist'
+              ? [
+                  for (final l in Checklists(store).byNote(id)!.lines)
+                    (l.id, l.text),
+                ]
+              : [
+                  for (final l in ShoppingLists(
+                    store,
+                  ).byNote(id, deviceWallClock)!.lines)
+                    (l.id, l.text),
+                ];
+          final tickets = stored().last.$1;
+          await edit(tester, id);
+          final add = key('$prefix-add-line');
+          expect(
+            find.descendant(of: key(prefix), matching: add),
+            findsOneWidget,
+          );
+          final hint = tester
+              .widget<TextField>(
+                find.descendant(of: add, matching: find.byType(TextField)),
+              )
+              .decoration
+              ?.hintText;
+          expect(hint, 'Add a Line');
+          expect(
+            tester.getSemantics(add),
+            isSemantics(label: 'Add a Line', hasTapAction: true),
+          );
+          // Under the Lines.
+          final last = key('$prefix-field-$tickets');
+          expect(
+            tester.getTopLeft(add).dy,
+            greaterThanOrEqualTo(tester.getBottomLeft(last).dy),
+          );
+          await tap(tester, add);
+          final typed = lineField(prefix, 'new-1');
+          expect(typed, findsOneWidget);
+          expect(tester.widget<TextField>(typed).focusNode!.hasFocus, isTrue);
+          expect(
+            tester.getTopLeft(typed).dy,
+            greaterThanOrEqualTo(tester.getBottomLeft(last).dy),
+          );
+          expect(
+            tester.getTopLeft(add).dy,
+            greaterThanOrEqualTo(tester.getBottomLeft(typed).dy),
+          );
+          // Again while the new Line is empty: the cursor stays there.
+          await tap(tester, add);
+          expect(lineField(prefix, 'new-2'), findsNothing);
+          expect(tester.widget<TextField>(typed).focusNode!.hasFocus, isTrue);
+
+          await tester.enterText(typed, '${lineStart}Snacks');
+          await tester.pumpAndSettle();
+          await leave(tester);
+          expect(stored().map((l) => l.$2), ['Passport', 'Tickets', 'Snacks']);
+          semantics.dispose();
+        },
+      );
+    }
+
+    testWidgets('of a Checklist puts the new Line after the open ones', (
+      tester,
+    ) async {
+      final id = notes.capture('Trip\nPassport\nTickets').id;
+      final lists = Checklists(store)..make(id);
+      String lineId(String text) =>
+          lists.byNote(id)!.lines.firstWhere((l) => l.text == text).id;
+      lists.check(lineId('Tickets'));
+      final passport = key('checklist-field-${lineId('Passport')}');
+      final tickets = key('checklist-field-${lineId('Tickets')}');
+      await edit(tester, id);
+      await tap(tester, key('checklist-add-line'));
+      final typed = lineField('checklist', 'new-1');
+      expect(
+        tester.getTopLeft(typed).dy,
+        greaterThanOrEqualTo(tester.getBottomLeft(passport).dy),
+      );
+      expect(
+        tester.getBottomLeft(typed).dy,
+        lessThanOrEqualTo(tester.getTopLeft(tickets).dy),
+      );
+      await tester.enterText(typed, '${lineStart}Snacks');
+      await tester.pumpAndSettle();
+      await leave(tester);
+      expect(lists.byNote(id)!.lines.map((l) => l.text), [
+        'Passport',
+        'Snacks',
+        'Tickets',
+      ]);
+    });
+
+    testWidgets('of a Shopping List puts the new Line before the struck '
+        'ones', (tester) async {
+      final id = notes.capture('Trip\nPassport\nTickets').id;
+      final lists = ShoppingLists(store)..make(id);
+      final passport = lists.byNote(id, deviceWallClock)!.lines.first.id;
+      lists.check(passport, deviceWallClock);
+      final tickets = lists
+          .byNote(id, deviceWallClock)!
+          .lines
+          .firstWhere((l) => l.text == 'Tickets')
+          .id;
+      await edit(tester, id);
+      final open = key('shopping-field-$tickets');
+      final struck = key('shopping-field-$passport');
+      expect(
+        tester.getTopLeft(struck).dy,
+        greaterThanOrEqualTo(tester.getBottomLeft(open).dy),
+      );
+      await tap(tester, key('shopping-add-line'));
+      final typed = lineField('shopping', 'new-1');
+      expect(
+        tester.getTopLeft(typed).dy,
+        greaterThanOrEqualTo(tester.getBottomLeft(open).dy),
+      );
+      expect(
+        tester.getBottomLeft(typed).dy,
+        lessThanOrEqualTo(tester.getTopLeft(struck).dy),
+      );
+      await tester.enterText(typed, '${lineStart}Snacks');
+      await tester.pumpAndSettle();
+      await leave(tester);
+      expect(
+        [
+          for (final l in lists.byNote(id, deviceWallClock)!.lines)
+            if (!l.struck) l.text,
+        ],
+        ['Tickets', 'Snacks'],
+      );
+    });
   });
 
   group('the full card', () {

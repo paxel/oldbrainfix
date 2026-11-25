@@ -13,11 +13,12 @@
 //! it can't be saved it asks once whether to discard it. Left as it
 //! opened, or by Cancel, it makes nothing.
 
-use egui::{Id, RichText, TextEdit, Ui};
+use egui::{Id, RichText, Ui};
 use oldbrainfix_core::tally_units;
 use oldbrainfix_core::{Notes, Store, Tallies, TallyRule, UnitSystem};
 
 use crate::app::{chip_row, embossed};
+use crate::design;
 use crate::icons;
 use crate::l10n::L10n;
 use crate::leave_saves::Leaving;
@@ -283,20 +284,20 @@ impl TallyPage {
             .show(ui, |ui| {
                 ui.spacing_mut().item_spacing.y = 16.0;
                 ui.add_space(4.0);
-                ui.label(RichText::new(t.new_tally()).size(18.0).strong().color(text));
+                crate::design::dialog_title(ui, t.new_tally());
                 ui.horizontal_wrapped(|ui| {
                     if theme::main_action(ui, true, t.save()) {
                         intent = Some(PageIntent::Save);
                     }
-                    if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+                    if design::row_button(ui, t.cancel()).clicked() {
                         intent = Some(PageIntent::Close);
                     }
                 });
                 embossed(ui, tones, false, None, |ui| {
-                    let label = ui.label(RichText::new(t.kind_name()).strong().color(text));
+                    let label = ui.label(RichText::new(t.kind_name()).strong());
                     let field = ui
                         .add(
-                            TextEdit::singleline(&mut self.name)
+                            crate::theme::field(ui, &mut self.name)
                                 .id(Id::new(NAME_FIELD))
                                 .text_color(text)
                                 .desired_width(f32::INFINITY),
@@ -311,16 +312,15 @@ impl TallyPage {
                         ui.label(RichText::new(t.kind_name_missing()).color(error));
                     }
                 });
-                ui.label(RichText::new(t.tally_fields()).strong().color(text));
+                ui.label(RichText::new(t.tally_fields()).strong());
                 for (index, field) in self.fields.iter_mut().enumerate() {
                     embossed(ui, tones, false, None, |ui| {
                         ui.spacing_mut().item_spacing.y = 8.0;
-                        let label =
-                            ui.label(RichText::new(t.tally_field_name()).strong().color(text));
+                        let label = ui.label(RichText::new(t.tally_field_name()).strong());
                         let id = field_id(field.key);
                         let typed = ui
                             .add(
-                                TextEdit::singleline(&mut field.name)
+                                crate::theme::field(ui, &mut field.name)
                                     .id(id)
                                     .hint_text(t.tally_field_name_hint())
                                     .text_color(text)
@@ -398,11 +398,7 @@ impl TallyPage {
                         }
                     });
                 }
-                let add = ui.horizontal(|ui| {
-                    icons::show(ui, icons::ADD, 20.0, text);
-                    ui.button(RichText::new(t.tally_add_field()).color(text))
-                });
-                if add.inner.clicked() {
+                if design::text_button(ui, icons::ADD, t.tally_add_field()).clicked() {
                     self.next += 1;
                     let field = FieldDraft::new(self.next);
                     self.focus = Some(field_id(field.key));
@@ -478,7 +474,7 @@ impl TallyPage {
                     let weak = ui.visuals().weak_text_color();
                     let id = Id::new("new tally unit");
                     let typed = ui.add(
-                        TextEdit::singleline(&mut field.unit_text)
+                        crate::theme::field(ui, &mut field.unit_text)
                             .id(id)
                             .hint_text(t.tally_unit_hint())
                             .text_color(text)
@@ -536,7 +532,7 @@ impl TallyPage {
                     ui.horizontal(|ui| {
                         let typed = ui
                             .add(
-                                TextEdit::singleline(&mut field.target)
+                                crate::theme::field(ui, &mut field.target)
                                     .id(Id::new("new tally target"))
                                     .text_color(text)
                                     .desired_width(120.0),

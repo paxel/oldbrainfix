@@ -164,6 +164,12 @@ abstract class AppLocalizations {
   /// **'Text'**
   String get text;
 
+  /// Topmost entry of the Agenda's "+" fan (obf-1141): opens an empty Note in the full Note editor instead of the quick note.
+  ///
+  /// In en, this message translates to:
+  /// **'Editor'**
+  String get captureFanEditor;
+
   /// No description provided for @captureFanClose.
   ///
   /// In en, this message translates to:
@@ -235,6 +241,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'New Area'**
   String get newArea;
+
+  /// In ⋮ of the Areas list's top bar (obf-1089): shows a move handle on each Area row until Done.
+  ///
+  /// In en, this message translates to:
+  /// **'Rearrange'**
+  String get rearrangeAreas;
+
+  /// The button in the place of ⋮ on the Areas list while rearranging (obf-1089): hides the move handles again; the order is kept.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get rearrangeDone;
 
   /// No description provided for @newTopic.
   ///
@@ -590,6 +608,48 @@ abstract class AppLocalizations {
   /// **'No Note matches.'**
   String get nothingFound;
 
+  /// No description provided for @findingsMore.
+  ///
+  /// In en, this message translates to:
+  /// **'+{count} more'**
+  String findingsMore(int count);
+
+  /// No description provided for @findInNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Find in Note'**
+  String get findInNote;
+
+  /// No description provided for @findCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{at} of {count}'**
+  String findCount(int at, int count);
+
+  /// No description provided for @findNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Not in this Note'**
+  String get findNone;
+
+  /// No description provided for @findPrevious.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous place found'**
+  String get findPrevious;
+
+  /// No description provided for @findNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next place found'**
+  String get findNext;
+
+  /// No description provided for @findClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close the find bar'**
+  String get findClose;
+
   /// No description provided for @noNotesHere.
   ///
   /// In en, this message translates to:
@@ -644,11 +704,29 @@ abstract class AppLocalizations {
   /// **'What\'s new?'**
   String get amendHint;
 
+  /// The Note editor's action that opens the box adding a part (a Section) to an existing Note; a Note being made has none (obf-1072).
+  ///
+  /// In en, this message translates to:
+  /// **'Add a part'**
+  String get addAPart;
+
   /// No description provided for @add.
   ///
   /// In en, this message translates to:
   /// **'Add'**
   String get add;
+
+  /// Heading of the first of the Note editor's four groups under the text (obf-1073), over the badges of the Note's settings: Kind, Importance, Area and Topic, Captured, Show on the Agenda, Hidden from AI.
+  ///
+  /// In en, this message translates to:
+  /// **'This Note'**
+  String get editorGroupThisNote;
+
+  /// Heading of the last of the Note editor's four groups (obf-1073), over Merge into…, Add to a Shopping List and Move to trash.
+  ///
+  /// In en, this message translates to:
+  /// **'Tidy'**
+  String get editorGroupTidy;
 
   /// No description provided for @moveToTrash.
   ///
@@ -667,6 +745,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The trash is empty.'**
   String get trashEmpty;
+
+  /// Bar action of the Trash that deletes everything in it for good at once (obf-1095).
+  ///
+  /// In en, this message translates to:
+  /// **'Empty the trash now'**
+  String get trashEmptyNow;
+
+  /// The question before emptying the trash when only Notes go (obf-1095).
+  ///
+  /// In en, this message translates to:
+  /// **'{notes, plural, =1{Delete 1 Note for good? It can\'t come back.} other{Delete {notes} Notes for good? They can\'t come back.}}'**
+  String trashEmptyNotes(int notes);
+
+  /// The question before emptying the trash when only Routines and Reminders go (obf-1095).
+  ///
+  /// In en, this message translates to:
+  /// **'{routines, plural, =1{Delete 1 Routine for good? It can\'t come back.} other{Delete {routines} Routines for good? They can\'t come back.}}'**
+  String trashEmptyRoutines(int routines);
+
+  /// The question before emptying the trash when Notes and Routines or Reminders go (obf-1095).
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {notes, plural, =1{1 Note} other{{notes} Notes}} and {routines, plural, =1{1 Routine} other{{routines} Routines}} for good? They can\'t come back.'**
+  String trashEmptyBoth(int notes, int routines);
+
+  /// The confirm button of the question before emptying the trash (obf-1095).
+  ///
+  /// In en, this message translates to:
+  /// **'Delete for good'**
+  String get deleteForGood;
+
+  /// Announced at the top on the phone when emptying the trash beside the app failed (obf-1095).
+  ///
+  /// In en, this message translates to:
+  /// **'The trash could not be emptied.'**
+  String get trashEmptyFailed;
+
+  /// Title of the dialog behind 'trashEmptyFailed'.
+  ///
+  /// In en, this message translates to:
+  /// **'Trash not emptied'**
+  String get trashEmptyFailedTitle;
+
+  /// The cause in the dialog behind 'trashEmptyFailed'.
+  ///
+  /// In en, this message translates to:
+  /// **'The Notes in the trash could not be deleted for good.'**
+  String get trashEmptyFailedCause;
+
+  /// The fix in the dialog behind 'trashEmptyFailed'.
+  ///
+  /// In en, this message translates to:
+  /// **'What was not deleted stays in the trash. Try again.'**
+  String get trashEmptyFailedFix;
 
   /// No description provided for @restore.
   ///
@@ -950,13 +1082,13 @@ abstract class AppLocalizations {
   /// **'Reminder'**
   String get reminder;
 
-  /// The one entry, in a Note card's menus, the Note editor's "+", the quick note's alarm clock and the desktop's Note menu, that opens the editor of a new Routine or Reminder for the Note, starting as a Reminder (once).
+  /// The one entry, in a Note card's menus, the Note editor's "+", the quick note's alarm clock and the desktop's Note dialog, that opens the editor of a new Routine or Reminder for the Note, starting as a Reminder (once).
   ///
   /// In en, this message translates to:
   /// **'Remind me…'**
   String get remindMe;
 
-  /// Entry in a compact Note card's ⋮ menu, in Advanced, that opens the editor of a new Session run from the Note.
+  /// Entry in every menu that gives a Note a Routine, a Reminder, a Frog or a Session (a card's ⋮ and alarm clock, the Note editor's +), in Advanced, that opens the editor of a new Session run from the Note.
   ///
   /// In en, this message translates to:
   /// **'Session…'**
@@ -1177,6 +1309,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'More'**
   String get more;
+
+  /// No description provided for @unitMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{minute} other{minutes}}'**
+  String unitMinutes(int count);
+
+  /// No description provided for @unitHours.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{hour} other{hours}}'**
+  String unitHours(int count);
 
   /// No description provided for @unitDays.
   ///
@@ -1454,6 +1598,18 @@ abstract class AppLocalizations {
   /// **'From the day before'**
   String get occurrenceFromDayBefore;
 
+  /// At the top of the Agenda when an Occurrence's notification was tapped and the Occurrence was Done meanwhile, so the Agenda lists it nowhere (obf-1039).
+  ///
+  /// In en, this message translates to:
+  /// **'Already done'**
+  String get notificationAlreadyDone;
+
+  /// At the top of the Agenda when an Occurrence's notification was tapped and the Occurrence was skipped meanwhile, so the Agenda lists it nowhere (obf-1039).
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped'**
+  String get notificationSkipped;
+
   /// No description provided for @alarmsBanner.
   ///
   /// In en, this message translates to:
@@ -1646,7 +1802,7 @@ abstract class AppLocalizations {
   /// **'Routines and Reminders in the Quiet Hours'**
   String get quietChannel;
 
-  /// The Agenda's menu entry that makes today a quiet day: everything shows, nothing notifies (obf-1044).
+  /// The Agenda's bar action (the phone) or button (the desktop) that makes today a quiet day: everything shows, nothing notifies (obf-1044).
   ///
   /// In en, this message translates to:
   /// **'Quiet today'**
@@ -1687,6 +1843,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Remove heads-up'**
   String get removeHeadsUp;
+
+  /// The last item of Add heads-up's menu, which opens a dialog for a number and a unit (obf-1087).
+  ///
+  /// In en, this message translates to:
+  /// **'Custom…'**
+  String get headsUpCustom;
+
+  /// No description provided for @headsUpCustomTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom heads-up'**
+  String get headsUpCustomTitle;
+
+  /// The label of the custom heads-up dialog's number field.
+  ///
+  /// In en, this message translates to:
+  /// **'How long before'**
+  String get headsUpCustomCount;
+
+  /// Under the custom heads-up's number: the numbers its unit takes.
+  ///
+  /// In en, this message translates to:
+  /// **'From 1 to {most}.'**
+  String headsUpCustomRange(int most);
 
   /// No description provided for @headsUpMinutesBefore.
   ///
@@ -2036,12 +2216,6 @@ abstract class AppLocalizations {
   /// **'More about the capture'**
   String get moreCaptureContext;
 
-  /// No description provided for @recordVoice.
-  ///
-  /// In en, this message translates to:
-  /// **'Record voice'**
-  String get recordVoice;
-
   /// No description provided for @recording.
   ///
   /// In en, this message translates to:
@@ -2263,6 +2437,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'You are on mobile data. The download uses {megabytes} MB of it.'**
   String speechOfferMobileData(int megabytes);
+
+  /// No description provided for @speechOfferRestored.
+  ///
+  /// In en, this message translates to:
+  /// **'The Backup names the speech model used before: {model}. Download it once. It downloads in the background while you go on, and Settings offers it any time later.'**
+  String speechOfferRestored(String model);
+
+  /// No description provided for @speechOfferRestoredFile.
+  ///
+  /// In en, this message translates to:
+  /// **'The Backup names the speech model used before: {model}. It came from a file of your own: pick that file again. Settings offers it any time later.'**
+  String speechOfferRestoredFile(String model);
+
+  /// No description provided for @speechOfferPickAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick the file again'**
+  String get speechOfferPickAgain;
+
+  /// No description provided for @speechRestoredDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'The speech model from the Backup is not on this phone yet. Download'**
+  String get speechRestoredDownload;
+
+  /// No description provided for @speechRestoredPick.
+  ///
+  /// In en, this message translates to:
+  /// **'The speech model from the Backup is not on this phone yet. Pick its file'**
+  String get speechRestoredPick;
 
   /// No description provided for @transcribing.
   ///
@@ -2749,6 +2953,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Text, icons and buttons show 1.3 times their size, on top of the system\'s font size, on the Agenda\'s widget too.'**
   String get fatFingersDetail;
+
+  /// Switch in Settings ▸ Look (obf-1143), on by default: every button tap shows a green exclamation mark above the finger for a moment.
+  ///
+  /// In en, this message translates to:
+  /// **'Show button taps'**
+  String get tapMarks;
+
+  /// No description provided for @tapMarksDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'A green \"!\" shows above the finger for a moment when a button takes a tap.'**
+  String get tapMarksDetail;
 
   /// The choice in Settings > Look, on the desktop in Settings > This computer and View > Text size, of how large the text of Notes, Lines, Sections, the Agenda's rows and Ask's answers shows on this Device, apart from Fat fingers (#326, obf-1019).
   ///
@@ -3779,7 +3995,7 @@ abstract class AppLocalizations {
   /// No description provided for @shareArea.
   ///
   /// In en, this message translates to:
-  /// **'Share…'**
+  /// **'Share with people…'**
   String get shareArea;
 
   /// No description provided for @areaShared.
@@ -4235,7 +4451,7 @@ abstract class AppLocalizations {
   /// No description provided for @sentItemAcceptCancel.
   ///
   /// In en, this message translates to:
-  /// **'Move to the trash'**
+  /// **'Move to trash'**
   String get sentItemAcceptCancel;
 
   /// No description provided for @sentItemTrashed.
@@ -4283,7 +4499,7 @@ abstract class AppLocalizations {
   /// No description provided for @backupsIntro.
   ///
   /// In en, this message translates to:
-  /// **'A Backup is an encrypted file of all your Areas, Notes, photos, voice recordings, Routines and their history. Only your passphrase, or the recovery key on the Recovery Sheet, opens it. This Device\'s settings stay out, except the playback speed. All your Devices share one passphrase and one recovery key, and each writes Backups of its own.'**
+  /// **'A Backup is an encrypted file of all your Areas, Notes, photos, voice recordings, Routines and their history. Only your passphrase, or the recovery key on the Recovery Sheet, opens it. It also holds this Device\'s settings and which speech model it uses, not the model itself. The App Lock, the Area Locks, the alarm sound, the paired Devices, the shared folder and the Backup folder stay out: set them again after a restore. All your Devices share one passphrase and one recovery key, and each writes Backups of its own.'**
   String get backupsIntro;
 
   /// No description provided for @backupPassphrase.
@@ -4553,7 +4769,7 @@ abstract class AppLocalizations {
   /// No description provided for @restoreDone.
   ///
   /// In en, this message translates to:
-  /// **'Restored: {count, plural, =1{1 change} other{{count} changes}}. Set alarms and locks again, choose the Backup folder again, and pair your other Devices again.'**
+  /// **'Restored: {count, plural, =1{1 change} other{{count} changes}}. Set the App Lock, the Area Locks and the alarm sound again, choose the Backup folder again, and pair your other Devices again.'**
   String restoreDone(int count);
 
   /// No description provided for @recoverySheetPdfTitle.
@@ -4898,6 +5114,18 @@ abstract class AppLocalizations {
   /// **'Only Notes by'**
   String get personFilterShowing;
 
+  /// Announcement at the top after "+" of an Area, a Topic or All Notes made a Note that the person filter (Show Notes by…) hides (obf-1070); it ends with showHidden.
+  ///
+  /// In en, this message translates to:
+  /// **'Made, hidden by the filter'**
+  String get madeHiddenByFilter;
+
+  /// The word at the end of the announcement madeHiddenByFilter: its tap clears the person filter, so the Note made shows.
+  ///
+  /// In en, this message translates to:
+  /// **'Show'**
+  String get showHidden;
+
   /// On another person's Profile: opens All Notes with only the Notes this person wrote.
   ///
   /// In en, this message translates to:
@@ -4973,7 +5201,7 @@ abstract class AppLocalizations {
   /// No description provided for @deleteNoteQuestion.
   ///
   /// In en, this message translates to:
-  /// **'Delete this Note?'**
+  /// **'Move this Note to the trash?'**
   String get deleteNoteQuestion;
 
   /// No description provided for @deleteNoteDetail.
@@ -4985,13 +5213,13 @@ abstract class AppLocalizations {
   /// No description provided for @deleteNoteLinkedQuestion.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{Delete this Note and its 1 Routine?} other{Delete this Note and its {count} Routines and Reminders?}}'**
+  /// **'{count, plural, =1{Move this Note and its 1 Routine to the trash?} other{Move this Note and its {count} Routines and Reminders to the trash?}}'**
   String deleteNoteLinkedQuestion(int count);
 
   /// No description provided for @deleteNoteReminderQuestion.
   ///
   /// In en, this message translates to:
-  /// **'Delete this Note and its 1 Reminder?'**
+  /// **'Move this Note and its 1 Reminder to the trash?'**
   String get deleteNoteReminderQuestion;
 
   /// No description provided for @removeRecordingKeepText.
@@ -5009,20 +5237,26 @@ abstract class AppLocalizations {
   /// No description provided for @removeRecordingQuestion.
   ///
   /// In en, this message translates to:
-  /// **'Remove this recording and keep its Transcript?'**
+  /// **'Remove this recording and keep its words in the text?'**
   String get removeRecordingQuestion;
 
   /// No description provided for @removePhotoQuestion.
   ///
   /// In en, this message translates to:
-  /// **'Remove this photo and keep its Photo Text?'**
+  /// **'Remove this photo and keep its words in the text?'**
   String get removePhotoQuestion;
 
   /// No description provided for @removeMediaDetail.
   ///
   /// In en, this message translates to:
-  /// **'The file goes from all your Devices and from everyone you share the Note\'s Area with. The text stays on the Note.'**
+  /// **'The file goes from all your Devices and from everyone you share the Note\'s Area with. Its words go into the text, to be edited or deleted like typed text.'**
   String get removeMediaDetail;
+
+  /// No description provided for @removeAttachmentDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'The file goes from all your Devices and from everyone you share the Note\'s Area with. The text stays on the Note.'**
+  String get removeAttachmentDetail;
 
   /// No description provided for @remove.
   ///
@@ -5801,7 +6035,7 @@ abstract class AppLocalizations {
   /// No description provided for @deleteFrogQuestion.
   ///
   /// In en, this message translates to:
-  /// **'Delete this Frog? It stays in the trash. Its Note stays.'**
+  /// **'Move this Frog to the trash? Its Note stays.'**
   String get deleteFrogQuestion;
 
   /// The Frog badge's value in the Note editor while the Frog is not eaten (#259).
@@ -7520,17 +7754,11 @@ abstract class AppLocalizations {
   /// **'Install a messenger or a mail app, then send it again.'**
   String get sendNoAppFix;
 
-  /// The entry in a Note's ⋮ menu and the editor's bar that hands the Note's text, photos and recordings to another app on the share sheet.
+  /// The entry in a Note's ⋮ menu and the editor's Share group that hands the Note's text, photos and recordings to another app on the share sheet, and in the ⋮ of the phone's full-screen photo that hands the photo to one.
   ///
   /// In en, this message translates to:
   /// **'Share to an app'**
   String get shareToApp;
-
-  /// Entry in a Note card's ⋮ menu that opens a small menu with Send to a person, Share to an app, Copy text and Export as Pack…
-  ///
-  /// In en, this message translates to:
-  /// **'Share…'**
-  String get shareNote;
 
   /// Announced when a Note could not be handed to another app; the tap shows why and what to do.
   ///
@@ -8000,7 +8228,7 @@ abstract class AppLocalizations {
   /// **'Link'**
   String get formatLink;
 
-  /// Format bar button: shows the selection or word as code, in a fixed-width font.
+  /// Format bar button: shows the selection or word as code, in a fixed-width font; a selection over several lines or an empty line becomes a code block.
   ///
   /// In en, this message translates to:
   /// **'Code'**
@@ -8138,11 +8366,35 @@ abstract class AppLocalizations {
   /// **'Table'**
   String get tableTitle;
 
-  /// Button in the bar of a table full screen: puts the table on the clipboard as an HTML table and, as plain text, as Markdown (#324).
+  /// Button in the bar of a table full screen and entry of a table's ⋮ (obf-1050): puts the table on the clipboard as an HTML table and, as plain text, as Markdown (#324).
   ///
   /// In en, this message translates to:
   /// **'Copy'**
   String get tableCopy;
+
+  /// Tooltip and screen reader label of the ⋮ at a table's top right corner (obf-1050): Copy, and in the Note editor Move up, Move down and Delete table.
+  ///
+  /// In en, this message translates to:
+  /// **'More for the table'**
+  String get tableMore;
+
+  /// Entry of a table's ⋮ in the Note editor (obf-1050): moves the whole table past the block of the text above it.
+  ///
+  /// In en, this message translates to:
+  /// **'Move up'**
+  String get tableUp;
+
+  /// Entry of a table's ⋮ in the Note editor (obf-1050): moves the whole table past the block of the text below it.
+  ///
+  /// In en, this message translates to:
+  /// **'Move down'**
+  String get tableDown;
+
+  /// Entry of a table's ⋮ in the Note editor (obf-1050): deletes the whole table, asking first while its cells hold words.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete table'**
+  String get tableDelete;
 
   /// Screen reader hint of a table in a text: a tap opens it full screen.
   ///
@@ -8150,11 +8402,17 @@ abstract class AppLocalizations {
   /// **'Open the table'**
   String get tableOpen;
 
-  /// Screen reader label of the bar above a table shown full screen that moves the table left and right.
+  /// Screen reader label of the bar above a table, full screen or read in a text, that moves the table left and right.
   ///
   /// In en, this message translates to:
   /// **'Move the table sideways'**
   String get tableSideways;
+
+  /// Button under a table on a card that shows only its first 10 rows (obf-1048): unfolds all of its rows in place. count is how many rows it has under its header.
+  ///
+  /// In en, this message translates to:
+  /// **'Show all {count}'**
+  String tableShowAll(int count);
 
   /// Screen reader label of a row's number beside a table: a tap or long press opens the row's menu.
   ///
@@ -8306,6 +8564,90 @@ abstract class AppLocalizations {
   /// **'Row {number}, column {letter}'**
   String tableCell(int number, String letter);
 
+  /// What a screen reader says a tap on a column's heading in a table being read does (obf-1052): it sorts the rows shown by that column, ascending, then descending, then as written. The Note's text stays as it is.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort by this column'**
+  String get tableSort;
+
+  /// What a screen reader says of the column a table being read is sorted by, ascending (obf-1052); its heading shows an arrow up.
+  ///
+  /// In en, this message translates to:
+  /// **'Sorted ascending'**
+  String get tableSortedUp;
+
+  /// What a screen reader says of the column a table being read is sorted by, descending (obf-1052); its heading shows an arrow down.
+  ///
+  /// In en, this message translates to:
+  /// **'Sorted descending'**
+  String get tableSortedDown;
+
+  /// Menu item of a column's letter in a table's full screen where it is edited (obf-1052): shows the rows sorted by that column, ascending, without changing the Note's text.
+  ///
+  /// In en, this message translates to:
+  /// **'Show sorted ascending'**
+  String get tableShowSortedUp;
+
+  /// Menu item of a column's letter in a table's full screen where it is edited (obf-1052): shows the rows sorted by that column, descending, without changing the Note's text.
+  ///
+  /// In en, this message translates to:
+  /// **'Show sorted descending'**
+  String get tableShowSortedDown;
+
+  /// Menu item of a column's letter in a table's full screen, while the rows show sorted (obf-1052): shows them in the order of the Note's text again.
+  ///
+  /// In en, this message translates to:
+  /// **'Show as written'**
+  String get tableShowAsWritten;
+
+  /// Menu item of a column's letter on a table edited as a grid in the Note editor (obf-1052): puts the rows under the header in ascending order of that column in the Note's text. Undo takes it back.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort rows by this column'**
+  String get tableSortRows;
+
+  /// Menu item of a column's letter on a table edited as a grid in the Note editor (obf-1052): puts the rows under the header in descending order of that column in the Note's text. Undo takes it back.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort rows by this column, descending'**
+  String get tableSortRowsDown;
+
+  /// Entry of a table column's menu on the phone (obf-1014) that opens a second menu with Insert a column to the left and to the right.
+  ///
+  /// In en, this message translates to:
+  /// **'Insert'**
+  String get tableInsertMenu;
+
+  /// Entry of a table column's menu on the phone (obf-1014) that opens a second menu with Move left and Move right.
+  ///
+  /// In en, this message translates to:
+  /// **'Move'**
+  String get tableMoveMenu;
+
+  /// Entry of a table column's menu in the Note editor on the phone (obf-1014) that opens a second menu with Align left, Centre and Align right.
+  ///
+  /// In en, this message translates to:
+  /// **'Align'**
+  String get tableAlignMenu;
+
+  /// Entry of a table column's menu in the Note editor on the phone (obf-1014) that opens a second menu with the two ways of sorting the rows by that column in the Note's text.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort rows'**
+  String get tableSortRowsMenu;
+
+  /// Entry of a table column's menu in the full-screen table on the phone (obf-1014) that opens a second menu with Show sorted ascending, Show sorted descending and Show as written.
+  ///
+  /// In en, this message translates to:
+  /// **'Show sorted'**
+  String get tableShowSortedMenu;
+
+  /// The last entry of a menu on the phone that would show more than seven (obf-1014): opens a second menu with the rest.
+  ///
+  /// In en, this message translates to:
+  /// **'More…'**
+  String get menuMore;
+
   /// Under the pair code field, on the phone and the desktop, when the code typed or scanned is of a layout a later version of the app writes (ADR 0034): this version cannot join with it.
   ///
   /// In en, this message translates to:
@@ -8363,7 +8705,7 @@ abstract class AppLocalizations {
   /// Explanation under the Settings section 'Quick note'.
   ///
   /// In en, this message translates to:
-  /// **'The quick note shows the text, the three Nudge buttons and More, which opens the full editor. Photo, Voice, Gallery, Paste, File and everything that sorts the Note are in the full editor.'**
+  /// **'The quick note shows the text, the three Nudge buttons and Open in the editor, which opens the full editor. Photo, Voice, Gallery, Paste, File and everything that sorts the Note are in the full editor.'**
   String get settingsQuickNoteDetail;
 
   /// Switch in Settings ▸ Quick note: the format bar above the keyboard.
@@ -8393,20 +8735,14 @@ abstract class AppLocalizations {
   /// In the ⋮ of the phone's full-screen photo: puts the picture on the clipboard (#149).
   ///
   /// In en, this message translates to:
-  /// **'Copy'**
+  /// **'Copy photo'**
   String get copyPhoto;
 
   /// In the ⋮ of the phone's full-screen photo: saves it into the phone's Pictures, in the album 'Old Brain Fix' (#149).
   ///
   /// In en, this message translates to:
-  /// **'Save'**
+  /// **'Save photo'**
   String get savePhoto;
-
-  /// In the ⋮ of the phone's full-screen photo: hands it to the app picked on the share sheet (#149).
-  ///
-  /// In en, this message translates to:
-  /// **'Share'**
-  String get sharePhoto;
 
   /// Announced at the top of the phone when Save in the full-screen photo's ⋮ failed; the tap opens the cause and the fix.
   ///
@@ -8498,13 +8834,25 @@ abstract class AppLocalizations {
   /// **'The photo\'s file could not be written on this phone.'**
   String get photoNotWrittenCause;
 
-  /// Section title in Settings for the Import of a folder (CONTEXT.md: Import).
+  /// Title of the phone's page of the Imports, opened by 'areasImport' (obf-1096; CONTEXT.md: Import).
   ///
   /// In en, this message translates to:
   /// **'Import'**
   String get settingsImport;
 
-  /// Settings row that opens the system's folder picker for an Import.
+  /// In ⋮ of the Areas list's top bar, between Rearrange and Running (obf-1096): opens the page with the Import of a folder and of Google Keep.
+  ///
+  /// In en, this message translates to:
+  /// **'Import…'**
+  String get areasImport;
+
+  /// A line Settings shows only while its search finds the Imports (obf-1096); its tap opens the Areas list, whose top bar's ⋮ holds Import….
+  ///
+  /// In en, this message translates to:
+  /// **'Import… is in the Areas list\'s ⋮'**
+  String get settingsImportMoved;
+
+  /// Row of the Imports page (obf-1096) that opens the system's folder picker for an Import.
   ///
   /// In en, this message translates to:
   /// **'Import a folder'**
@@ -8606,7 +8954,7 @@ abstract class AppLocalizations {
   /// **'Nothing was imported. Copy the folder onto the phone and import it from there.'**
   String get importFailedFix;
 
-  /// Settings row under 'importFolder' that imports a Google Takeout export of Google Keep (ADR 0036); also the title of the dialog behind it. Shared with the desktop.
+  /// Row of the Imports page under 'importFolder' that imports a Google Takeout export of Google Keep (ADR 0036); also the title of the dialog behind it. Shared with the desktop.
   ///
   /// In en, this message translates to:
   /// **'Import from Google Keep'**
@@ -8726,6 +9074,42 @@ abstract class AppLocalizations {
   /// **'You can leave this page. The Import goes on beside the app, and the top of the screen says when it is done.'**
   String get importGoesOn;
 
+  /// The question asked on the phone after a folder or Keep export was picked that an earlier Import came from (obf-1078); above 'importFillIn' and 'importAsNew'.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill in the Import of {date} into {area}? Only what that Import did not bring in is added there.'**
+  String importFillInAsk(String date, String area);
+
+  /// Answer to 'importFillInAsk': the missing items go into the Area of the earlier Import.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill in'**
+  String get importFillIn;
+
+  /// Answer to 'importFillInAsk': a new Area with every item, as a first Import makes.
+  ///
+  /// In en, this message translates to:
+  /// **'Import as new'**
+  String get importAsNew;
+
+  /// First line of what an Import that filled in an earlier one made (obf-1078), instead of 'importFinishedNotes'.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 Note went into the Area {area}.} other{{count} Notes went into the Area {area}.}}'**
+  String importFilledIn(int count, String area);
+
+  /// Under 'importFilledIn': the items the earlier Import made already (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 was imported before and is left out.} other{{count} were imported before and are left out.}}'**
+  String importAlready(int count);
+
+  /// What an Import that filled in an earlier one says when nothing was missing (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing new: {count} already imported'**
+  String importNothingNew(int count);
+
   /// What a screen reader reads for a badge of a Note's setting in the Note editor (#160): the setting's name and its current value.
   ///
   /// In en, this message translates to:
@@ -8755,6 +9139,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Name'**
   String get noteName;
+
+  /// The field under the Lines of a Checklist or Shopping List in the phone's Note editor (obf-1071): a tap puts the cursor into a new empty Line after the open Lines.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a Line'**
+  String get addALine;
+
+  /// Small text button under the name of a Checklist, Shopping List or Tally without a description in the phone's Note editor (obf-1071): opens the description's field.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a description'**
+  String get addADescription;
 
   /// The label of the field for the description of a Note of a kind (#188): the rest of its text after the name, shown small under it.
   ///
@@ -9029,7 +9425,7 @@ abstract class AppLocalizations {
   /// The heading of the Simple / Advanced choice on the first start's Starter Set page and in Settings (#197); a setting of the person, the same on all of their own Devices.
   ///
   /// In en, this message translates to:
-  /// **'What Old Brain Fix offers'**
+  /// **'Complexity'**
   String get features;
 
   /// Under the heading features (#197).
@@ -9089,13 +9485,13 @@ abstract class AppLocalizations {
   /// No description provided for @helpQuickStart3.
   ///
   /// In en, this message translates to:
-  /// **'Type a task in +, tap More, then + and Remind me…; set its time and tap Save.'**
+  /// **'Type a task in +, tap Open in the editor, then + and Remind me…; set its time and tap Save.'**
   String get helpQuickStart3;
 
   /// No description provided for @helpQuickStart4.
   ///
   /// In en, this message translates to:
-  /// **'Type a habit in +, tap More, then + and Remind me…; pick Every …, set when, and Save.'**
+  /// **'Type a habit in +, tap Open in the editor, then + and Remind me…; pick Every …, set when, and Save.'**
   String get helpQuickStart4;
 
   /// No description provided for @helpQuickStart5.
@@ -9143,7 +9539,7 @@ abstract class AppLocalizations {
   /// No description provided for @helpQuickStartDesktop3.
   ///
   /// In en, this message translates to:
-  /// **'Reminder: in the quick note, type, click More, then + and Remind me…; set its time and click Save.'**
+  /// **'Reminder: in the quick note, type, click Open in the editor, then + and Remind me…; set its time and click Save.'**
   String get helpQuickStartDesktop3;
 
   /// No description provided for @helpQuickStartDesktop4.
@@ -9692,6 +10088,24 @@ abstract class AppLocalizations {
   /// **'From {date}'**
   String feedbackCrashFrom(String date);
 
+  /// Tick, on at first while there are any: the trace of the last notification taps goes along, what each tap opened, without any Note's text (obf-1039).
+  ///
+  /// In en, this message translates to:
+  /// **'The last notification taps'**
+  String get feedbackTaps;
+
+  /// Under 'The last notification taps' when no notification was tapped yet; the tick is greyed.
+  ///
+  /// In en, this message translates to:
+  /// **'None so far.'**
+  String get feedbackTapsNone;
+
+  /// Under 'The last notification taps': how many taps are kept; only kinds and ids go along, no Note's text.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 tap, without the Notes\' text} other{{count} taps, without the Notes\' text}}'**
+  String feedbackTapsKept(int count);
+
   /// Tick, off at first: copies of Notes picked in the Pack's tree go along as a Pack file.
   ///
   /// In en, this message translates to:
@@ -9782,10 +10196,10 @@ abstract class AppLocalizations {
   /// **'Undo'**
   String get undo;
 
-  /// Announced after a Note was moved to the Trash without asking; its tap brings it back with its Routines and Reminders.
+  /// Announced after a Note was moved to the trash without asking; its tap brings it back with its Routines and Reminders.
   ///
   /// In en, this message translates to:
-  /// **'Moved to the Trash'**
+  /// **'Moved to the trash'**
   String get undoNoteTrashed;
 
   /// Announced after a Line of a Checklist or Shopping List was deleted without asking; its tap restores it.
@@ -9803,19 +10217,19 @@ abstract class AppLocalizations {
   /// Announced after a Frog was moved to the Trash without asking; its tap restores it.
   ///
   /// In en, this message translates to:
-  /// **'Frog moved to the Trash'**
+  /// **'Frog moved to the trash'**
   String get undoFrogTrashed;
 
   /// Announced after a Routine was moved to the Trash without asking; its tap restores it.
   ///
   /// In en, this message translates to:
-  /// **'Routine moved to the Trash'**
+  /// **'Routine moved to the trash'**
   String get undoRoutineTrashed;
 
   /// Announced after a Reminder was moved to the Trash without asking; its tap restores it.
   ///
   /// In en, this message translates to:
-  /// **'Reminder moved to the Trash'**
+  /// **'Reminder moved to the trash'**
   String get undoReminderTrashed;
 
   /// Announced after a Note's “From …” label was removed without asking; its tap brings it back. No name: values never go into an announcement.
@@ -10028,7 +10442,7 @@ abstract class AppLocalizations {
   /// **'Nothing was added; open the Backup again.'**
   String get backupAddDamagedFix;
 
-  /// Row below the Areas in the Areas list, and the title of the page it opens: every tag (#word) of the Notes by its levels (#267).
+  /// The title of the tag tree page: every tag (#word) of the Notes by its levels (#267).
   ///
   /// In en, this message translates to:
   /// **'Tags'**
@@ -10057,6 +10471,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Hide the tags below'**
   String get tagFold;
+
+  /// The last chip of the row of the most used tags under the Areas list's search field (obf-1074): opens the tag tree, every tag of the Notes by its levels.
+  ///
+  /// In en, this message translates to:
+  /// **'All tags…'**
+  String get allTags;
 
   /// The mark of a Note or an Area that hides it and everything on it from the AI on the user's computer (#267, ADR 0049): a switch in the card's and the Area's menu and a badge in the Note editor; also read by a screen reader for the shield beside a hidden Note or Area.
   ///
@@ -10094,10 +10514,10 @@ abstract class AppLocalizations {
   /// **'File'**
   String get file;
 
-  /// Action in the Note editor's bar: picks files with the system's file picker and attaches them to the Note.
+  /// Action in the Add group of the Note editor: picks files with the system's file picker and attaches them to the Note.
   ///
   /// In en, this message translates to:
-  /// **'Attach a file'**
+  /// **'Attach a file…'**
   String get attachFile;
 
   /// Label over the text read out of an attached file, shown dimmed so it does not read as typed text (like Photo Text).
@@ -10849,6 +11269,12 @@ abstract class AppLocalizations {
   /// **'Got it'**
   String get spotDone;
 
+  /// The button on every Spotlight's card (obf-1060) that switches Show tips off at once: no screen of this Device shows a tip until it is switched on again in the Settings.
+  ///
+  /// In en, this message translates to:
+  /// **'No more tips'**
+  String get spotNoMoreTips;
+
   /// The Settings row (obf-1043) that brings back every Spotlight on this Device: each screen explains itself again on its next visit.
   ///
   /// In en, this message translates to:
@@ -10860,6 +11286,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Each screen shows its tips again.'**
   String get settingsShowTipsDone;
+
+  /// Title of the Settings card (obf-1060) with Show tips and Show tips again. CONTEXT.md, Spotlight.
+  ///
+  /// In en, this message translates to:
+  /// **'Tips'**
+  String get settingsTips;
+
+  /// The Settings switch (obf-1060), on by default and kept on this Device: off, no screen shows a Spotlight, a new one neither.
+  ///
+  /// In en, this message translates to:
+  /// **'Show tips'**
+  String get settingsTipsSwitch;
+
+  /// The line under Show tips in the Settings (obf-1060).
+  ///
+  /// In en, this message translates to:
+  /// **'Each screen explains its buttons once.'**
+  String get settingsTipsSwitchDetail;
 
   /// A Spotlight (obf-1043) on the Agenda's +: one sentence of what it does.
   ///
@@ -10903,11 +11347,17 @@ abstract class AppLocalizations {
   /// **'Each button saves the Note, and a Nudge reminds you to sort it then.'**
   String get spotCaptureNudge;
 
-  /// A Spotlight (obf-1043) on the quick note's More (new in 0.7.0): one sentence of what it does.
+  /// A Spotlight (obf-1043) on the quick note's Open in the editor (obf-1080): one sentence of what it does.
   ///
   /// In en, this message translates to:
-  /// **'More saves the Note and opens it in the full editor.'**
+  /// **'Open in the editor saves the Note and opens it in the full editor.'**
   String get spotCaptureMore;
+
+  /// The quick note's full-width button under the Nudge buttons (obf-1080): saves the Note and opens it in the Note editor.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in the editor'**
+  String get captureOpenInEditor;
 
   /// A Spotlight (obf-1043) on the Note editor's kind badge: one sentence of what it does.
   ///
@@ -10921,7 +11371,7 @@ abstract class AppLocalizations {
   /// **'Here you file the Note into an Area or a Topic.'**
   String get spotEditorPlace;
 
-  /// A Spotlight (obf-1043) on the Note editor's + badge, which holds Remind me… (new in 0.7.0): one sentence of what it does.
+  /// A Spotlight (obf-1043) on the Note editor's + badge, first in its Add group (obf-1073), which holds Remind me… (new in 0.7.0): one sentence of what it does.
   ///
   /// In en, this message translates to:
   /// **'In +, Remind me… sets up a Reminder or a Routine for this Note.'**
@@ -10938,6 +11388,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Linked from lists the Notes whose links lead to this one.'**
   String get spotEditorLinkedFrom;
+
+  /// A Spotlight (obf-1043) on Add a part in the Note editor's Add group (new in 0.8.0, obf-1072, obf-1073): one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a part puts something new under the Note, with its own time.'**
+  String get spotEditorAddPart;
 
   /// A Spotlight (obf-1043) on the search field of an Area or a Topic: one sentence of what it does.
   ///
@@ -11010,6 +11466,234 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add grammar… colours code in one more language, on all your Devices.'**
   String get spotSettingsGrammar;
+
+  /// A Spotlight (obf-1060) on the Show tips switch in the Settings (new in 0.8.0): one sentence of what it does.
+  ///
+  /// In en, this message translates to:
+  /// **'Switched off, no screen shows a tip; No more tips does the same.'**
+  String get spotSettingsTipsSwitch;
+
+  /// In the Note editor's top bar (obf-1051): takes back the last change made since it opened.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get editorUndo;
+
+  /// In the Note editor's top bar (obf-1051): makes the last change taken back again.
+  ///
+  /// In en, this message translates to:
+  /// **'Redo'**
+  String get editorRedo;
+
+  /// In the Note editor's ⋮ (obf-1051): asks once, then takes back every change made since it opened.
+  ///
+  /// In en, this message translates to:
+  /// **'Revert all changes'**
+  String get revertAllChanges;
+
+  /// Title of the question behind 'revertAllChanges'.
+  ///
+  /// In en, this message translates to:
+  /// **'Revert all changes?'**
+  String get revertAllQuestion;
+
+  /// Body of the question behind 'revertAllChanges'; two sentences at most.
+  ///
+  /// In en, this message translates to:
+  /// **'The Note goes back to how it was when it was opened. Redo brings the changes back one by one.'**
+  String get revertAllBody;
+
+  /// Confirm button of the question behind 'revertAllChanges'.
+  ///
+  /// In en, this message translates to:
+  /// **'Revert'**
+  String get revertAllConfirm;
+
+  /// Settings ▸ Capture (obf-1053), this Device only: the title of the choice after how long a pause a voice recording ends on its own; Off by default.
+  ///
+  /// In en, this message translates to:
+  /// **'End a recording after a pause'**
+  String get recordingPause;
+
+  /// The detail line under 'recordingPause' in Settings ▸ Capture (obf-1053).
+  ///
+  /// In en, this message translates to:
+  /// **'Ends a voice recording on its own once you have said nothing this long, and keeps it as Stop does. Off: pauses are ignored.'**
+  String get recordingPauseDetail;
+
+  /// The option of 'recordingPause' that ignores pauses, the default (obf-1053).
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get recordingPauseOff;
+
+  /// An option of 'recordingPause' (obf-1053): a pause of this many seconds ends a recording.
+  ///
+  /// In en, this message translates to:
+  /// **'{seconds} s'**
+  String recordingPauseSeconds(int seconds);
+
+  /// Title of the phone's page listing every job running in the background, and its entry in the top bar's ⋮ of the Agenda and the Areas list (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Running'**
+  String get jobsTitle;
+
+  /// On the page Running while no job runs (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing runs in the background.'**
+  String get jobsNone;
+
+  /// On the page Running: when a job started, as the clock shows it (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Since {time}'**
+  String jobsSince(String time);
+
+  /// Button of a job on the page Running: stops it at its next safe point (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Abort'**
+  String get jobsAbort;
+
+  /// On the page Running in place of Abort once it was pressed, until the job stops (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Stopping…'**
+  String get jobsStopping;
+
+  /// Heading over the jobs Abort stopped or paused, on the page Running (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped'**
+  String get jobsStopped;
+
+  /// Button of a paused job on the page Running: starts it again (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Go on'**
+  String get jobsGoOn;
+
+  /// A job on the page Running: this Device syncs with the shared folder or a paired Device (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Sync with a Device'**
+  String get jobsSync;
+
+  /// Under the sync's Abort on the page Running: what Abort does (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'The sync under way ends first. Then this Device does not sync on its own until Sync now, Go on or the next start.'**
+  String get jobsSyncAbort;
+
+  /// On the page Running for the sync Abort paused (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Paused: this Device does not sync on its own until Sync now, Go on or the next start.'**
+  String get jobsSyncPaused;
+
+  /// A job on the page Running: the Import of a folder (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Import of {name}'**
+  String jobsImport(String name);
+
+  /// Under an Import's Abort on the page Running (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'The Notes imported so far stay.'**
+  String get jobsImportAbort;
+
+  /// On the page Running and the Import's page for an Import Abort stopped: how many of its Notes it made (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped: {done} of {count} imported'**
+  String jobsImportStopped(int done, int count);
+
+  /// Announced at the top once an Import Abort stopped on the page Running has ended (obf-1078); its tap shows what it made.
+  ///
+  /// In en, this message translates to:
+  /// **'Import stopped.'**
+  String get jobsImportEnded;
+
+  /// A job on the page Running: Transcripts being made (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Transcribing recordings'**
+  String get jobsTranscripts;
+
+  /// A job on the page Running: Photo Texts being read (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Reading the text in photos'**
+  String get jobsPhotoTexts;
+
+  /// A job on the page Running: Attachment Texts being read (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Reading attached files'**
+  String get jobsAttachmentTexts;
+
+  /// On the page Running: how many of the recordings, photos or files waiting were read (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'{done} of {count}'**
+  String jobsRead(int done, int count);
+
+  /// Under the Abort of reading recordings, photos or files on the page Running (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'The one being read ends first. The others wait until Go on or the next start.'**
+  String get jobsReadAbort;
+
+  /// On the page Running for reading Abort stopped (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped: the others wait until Go on or the next start.'**
+  String get jobsReadStopped;
+
+  /// A job on the page Running (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading the speech model'**
+  String get jobsModelDownload;
+
+  /// A job on the page Running: a speech model file of the user's own being copied in (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Copying the speech model'**
+  String get jobsModelCopy;
+
+  /// On the page Running for the speech model's download Abort stopped (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped. The Settings offer the speech model again.'**
+  String get jobsModelStopped;
+
+  /// A job on the page Running (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'Deleting the Area {name}'**
+  String jobsAreaDeletion(String name);
+
+  /// Under the Abort of deleting an Area on the page Running (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'The Notes moved so far stay where they went. The Area stays with the others.'**
+  String get jobsAreaAbort;
+
+  /// On the page Running for deleting an Area Abort stopped (obf-1078).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Stopped: {moved} of 1 Note moved} other{Stopped: {moved} of {count} Notes moved}}'**
+  String jobsAreaStopped(int moved, int count);
+
+  /// A job on the page Running: Empty the trash now (obf-1095).
+  ///
+  /// In en, this message translates to:
+  /// **'Emptying the trash'**
+  String get jobsTrashEmptying;
 }
 
 class _AppLocalizationsDelegate

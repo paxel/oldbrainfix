@@ -115,6 +115,8 @@ void main() {
       await start(tester);
       expect(card, findsOneWidget, reason: 'opening the app never clears it');
 
+      // A text button with its icon (obf-1104).
+      expect(inCard(find.byIcon(Icons.done_all)), findsOneWidget);
       await tap(tester, inCard(find.text('Seen')));
       expect(card, findsNothing);
       expect(store.missedSeen, now.toUtc());

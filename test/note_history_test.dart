@@ -7,6 +7,8 @@ import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/note_history_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'editor_actions.dart';
+
 /// A Note's History on the phone (#193): opened from the Note editor's
 /// bar, every change newest first with who, when and what, and "Use
 /// this version", which brings an old text back as a new change.
@@ -71,7 +73,8 @@ void main() {
     notes.setImportance(note.id, Importance.important);
     await openEditor(tester, 'Dentist on Wednesday');
 
-    await tap(tester, find.byKey(const ValueKey('note-history')));
+    // On the bar after Undo, Redo and Find (obf-1051), or in ⋮.
+    await tapBarAction(tester, find.byKey(const ValueKey('note-history')));
     expect(find.byType(NoteHistoryScreen), findsOneWidget);
     expect(find.text('History'), findsOneWidget);
     expect(row(tester, 0), startsWith('Importance | Ann, '));

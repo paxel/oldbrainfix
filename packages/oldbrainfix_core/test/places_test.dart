@@ -253,6 +253,44 @@ void main() {
       notes.restore(note.id);
       expect(notes.byId(note.id)?.isUnsorted, isTrue);
     });
+
+    test('deleting an Area stopped keeps the Area and the Notes not gone '
+        'yet (obf-1078)', () {
+      for (final notesGo in [NotesGo.trash, NotesGo.unsorted]) {
+        final home = places.addArea('Home $notesGo');
+        final kitchen = places.addTopic(home.id, 'Kitchen');
+        for (final (i, place) in [
+          home.id,
+          kitchen.id,
+          home.id,
+          kitchen.id,
+        ].indexed) {
+          notes.capture('note $i', place: place);
+        }
+        tick();
+        var gone = 0;
+        final deleted = places.deleteAreaStopping(
+          home.id,
+          notesGo,
+          progress: (n, _) => gone = n,
+          // Stopped once two Notes have gone.
+          stop: () => gone >= 2,
+        );
+        expect(deleted, isFalse);
+        expect(places.areaById(home.id), isNotNull, reason: 'the Area stays');
+        expect(places.topics(home.id), hasLength(1), reason: 'its Topic too');
+        expect(
+          notes.inside(home.id),
+          hasLength(2),
+          reason: '$notesGo: two of four gone, two stay',
+        );
+        // Asked again, the rest goes, and the Area.
+        tick();
+        expect(places.deleteAreaStopping(home.id, notesGo), isTrue);
+        expect(places.areaById(home.id), isNull);
+        expect(places.topicById(kitchen.id), isNull);
+      }
+    });
   });
 
   group('Starter Set', () {

@@ -109,7 +109,9 @@ fn register_at(data_home: &Path, exec: &Path) -> io::Result<bool> {
 
 /// The launcher, as `packaging/linux/io.github.paxel.oldbrainfix.desktop`
 /// has it, with Exec and TryExec pointed at the binary: TryExec hides the
-/// entry once an AppImage was moved away instead of failing.
+/// entry once an AppImage was moved away instead of failing. Exec takes
+/// the files "Open with" hands it, Markdown files by its MimeType
+/// (obf-1056), which offers it there and never makes it their default.
 fn desktop_entry(exec: &Path) -> String {
     let exec_str = exec.to_string_lossy();
     format!(
@@ -117,11 +119,12 @@ fn desktop_entry(exec: &Path) -> String {
          Name={APP_NAME}\n\
          Comment=Capture a thought in seconds. Get nagged until it is sorted or done.\n\
          TryExec={exec_str}\n\
-         Exec={}\n\
+         Exec={} %F\n\
          Icon={ICON_NAME}\n\
          Terminal=false\n\
          Type=Application\n\
          Categories=Utility;\n\
+         MimeType=text/markdown;text/x-markdown;\n\
          StartupWMClass={APP_ID}\n\
          {MARKER}\n",
         quote_exec(&exec_str),

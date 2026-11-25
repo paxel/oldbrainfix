@@ -6,6 +6,7 @@ import 'package:flutter/semantics.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
+import 'agenda_focus.dart';
 import 'agenda_reader.dart';
 import 'agenda_screen.dart';
 import 'alarm_platform.dart';
@@ -44,7 +45,7 @@ import 'location.dart';
 import 'lock_platform.dart';
 import 'lock_screen.dart';
 import 'look.dart';
-import 'note_editor_screen.dart';
+import 'notification_taps.dart';
 import 'nudge_screen.dart';
 import 'occurrence_answers.dart';
 import 'ocr_platform.dart';
@@ -58,6 +59,7 @@ import 'profile_platform.dart';
 import 'question_mark_background.dart';
 import 'restore_screen.dart';
 import 'ring_screen.dart';
+import 'running.dart';
 import 'session_view.dart';
 import 'routine_editor_screen.dart';
 import 'run_over.dart';
@@ -67,12 +69,14 @@ import 'speech_model_screen.dart';
 import 'speech_offer_screen.dart';
 import 'speech_platform.dart';
 import 'spotlight.dart';
+import 'tap_mark.dart';
 import 'starter_set_screen.dart';
 import 'sync_platform.dart';
 import 'sync_runner.dart';
 import 'sync_screen.dart';
 import 'tally_entry_screen.dart';
 import 'text_marks_view.dart';
+import 'trash_emptying.dart';
 import 'voice_platform.dart';
 
 /// Stops what a run of the app does on its own, apart from its screens:
@@ -224,6 +228,11 @@ class OldBrainFixApp extends StatefulWidget {
   /// tip unless it switches them on.
   final bool spotlights;
 
+  /// Whether a button tap shows its green "!" (obf-1143); only the app
+  /// `main.dart` starts, so no test or screenshot shows one unless it
+  /// switches them on.
+  final bool tapMarks;
+
   const OldBrainFixApp({
     super.key,
     required this.store,
@@ -262,6 +271,7 @@ class OldBrainFixApp extends StatefulWidget {
     this.workDir,
     this.help,
     this.spotlights = false,
+    this.tapMarks = false,
   });
 
   @override
@@ -272,16 +282,28 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
   final _scroll = ParallaxScroll();
   late var _fatFingers = widget.store.fatFingers;
   late var _textSize = widget.store.textSize;
+
+  /// The green "!" of the button taps (obf-1143), and the ink that shows
+  /// them while this Device has them on.
+  final _tapMarks = TapMarks();
+  late final _tapInk = widget.tapMarks ? TapMarkSplashFactory(_tapped) : null;
   late var _light = lookTheme(
     Brightness.light,
     fatFingers: _fatFingers,
     textSize: _textSize,
+    tapMarks: _tapInk,
   );
   late var _dark = lookTheme(
     Brightness.dark,
     fatFingers: _fatFingers,
     textSize: _textSize,
+    tapMarks: _tapInk,
   );
+
+  void _tapped(Offset at) {
+    if (TapMarkSwitch.of(widget.store).value) _tapMarks.show(at);
+  }
+
   late final _announcements = widget.announcements ?? Announcements();
   late final _drafts = widget.drafts ?? MemoryDrafts();
   late var _themeMode = themeModeOf(widget.store.themeChoice);
@@ -301,7 +323,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     speed: widget.store.playbackSpeed,
     onSpeed: (speed) => widget.store.playbackSpeed = speed,
   );
-  late final _speechModel = SpeechModel(widget.speech);
+  late final _speechModel = SpeechModel(widget.speech, store: widget.store);
   late final _lock = AppLock(store: widget.store, platform: widget.lock);
   final _routes = RouteStack();
   late final _autoSync = AutoSync(
@@ -324,6 +346,20 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
   late final _jobs = widget.jobRunner ?? InlineJobRunner(widget.folders);
   late final _imports = ImportJobs(store: widget.store, runner: _jobs);
   late final _deletions = AreaDeletions(store: widget.store, runner: _jobs);
+  late final _emptying = TrashEmptying(store: widget.store, runner: _jobs);
+
+  /// What the page Running lists (obf-1078), once the readers are made.
+  late final _running = Running(
+    places: _places,
+    sync: _autoSync,
+    imports: _imports,
+    deletions: _deletions,
+    emptying: _emptying,
+    transcriber: _transcriber,
+    photos: _photoReader,
+    files: _attachmentReader,
+    model: _speechModel,
+  );
 
   @override
   void initState() {
@@ -390,6 +426,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     _stopped = true;
     (Object, StackTrace)? failed;
     for (final stop in <VoidCallback>[
+      _running.dispose,
       _alarms.dispose,
       _autoSync.dispose,
       _mirror.dispose,
@@ -403,6 +440,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
       _frameTimes.dispose,
       _imports.dispose,
       _deletions.dispose,
+      _emptying.dispose,
     ]) {
       try {
         stop();
@@ -421,6 +459,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     _stopWork();
     _pager.dispose();
     _scroll.dispose();
+    _tapMarks.dispose();
     if (widget.announcements == null) _announcements.dispose();
     super.dispose();
   }
@@ -463,6 +502,11 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     ),
   );
 
+  /// [child] with the green "!" of the button taps over it while they
+  /// are on (obf-1143).
+  Widget _marked(Widget child) =>
+      widget.tapMarks ? TapMarkLayer(marks: _tapMarks, child: child) : child;
+
   /// [child] under the Spotlights' scope while they are on (obf-1043).
   Widget _spotlit(Widget child) => widget.spotlights
       ? SpotlightScope(store: widget.store, child: child)
@@ -478,84 +522,97 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     darkTheme: _dark,
     themeMode: _themeMode,
     navigatorObservers: [_scroll, _routes, spotlightRoutes],
-    builder: (context, child) => FrameTimesScope(
-      frameTimes: _frameTimes,
-      child: FrameTimesOverlay(
+    // Over everything, dialogs and fans included (obf-1143).
+    builder: (context, child) => _marked(
+      FrameTimesScope(
         frameTimes: _frameTimes,
-        child: FatFingersText(
-          on: _fatFingers,
-          child: QuestionMarkBackground(
-            scroll: _scroll,
-            child: AnnouncementStrip(
-              announcements: _announcements,
-              child: AnnouncementsScope(
+        child: FrameTimesOverlay(
+          frameTimes: _frameTimes,
+          child: FatFingersText(
+            on: _fatFingers,
+            child: QuestionMarkBackground(
+              scroll: _scroll,
+              child: AnnouncementStrip(
                 announcements: _announcements,
-                child: LocationScope(
-                  location: widget.location,
-                  child: ContextScope(
-                    source: widget.context,
-                    child: PhotoScope(
-                      photos: widget.photos,
-                      bytes: _notes.photoBytes,
-                      child: VoiceScope(
-                        voice: widget.voice,
-                        playback: _playback,
-                        child: SpeechScope(
-                          model: _speechModel,
-                          transcriber: _transcriber,
-                          child: PhotoReaderScope(
-                            reader: _photoReader,
-                            child: FileScope(
-                              files: widget.files,
-                              child: PrintScope(
-                                printing: widget.printing,
-                                child: AttachmentReaderScope(
-                                  reader: _attachmentReader,
-                                  child: AttachmentScope(
-                                    notes: _notes,
-                                    child: CalendarScope(
-                                      calendar: widget.calendar,
-                                      child: CalendarMirrorScope(
-                                        mirror: _mirror,
-                                        child: AppointmentScope(
-                                          source: widget.appointments,
-                                          child: DraftsScope(
-                                            drafts: _drafts,
-                                            child: LockScope(
-                                              lock: _lock,
-                                              child: PairingScope(
-                                                pairing: widget.pairing,
-                                                child: AutoSyncScope(
-                                                  sync: _autoSync,
-                                                  child: FolderScope(
-                                                    folders: widget.folders,
-                                                    child: BundleScope(
-                                                      bundles: widget.bundles,
-                                                      child: PersonScope(
-                                                        store: widget.store,
-                                                        platform:
-                                                            widget.profile,
-                                                        onChangesSent:
-                                                            _alarms.replan,
-                                                        child: TagSearchScope(
-                                                          onSearch: _searchTag,
-                                                          child: AppLinkScope(
-                                                            onOpen: _links.open,
-                                                            onPick: _pickLink,
-                                                            child: AlarmSyncScope(
-                                                              alarms: _alarms,
-                                                              child: HomeShortcutsScope(
-                                                                shortcuts: widget
-                                                                    .shortcuts,
-                                                                child: ImportJobsScope(
-                                                                  jobs:
-                                                                      _imports,
-                                                                  child: AreaDeletionsScope(
-                                                                    deletions:
-                                                                        _deletions,
-                                                                    child: _spotlit(
-                                                                      child ??
-                                                                          const SizedBox.shrink(),
+                child: AnnouncementsScope(
+                  announcements: _announcements,
+                  child: LocationScope(
+                    location: widget.location,
+                    child: ContextScope(
+                      source: widget.context,
+                      child: PhotoScope(
+                        photos: widget.photos,
+                        bytes: _notes.photoBytes,
+                        child: VoiceScope(
+                          voice: widget.voice,
+                          playback: _playback,
+                          child: SpeechScope(
+                            model: _speechModel,
+                            transcriber: _transcriber,
+                            child: PhotoReaderScope(
+                              reader: _photoReader,
+                              child: FileScope(
+                                files: widget.files,
+                                child: PrintScope(
+                                  printing: widget.printing,
+                                  child: AttachmentReaderScope(
+                                    reader: _attachmentReader,
+                                    child: AttachmentScope(
+                                      notes: _notes,
+                                      child: CalendarScope(
+                                        calendar: widget.calendar,
+                                        child: CalendarMirrorScope(
+                                          mirror: _mirror,
+                                          child: AppointmentScope(
+                                            source: widget.appointments,
+                                            child: DraftsScope(
+                                              drafts: _drafts,
+                                              child: LockScope(
+                                                lock: _lock,
+                                                child: PairingScope(
+                                                  pairing: widget.pairing,
+                                                  child: AutoSyncScope(
+                                                    sync: _autoSync,
+                                                    child: FolderScope(
+                                                      folders: widget.folders,
+                                                      child: BundleScope(
+                                                        bundles: widget.bundles,
+                                                        child: PersonScope(
+                                                          store: widget.store,
+                                                          platform:
+                                                              widget.profile,
+                                                          onChangesSent:
+                                                              _alarms.replan,
+                                                          child: TagSearchScope(
+                                                            onSearch:
+                                                                _searchTag,
+                                                            child: AppLinkScope(
+                                                              onOpen:
+                                                                  _links.open,
+                                                              onPick: _pickLink,
+                                                              child: AlarmSyncScope(
+                                                                alarms: _alarms,
+                                                                child: HomeShortcutsScope(
+                                                                  shortcuts: widget
+                                                                      .shortcuts,
+                                                                  child: ImportJobsScope(
+                                                                    jobs:
+                                                                        _imports,
+                                                                    child: AreaDeletionsScope(
+                                                                      deletions:
+                                                                          _deletions,
+                                                                      child: TrashEmptyingScope(
+                                                                        emptying:
+                                                                            _emptying,
+                                                                        child: RunningScope(
+                                                                          running:
+                                                                              _running,
+                                                                          child: _spotlit(
+                                                                            child ??
+                                                                                const SizedBox.shrink(),
+                                                                          ),
+                                                                        ),
+                                                                      ),
                                                                     ),
                                                                   ),
                                                                 ),
@@ -632,11 +689,13 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
       Brightness.light,
       fatFingers: _fatFingers,
       textSize: _textSize,
+      tapMarks: _tapInk,
     );
     _dark = lookTheme(
       Brightness.dark,
       fatFingers: _fatFingers,
       textSize: _textSize,
+      tapMarks: _tapInk,
     );
   });
 }
@@ -760,6 +819,14 @@ class _HomeState extends State<_Home> {
   /// Set, a restore or a Device added on the first start, and never again, as Settings
   /// offers it as well.
   var _speechOfferDue = false;
+
+  /// The speech model a restored Backup names (obf-1098), offered in its
+  /// place while it is not in use here.
+  SpeechModelChoice? _restoredModel;
+
+  /// Whether a restored Backup's speech model, not taken up on an
+  /// earlier start, is still to be announced once the check is done.
+  var _restoredModelDue = false;
   late bool _alarmSetupDone =
       widget.store.alarmSetupDone || !widget.alarms.platform.available;
   late final AppLifecycleListener _lifecycle;
@@ -780,7 +847,11 @@ class _HomeState extends State<_Home> {
   var _changesWaiting = false;
   var _unsortedWaiting = false;
   WidgetPick? _pickWaiting;
-  OpenedOccurrence? _occurrenceWaiting;
+  ({OpenedOccurrence opened, TapArrival? arrival})? _occurrenceWaiting;
+
+  /// The way an Occurrence's notification tap reaches the Agenda
+  /// (obf-1039).
+  final _agendaFocus = AgendaFocus();
 
   /// The Note of the Tally whose shortcut was tapped while locked (#284).
   String? _tallyWaiting;
@@ -804,6 +875,8 @@ class _HomeState extends State<_Home> {
   @override
   void initState() {
     super.initState();
+    _restoredModelDue =
+        _starterSetOffered && widget.store.speechModelOffer != null;
     _bundlesOpened = widget.bundles.opened.listen(
       (_) => unawaited(_importOpened()),
     );
@@ -818,6 +891,7 @@ class _HomeState extends State<_Home> {
     widget.alarms.addListener(_unsortedOpened);
     widget.alarms.addListener(_pickOpened);
     widget.alarms.addListener(_occurrenceOpened);
+    widget.alarms.addListener(_ringTapped);
     widget.lock.addListener(_lockChanged);
     widget.speech.addListener(_speechChanged);
     widget.autoSync.addListener(_conflictsSynced);
@@ -836,6 +910,7 @@ class _HomeState extends State<_Home> {
       // Past the first start already: what this version's help Notes
       // still owe (#180), an update's What's new.
       if (_starterSetOffered) _helpDue(fresh: false);
+      _speechChanged();
     });
     // Back from the background, or from a settings page: apply what was
     // tapped meanwhile, see what is allowed now, arm again. Arms on the
@@ -961,6 +1036,7 @@ class _HomeState extends State<_Home> {
     widget.alarms.removeListener(_unsortedOpened);
     widget.alarms.removeListener(_pickOpened);
     widget.alarms.removeListener(_occurrenceOpened);
+    widget.alarms.removeListener(_ringTapped);
     widget.lock.removeListener(_lockChanged);
     widget.speech.removeListener(_speechChanged);
     widget.autoSync.removeListener(_conflictsSynced);
@@ -970,6 +1046,7 @@ class _HomeState extends State<_Home> {
     unawaited(_tallyAsked.cancel());
     widget.profile.removeListener(_profileMade);
     _lifecycle.dispose();
+    _agendaFocus.dispose();
     super.dispose();
   }
 
@@ -1036,6 +1113,20 @@ class _HomeState extends State<_Home> {
     unawaited(navigator.push(route));
   }
 
+  /// Notes a tap on the full-screen alarm's notification in the trace
+  /// of the taps (obf-1039): it shows the full-screen alarm while one
+  /// rings, else the app as it was.
+  void _ringTapped() {
+    if (!mounted) return;
+    final arrival = widget.alarms.takeTapArrived(const {'ring'});
+    if (arrival == null) return;
+    notificationTaps.record(
+      kind: 'ring',
+      arrival: arrival,
+      went: widget.alarms.ringing == null ? TapWent.agenda : TapWent.ring,
+    );
+  }
+
   /// Shows the lock screen when the app locks, with the browser gone,
   /// and what waited for the unlock after it.
   void _lockChanged() {
@@ -1059,9 +1150,9 @@ class _HomeState extends State<_Home> {
       _pickWaiting = null;
       unawaited(_openPick(pick));
     }
-    if (_occurrenceWaiting case final opened?) {
+    if (_occurrenceWaiting case (:final opened, :final arrival)?) {
       _occurrenceWaiting = null;
-      unawaited(_openOccurrence(opened));
+      _showOccurrence(opened, arrival);
     }
     if (_tallyWaiting case final noteId?) {
       _tallyWaiting = null;
@@ -1102,7 +1193,13 @@ class _HomeState extends State<_Home> {
   /// Opens the Nudge screen when the Nudge's notification was tapped.
   void _nudgeOpened() {
     if (!mounted || !widget.alarms.takeNudgeOpened()) return;
-    if (widget.lock.locked) {
+    final locked = widget.lock.locked;
+    notificationTaps.record(
+      kind: 'nudge',
+      arrival: widget.alarms.takeTapArrived(const {'nudge'}),
+      went: locked ? TapWent.locked : TapWent.nudge,
+    );
+    if (locked) {
       _nudgeWaiting = true;
       return;
     }
@@ -1127,8 +1224,26 @@ class _HomeState extends State<_Home> {
   /// lock has put the Agenda under it already.
   void _catchUpOpened() {
     if (!mounted || !widget.alarms.takeCatchUpOpened()) return;
+    notificationTaps.record(
+      kind: 'catchUp',
+      arrival: widget.alarms.takeTapArrived(const {'catchUp'}),
+      went: TapWent.agenda,
+    );
     if (widget.lock.locked) return;
-    Navigator.of(context).popUntil((route) => route.isFirst);
+    _backToAgenda();
+  }
+
+  /// Back to the Agenda from whatever page shows, the Areas list too:
+  /// each page closes as Back closes it, up to Capture, the full-screen
+  /// alarm or a page that holds its leaving to save or ask first (#275),
+  /// which stay over it, nothing typed lost (obf-1039).
+  void _backToAgenda() {
+    Navigator.of(context).popUntil(
+      (route) =>
+          route.isFirst ||
+          LockFreeRoutes.contains(route) ||
+          route.popDisposition == RoutePopDisposition.doNotPop,
+    );
     _pager.jumpToAgenda();
   }
 
@@ -1136,6 +1251,11 @@ class _HomeState extends State<_Home> {
   /// tapped (#109); behind the App Lock they wait for the unlock.
   void _changesOpened() {
     if (!mounted || !widget.alarms.takeChangesOpened()) return;
+    notificationTaps.record(
+      kind: 'changes',
+      arrival: widget.alarms.takeTapArrived(const {'changes'}),
+      went: widget.lock.locked ? TapWent.locked : TapWent.changes,
+    );
     if (widget.lock.locked) {
       _changesWaiting = true;
       return;
@@ -1229,42 +1349,65 @@ class _HomeState extends State<_Home> {
     lock?.closeAreas();
   }
 
-  /// Opens the Note of an Occurrence whose notification was tapped
-  /// (#270); behind the App Lock it waits for the unlock.
+  /// Shows the Occurrence whose notification was tapped on the Agenda,
+  /// marked (obf-1039); behind the App Lock it waits for the unlock.
   void _occurrenceOpened() {
     if (!mounted) return;
     final opened = widget.alarms.takeOccurrenceOpened();
     if (opened == null) return;
+    final arrival = widget.alarms.takeTapArrived(occurrenceTapKinds);
     if (widget.lock.locked) {
-      _occurrenceWaiting = opened;
+      _occurrenceWaiting = (opened: opened, arrival: arrival);
+      notificationTaps.record(
+        kind: 'occurrence',
+        arrival: arrival,
+        ids: _tapIds(opened),
+        went: TapWent.locked,
+      );
       return;
     }
-    unawaited(_openOccurrence(opened));
+    _showOccurrence(opened, arrival);
   }
 
-  /// Opens the editor of the Note of [opened]'s Routine, as a tap on its
-  /// row on the Agenda does: its locked Area first. A Routine or Note no
-  /// longer there, or in the trash, opens nothing, the Agenda being open.
-  Future<void> _openOccurrence(OpenedOccurrence opened) async {
-    final store = widget.store;
-    final routine = Routines(store).byId(opened.routineId);
-    if (routine == null || routine.isTrashed) return;
-    final note = widget.notes.byId(routine.noteId);
-    if (note == null || note.isTrashed) return;
-    final lock = LockScope.of(context);
-    final areaId = AreaLocks(store).lockedAreaOf(note);
-    if (areaId != null) {
-      final area = widget.places.areaById(areaId);
-      final open = await openLockedArea(
-        context,
-        lock,
-        areaId,
-        area == null ? '' : areaName(context.t, area),
-      );
-      if (!open || !mounted) return;
+  /// The ids of [opened] as the trace of the taps notes them: never a
+  /// Note's text.
+  static Map<String, String> _tapIds(OpenedOccurrence opened) => {
+    'routine': opened.routineId,
+    'occurrence': opened.occurrenceKey,
+  };
+
+  /// Shows the Agenda, from whatever page the app showed, as the
+  /// Catch-up Notification does ([_backToAgenda]), with [opened] marked
+  /// where it lists it. A Routine or Note gone or in the trash shows the
+  /// Agenda alone. The trace of the taps notes where it went.
+  void _showOccurrence(OpenedOccurrence opened, TapArrival? arrival) {
+    void traced(String went) => notificationTaps.record(
+      kind: 'occurrence',
+      arrival: arrival,
+      ids: _tapIds(opened),
+      went: went,
+    );
+    _backToAgenda();
+    final routine = Routines(widget.store).byId(opened.routineId);
+    final note = routine == null ? null : widget.notes.byId(routine.noteId);
+    if (routine == null ||
+        routine.isTrashed ||
+        note == null ||
+        note.isTrashed) {
+      traced(TapWent.agendaGone);
+      return;
     }
-    await openNote(context, widget.notes, widget.places, note);
-    lock?.closeAreas();
+    _agendaFocus.show(
+      opened,
+      (found) => traced(switch (found) {
+        AgendaFound.today => TapWent.agendaToday,
+        AgendaFound.missed => TapWent.agendaMissed,
+        AgendaFound.comingDay => TapWent.agendaLater,
+        AgendaFound.done => TapWent.agendaDone,
+        AgendaFound.skipped => TapWent.agendaSkipped,
+        AgendaFound.nowhere => TapWent.agendaNowhere,
+      }),
+    );
   }
 
   /// Opens the entry page of the Tally whose shortcut on the home screen
@@ -1331,24 +1474,100 @@ class _HomeState extends State<_Home> {
   }
 
   /// Whether the speech model is worth offering: there is a speech layer,
-  /// Whisper may run here, and no model is in place.
-  bool get _speechWanted =>
-      widget.speech.platform.available &&
-      widget.speech.status != ModelStatus.ready &&
-      widget.speech.status != ModelStatus.unsupported;
+  /// Whisper may run here, and no model is in place, or not the one a
+  /// restored Backup names.
+  bool get _speechWanted {
+    final speech = widget.speech;
+    if (!speech.platform.available) return false;
+    return switch (speech.status) {
+      ModelStatus.unsupported => false,
+      ModelStatus.ready =>
+        _restoredModel != null && speech.current?.name != _restoredModel?.name,
+      _ => true,
+    };
+  }
 
   /// The offer goes once the check finds a model in place or that Whisper
-  /// does not run here.
+  /// does not run here; a restored Backup's model goes with it, dropped
+  /// once in use ([SpeechModel]). One not taken up on an earlier start is
+  /// announced at the top once the check is done, once.
   void _speechChanged() {
-    if (!mounted || !_speechOfferDue || _speechWanted) return;
+    if (!mounted) return;
+    final speech = widget.speech;
+    if (speech.status == ModelStatus.checking) return;
+    if (_restoredModelDue) {
+      _restoredModelDue = false;
+      _announceRestoredModel();
+    }
+    if (!_speechOfferDue || _speechWanted) return;
+    if (!speech.platform.available ||
+        speech.status == ModelStatus.unsupported) {
+      widget.store.dropSpeechModelOffer();
+    }
+    setState(() {
+      _speechOfferDue = false;
+      _restoredModel = null;
+    });
+  }
+
+  /// A restored Backup's speech model still offered on a later start:
+  /// at the top, once, a tap downloading it or picking its file again.
+  /// Settings offers it after that.
+  void _announceRestoredModel() {
+    final store = widget.store;
+    final offer = store.speechModelOffer;
+    if (offer == null) return;
+    store.dropSpeechModelOffer();
+    final speech = widget.speech;
+    if (!speech.platform.available ||
+        speech.status == ModelStatus.unsupported ||
+        speech.current?.name == offer.name) {
+      return;
+    }
+    final model = WhisperModel.values.asNameMap()[offer.name];
+    if (model == null) return;
+    final t = context.t;
+    final fromFile = offer.source == SpeechModelSource.file;
+    AnnouncementsScope.of(context)?.announce(
+      fromFile ? t.speechRestoredPick : t.speechRestoredDownload,
+      onTap: () {
+        if (!mounted) return;
+        unawaited(
+          fetchSpeechModel(
+            context,
+            fromFile ? speech.pick : () => speech.download(model),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Starts the speech model's download in the background, the one a
+  /// restored Backup names or else the base one, announced at the top
+  /// should it fail, and goes on with the setup at once.
+  void _downloadSpeech() {
+    final model =
+        WhisperModel.values.asNameMap()[_restoredModel?.name] ??
+        WhisperModel.base;
+    unawaited(fetchSpeechModel(context, () => widget.speech.download(model)));
     setState(() => _speechOfferDue = false);
   }
 
-  /// Starts the speech model's download in the background, announced
-  /// at the top should it fail, and goes on with the setup at once.
-  void _downloadSpeech() {
-    unawaited(fetchSpeechModel(context, widget.speech.download));
+  /// Takes a restored Backup's model from the file the user picks again,
+  /// as [_downloadSpeech] does.
+  void _pickSpeech() {
+    unawaited(fetchSpeechModel(context, widget.speech.pick));
     setState(() => _speechOfferDue = false);
+  }
+
+  /// Not now: a restored Backup's model is not offered again here;
+  /// Settings offers every model.
+  void _skipSpeech() {
+    if (_restoredModel != null) widget.store.dropSpeechModelOffer();
+    setState(() {
+      _speechOfferDue = false;
+      _restoredModel = null;
+    });
   }
 
   /// The platform's backup is told the opt-in this Device keeps, and on
@@ -1389,8 +1608,12 @@ class _HomeState extends State<_Home> {
       _found = null;
     }
     widget.store.starterSetOffered = true;
-    // The playback speed came with it.
-    VoiceScope.playbackOf(context)?.speed.value = widget.store.playbackSpeed;
+    // The playback speed came with it, and the Device's other settings
+    // (obf-1098): the look and the tips show them at once.
+    final store = widget.store;
+    VoiceScope.playbackOf(context)?.speed.value = store.playbackSpeed;
+    widget.onThemeChanged();
+    TipsSwitch.of(store).value = store.localSetting(tipsOffKey) != 'true';
     _setUpAfterwards();
   }
 
@@ -1417,10 +1640,18 @@ class _HomeState extends State<_Home> {
   /// After a restore or a Device added: what came with it is in place;
   /// the Profile is there already, the defaults only fill a gap.
   void _setUpAfterwards() {
+    final offer = widget.store.speechModelOffer;
     setState(() {
       _starterSetOffered = true;
+      _restoredModel = offer;
       _speechOfferDue = _speechWanted;
+      if (!_speechOfferDue) _restoredModel = null;
     });
+    // The model a restored Backup names, in use already or not to be run
+    // here, is not offered.
+    if (offer != null && !_speechOfferDue) {
+      widget.store.dropSpeechModelOffer();
+    }
     unawaited(widget.profile.applyDefaults());
     _helpDue(fresh: true);
     unawaited(widget.alarms.refresh());
@@ -1476,8 +1707,10 @@ class _HomeState extends State<_Home> {
     if (_speechOfferDue) {
       return SpeechOfferScreen(
         model: widget.speech,
+        restored: _restoredModel,
         onDownload: _downloadSpeech,
-        onSkip: () => setState(() => _speechOfferDue = false),
+        onPick: _pickSpeech,
+        onSkip: _skipSpeech,
       );
     }
     if (!_alarmSetupDone) {
@@ -1503,6 +1736,7 @@ class _HomeState extends State<_Home> {
                 profile: widget.profile,
                 onThemeChanged: widget.onThemeChanged,
                 pager: _pager,
+                focus: _agendaFocus,
               ),
               areas: AreasScreen(
                 notes: widget.notes,

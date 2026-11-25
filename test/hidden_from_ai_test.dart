@@ -3,6 +3,7 @@ import 'dart:isolate';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/merge_into_screen.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/note_card.dart';
@@ -13,6 +14,8 @@ import 'package:oldbrainfix/src/share_area_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'bundle_test.dart' show FakeBundles;
+
+import 'card_menu.dart';
 
 /// Hidden from AI on the phone (#267, ADR 0049): the switch in a card's
 /// ⋮, an Area's menu and the Note editor's badge, a shield on what is
@@ -48,7 +51,10 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Future<void> start(WidgetTester tester) async {
+  Future<void> start(
+    WidgetTester tester, {
+    String browse = 'Search and browse',
+  }) async {
     tester.view.physicalSize = const Size(800, 2400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -56,7 +62,7 @@ void main() {
       OldBrainFixApp(store: store, bundles: FakeBundles(dir)),
     );
     await tester.pumpAndSettle();
-    await tap(tester, find.byTooltip('Search and browse'));
+    await tap(tester, find.byTooltip(browse));
   }
 
   Future<void> allNotes(WidgetTester tester) async {
@@ -95,6 +101,7 @@ void main() {
     expect(shieldOn('Diary'), findsNothing);
 
     await openMenu(tester, 'Diary');
+    await openCardGroup(tester, 'note-hidden-from-ai');
     await tap(tester, key('note-hidden-from-ai'));
     expect(store.isMarkedHiddenFromAi(diary), isTrue);
     expect(shieldOn('Diary'), findsOneWidget);
@@ -108,6 +115,7 @@ void main() {
     );
 
     await openMenu(tester, 'Diary');
+    await openCardGroup(tester, 'note-hidden-from-ai');
     final item = tester.widget<Switch>(
       find.descendant(
         of: key('note-hidden-from-ai'),
@@ -120,6 +128,7 @@ void main() {
     expect(shieldOn('Diary'), findsNothing);
 
     await openMenu(tester, 'Shopping for all');
+    await openCardGroup(tester, 'note-hidden-from-ai');
     expect(key('note-hidden-from-ai'), findsNothing);
   });
 
@@ -148,6 +157,37 @@ void main() {
     await tap(tester, find.byTooltip('All Notes'));
     expect(shieldOn('Back pain'), findsOneWidget);
   });
+
+  for (final german in [false, true]) {
+    testWidgets('the menu entry is one flat line, its switch at the end '
+        '(obf-1135)${german ? ', in German' : ''}', (tester) async {
+      if (german) {
+        tester.platformDispatcher.localesTestValue = const [Locale('de')];
+        addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+      }
+      final health = places.addArea('Health');
+      await start(
+        tester,
+        browse: lookupAppLocalizations(Locale(german ? 'de' : 'en'))
+            .browseTooltip,
+      );
+      await tap(tester, key('area-menu-${health.id}'));
+      final entry = key('area-hidden-from-ai-${health.id}');
+      Rect of(Type type) => tester.getRect(
+        find.descendant(of: entry, matching: find.byType(type)).first,
+      );
+      final icon = of(Icon);
+      final words = of(Text);
+      final toggle = of(Switch);
+      expect(words.left, greaterThan(icon.right));
+      expect(toggle.left, greaterThan(words.left));
+      // All on one line: each of them across the middle of the others.
+      for (final part in [icon, toggle]) {
+        expect(part.top, lessThan(words.center.dy));
+        expect(part.bottom, greaterThan(words.center.dy));
+      }
+    });
+  }
 
   testWidgets('filing a hidden Note into a Shared Area asks first: Cancel '
       'keeps it as it was, Show to the AI takes the mark off and files it', (
@@ -206,15 +246,13 @@ void main() {
     final milk = notes.capture('Milk for the family', place: shared).id;
     await allNotes(tester);
 
-    // The Unsorted one's card names it Add to Note… (#308).
+    // The Unsorted one's card names it Merge into… too (obf-1014).
     Future<void> mergeFromCard(String text, String into) async {
       await tap(
         tester,
         find.descendant(
           of: card(text),
-          matching: find.byTooltip(
-            text == 'Diary' ? 'Add to Note…' : 'Merge into…',
-          ),
+          matching: find.byTooltip('Merge into…'),
         ),
       );
       await tap(
@@ -309,14 +347,14 @@ void main() {
     await allNotes(tester);
 
     await openMenu(tester, 'Diary');
-    await tap(tester, key('note-share-menu'));
+    await tap(tester, key('note-group-share'));
     await tap(tester, key('note-pack'));
     expect(key('hidden-from-ai-refused'), findsOneWidget);
     await tap(tester, find.text('Cancel'));
     expect(find.byType(PackExportScreen), findsNothing);
 
     await openMenu(tester, 'Diary');
-    await tap(tester, key('note-share-menu'));
+    await tap(tester, key('note-group-share'));
     await tap(tester, key('note-send'));
     expect(key('hidden-from-ai-refused'), findsOneWidget);
     await tap(tester, find.text('Cancel'));
@@ -324,7 +362,7 @@ void main() {
     expect(store.isMarkedHiddenFromAi(diary), isTrue);
 
     await openMenu(tester, 'Diary');
-    await tap(tester, key('note-share-menu'));
+    await tap(tester, key('note-group-share'));
     await tap(tester, key('note-pack'));
     await tap(tester, key('hidden-from-ai-show'));
     expect(find.byType(PackExportScreen), findsOneWidget);
@@ -338,14 +376,14 @@ void main() {
     store.setHiddenFromAi(back, true);
     await start(tester);
     await tap(tester, key('area-menu-${health.id}'));
-    await tap(tester, find.text('Share…'));
+    await tap(tester, find.text('Share with people…'));
     expect(find.textContaining('Back pain: hidden from AI'), findsOne);
     await tap(tester, find.text('Cancel'));
     expect(find.byType(ShareAreaScreen), findsNothing);
     expect(store.isShared(health.id), isFalse);
 
     await tap(tester, key('area-menu-${health.id}'));
-    await tap(tester, find.text('Share…'));
+    await tap(tester, find.text('Share with people…'));
     await tap(tester, key('hidden-from-ai-show'));
     expect(find.byType(ShareAreaScreen), findsOneWidget);
     expect(store.isMarkedHiddenFromAi(back), isFalse);

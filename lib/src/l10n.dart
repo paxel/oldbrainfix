@@ -9,11 +9,23 @@ extension L10nContext on BuildContext {
 }
 
 /// [note] where only its words fit, as in a row or an alarm: its text
-/// as it reads, without the marks of a formatted one, or what it holds
-/// when it has no words ([Note.wordless]).
-String noteText(AppLocalizations t, Note note) => note.text.trim().isEmpty
-    ? wordlessTitle(t, note.wordless, note.wordlessName)
-    : note.visibleText;
+/// as it reads, without the marks of a formatted one, else the first
+/// line of its Transcript or Photo Text ([Note.shownName], obf-1049), or
+/// what it holds when it has neither ([Note.wordless]).
+String noteText(AppLocalizations t, Note note) => switch (note.shownName) {
+  '' => wordlessTitle(t, note.wordless, note.wordlessName),
+  final name => name,
+};
+
+/// What a calendar entry of [note] reads, its first line the entry's
+/// title and the whole its description: its text as it reads, else its
+/// whole Transcript or Photo Text ([Note.calendarText], obf-1049), or
+/// what it holds when it has neither.
+String noteCalendarText(AppLocalizations t, Note note) =>
+    switch (note.calendarText) {
+      '' => wordlessTitle(t, note.wordless, note.wordlessName),
+      final text => text,
+    };
 
 /// "Photo" or "Voice recording" for a Note without words; for one of
 /// files by the [name] of its first file (#267, [Note.wordlessName]), or

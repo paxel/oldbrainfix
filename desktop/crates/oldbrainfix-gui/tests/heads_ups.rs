@@ -5,6 +5,8 @@
 //! days only, which it also keeps alone. Save writes them, of a new
 //! Reminder too; a Member who may not change the Routine gets the editor
 //! with the rest not editable, and Save writes only the Heads-ups.
+//! "Custom…" at the end of the list asks for a number and a unit
+//! (obf-1087), days and weeks only on an all-day schedule.
 
 // A test may unwrap, expect, panic and index, its helpers too (#229).
 #![allow(
@@ -18,7 +20,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
 
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
-use egui::accesskit::Role;
+use egui::accesskit::{Role, Toggled};
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::lan::{Joining, answer_sync_inviting, apply_answer_as, sync_request_as};
@@ -116,6 +118,53 @@ fn listed<S>(harness: &Harness<'_, S>) -> Vec<String> {
 fn add(harness: &mut Harness<'_, App>, label: &str) -> TestResult {
     click(harness, "Add heads-up")?;
     click(harness, label)
+}
+
+/// Every button label of the open "Add heads-up" menu, in order.
+fn menu<S>(harness: &Harness<'_, S>) -> Vec<String> {
+    let mut labels: Vec<&str> = TIMED.to_vec();
+    labels.extend(["3 days before", "Custom…"]);
+    offered(harness, &labels)
+}
+
+/// Opens "Custom…" and types `count` into its number.
+fn custom(harness: &mut Harness<'_, App>, count: &str) -> TestResult {
+    add(harness, "Custom…")?;
+    assert!(harness.query_by_label("Custom heads-up").is_some());
+    if !count.is_empty() {
+        harness.get_by(|n| n.is_focused()).type_text(count);
+        harness.run();
+    }
+    Ok(())
+}
+
+/// Whether the custom Heads-up's Add can be clicked.
+fn add_on<S>(harness: &Harness<'_, S>) -> bool {
+    !harness
+        .get_by_role_and_label(Role::Button, "Add")
+        .accesskit_node()
+        .is_disabled()
+}
+
+/// The custom Heads-up's units, as its chips say them for more than one.
+const UNITS: [&str; 4] = ["minutes", "hours", "days", "weeks"];
+
+/// The unit chips, by their words, only those `picked` if so asked.
+fn units<S>(harness: &Harness<'_, S>, picked: bool) -> Vec<String> {
+    harness
+        .query_all_by_role(Role::RadioButton)
+        .filter(|n| !picked || n.accesskit_node().toggled() == Some(Toggled::True))
+        .filter_map(|n| n.accesskit_node().label())
+        .filter(|l| UNITS.contains(&l.as_str()))
+        .collect()
+}
+
+/// Picks the unit chip `label`.
+fn unit(harness: &mut Harness<'_, App>, label: &str) {
+    harness
+        .get_by_role_and_label(Role::RadioButton, label)
+        .click();
+    harness.run();
 }
 
 /// A Routine of a new Note `text` on `schedule`: its id.
@@ -300,5 +349,138 @@ fn a_member_sets_only_their_own_heads_ups() -> TestResult {
     assert_eq!(after.schedule, before.schedule);
     assert_eq!(after.renag, before.renag);
     assert_eq!(after.escalation, before.escalation);
+    Ok(())
+}
+
+#[test]
+fn custom_takes_a_number_and_a_unit_on_a_timed_routine() -> TestResult {
+    let store = Arc::new(device(1, "Ann")?);
+    let id = routine(&store, "Dentist", &daily(&[ten()?])?)?;
+    let mut harness = window(&store);
+    harness.state_mut().open_routine(&id);
+    harness.run();
+    click(&mut harness, "Add heads-up")?;
+    let mut all: Vec<String> = TIMED.iter().map(ToString::to_string).collect();
+    all.push("Custom…".into());
+    assert_eq!(menu(&harness), all);
+    click(&mut harness, "Custom…")?;
+    // Minutes to start with, Add off while nothing is typed.
+    assert_eq!(
+        units(&harness, false),
+        ["minutes", "hours", "days", "weeks"]
+    );
+    assert_eq!(units(&harness, true), ["minutes"]);
+    assert!(harness.query_by_label("From 1 to 43200.").is_some());
+    assert!(!add_on(&harness));
+    // 721 hours lie past 30 days.
+    harness.get_by(|n| n.is_focused()).type_text("721");
+    harness.run();
+    unit(&mut harness, "hours");
+    assert!(harness.query_by_label("From 1 to 720.").is_some());
+    assert!(!add_on(&harness));
+    harness.get_by_label("How long before").click();
+    harness.run();
+    harness.key_press(egui::Key::Backspace);
+    harness.key_press(egui::Key::Backspace);
+    harness.key_press(egui::Key::Backspace);
+    harness.run();
+    harness.get_by(|n| n.is_focused()).type_text("45");
+    harness.run();
+    unit(&mut harness, "minutes");
+    assert!(add_on(&harness));
+    click(&mut harness, "Add")?;
+    assert!(harness.query_by_label("Custom heads-up").is_none());
+    assert_eq!(listed(&harness), ["45 min before"]);
+    // Not saved before Save, which writes it.
+    assert!(Routines::new(&store).heads_ups(&id)?.is_empty());
+    click(&mut harness, "Save")?;
+    assert_eq!(Routines::new(&store).heads_ups(&id)?, [45]);
+    Ok(())
+}
+
+#[test]
+fn custom_on_an_all_day_routine_takes_days_and_weeks() -> TestResult {
+    let store = Arc::new(device(1, "Ann")?);
+    let id = routine(&store, "Bins out", &daily(&[])?)?;
+    let mut harness = window(&store);
+    harness.state_mut().open_routine(&id);
+    harness.run();
+    custom(&mut harness, "2")?;
+    assert_eq!(units(&harness, false), ["days", "weeks"]);
+    assert_eq!(units(&harness, true), ["days"]);
+    assert!(harness.query_by_label("From 1 to 30.").is_some());
+    unit(&mut harness, "weeks");
+    assert!(harness.query_by_label("From 1 to 4.").is_some());
+    click(&mut harness, "Add")?;
+    assert_eq!(listed(&harness), ["2 weeks before"]);
+    click(&mut harness, "Save")?;
+    assert_eq!(Routines::new(&store).heads_ups(&id)?, [20160]);
+    Ok(())
+}
+
+#[test]
+fn custom_stays_with_every_choice_set_and_sets_none_twice() -> TestResult {
+    let store = Arc::new(device(1, "Ann")?);
+    let id = routine(&store, "Dentist", &daily(&[ten()?])?)?;
+    Routines::new(&store).set_heads_ups(&id, &[5, 10, 15, 30, 60, 120, 1440, 2880, 10080])?;
+    let mut harness = window(&store);
+    harness.state_mut().open_routine(&id);
+    harness.run();
+    click(&mut harness, "Add heads-up")?;
+    assert_eq!(menu(&harness), ["Custom…"]);
+    click(&mut harness, "Custom…")?;
+    harness.get_by(|n| n.is_focused()).type_text("1");
+    harness.run();
+    // The words agree with the number.
+    unit(&mut harness, "hour");
+    click(&mut harness, "Add")?;
+    // 1 hour was set: one row of it.
+    assert_eq!(
+        listed(&harness)
+            .iter()
+            .filter(|l| *l == "1 h before")
+            .count(),
+        1
+    );
+    assert_eq!(listed(&harness).len(), 9);
+    Ok(())
+}
+
+#[test]
+fn cancel_and_esc_leave_the_editor_as_it_was() -> TestResult {
+    let store = Arc::new(device(1, "Ann")?);
+    let id = routine(&store, "Dentist", &daily(&[ten()?])?)?;
+    let mut harness = window(&store);
+    harness.state_mut().open_routine(&id);
+    harness.run();
+    custom(&mut harness, "45")?;
+    click(&mut harness, "Cancel")?;
+    assert!(harness.query_by_label("Custom heads-up").is_none());
+    let editor = harness.state().routine_editor().ok_or("the editor")?;
+    assert!(!editor.changed());
+    assert!(listed(&harness).is_empty());
+    custom(&mut harness, "45")?;
+    harness.key_press(egui::Key::Escape);
+    harness.run();
+    assert!(harness.query_by_label("Custom heads-up").is_none());
+    let editor = harness.state().routine_editor().ok_or("the editor")?;
+    assert!(!editor.changed());
+    assert!(Routines::new(&store).heads_ups(&id)?.is_empty());
+    Ok(())
+}
+
+#[test]
+fn a_member_adds_a_custom_heads_up() -> TestResult {
+    let (ben, id) = shared()?;
+    let ben = Arc::new(ben);
+    let mut harness = window(&ben);
+    harness.state_mut().open_routine(&id);
+    harness.run();
+    custom(&mut harness, "3")?;
+    unit(&mut harness, "hours");
+    click(&mut harness, "Add")?;
+    assert_eq!(listed(&harness), ["3 h before"]);
+    click(&mut harness, "Save")?;
+    assert_eq!(Routines::new(&ben).heads_ups(&id)?, [180]);
     Ok(())
 }

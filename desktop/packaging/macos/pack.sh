@@ -29,7 +29,8 @@ done
 iconutil -c icns "$iconset" -o "$app/Contents/Resources/oldbrainfix.icns"
 
 # The microphone needs its usage text, or macOS ends the app on the
-# first recording.
+# first recording. Markdown files list it under "Open With" (obf-1056),
+# as an Alternate handler, so it never becomes their default.
 cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -46,6 +47,18 @@ cat > "$app/Contents/Info.plist" <<PLIST
   <key>LSMinimumSystemVersion</key><string>11.0</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSMicrophoneUsageDescription</key><string>Old Brain Fix records voice Notes.</string>
+  <key>CFBundleDocumentTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleTypeName</key><string>Markdown document</string>
+      <key>CFBundleTypeRole</key><string>Viewer</string>
+      <key>LSHandlerRank</key><string>Alternate</string>
+      <key>LSItemContentTypes</key>
+      <array><string>net.daringfireball.markdown</string></array>
+      <key>CFBundleTypeExtensions</key>
+      <array><string>md</string><string>markdown</string></array>
+    </dict>
+  </array>
 </dict>
 </plist>
 PLIST

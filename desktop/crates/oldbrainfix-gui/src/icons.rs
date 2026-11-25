@@ -52,7 +52,8 @@ pub const PERSON: char = '\u{e491}';
 pub const MAIL_UNREAD: char = '\u{f1b6}';
 /// `group_add_outlined`, as the phone marks Areas shared from afar.
 pub const GROUP_ADD: char = '\u{f0d8}';
-/// `notifications_off`, on the Agenda's line of a quiet day (obf-1044).
+/// `notifications_off`, on the Agenda's line of a quiet day (obf-1044)
+/// and its Quiet today (obf-1066).
 pub const NOTIFICATIONS_OFF: char = '\u{e452}';
 pub const ARROW_UP: char = '\u{e0a0}';
 pub const ARROW_DOWN: char = '\u{e097}';
@@ -82,6 +83,9 @@ pub const MORE: char = '\u{e402}';
 /// `file_upload_outlined`, as that page's Export.
 pub const ALL_ROUTINES: char = '\u{e2b8}';
 pub const MORE_VERT: char = '\u{e404}';
+/// Undo and Redo in the bar of the Note open (obf-1051).
+pub const UNDO: char = '\u{e68c}';
+pub const REDO: char = '\u{e512}';
 /// `drag_handle`, as the phone's Areas list drags its rows by.
 pub const DRAG_HANDLE: char = '\u{e206}';
 /// `check_circle`, `cancel` and `timelapse`, as the phone's Routine
@@ -191,8 +195,10 @@ pub const SESSION_LEAST: char = '\u{f04c6}';
 /// one unfolded, `expand_less`.
 pub const EXPAND_MORE: char = '\u{e246}';
 /// `arrow_drop_down`, the ▾ after a badge's value in words whose click
-/// picks among values, such as the kind (#310).
-pub const ARROW_DROP_DOWN: char = '\u{e5c5}';
+/// picks among values, such as the kind (#310): Flutter's codepoint, as
+/// the bundled font has it, not the older font's `e5c5`, which here is
+/// `smart_toy` (obf-1116).
+pub const ARROW_DROP_DOWN: char = '\u{e098}';
 /// The kinds of an Attachment (#267), as on the phone: a PDF, a text
 /// document, a table, plain text or Markdown, any other file.
 pub const FILE_PDF: char = '\u{f2a4}';
@@ -207,6 +213,18 @@ pub const HIDDEN_FROM_AI: char = '\u{f379}';
 /// `tag`: the sidebar's Tags (#267).
 pub const TAG: char = '\u{e640}';
 pub const EXPAND_LESS: char = '\u{e245}';
+/// The lesser actions of an Ask answer, as the phone draws them (#316,
+/// obf-1103): `copy_outlined` Copy text, `note_add_outlined` Keep as
+/// Note, `call_merge` Add to Note…, and `file_download_outlined` Save
+/// as Markdown…, the desktop's alone.
+pub const COPY: char = '\u{ef7f}';
+pub const NOTE_ADD: char = '\u{f22e}';
+pub const ADD_TO_NOTE: char = '\u{e129}';
+pub const SAVE_FILE: char = '\u{f05b}';
+/// `notes` and `grid_on`: a table grid's switch to its lines and back,
+/// as the phone's (obf-1111).
+pub const SHOW_LINES: char = '\u{e44c}';
+pub const SHOW_GRID: char = '\u{e2e9}';
 
 /// How the phone draws each of the core's Area icons.
 pub fn area_icon(key: Option<&str>) -> Option<char> {

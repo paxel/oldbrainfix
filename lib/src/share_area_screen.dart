@@ -9,6 +9,7 @@ import 'folder_platform.dart';
 import 'hidden_from_ai_view.dart';
 import 'host_screen.dart';
 import 'l10n.dart';
+import 'look.dart';
 import 'page_bar.dart';
 import 'pairing_platform.dart';
 import 'person_screen.dart';
@@ -348,7 +349,7 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
           // Roles are chosen only in Advanced (#197); in Simple the
           // person joins as a Member.
           if (_advanced) ...[
-            Text(t.roleHeading, style: Theme.of(context).textTheme.titleSmall),
+            Text(t.roleHeading, style: sectionHeading(context)),
             RadioGroup<AreaRole>(
               groupValue: _role,
               onChanged: (role) {
@@ -415,7 +416,7 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
                       Text(t.syncSyncing),
                     ],
                   )
-                : FilledButton.tonal(
+                : OutlinedButton(
                     key: const ValueKey('invite'),
                     onPressed: _invite,
                     child: Text(t.shareInvite),
@@ -426,7 +427,7 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
           const SizedBox(height: 8),
           Align(
             alignment: Alignment.centerLeft,
-            child: FilledButton.tonalIcon(
+            child: OutlinedButton.icon(
               key: const ValueKey('share-show'),
               onPressed: _busy ? null : _showCode,
               icon: const Icon(Icons.qr_code_2),
@@ -435,17 +436,14 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
           ),
           if (canSend) ...[
             const SizedBox(height: 24),
-            Text(
-              t.shareAfarHeading,
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
+            Text(t.shareAfarHeading, style: sectionHeading(context)),
             const SizedBox(height: 8),
             Text(_afar.isEmpty ? t.shareAfarNobody : t.shareAfarIntro),
             if (_afar.isNotEmpty) ...[
               const SizedBox(height: 8),
               Align(
                 alignment: Alignment.centerLeft,
-                child: FilledButton.tonalIcon(
+                child: OutlinedButton.icon(
                   key: const ValueKey('share-afar'),
                   onPressed: _busy ? null : _shareAfar,
                   icon: const Icon(Icons.person_search_outlined),
@@ -726,10 +724,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
             onPressed: () => Navigator.of(context).pop(false),
             child: Text(t.cancel),
           ),
-          TextButton(
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
-            ),
+          DestructiveButton(
             onPressed: () => Navigator.of(context).pop(true),
             child: Text(t.removePerson),
           ),

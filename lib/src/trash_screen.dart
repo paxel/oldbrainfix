@@ -1,24 +1,31 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'announcements.dart';
 import 'app_lock.dart';
 import 'browser.dart';
+import 'failure_dialog.dart';
 import 'frogs_screen.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'note_card.dart';
 import 'note_selection.dart';
 import 'page_bar.dart';
+import 'run_over.dart';
 import 'schedule_text.dart';
 import 'system_bars.dart';
+import 'trash_emptying.dart';
 
 /// The deleted Notes, and the Routines, Reminders and Frogs deleted on
 /// their own, most recently deleted first, each with how long it stays
 /// and a button to restore it; a Frog stays until restored (ADR 0027).
 /// A Note comes back to where it was filed, with the Routines and
 /// Reminders deleted along with it. Those of closed locked Areas stay
-/// out.
+/// out. "Empty the trash now", last on the bar, deletes for good beside
+/// the app what this Device may change, once asked (obf-1095).
 class TrashScreen extends StatefulWidget {
   final Notes notes;
   final Places places;
@@ -44,16 +51,130 @@ class _TrashScreenState extends State<TrashScreen>
   late final _frogs = Frogs(widget.notes.store);
   late List<_Trashed> _trashed = _load();
 
+  /// The app's emptying of the trash (obf-1095); none without the app,
+  /// and then no "Empty the trash now".
+  TrashEmptying? _emptying;
+
+  /// What "Empty the trash now" removes, as last counted beside the app;
+  /// null until it is.
+  TrashEmptied? _toEmpty;
+
+  /// Which count is the latest, so an older one ending later is dropped.
+  var _counts = 0;
+
   @override
   Store get log => widget.notes.store;
 
   @override
   void reloadLog() => _reload();
 
-  void _reload() => setState(() {
-    _trashed = _load();
-    keepShown(_notes);
-  });
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final emptying = TrashEmptyingScope.of(context);
+    if (emptying == _emptying) return;
+    _emptying?.removeListener(_emptyingChanged);
+    _emptying = emptying?..addListener(_emptyingChanged);
+    unawaited(_count());
+  }
+
+  @override
+  void dispose() {
+    _emptying?.removeListener(_emptyingChanged);
+    super.dispose();
+  }
+
+  /// Emptying started or ended: the action is off meanwhile.
+  void _emptyingChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _reload() {
+    setState(() {
+      _trashed = _load();
+      keepShown(_notes);
+      // Off until counted again: the question never names an old count.
+      _toEmpty = null;
+    });
+    unawaited(_count());
+  }
+
+  /// Counts what "Empty the trash now" removes, beside the app: it reads
+  /// every Note in the trash, too slow for a frame on thousands.
+  Future<void> _count() async {
+    final emptying = _emptying;
+    if (emptying == null) return;
+    final count = ++_counts;
+    TrashEmptied? toEmpty;
+    try {
+      toEmpty = await emptying.toEmpty();
+    } on Object {
+      // The store closed under it, as on a Restart: the action stays off.
+      toEmpty = null;
+    }
+    if (!mounted || count != _counts) return;
+    setState(() => _toEmpty = toEmpty);
+  }
+
+  /// Whether "Empty the trash now" has something to remove and nothing
+  /// empties the trash already.
+  bool get _mayEmpty =>
+      !(_toEmpty?.isEmpty ?? true) && !(_emptying?.running ?? true);
+
+  /// Asks once, naming how many Notes and Routines go, then empties the
+  /// trash beside the app (obf-1095); it cannot be undone. A failure is
+  /// announced at the top in [AppLocalizations] taken before the wait,
+  /// even after this page closed; success is not.
+  Future<void> _emptyNow() async {
+    final emptying = _emptying;
+    final toEmpty = _toEmpty;
+    if (emptying == null || toEmpty == null || !_mayEmpty) return;
+    final t = context.t;
+    final (notes, routines) = (toEmpty.notes.length, toEmpty.routines.length);
+    final sure = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        key: const ValueKey('trash-empty-question'),
+        content: Text(switch ((notes, routines)) {
+          (_, 0) => t.trashEmptyNotes(notes),
+          (0, _) => t.trashEmptyRoutines(routines),
+          _ => t.trashEmptyBoth(notes, routines),
+        }),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(t.cancel),
+          ),
+          DestructiveButton(
+            key: const ValueKey('trash-empty-confirm'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(t.deleteForGood),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || sure != true) return;
+    final announcements = AnnouncementsScope.of(context);
+    final navigator = Navigator.of(context, rootNavigator: true);
+    final store = widget.notes.store;
+    try {
+      await emptying.run();
+    } on Object catch (e) {
+      // A Restart ended this run of the app meanwhile: its store is
+      // closed, and nobody is left to tell.
+      if (runOver(store)) return;
+      announceFailureWith(
+        announcements,
+        navigator,
+        t.trashEmptyFailed,
+        title: t.trashEmptyFailedTitle,
+        cause: t.trashEmptyFailedCause,
+        fix: t.trashEmptyFailedFix,
+        details: '$e',
+      );
+    }
+    // The page reads the trash again as the log tells it changed.
+  }
 
   /// The Notes among [_trashed], which the selection takes (#273).
   Iterable<PlacedNote> get _notes => [
@@ -239,7 +360,16 @@ class _TrashScreenState extends State<TrashScreen>
                     _reload();
                   },
                 )
-              : [if (mayTick(notes)) selectButton(context)],
+              : [
+                  if (mayTick(notes)) selectButton(context),
+                  if (_emptying != null)
+                    BarAction(
+                      key: const ValueKey('trash-empty'),
+                      icon: Icons.delete_forever_outlined,
+                      label: t.trashEmptyNow,
+                      onPressed: _mayEmpty ? _emptyNow : null,
+                    ),
+                ],
         ),
         body: ListView(
           padding: clearOfSystemBars(

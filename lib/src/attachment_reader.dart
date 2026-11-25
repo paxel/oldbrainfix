@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'file_platform.dart';
+import 'import_run.dart' show ReaderBusy;
 import 'ocr_platform.dart';
 
 /// Runs the reading of a file's text off the UI isolate; tests run it in
@@ -61,6 +62,32 @@ class AttachmentReader extends ChangeNotifier {
   /// The file being read, by its hash; null while none is.
   String? get current => _current;
 
+  /// Since when it reads without a rest, and how many of how many
+  /// files it took meanwhile; null while it rests (obf-1078).
+  ReaderBusy? get busy => _busy;
+  ReaderBusy? _busy;
+
+  /// Whether Abort on the page Running stopped it (obf-1078): the
+  /// file under way ends and is kept; of the others, only those
+  /// asked for again are read, until [goOn] or the next start.
+  bool get stopped => _stopped;
+  var _stopped = false;
+
+  /// Stops it as [stopped] says.
+  void stop() {
+    if (_stopped || _disposed) return;
+    _stopped = true;
+    notifyListeners();
+  }
+
+  /// Reads the files waiting again, after [stop].
+  void goOn() {
+    if (!_stopped || _disposed) return;
+    _stopped = false;
+    notifyListeners();
+    _kick();
+  }
+
   /// Reads the file [hash] of the Note [noteId] again, after the one
   /// running if any, and keeps its text in place of the one before or of
   /// a removed one; whether it did. A file left to a computer is not read
@@ -102,19 +129,24 @@ class AttachmentReader extends ChangeNotifier {
     _again = false;
     Completer<bool>? waiting;
     var ocrUsed = false;
+    var took = 0;
     try {
       while (!_disposed) {
         final asked = _asked.isEmpty ? null : _asked.removeAt(0);
         waiting = asked?.done;
-        final next = asked == null
-            ? notes
+        // Stopped, only what is asked for again is read (obf-1078).
+        final left = asked == null && _stopped
+            ? const <({String noteId, String hash})>[]
+            : notes
                   .unreadAttachments(computer: false)
                   .where(
                     (f) =>
                         !_skipped.contains(f.hash) &&
                         !_missing.contains(f.hash),
                   )
-                  .firstOrNull
+                  .toList();
+        final next = asked == null
+            ? left.firstOrNull
             : (noteId: asked.noteId, hash: asked.hash);
         if (next == null) break;
         final file = notes
@@ -127,6 +159,16 @@ class AttachmentReader extends ChangeNotifier {
         if (file != null && bytes == null) {
           _missing.add(next.hash);
         } else if (file != null && bytes != null) {
+          _busy = (
+            since: _busy?.since ?? DateTime.now(),
+            done: took,
+            of:
+                took +
+                1 +
+                _asked.length +
+                (_stopped ? 0 : left.length - (asked == null ? 1 : 0)),
+          );
+          took++;
           _current = next.hash;
           notifyListeners();
           final read = await _read(file, bytes);
@@ -159,6 +201,10 @@ class AttachmentReader extends ChangeNotifier {
       _running = false;
       waiting?.complete(false);
       if (_disposed) _dropAsked();
+      if (_busy != null) {
+        _busy = null;
+        if (!_disposed) notifyListeners();
+      }
     }
     if (_again) _kick();
   }

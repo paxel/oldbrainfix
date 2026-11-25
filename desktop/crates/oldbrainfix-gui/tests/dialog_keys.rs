@@ -547,7 +547,7 @@ fn send_goes_by_ctrl_enter_from_the_note_dialog() -> TestResult {
         focused(&harness).map(|(role, _)| role),
         Some(Role::MultilineTextInput)
     );
-    click(&mut harness, "Send…");
+    click(&mut harness, "Send to a person");
     assert!(shows(&harness, t.send_title()));
     click(&mut harness, t.send_anyone());
     ctrl(&mut harness, Key::Enter);

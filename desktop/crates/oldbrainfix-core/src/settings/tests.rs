@@ -352,3 +352,39 @@ fn add_to_note_keeps_the_last_three_notes_added_to_latest_first() -> Result<()> 
     assert!(store.all_entries()?.is_empty(), "settings are never logged");
     Ok(())
 }
+
+#[test]
+fn a_pause_ends_a_recording_only_once_this_device_set_one() -> Result<()> {
+    let store = crate::store::tests::store();
+    let settings = DeviceSettings::new(&store);
+    assert_eq!(settings.recording_pause_seconds()?, None, "Off by default");
+    for seconds in RECORDING_PAUSE_CHOICES {
+        settings.set_recording_pause_seconds(Some(seconds))?;
+        assert_eq!(settings.recording_pause_seconds()?, Some(seconds));
+        // As the phone keeps it, under the same key.
+        assert_eq!(
+            store.local_setting(RECORDING_PAUSE_SECONDS)?,
+            Some(seconds.to_string())
+        );
+    }
+    assert!(settings.set_recording_pause_seconds(Some(7)).is_err());
+    assert_eq!(
+        settings.recording_pause_seconds()?,
+        Some(10),
+        "kept as it was"
+    );
+    settings.set_recording_pause_seconds(None)?;
+    assert_eq!(settings.recording_pause_seconds()?, None);
+    assert_eq!(
+        store.local_setting(RECORDING_PAUSE_SECONDS)?,
+        None,
+        "Off is absent"
+    );
+    // Anything else kept, by another version, is Off.
+    for kept in ["7", "0", "-3", "three", ""] {
+        store.set_local_setting(RECORDING_PAUSE_SECONDS, kept)?;
+        assert_eq!(settings.recording_pause_seconds()?, None, "{kept:?}");
+    }
+    assert!(store.all_entries()?.is_empty(), "settings are never logged");
+    Ok(())
+}

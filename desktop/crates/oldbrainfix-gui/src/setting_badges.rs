@@ -13,6 +13,7 @@ use egui::{
     Align2, Color32, FontId, Frame, Id, Margin, RichText, Sense, Ui, WidgetInfo, WidgetType,
 };
 
+use crate::design;
 use crate::icons;
 use crate::l10n::L10n;
 use crate::theme::{self, Tones};
@@ -56,6 +57,10 @@ pub fn switch_icon(on: bool) -> char {
     }
 }
 
+/// How far the ▾ after a value that picks among values stands from its
+/// words (obf-1116).
+pub const ARROW_GAP: f32 = 4.0;
+
 /// The badge of `setting` with its `value`, `None` for one that only
 /// adds, such as "+": `icon` on its tinted part, in `colour` or the
 /// accent. It answers clicks while `active`.
@@ -85,8 +90,10 @@ pub fn badge(
     } else {
         0.0
     };
+    // The room between the value's words and its ▾ (obf-1116).
+    let gap = if arrow > 0.0 { ARROW_GAP } else { 0.0 };
     let value_width = match (&galley, value) {
-        (Some(g), _) => g.size().x + arrow + 2.0 * pad,
+        (Some(g), _) => g.size().x + gap + arrow + 2.0 * pad,
         (None, Some(BadgeValue::Icon(..))) => value_icon + 2.0 * pad,
         (None, _) => 0.0,
     };
@@ -132,7 +139,7 @@ pub fn badge(
             let end = at.x + galley.size().x;
             painter.galley(at, galley, text);
             if arrow > 0.0 {
-                let at = egui::pos2(end + arrow / 2.0, rect.center().y);
+                let at = egui::pos2(end + gap + arrow / 2.0, rect.center().y);
                 let square = egui::Rect::from_center_size(at, egui::vec2(arrow, arrow));
                 icons::paint(painter, square, icons::ARROW_DROP_DOWN, text);
             }
@@ -175,16 +182,15 @@ pub fn badge_dialog(
         .show(ctx, |ui| {
             ui.set_width(340.0);
             ui.spacing_mut().item_spacing.y = 10.0;
-            let text = ui.visuals().text_color();
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 12.0;
                 let (rect, _) = ui.allocate_exact_size(egui::vec2(24.0, 24.0), Sense::hover());
                 icons::paint(ui.painter(), rect, icon, colour.unwrap_or(tones.accent));
-                ui.label(RichText::new(setting).size(18.0).strong().color(text));
+                crate::design::dialog_title(ui, setting);
             });
             content(ui);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
-                if ui.button(RichText::new(t.close()).color(text)).clicked() {
+                if design::row_button(ui, t.close()).clicked() {
                     closed = true;
                 }
             });

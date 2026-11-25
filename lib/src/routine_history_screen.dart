@@ -5,6 +5,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import '../l10n/app_localizations.dart';
 
 import 'l10n.dart';
+import 'look.dart';
 import 'note_editor_screen.dart';
 import 'page_bar.dart';
 import 'routine_editor_screen.dart';
@@ -91,7 +92,7 @@ class _RoutineHistoryScreenState extends State<RoutineHistoryScreen> {
         _AdherencePanel(history: history),
       ],
       const SizedBox(height: 8),
-      Text(t.historyLog, style: Theme.of(context).textTheme.titleSmall),
+      Text(t.historyLog, style: sectionHeading(context)),
       Text(
         t.snoozesHere,
         style: Theme.of(context).textTheme.bodySmall

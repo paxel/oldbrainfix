@@ -1,16 +1,21 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart'
+    show RenderAbstractViewport, RenderSliverMultiBoxAdaptor;
 import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
 
+import 'agenda_focus.dart';
 import 'agenda_group.dart';
 import 'agenda_rows.dart';
 import 'agenda_widget.dart';
 import 'agenda_reader.dart';
+import 'alarm_platform.dart';
 import 'alarm_sync.dart';
+import 'announcements.dart';
 import 'app_lock.dart';
 import 'appointments.dart';
 import 'area_offer_screen.dart';
@@ -18,9 +23,9 @@ import 'areas_screen.dart';
 import 'ask_screen.dart';
 import 'browser.dart';
 import 'all_routines_screen.dart';
-import 'calendar_platform.dart';
 import 'calendar_screen.dart';
 import 'card_glance.dart';
+import 'browser_add.dart';
 import 'capture_fan.dart';
 import 'capture_requests.dart';
 import 'capture_screen.dart';
@@ -43,6 +48,7 @@ import 'profile_screen.dart';
 import 'routine_editor_screen.dart';
 import 'routine_history_screen.dart';
 import 'run_over.dart';
+import 'running.dart';
 import 'schedule_text.dart';
 import 'session_view.dart';
 import 'setup_screen.dart';
@@ -54,7 +60,7 @@ import 'tick_saves.dart';
 import 'unit_system.dart';
 
 /// What the menu of an Occurrence's row does.
-enum _RowChoice { schedule, history, share }
+enum _RowChoice { schedule, history }
 
 /// The home screen (CONTEXT.md): today's Occurrences, all-day first and
 /// then by time, a visible gap, and tomorrow's in dimmer colours, then
@@ -68,8 +74,8 @@ enum _RowChoice { schedule, history, share }
 /// of all Routines and Reminders and the Calendar page, makes a Routine
 /// without a Note, and has the Profile picture in its corner, the only
 /// way to Settings. Each
-/// row's ⋮, or a long press on it, shares its Routine or Reminder as a
-/// calendar file, and a Routine's leads to its history. A red
+/// row's ⋮, or a long press on it, answers it, opens its schedule, and a
+/// Routine's leads to its history. A red
 /// banner on top shows while alarms lack a permission, and leads to the
 /// setup. Below it the Missed Summary shows until "seen", and under it
 /// the "x Unsorted" banner while Notes are Unsorted, opening them, and
@@ -83,6 +89,11 @@ enum _RowChoice { schedule, history, share }
 /// locked Area set to Masked shows its masked text and can still be
 /// checked off; opening it, or its history, asks to open its Area first.
 /// Back on the Agenda, every Area opened meanwhile is closed again.
+///
+/// The Occurrence whose notification was tapped shows marked where the
+/// Agenda lists it, today, in the Missed Summary or on a coming day,
+/// scrolled into view; listed nowhere, the top says when it was Done or
+/// skipped meanwhile (obf-1039).
 ///
 /// Under today's timed Occurrences the "Eat a frog" section offers
 /// today's pick of two Frogs (ADR 0027), written for the user's own
@@ -145,6 +156,9 @@ class AgendaScreen extends StatefulWidget {
   /// The way to the Areas list beside the Agenda (#258).
   final HomePager pager;
 
+  /// The Occurrence a notification tap asks to show marked (obf-1039).
+  final AgendaFocus? focus;
+
   const AgendaScreen({
     super.key,
     required this.notes,
@@ -155,6 +169,7 @@ class AgendaScreen extends StatefulWidget {
     required this.pager,
     this.requests = const NoCaptureRequests(),
     this.onThemeChanged,
+    this.focus,
   });
 
   /// How many times an Agenda read its rows, for the tests that count
@@ -239,6 +254,23 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
   /// Where "+" sits, so the fan opens from it.
   final _plus = GlobalKey();
 
+  /// The Occurrence a notification tap asked for (obf-1039), until its
+  /// rows are read; then the one marked and where, until the app goes
+  /// out of sight or another tap asks for another.
+  AgendaFocusAsk? _seeking;
+  ({OpenedOccurrence occurrence, AgendaFound where})? _marked;
+
+  /// Finds the marked row, to scroll it into view.
+  final _markKey = GlobalKey();
+
+  /// Finds the Today heading, kept in view over a marked row right under
+  /// it (obf-1137).
+  final _todayKey = GlobalKey();
+
+  /// Inside the list of the rows, to scroll it while the marked row is
+  /// not built yet.
+  BuildContext? _listContext;
+
   @override
   void initState() {
     super.initState();
@@ -248,6 +280,10 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
       // Back from the background, the last capture is old news. A
       // dialog or the notification shade only makes the app inactive.
       onShow: () => _capturedId = null,
+      // Out of sight, a row a notification tap marked is old news too.
+      onHide: () {
+        if (_marked != null && mounted) setState(() => _marked = null);
+      },
       // Maybe a new day, maybe something shared or a capture asked
       // for meanwhile.
       onResume: () {
@@ -264,6 +300,10 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
     widget.notes.store.addListener(_logChanged);
     _requests = widget.requests.arrived.listen((_) => _openWaiting());
     widget.pager.shown.addListener(_pageShown);
+    widget.focus?.addListener(_focusAsked);
+    // Asked before the Agenda came up, as on a start by the tap.
+    _seeking = widget.focus?.take();
+    _seek();
   }
 
   @override
@@ -285,6 +325,7 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
     widget.alarms.removeListener(_alarmsChanged);
     widget.notes.store.removeListener(_logChanged);
     widget.pager.shown.removeListener(_pageShown);
+    widget.focus?.removeListener(_focusAsked);
     _lifecycle.dispose();
     super.dispose();
   }
@@ -500,11 +541,148 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
             (LockScope.of(context)?.hides(captured) ?? false)
         ? null
         : placeNote(widget.places, captured);
+    // A notification tap that waited for the rows.
+    _seek();
   }
 
   /// Whether this Device hides what is checked on the Agenda (#217), as
   /// the rows were read.
   bool get _hidesChecked => _days?.hidesChecked ?? false;
+
+  /// A notification tap asked for an Occurrence (obf-1039).
+  void _focusAsked() {
+    final asked = widget.focus?.take();
+    if (asked == null || !mounted) return;
+    setState(() {
+      _seeking = asked;
+      _seek();
+    });
+  }
+
+  /// Marks the Occurrence asked for where the rows as read list it, once
+  /// they are read; after the frame scrolls it into view, or says at the
+  /// top that it was Done or skipped meanwhile, and tells where.
+  void _seek() {
+    final asked = _seeking;
+    if (asked == null || _days == null) return;
+    _seeking = null;
+    final (:occurrence, :found) = asked;
+    final where = agendaFound(
+      occurrence,
+      today: _today,
+      missed: _missed,
+      tomorrow: _tomorrow,
+      later: [for (final day in _later) day.rows],
+      routine: _routines.byId(occurrence.routineId),
+    );
+    final listed = switch (where) {
+      AgendaFound.today || AgendaFound.missed || AgendaFound.comingDay => true,
+      _ => false,
+    };
+    _marked = listed ? (occurrence: occurrence, where: where) : null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final t = context.t;
+      final line = switch (where) {
+        AgendaFound.done => t.notificationAlreadyDone,
+        AgendaFound.skipped => t.notificationSkipped,
+        _ => null,
+      };
+      if (line != null) AnnouncementsScope.of(context)?.announce(line);
+      if (listed) _reveal();
+      found(where);
+    });
+  }
+
+  /// Whether [row] is the one marked among the days' rows.
+  bool _marks(AgendaRow row) => switch (_marked) {
+    (:final occurrence, :final where) when where != AgendaFound.missed =>
+      row.routine.id == occurrence.routineId &&
+          row.occurrence.key == occurrence.occurrenceKey,
+    _ => false,
+  };
+
+  /// Scrolls the marked row into view, a fifth down from the top or less,
+  /// so that the heading or row above it starts whole under the bar
+  /// ([_whole]). Not built yet, the list goes back to its top and on a
+  /// screen at a time until it is, a frame each.
+  void _reveal([int tries = 0]) {
+    if (!mounted || _marked == null) return;
+    final target = _markKey.currentContext?.findRenderObject();
+    final list = _listContext;
+    final position = list != null && list.mounted
+        ? Scrollable.maybeOf(list)?.position
+        : null;
+    if (position == null) return;
+    if (target != null) {
+      if (RenderAbstractViewport.maybeOf(target) case final viewport?) {
+        position.jumpTo(
+          _whole(
+            viewport,
+            target,
+            position,
+          ).clamp(position.minScrollExtent, position.maxScrollExtent),
+        );
+      }
+      return;
+    }
+    if (tries > 0 && position.pixels >= position.maxScrollExtent) return;
+    if (tries > 50) return;
+    position.jumpTo(
+      tries == 0
+          ? position.minScrollExtent
+          : (position.pixels + position.viewportDimension).clamp(
+              position.minScrollExtent,
+              position.maxScrollExtent,
+            ),
+    );
+    WidgetsBinding.instance
+      ..addPostFrameCallback((_) => _reveal(tries + 1))
+      // Also where the list did not move, so the next look comes.
+      ..ensureVisualUpdate();
+  }
+
+  /// Where the list stops to show [target] (obf-1137): a fifth down from
+  /// the top, moved up to where the last of the list's blocks above that
+  /// starts (a heading, a row, a banner), so none is cut by the bar; the
+  /// list's own top for its first block. A first row of today keeps the
+  /// Today heading over it. Where that leaves [target] cut at the bottom,
+  /// at [target]'s own top.
+  double _whole(
+    RenderAbstractViewport viewport,
+    RenderObject target,
+    ScrollPosition position,
+  ) {
+    final wanted = viewport.getOffsetToReveal(target, 0.2).offset;
+    final own = viewport.getOffsetToReveal(target, 0).offset;
+    var node = target.parent;
+    while (node != null && node is! RenderSliverMultiBoxAdaptor) {
+      node = node.parent;
+    }
+    if (node is! RenderSliverMultiBoxAdaptor) return wanted;
+    double? start;
+    double? first;
+    for (var child = node.firstChild; child != null;) {
+      final top = viewport.getOffsetToReveal(child, 0).offset;
+      if (node.indexOf(child) == 0) first = top;
+      if (top <= wanted && (start == null || top > start)) start = top;
+      child = node.childAfter(child);
+    }
+    if (start == null) {
+      // Nothing above is built: near the top, the list's top.
+      return wanted <= position.minScrollExtent
+          ? position.minScrollExtent
+          : own;
+    }
+    if (_todayKey.currentContext?.findRenderObject()
+        case RenderBox(:final size) && final today) {
+      final heading = viewport.getOffsetToReveal(today, 0).offset;
+      if ((heading + size.height - start).abs() < 1) start = heading;
+    }
+    if (first != null && start <= first) start = position.minScrollExtent;
+    final lowest = viewport.getOffsetToReveal(target, 1).offset;
+    return start < lowest ? own : start;
+  }
 
   /// Shows the rows of [days].
   void _show(AgendaDays days) {
@@ -584,12 +762,27 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
   }
 
   /// Fans out the ways to capture from "+", the ones this Device has,
-  /// and opens the capture screen of the way picked.
+  /// and opens the capture screen of the way picked; Editor opens an
+  /// empty Note in the Note editor (obf-1141).
   Future<void> _capture() async {
-    final fan = captureFanFor(context, _plus);
+    final fan = captureFanFor(context, _plus, editor: true);
     if (fan == null) return;
     final way = await Navigator.of(context).push(fan);
     if (way == null || !mounted) return;
+    if (way == CaptureWay.editor) {
+      final made = await editNew(
+        context,
+        widget.notes,
+        widget.places,
+        null,
+        onChanged: _reloadIfMounted,
+      );
+      if (made == null) return;
+      // Shown on top, as a Note captured here is.
+      _capturedId = made;
+      _reloadIfMounted();
+      return;
+    }
     await captureNote(
       context,
       widget.notes,
@@ -887,22 +1080,20 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
 
   /// The ⋮ of an Occurrence's row, or a long press on it, opens a menu
   /// where the finger is: Snooze and Not today while it can be answered
-  /// (#269), Edit schedule, which opens its Routine (#270), a Routine's
-  /// history, and Share, which hands the Routine as its whole series, or
-  /// the Reminder, to another app as a calendar file. Edit schedule,
-  /// History and Share open a locked Area first, as a Masked row tells
+  /// (#269), Edit schedule, which opens its Routine (#270), and a
+  /// Routine's history; a calendar file is shared from the Routine's
+  /// editor (obf-1014). Edit schedule and History open a locked Area
+  /// first, as a Masked row tells
   /// nothing until then; Snooze and Not today answer it as its box does.
   void Function(Offset at) _rowMenu(AgendaRow row) {
     final history = !row.routine.isReminder;
-    final share = CalendarScope.of(context).available;
-    return (at) => _showRowMenu(row, at, history: history, share: share);
+    return (at) => _showRowMenu(row, at, history: history);
   }
 
   Future<void> _showRowMenu(
     AgendaRow row,
     Offset at, {
     required bool history,
-    required bool share,
   }) async {
     final t = context.t;
     final overlay =
@@ -940,7 +1131,6 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
       if (answers.isNotEmpty) const PopupMenuDivider(),
       item(_RowChoice.schedule, Icons.edit_calendar_outlined, t.editSchedule),
       if (history) item(_RowChoice.history, Icons.history, t.historyTitle),
-      if (share) item(_RowChoice.share, Icons.share_outlined, t.share),
     ];
     if (items.isEmpty) return;
     final choice = await showMenu<Object>(
@@ -974,8 +1164,6 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
         return;
       case _RowChoice.history:
         await openHistory(context, widget.notes, row.routine);
-      case _RowChoice.share:
-        await shareRoutinesFile(context, _routines, [row.routine]);
     }
     if (!mounted) return;
     _closeAreas();
@@ -1043,6 +1231,7 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
       onMenu: _rowMenu(row),
       menuKey: ValueKey('row-menu-${row.routine.id}'),
       entries: [..._sessionPicks(t, placed), ..._routineLines(placed)],
+      marked: _marks(row) ? _markKey : null,
     );
   }
 
@@ -1486,166 +1675,195 @@ class _AgendaScreenState extends State<AgendaScreen> with TicksAtOnce {
                 icon: OwnProfileAvatar(model: widget.profile),
               ),
             ),
+            // What runs in the background, always in ⋮ (obf-1078).
+            if (RunningScope.of(context) != null)
+              BarAction(
+                key: const ValueKey('running'),
+                label: t.jobsTitle,
+                onPressed: () => openRunning(context),
+                icon: Icons.timelapse,
+                inMenu: true,
+              ),
           ],
         ),
-        body: ListView(
-          padding: clearOfFloatingButtons(
-            context,
-            const EdgeInsets.only(top: 8),
-          ),
-          children: [
-            // First in the Agenda's order (obf-1044).
-            if (_quietUntil != null) _QuietDayLine(onEnd: _endQuietDay),
-            if (widget.alarms.missing.isNotEmpty) _AlarmsBanner(onTap: _setUp),
-            if (!_missed.isEmpty)
-              MissedSummaryCard(
-                summary: _missed,
-                masks: _locks.masks,
-                onCheck: _checkMissed,
-                ticked: (routine, occurrence) =>
-                    _tap(
-                      _boxKey(routine: routine.id, occurrence: occurrence),
-                    ) ??
-                    false,
-                onSeen: _seen,
-              ),
-            if (_unsorted > 0)
-              Spotlight(
-                id: 'agenda-unsorted',
-                child: _CountBanner(
-                  bannerKey: const ValueKey('unsortedBanner'),
-                  icon: Icons.move_to_inbox,
-                  text: t.unsortedBanner(_unsorted),
-                  onTap: _openUnsorted,
+        // Where the list is, for a notification tap to scroll it.
+        body: NotificationListener<ScrollMetricsNotification>(
+          onNotification: (notification) {
+            if (notification.depth == 0) _listContext = notification.context;
+            return false;
+          },
+          child: ListView(
+            padding: clearOfFloatingButtons(
+              context,
+              const EdgeInsets.only(top: 8),
+            ),
+            children: [
+              // First in the Agenda's order (obf-1044).
+              if (_quietUntil != null) _QuietDayLine(onEnd: _endQuietDay),
+              if (widget.alarms.missing.isNotEmpty)
+                _AlarmsBanner(onTap: _setUp),
+              if (!_missed.isEmpty)
+                MissedSummaryCard(
+                  summary: _missed,
+                  masks: _locks.masks,
+                  onCheck: _checkMissed,
+                  ticked: (routine, occurrence) =>
+                      _tap(
+                        _boxKey(routine: routine.id, occurrence: occurrence),
+                      ) ??
+                      false,
+                  onSeen: _seen,
+                  marked: switch (_marked) {
+                    (:final occurrence, where: AgendaFound.missed) =>
+                      occurrence,
+                    _ => null,
+                  },
+                  markKey: _markKey,
                 ),
-              ),
-            if (_waiting > 0)
-              _CountBanner(
-                bannerKey: const ValueKey('sentItemsWaiting'),
-                icon: Icons.mark_email_unread_outlined,
-                text: t.sentItemsWaiting(_waiting),
-                onTap: _openHeld,
-              ),
-            if (_offers > 0)
-              _CountBanner(
-                bannerKey: const ValueKey('areaOffersWaiting'),
-                icon: Icons.group_add_outlined,
-                text: t.areaOffersWaiting(_offers),
-                onTap: _openOffers,
-              ),
-            if (captured != null) ...[
-              _Heading(t.justCaptured),
-              NoteCard(
-                note: captured.note,
-                when: DateFormat.yMd(locale).add_Hm(),
-                area: captured.area,
-                topic: captured.topic,
-                showPlace: true,
-                onFile: () => _file(captured.note),
-                onMerge: () => _merge(captured.note),
-                // Only a Manager spawns in a Shared Area (ADR 0013).
-                onSchedule: captured.schedules
-                    ? (spawn) => _schedule(captured.note, spawn)
-                    : null,
-                actions: noteActions(
-                  context,
-                  widget.notes,
-                  captured,
-                  _reload,
+              if (_unsorted > 0)
+                Spotlight(
+                  id: 'agenda-unsorted',
+                  child: _CountBanner(
+                    bannerKey: const ValueKey('unsortedBanner'),
+                    icon: Icons.move_to_inbox,
+                    text: t.unsortedBanner(_unsorted),
+                    onTap: _openUnsorted,
+                  ),
+                ),
+              if (_waiting > 0)
+                _CountBanner(
+                  bannerKey: const ValueKey('sentItemsWaiting'),
+                  icon: Icons.mark_email_unread_outlined,
+                  text: t.sentItemsWaiting(_waiting),
+                  onTap: _openHeld,
+                ),
+              if (_offers > 0)
+                _CountBanner(
+                  bannerKey: const ValueKey('areaOffersWaiting'),
+                  icon: Icons.group_add_outlined,
+                  text: t.areaOffersWaiting(_offers),
+                  onTap: _openOffers,
+                ),
+              if (captured != null) ...[
+                _Heading(t.justCaptured),
+                NoteCard(
+                  note: captured.note,
+                  when: DateFormat.yMd(locale).add_Hm(),
+                  area: captured.area,
+                  topic: captured.topic,
+                  showPlace: true,
+                  onFile: () => _file(captured.note),
+                  onMerge: () => _merge(captured.note),
+                  // Only a Manager spawns in a Shared Area (ADR 0013).
+                  onSchedule: captured.schedules
+                      ? (spawn) => _schedule(captured.note, spawn)
+                      : null,
+                  actions: noteActions(
+                    context,
+                    widget.notes,
+                    captured,
+                    _reload,
+                    onEdit: () => _open(captured.note),
+                  ),
+                  full: _compactId != captured.note.id,
+                  sections: () => widget.notes.sections(captured.note.id),
+                  checklist: (
+                    read: () =>
+                        Checklists(widget.notes.store)
+                            .shownNow(captured.note.id, deviceWallClock),
+                    lists: Checklists(widget.notes.store),
+                  ),
+                  shopping: (
+                    read: () =>
+                        ShoppingLists(widget.notes.store)
+                            .byNote(captured.note.id, deviceWallClock),
+                    lists: ShoppingLists(widget.notes.store),
+                  ),
+                  tally: widget.notes,
+                  session: widget.notes,
+                  kind: () =>
+                      NoteKinds(widget.notes.store).of(captured.note.id),
+                  glance: () => glances.of(captured.note.id),
+                  boxes: boxTicks(widget.notes, captured, _reload),
+                  onTable: tableEdit(widget.notes, captured, _reload),
+                  onTap: () => setState(
+                    () => _compactId = _compactId == captured.note.id
+                        ? null
+                        : captured.note.id,
+                  ),
                   onEdit: () => _open(captured.note),
                 ),
-                full: _compactId != captured.note.id,
-                sections: () => widget.notes.sections(captured.note.id),
-                checklist: (
-                  read: () =>
-                      Checklists(widget.notes.store)
-                          .shownNow(captured.note.id, deviceWallClock),
-                  lists: Checklists(widget.notes.store),
-                ),
-                shopping: (
-                  read: () =>
-                      ShoppingLists(widget.notes.store)
-                          .byNote(captured.note.id, deviceWallClock),
-                  lists: ShoppingLists(widget.notes.store),
-                ),
-                tally: widget.notes,
-                session: widget.notes,
-                kind: () => NoteKinds(widget.notes.store).of(captured.note.id),
-                glance: () => glances.of(captured.note.id),
-                boxes: boxTicks(widget.notes, captured, _reload),
-                onTable: tableEdit(widget.notes, captured, _reload),
-                onTap: () => setState(
-                  () => _compactId = _compactId == captured.note.id
-                      ? null
-                      : captured.note.id,
-                ),
-                onEdit: () => _open(captured.note),
-              ),
-            ],
-            // Nothing of the days before their first read is in (#207):
-            // no "Nothing planned" that is not so.
-            if (_days != null) ...[
-              Spotlight(id: 'agenda-today', child: _Heading(t.agendaToday)),
-              if (_today.isEmpty)
-                BrowserEmpty(text: t.nothingToday)
-              else
-                ...rows(_today),
-              // Under what is due, never above it (#101).
-              if (_frogsToday case final frogs?
-                  when _days?.showsFrogs(frogs) ?? frogs.visible) ...[
-                _FrogsHeading(onTap: _openFrogs),
-                for (final (:placed, :masked) in _frogRows)
-                  FrogRow(
-                    key: ValueKey('frog-${placed.frog.id}'),
-                    frog: placed.frog,
-                    // A Masked row tells nothing of its Area either.
-                    area: masked ? null : placed.area,
-                    title: masked ? t.maskedFrog : noteText(t, placed.note),
-                    done: _tap(_boxKey(frog: placed.frog.id)),
-                    onToggle: widget.notes.store.mayCheckOff(placed.frog.id)
-                        ? () => _toggleFrog(placed.frog)
-                        : null,
-                    onTap: () => _openFrogNote(placed.note),
-                    onMenu: (at) => frogMenu(context, _frogs, placed.frog, at),
-                    onAnother: frogs.canSwap && !frogs.eaten
-                        ? () => _anotherFrog(placed.frog)
-                        : null,
-                  ),
               ],
-              // The visible gap between today and tomorrow.
-              const SizedBox(height: 32),
-              Opacity(
-                opacity: AgendaScreen.tomorrowOpacity,
-                child: Column(
-                  children: [
-                    _Heading(t.agendaTomorrow),
-                    // Only today's empty day tells how to capture.
-                    if (_tomorrow.isEmpty)
-                      _NothingPlanned(t.nothingPlanned)
-                    else
-                      ...rows(_tomorrow),
-                  ],
+              // Nothing of the days before their first read is in (#207):
+              // no "Nothing planned" that is not so.
+              if (_days != null) ...[
+                Spotlight(
+                  id: 'agenda-today',
+                  child: _Heading(t.agendaToday, key: _todayKey),
                 ),
-              ),
-              // The days after, each under its weekday and date; one with
-              // nothing due still shows.
-              for (final (:day, rows: later) in _later) ...[
+                if (_today.isEmpty)
+                  BrowserEmpty(text: t.nothingToday)
+                else
+                  ...rows(_today),
+                // Under what is due, never above it (#101).
+                if (_frogsToday case final frogs?
+                    when _days?.showsFrogs(frogs) ?? frogs.visible) ...[
+                  _FrogsHeading(onTap: _openFrogs),
+                  for (final (:placed, :masked) in _frogRows)
+                    FrogRow(
+                      key: ValueKey('frog-${placed.frog.id}'),
+                      frog: placed.frog,
+                      // A Masked row tells nothing of its Area either.
+                      area: masked ? null : placed.area,
+                      title: masked ? t.maskedFrog : noteText(t, placed.note),
+                      done: _tap(_boxKey(frog: placed.frog.id)),
+                      onToggle: widget.notes.store.mayCheckOff(placed.frog.id)
+                          ? () => _toggleFrog(placed.frog)
+                          : null,
+                      onTap: () => _openFrogNote(placed.note),
+                      onMenu: (at) =>
+                          frogMenu(context, _frogs, placed.frog, at),
+                      onAnother: frogs.canSwap && !frogs.eaten
+                          ? () => _anotherFrog(placed.frog)
+                          : null,
+                    ),
+                ],
+                // The visible gap between today and tomorrow, as between
+                // the days after (obf-1137).
                 const SizedBox(height: 16),
                 Opacity(
                   opacity: AgendaScreen.tomorrowOpacity,
                   child: Column(
                     children: [
-                      _Heading(t.agendaDay(day.wall)),
-                      if (later.isEmpty)
+                      _Heading(t.agendaTomorrow),
+                      // Only today's empty day tells how to capture.
+                      if (_tomorrow.isEmpty)
                         _NothingPlanned(t.nothingPlanned)
                       else
-                        ...rows(later),
+                        ...rows(_tomorrow),
                     ],
                   ),
                 ),
+                // The days after, each under its weekday and date; one with
+                // nothing due still shows.
+                for (final (:day, rows: later) in _later) ...[
+                  const SizedBox(height: 16),
+                  Opacity(
+                    opacity: AgendaScreen.tomorrowOpacity,
+                    child: Column(
+                      children: [
+                        _Heading(t.agendaDay(day.wall)),
+                        if (later.isEmpty)
+                          _NothingPlanned(t.nothingPlanned)
+                        else
+                          ...rows(later),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ],
-          ],
+          ),
         ),
         floatingActionButton: Spotlight(
           id: 'agenda-plus',
@@ -1799,7 +2017,7 @@ class _CountBanner extends StatelessWidget {
 class _Heading extends StatelessWidget {
   final String text;
 
-  const _Heading(this.text);
+  const _Heading(this.text, {super.key});
 
   @override
   Widget build(BuildContext context) => Padding(

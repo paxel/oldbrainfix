@@ -52,9 +52,9 @@ class CalendarEvent {
   }
 }
 
-/// The events of [routine], whose Note reads [text]: one per time of day,
-/// each repeating on the Routine's days, or one all-day event; none when
-/// the schedule has no Occurrence at all.
+/// The events of [routine], whose Note reads [text] ([Note.calendarText]):
+/// one per time of day, each repeating on the Routine's days, or one
+/// all-day event; none when the schedule has no Occurrence at all.
 List<CalendarEvent> routineEvents(Routine routine, String text) {
   final schedule = routine.schedule;
   final first = schedule.next(schedule.start, 1).firstOrNull;

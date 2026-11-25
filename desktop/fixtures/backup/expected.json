@@ -80,8 +80,108 @@
     [
       "profile:signed",
       "{\"sig\":\"D3eb7Ocr6qL26/HQWEd+7+hn32qtMLmw/HpPR3tgRyv/12DFFLUWZ7LlkwGBOsaQ8oGNiEmD4J5SHWRQmshYAw==\",\"signer\":\"ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=\"}"
+    ],
+    [
+      "quietHours",
+      "21:30-07:00"
+    ],
+    [
+      "recordingPauseSeconds",
+      "5"
+    ],
+    [
+      "renagMinutes",
+      "15"
+    ],
+    [
+      "speechModelOffer",
+      "small:file"
+    ],
+    [
+      "theme",
+      "dark"
+    ],
+    [
+      "tipsOff",
+      "true"
+    ],
+    [
+      "twoRowEditorOff",
+      "true"
     ]
   ],
+  "carried": {
+    "alertsOff": "true",
+    "quietHours": "21:30-07:00",
+    "recordingPauseSeconds": "5",
+    "renagMinutes": "15",
+    "speechModel": "small:file",
+    "theme": "dark",
+    "tipsOff": "true",
+    "twoRowEditorOff": "true"
+  },
+  "taken": {
+    "phone": [
+      [
+        "quietHours",
+        "21:30-07:00"
+      ],
+      [
+        "recordingPauseSeconds",
+        "5"
+      ],
+      [
+        "renagMinutes",
+        "15"
+      ],
+      [
+        "speechModelOffer",
+        "small:file"
+      ],
+      [
+        "theme",
+        "dark"
+      ],
+      [
+        "tipsOff",
+        "true"
+      ],
+      [
+        "twoRowEditorOff",
+        "true"
+      ]
+    ],
+    "desktop": [
+      [
+        "alertsOff",
+        "true"
+      ],
+      [
+        "quietHours",
+        "21:30-07:00"
+      ],
+      [
+        "recordingPauseSeconds",
+        "5"
+      ],
+      [
+        "renagMinutes",
+        "15"
+      ],
+      [
+        "speechModelOffer",
+        "small:file"
+      ],
+      [
+        "theme",
+        "dark"
+      ],
+      [
+        "tipsOff",
+        "true"
+      ]
+    ]
+  },
   "read": {
     "now": "2026-01-03T10:00:31.000Z",
     "areas": [
@@ -256,6 +356,7 @@
       "dentist": [],
       "x-ray": [],
       "müller": [],
+      "MULLER": [],
       "called": [],
       "loop": [],
       " e ": [
@@ -272,6 +373,15 @@
       "area:00000000000000000000000000000001": [
         "note:00000000000000000000000000000002"
       ]
+    },
+    "findings": {
+      "MULLER": {},
+      "dentist": {},
+      "receipt": {},
+      "called": {},
+      "loop": {},
+      "lease": {},
+      "rent due": {}
     },
     "conflicts": []
   }

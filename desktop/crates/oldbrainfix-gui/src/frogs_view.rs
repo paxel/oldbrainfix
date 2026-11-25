@@ -12,7 +12,7 @@ use crate::app::{agenda_card, area_colour, check, list_scroll, row_title};
 use crate::icons;
 use crate::l10n::L10n;
 use crate::schedule_text::day_text;
-use crate::theme::Tones;
+use crate::theme::{self, Tones};
 
 /// The frog that marks Frogs: there is none among the Material icons,
 /// and egui's emoji font has it.
@@ -111,14 +111,16 @@ pub fn heading(ui: &mut Ui, t: &L10n, actions: &mut Vec<FrogAction>) {
     let line = ui.horizontal(|ui| {
         ui.style_mut().interaction.selectable_labels = false;
         frog_mark(ui, 18.0, text);
-        ui.label(RichText::new(label).strong().size(16.0).color(text));
+        ui.label(RichText::new(label).strong().size(16.0));
         icons::show(ui, icons::NEXT, 20.0, text);
     });
     let open = ui
         .interact(line.response.rect, Id::new("frogs heading"), Sense::click())
         .on_hover_cursor(egui::CursorIcon::PointingHand);
     open.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, label));
+    // A row, no button to mark (obf-1143).
     if open.clicked() {
+        crate::design::no_tap_mark(ui.ctx());
         actions.push(FrogAction::OpenView);
     }
 }
@@ -163,7 +165,9 @@ pub fn frog_row(
             let width = (ui.available_width() - 32.0).max(40.0);
             let body = ui.vertical(|ui| {
                 ui.set_max_width(width);
-                let mut line = RichText::new(&title).size(15.0).color(text);
+                let mut line = RichText::new(&title)
+                    .size(theme::content(ui, 16.0))
+                    .color(text);
                 if done {
                     line = line.strikethrough();
                 }
@@ -180,12 +184,17 @@ pub fn frog_row(
                 )
                 .on_hover_cursor(egui::CursorIcon::PointingHand);
             open.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, &title));
+            // A row, no button to mark (obf-1143).
             if open.clicked() {
+                crate::design::no_tap_mark(ui.ctx());
                 actions.push(FrogAction::OpenNote(shown.note.id.clone()));
             }
             if shown.manages {
                 open.context_menu(|ui| {
-                    if ui.button(RichText::new(t.delete()).color(text)).clicked() {
+                    if ui
+                        .button(RichText::new(t.move_to_trash()).color(text))
+                        .clicked()
+                    {
                         actions.push(FrogAction::Delete(frog.id.clone()));
                         // Also a pick by keyboard or screen reader.
                         ui.close();

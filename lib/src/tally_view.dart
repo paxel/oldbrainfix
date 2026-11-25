@@ -11,7 +11,6 @@ import 'announcements.dart';
 import 'browser.dart';
 import 'l10n.dart';
 import 'look.dart';
-import 'note_editor_screen.dart';
 import 'profile.dart';
 import 'routine_editor_screen.dart';
 import 'setting_badges.dart';
@@ -314,14 +313,17 @@ class _TallySetupState extends State<TallySetup> with ReloadsOnLogChange {
     final t = context.t;
     final decimal = decimalSign(context);
     final changes = widget.notes.store.mayChange(widget.noteId);
-    return EditorPanel(
+    // In the card of the Note, under its name (obf-1071).
+    return Padding(
       key: const ValueKey('tally-fields'),
-      heading: t.tallyFields,
+      padding: const EdgeInsets.only(bottom: 16),
       child: Material(
         type: MaterialType.transparency,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text(t.tallyFields, style: sectionHeading(context)),
+            const SizedBox(height: 8),
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Wrap(
@@ -348,7 +350,7 @@ class _TallySetupState extends State<TallySetup> with ReloadsOnLogChange {
             ),
             for (final field in tally.fields) _fieldRow(tally, field, decimal),
             if (widget.notes.store.mayChange(widget.noteId))
-              FilledButton.tonalIcon(
+              OutlinedButton.icon(
                 key: const ValueKey('tally-add-field'),
                 onPressed: () => _openField(null),
                 icon: const Icon(Icons.playlist_add),
@@ -640,7 +642,7 @@ class _CardTallyState extends State<CardTally> {
   /// A heading of a part of the card, a setting's or a chart's.
   Widget _heading(String text) => Padding(
     padding: const EdgeInsets.only(top: 16, bottom: 4),
-    child: Text(text, style: Theme.of(context).textTheme.titleSmall),
+    child: Text(text, style: sectionHeading(context)),
   );
 
   @override
@@ -667,7 +669,7 @@ class _CardTallyState extends State<CardTally> {
               padding: const EdgeInsets.only(top: 8),
               child: Align(
                 alignment: Alignment.centerLeft,
-                child: FilledButton.tonalIcon(
+                child: OutlinedButton.icon(
                   key: const ValueKey('tally-add-entry'),
                   onPressed: _addEntry,
                   icon: const Icon(Icons.add),

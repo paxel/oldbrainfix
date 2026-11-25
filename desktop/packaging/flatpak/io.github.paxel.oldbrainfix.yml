@@ -38,7 +38,11 @@ finish-args:
   - --own-name=org.kde.*
   # No filesystem access: folders and files are chosen through the file
   # chooser portal, which keeps them reachable through the document
-  # portal across restarts.
+  # portal across restarts. A Markdown file opened with it ("Open with",
+  # obf-1056) comes in through the document portal too, as Flatpak hands
+  # the entry's %F over; only that file is shared, so the viewer's line
+  # "Open the folder to follow its links" asks for the folder they are
+  # in through the file chooser portal (Q13), and reads only inside it.
 modules:
   - name: oldbrainfix
     buildsystem: simple

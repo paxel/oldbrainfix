@@ -88,6 +88,16 @@ class Voice(private val context: Context) {
         return null
     }
 
+    /**
+     * How loud the microphone was at its loudest since the last ask, 0
+     * silent to 1 the loudest; null while no recording runs or the
+     * recorder cannot tell (obf-1053).
+     */
+    fun level(): Double? {
+        val recorder = recorder ?: return null
+        return runCatching { Voice.level(recorder.maxAmplitude) }.getOrNull()
+    }
+
     /** Ends a recording without keeping it: the app is gone anyway. */
     private fun discard() {
         stop()?.file?.delete()
@@ -160,6 +170,15 @@ class Voice(private val context: Context) {
         const val SAMPLE_RATE = 16_000
         const val CHANNELS = 1
         const val BIT_RATE = 64_000
+
+        /** The loudest amplitude MediaRecorder reports. */
+        const val LOUDEST = 32_767
+
+        /**
+         * MediaRecorder's [amplitude] as a level, 0 silent to 1 the
+         * loudest, as the iPhone's recorder reports it.
+         */
+        fun level(amplitude: Int): Double = (amplitude.toDouble() / LOUDEST).coerceIn(0.0, 1.0)
 
         /**
          * The file extension of the recording [bytes]: `wav` for a WAV

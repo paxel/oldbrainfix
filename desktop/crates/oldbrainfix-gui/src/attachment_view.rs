@@ -176,9 +176,13 @@ pub fn row(ui: &mut Ui, t: &L10n, file: &Attachment, large: bool) -> egui::Rect 
         ui.vertical(|ui| {
             ui.spacing_mut().item_spacing.y = 2.0;
             let size = if large { 18.0 } else { 15.0 };
-            ui.add(
-                egui::Label::new(RichText::new(title(t, file)).size(size).color(text)).truncate(),
-            );
+            // Its name with the places a search found in it (obf-1047).
+            let (name, current) =
+                crate::find_marks::said_text(ui, title(t, file), (Some(size), text));
+            let shown = ui.add(egui::Label::new(name).truncate());
+            if current && let Some(marks) = crate::find_marks::marks(ui.ctx()) {
+                crate::find_marks::reveal(ui, &marks, shown.rect);
+            }
             ui.label(RichText::new(facts(t, file)).size(12.0).color(weak));
         });
     })
@@ -219,7 +223,7 @@ pub fn card_text(ui: &mut Ui, t: &L10n, text: Option<&String>, compact: bool) {
     ui.vertical(|ui| {
         ui.spacing_mut().item_spacing.y = 2.0;
         ui.label(RichText::new(t.attachment_text_label()).small().color(weak));
-        ui.label(RichText::new(text).color(weak));
+        crate::find_marks::said_label(ui, text, weak, false);
     });
 }
 
@@ -277,9 +281,7 @@ pub fn editor_files(
         ui.vertical(|ui| {
             ui.spacing_mut().item_spacing.y = 2.0;
             ui.label(RichText::new(t.attachment_text_label()).small().color(weak));
-            crate::read_text::shown(ui, |ui| {
-                crate::read_text::label(ui, egui::Label::new(RichText::new(said).color(weak)))
-            });
+            crate::find_marks::said_label(ui, said, weak, true);
         });
     };
     for file in files {

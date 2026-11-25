@@ -18,6 +18,7 @@ pub mod app_link;
 pub mod ask;
 pub mod backlinks;
 pub mod backup;
+pub mod backup_settings;
 pub mod blobs;
 pub mod blocks;
 pub mod box_keys;
@@ -31,6 +32,7 @@ pub mod discovery;
 pub mod entry;
 pub mod error;
 pub mod file_text;
+pub mod findings;
 pub mod folder;
 pub mod frogs;
 pub mod help_notes;
@@ -50,6 +52,7 @@ pub mod note_history;
 pub mod note_kinds;
 pub mod notes;
 pub mod nudges;
+pub mod obsidian;
 pub mod offers;
 pub mod overrides;
 pub mod packs;
@@ -83,6 +86,7 @@ pub mod text_boxes;
 pub mod text_format;
 pub mod text_tags;
 pub mod transcript_prompts;
+pub mod trash;
 pub mod vault;
 
 /// The symbol of `alphabet` for the low five bits of `value`, as the
@@ -113,7 +117,10 @@ pub use help_notes::{HelpNotes, HelpTexts, WhatsNew, compare_versions, parse_wha
 pub use history::{
     Adherence, DayTally, DoneTiming, HistoryEntry, OccurrenceStatus, RoutineHistory, ScheduleSpan,
 };
-pub use imports::{ImportFile, ImportSummary, ImportedLine, ImportedNote, Imports};
+pub use imports::{
+    EarlierImport, ImportFile, ImportSourceKind, ImportSummary, ImportedFrom, ImportedLine,
+    ImportedNote, Imports,
+};
 pub use named_places::{Coordinates, NamedPlace, NamedPlaces};
 pub use note_history::{NoteChange, NoteChangeKind, NoteHistory};
 pub use notes::{
@@ -134,10 +141,10 @@ pub use pending::{
 pub use people::{NoteAccess, PersonFilter, PersonTaken};
 pub use person_settings::PersonSettings;
 pub use places::{
-    AREA_ICONS, Area, MoveProgress, NotesGo, Places, STARTER_SET, StarterPlace, Topic,
+    AREA_ICONS, Area, MoveProgress, NotesGo, Places, STARTER_SET, StarterPlace, Stopping, Topic,
 };
 pub use profile::{OwnProfile, Profile, ProfileChoice, SentProfile};
-pub use routines::{Agenda, AgendaRow, NewerRoutine, Routine, Routines};
+pub use routines::{Agenda, AgendaRow, HeadsUpUnit, NewerRoutine, Routine, Routines};
 pub use schedule::{
     ClockTime, Day, Occurrence, Recurrence, RepeatEnd, RepeatKind, RepeatUnit, Schedule,
     SimpleRepeat, WallClock,
@@ -146,7 +153,9 @@ pub use search::Search;
 pub use sessions::{
     Session, SessionMarks, SessionOccurrence, SessionPick, SessionRule, SessionSetup, Sessions,
 };
-pub use settings::{DeviceSettings, QuickNoteControl, TextSize, ThemeChoice};
+pub use settings::{
+    DeviceSettings, QuickNoteControl, SpeechModelChoice, SpeechModelSource, TextSize, ThemeChoice,
+};
 pub use shared::{AreaAccess, AreaRole, Grant, Invite, Person};
 pub use shopping_lists::{
     BackIn, ListOnAgenda, Reappear, ReappearUnit, ShoppingAgenda, ShoppingAgendaRow, ShoppingLine,
@@ -162,6 +171,7 @@ pub use text_boxes::{BoxState, BoxTick, FoundBox, ShownBox, ShownText};
 pub use text_format::StoredText;
 pub use text_tags::FoundTag;
 pub use transcript_prompts::TranscriptPrompts;
+pub use trash::{Trash, TrashEmptied};
 
 /// The app's name, as the window title shows it.
 pub const APP_NAME: &str = "Old Brain Fix";

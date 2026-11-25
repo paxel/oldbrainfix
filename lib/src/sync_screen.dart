@@ -238,6 +238,9 @@ class _SyncScreenState extends State<SyncScreen> {
       return;
     }
     final pairing = PairingScope.of(context);
+    // Syncing by hand ends a pause Abort began on the page Running
+    // (obf-1078), as on the desktop.
+    AutoSyncScope.of(context)?.goOn();
     setState(() {
       _codeInvalid = false;
       _busy = true;
@@ -337,7 +340,7 @@ class _SyncScreenState extends State<SyncScreen> {
     final folder = widget.store.syncFolder;
     return [
       const SizedBox(height: 16),
-      Text(t.folderTitle, style: Theme.of(context).textTheme.titleSmall),
+      Text(t.folderTitle, style: sectionHeading(context)),
       Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Text(t.folderIntro),
@@ -345,7 +348,7 @@ class _SyncScreenState extends State<SyncScreen> {
       if (folder == null)
         Align(
           alignment: Alignment.centerLeft,
-          child: FilledButton.tonalIcon(
+          child: OutlinedButton.icon(
             key: const ValueKey('pick-folder'),
             onPressed: _pickFolder,
             icon: const Icon(Icons.folder_open),
@@ -445,7 +448,7 @@ class _SyncScreenState extends State<SyncScreen> {
     final chosen = _paired.any((d) => d.id == _bundleFor) ? _bundleFor : null;
     return [
       const SizedBox(height: 16),
-      Text(t.bundleTitle, style: Theme.of(context).textTheme.titleSmall),
+      Text(t.bundleTitle, style: sectionHeading(context)),
       Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Text(t.bundleIntro),
@@ -478,13 +481,13 @@ class _SyncScreenState extends State<SyncScreen> {
         spacing: 8,
         runSpacing: 8,
         children: [
-          FilledButton.tonalIcon(
+          OutlinedButton.icon(
             key: const ValueKey('send-bundle'),
             onPressed: _bundleBusy ? null : _sendBundle,
             icon: const Icon(Icons.send_outlined),
             label: Text(t.bundleSend),
           ),
-          FilledButton.tonalIcon(
+          OutlinedButton.icon(
             key: const ValueKey('import-bundle'),
             onPressed: _bundleBusy ? null : _importBundle,
             icon: const Icon(Icons.file_open_outlined),
@@ -554,7 +557,7 @@ class _SyncScreenState extends State<SyncScreen> {
                       Text(t.syncSyncing),
                     ],
                   )
-                : FilledButton.tonal(
+                : OutlinedButton(
                     key: const ValueKey('join'),
                     onPressed: _sync,
                     child: Text(t.syncJoin),
@@ -565,7 +568,7 @@ class _SyncScreenState extends State<SyncScreen> {
           const SizedBox(height: 8),
           Align(
             alignment: Alignment.centerLeft,
-            child: FilledButton.tonalIcon(
+            child: OutlinedButton.icon(
               key: const ValueKey('show-code'),
               onPressed: _busy ? null : _showCode,
               icon: const Icon(Icons.qr_code_2),
@@ -582,16 +585,22 @@ class _SyncScreenState extends State<SyncScreen> {
   /// out.
   List<Widget> _rest(AppLocalizations t, DateFormat when) => [
     const SizedBox(height: 16),
+    // In the accent with a chevron: it opens the Conflicts (obf-1108).
     ListTile(
       key: const ValueKey('conflicts'),
       contentPadding: EdgeInsets.zero,
+      iconColor: Theme.of(context).colorScheme.primary,
       leading: const Icon(Icons.call_split),
-      title: Text(t.conflictsTitle),
+      title: Text(
+        t.conflictsTitle,
+        style: TextStyle(color: Theme.of(context).colorScheme.primary),
+      ),
+      trailing: const Icon(Icons.chevron_right),
       subtitle: Text(t.conflictsEntry(_conflicts)),
       onTap: () => _openConflicts(Navigator.of(context)),
     ),
     const SizedBox(height: 8),
-    Text(t.pairedDevicesTitle, style: Theme.of(context).textTheme.titleSmall),
+    Text(t.pairedDevicesTitle, style: sectionHeading(context)),
     Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Text(_paired.isEmpty ? t.pairedNone : t.syncAutoIntro),
@@ -609,9 +618,10 @@ class _SyncScreenState extends State<SyncScreen> {
             t.pairedLastSync(when.format(device.lastSync.toLocal())),
           ].join('\n'),
         ),
-        control: TextButton(
+        control: TextButton.icon(
           onPressed: () => _forget(device),
-          child: Text(t.forgetDevice),
+          icon: const Icon(Icons.link_off),
+          label: Text(t.forgetDevice),
         ),
       ),
       // Only a Device that hosts can be found and synced with.

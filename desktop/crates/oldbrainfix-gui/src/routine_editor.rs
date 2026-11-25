@@ -27,6 +27,7 @@ use std::collections::BTreeSet;
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use egui::{Id, RichText, TextEdit, Ui};
 use oldbrainfix_core::alarms::DEFAULT_ESCALATION;
+use oldbrainfix_core::routines::heads_up_keys;
 use oldbrainfix_core::schedule::WallClock;
 use oldbrainfix_core::schedule::WeekdayRule;
 use oldbrainfix_core::schedule_sentence::{
@@ -38,8 +39,10 @@ use oldbrainfix_core::{
     Routine, Routines, Schedule, SimpleRepeat, Store,
 };
 
-use crate::app::{chip_row, embossed, icon_button, pill};
+use crate::all_routines_view::routine_name;
+use crate::app::{chip_row, embossed, icon_button};
 use crate::capture_choices::{ScheduleChoice, SessionChoice};
+use crate::design;
 use crate::icons;
 use crate::l10n::L10n;
 use crate::leave_saves::Leaving;
@@ -56,14 +59,6 @@ pub const RENAG_CHOICES: [i64; 5] = [5, 10, 15, 30, 60];
 
 /// The numbers of ignored Re-nags offered before Escalation.
 pub const ESCALATION_CHOICES: [i64; 5] = [1, 2, 3, 5, 10];
-
-/// The Heads-ups offered on a schedule with times, in minutes before an
-/// Occurrence: 5, 10, 15 and 30 min, 1 h, 2 h, 1 day, 2 days, 1 week.
-pub const HEADS_UP_CHOICES: [i64; 9] = [5, 10, 15, 30, 60, 120, 1440, 2880, 10080];
-
-/// The Heads-ups offered on an all-day schedule, whole days only: 1, 2
-/// and 3 days, 1 week.
-pub const HEADS_UP_DAY_CHOICES: [i64; 4] = [1440, 2880, 4320, 10080];
 
 /// How many coming Occurrences the editor shows.
 const PREVIEW: usize = 3;
@@ -103,6 +98,8 @@ pub enum Intent {
     OpenNote(String),
     /// Show the History of the Routine with this id.
     History(String),
+    /// Ask for a custom Heads-up, a number and a unit (obf-1087).
+    CustomHeadsUp,
     /// Something asked of a Session's part.
     Session(SessionIntent),
 }
@@ -199,6 +196,9 @@ pub struct RoutineEditor {
     /// among them count ([`RoutineEditor::kept_heads_ups`]), the others
     /// kept for a time set again.
     pub heads_ups: Vec<i64>,
+    /// Whether "Custom…" was picked in "Add heads-up" (obf-1087), for
+    /// [`RoutineEditor::show`] to ask for it.
+    custom_asked: bool,
     /// Whether only the Heads-ups are edited, the rest shown as it is: a
     /// Routine this Device may not change (obf-1046).
     locked: bool,
@@ -293,6 +293,7 @@ impl RoutineEditor {
             named: false,
             name_missing: false,
             heads_ups: Vec::new(),
+            custom_asked: false,
             locked: false,
             opened: Edited::default(),
         };
@@ -445,6 +446,7 @@ impl RoutineEditor {
             named: false,
             name_missing: false,
             heads_ups: Vec::new(),
+            custom_asked: false,
             locked: false,
             opened: Edited::default(),
         };
@@ -490,16 +492,17 @@ impl RoutineEditor {
             .collect()
     }
 
+    /// Whether the schedule is all-day, without times, which takes whole
+    /// days only as Heads-ups.
+    pub fn all_day(&self) -> bool {
+        self.times.is_empty()
+    }
+
     /// The Heads-ups offered to add: those of the schedule's kind not set
-    /// yet.
+    /// yet; "Custom…" follows them (obf-1087).
     pub fn heads_up_choices(&self) -> Vec<i64> {
-        let offered: &[i64] = if self.times.is_empty() {
-            &HEADS_UP_DAY_CHOICES
-        } else {
-            &HEADS_UP_CHOICES
-        };
         let kept = self.kept_heads_ups();
-        offered
+        heads_up_keys::choices(self.all_day())
             .iter()
             .copied()
             .filter(|m| !kept.contains(m))
@@ -912,10 +915,15 @@ impl RoutineEditor {
             .id_salt("routine")
             .auto_shrink([false, false])
             .show(ui, |ui| {
+                // The bar's width as room on the right, so the bar,
+                // hovered and wide too, never draws over a card's edge
+                // (obf-1120).
+                let bar = ui.spacing().scroll.bar_width;
+                ui.set_max_width((ui.available_width() - bar).max(0.0));
                 ui.spacing_mut().item_spacing.y = 16.0;
                 ui.add_space(4.0);
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new(heading).size(18.0).strong().color(text));
+                    crate::design::dialog_title(ui, heading);
                     // As in the bar of the phone's editor.
                     if let Some(id) = self.routine.as_ref().filter(|_| self.history) {
                         ui.add_space((ui.available_width() - 28.0).max(0.0));
@@ -924,92 +932,95 @@ impl RoutineEditor {
                         }
                     }
                 });
+                // One card, its fields in headed groups (obf-1118).
                 embossed(ui, tones, false, None, |ui| {
-                    if self.named {
-                        let label = ui.label(RichText::new(t.kind_name()).strong().color(text));
-                        let field = ui
-                            .add(
-                                TextEdit::singleline(&mut self.text)
-                                    .id(Id::new("routine text"))
-                                    .text_color(text)
-                                    .desired_width(f32::INFINITY),
-                            )
-                            .labelled_by(label.id);
-                        crate::text_menu::show(ui, t, &field, &self.text);
-                        self.take_first_focus(ui, &field);
-                        if self.name_missing {
-                            let error = ui.visuals().error_fg_color;
-                            ui.label(RichText::new(t.kind_name_missing()).color(error));
-                            if field.changed() {
-                                self.name_missing = false;
-                            }
-                        }
-                        return;
-                    }
-                    if !self.from_note {
-                        let field = ui.add(
-                            TextEdit::multiline(&mut self.text)
-                                .id(Id::new("routine text"))
-                                .hint_text(t.routine_what_hint())
-                                .text_color(text)
-                                .desired_rows(1)
-                                .desired_width(f32::INFINITY)
-                                .frame(egui::Frame::NONE),
-                        );
-                        crate::text_menu::show(ui, t, &field, &self.text);
-                        self.take_first_focus(ui, &field);
-                        return;
-                    }
-                    ui.label(RichText::new(t.from_note()).strong().color(text));
-                    if let Some(captured) = &self.capture {
-                        let shown = if captured.is_empty() {
-                            t.note_being_captured()
-                        } else {
-                            captured.as_str()
-                        };
-                        ui.horizontal(|ui| {
-                            icons::show(ui, icons::NOTE, 18.0, text);
-                            ui.label(RichText::new(shown).color(text));
-                        });
-                        return;
-                    }
-                    match &self.note {
-                        None => drop(ui.label(RichText::new(t.note_deleted()).color(weak))),
-                        Some(note) if note.is_trashed() => {
-                            ui.label(RichText::new(note.visible_text()).color(text));
-                            ui.label(RichText::new(t.note_in_trash()).color(weak));
-                        }
-                        Some(note) => {
-                            let link = ui.horizontal(|ui| {
-                                icons::show(ui, icons::NOTE, 18.0, text);
-                                ui.add(
-                                    egui::Label::new(
-                                        RichText::new(note.visible_text()).color(text),
-                                    )
-                                    .sense(egui::Sense::click()),
+                    ui.vertical(|ui| {
+                        if self.named {
+                            let label = ui.label(RichText::new(t.kind_name()).strong());
+                            let field = ui
+                                .add(
+                                    crate::theme::field(ui, &mut self.text)
+                                        .id(Id::new("routine text"))
+                                        .text_color(text)
+                                        .desired_width(f32::INFINITY),
                                 )
+                                .labelled_by(label.id);
+                            crate::text_menu::show(ui, t, &field, &self.text);
+                            self.take_first_focus(ui, &field);
+                            if self.name_missing {
+                                let error = ui.visuals().error_fg_color;
+                                ui.label(RichText::new(t.kind_name_missing()).color(error));
+                                if field.changed() {
+                                    self.name_missing = false;
+                                }
+                            }
+                            return;
+                        }
+                        if !self.from_note {
+                            let field = ui.add(
+                                TextEdit::multiline(&mut self.text)
+                                    .id(Id::new("routine text"))
+                                    .hint_text(t.routine_what_hint())
+                                    .text_color(text)
+                                    .desired_rows(1)
+                                    .desired_width(f32::INFINITY)
+                                    .frame(egui::Frame::NONE),
+                            );
+                            crate::text_menu::show(ui, t, &field, &self.text);
+                            self.take_first_focus(ui, &field);
+                            return;
+                        }
+                        ui.label(RichText::new(t.from_note()).strong());
+                        if let Some(captured) = &self.capture {
+                            let shown = if captured.is_empty() {
+                                t.note_being_captured()
+                            } else {
+                                captured.as_str()
+                            };
+                            ui.horizontal(|ui| {
+                                icons::show(ui, icons::NOTE, 18.0, text);
+                                ui.label(RichText::new(shown).color(text));
                             });
-                            if link
-                                .inner
-                                .on_hover_cursor(egui::CursorIcon::PointingHand)
-                                .clicked()
-                            {
-                                intent = Some(Intent::OpenNote(note.id.clone()));
+                            return;
+                        }
+                        match &self.note {
+                            None => drop(ui.label(RichText::new(t.note_deleted()).color(weak))),
+                            Some(note) if note.is_trashed() => {
+                                ui.label(RichText::new(routine_name(t, Some(note))).color(text));
+                                ui.label(RichText::new(t.note_in_trash()).color(weak));
+                            }
+                            Some(note) => {
+                                let link = ui.horizontal(|ui| {
+                                    icons::show(ui, icons::NOTE, 18.0, text);
+                                    ui.add(
+                                        egui::Label::new(
+                                            RichText::new(routine_name(t, Some(note))).color(text),
+                                        )
+                                        .sense(egui::Sense::click()),
+                                    )
+                                });
+                                if link
+                                    .inner
+                                    .on_hover_cursor(egui::CursorIcon::PointingHand)
+                                    .clicked()
+                                {
+                                    intent = Some(Intent::OpenNote(note.id.clone()));
+                                }
                             }
                         }
+                    });
+                    if let Some(draft) = &mut self.session
+                        && let Some(asked) = draft.show(ui, t)
+                    {
+                        intent = Some(Intent::Session(asked));
+                    }
+                    // Making a Note a Session sets it up alone (#191).
+                    if !self.makes {
+                        changed |= self.schedule_panels(ui, t, (once, shown_now, now));
                     }
                 });
-                if let Some(draft) = &mut self.session
-                    && let Some(asked) = draft.show(ui, t, tones)
-                {
-                    intent = Some(Intent::Session(asked));
-                }
-                // Making a Note a Session sets it up alone (#191).
-                if !self.makes {
-                    changed |= self.schedule_panels(ui, t, tones, (once, shown_now, now));
-                }
                 ui.horizontal(|ui| {
-                    if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+                    if design::row_button(ui, t.cancel()).clicked() {
                         intent = Some(Intent::Close);
                     }
                     if self.routine.is_some()
@@ -1031,6 +1042,9 @@ impl RoutineEditor {
         if !ui.is_sizing_pass() {
             self.focus_first = false;
         }
+        if std::mem::take(&mut self.custom_asked) {
+            intent = Some(Intent::CustomHeadsUp);
+        }
         intent
     }
 
@@ -1042,14 +1056,14 @@ impl RoutineEditor {
         &mut self,
         ui: &mut Ui,
         t: &L10n,
-        tones: Tones,
         (once, shown_now, now): (bool, NaiveDateTime, &SentenceNow),
     ) -> bool {
         let text = ui.visuals().text_color();
         let open = !self.locked;
         let mut changed = false;
         ui.add_enabled_ui(open, |ui| {
-            let schedule = embossed(ui, tones, false, None, |ui| {
+            design::group_gap(ui);
+            let schedule = ui.vertical(|ui| {
                 changed |= self.sentence_line(ui, t, now);
                 changed |= self.quick_line(ui, t, now);
                 let mut advanced = self.advanced;
@@ -1064,20 +1078,22 @@ impl RoutineEditor {
                 if self.advanced {
                     changed |= self.advanced_editor(ui, t);
                 } else {
-                    changed |= self.simple_editor(ui, t, tones);
+                    changed |= self.simple_editor(ui, t);
                 }
                 changed |= self.start_editor(ui, t, once);
                 if !self.advanced && self.kind != RepeatKind::Once {
                     changed |= self.end_editor(ui, t);
                 }
             });
-            spotlight::anchor(ui, "routine-schedule", schedule.rect);
-            embossed(ui, tones, false, None, |ui| {
-                changed |= self.times_editor(ui, t, tones, once, shown_now);
+            spotlight::anchor(ui, "routine-schedule", schedule.response.rect);
+            design::group_gap(ui);
+            ui.vertical(|ui| {
+                changed |= self.times_editor(ui, t, once, shown_now);
             });
         });
-        let next = embossed(ui, tones, false, None, |ui| {
-            ui.label(RichText::new(t.next_occurrences()).strong().color(text));
+        design::group_gap(ui);
+        let next = ui.vertical(|ui| {
+            ui.label(RichText::new(t.next_occurrences()).strong());
             if self.schedule.is_some() && self.next.is_empty() {
                 ui.label(RichText::new(t.never_due()).color(text));
             }
@@ -1086,23 +1102,27 @@ impl RoutineEditor {
                 ui.label(RichText::new(line).color(text));
             }
         });
-        spotlight::anchor(ui, "routine-next", next.rect);
-        let heads_ups = embossed(ui, tones, false, None, |ui| self.heads_ups_editor(ui, t));
-        spotlight::anchor(ui, "routine-heads-ups", heads_ups.rect);
+        spotlight::anchor(ui, "routine-next", next.response.rect);
+        design::group_gap(ui);
+        let heads_ups = ui.vertical(|ui| self.heads_ups_editor(ui, t));
+        spotlight::anchor(ui, "routine-heads-ups", heads_ups.response.rect);
         ui.add_enabled_ui(open, |ui| {
-            let renag = embossed(ui, tones, false, None, |ui| self.renag_editor(ui, t));
-            spotlight::anchor(ui, "routine-renag", renag.rect);
-            embossed(ui, tones, false, None, |ui| self.escalation_editor(ui, t));
+            design::group_gap(ui);
+            let renag = ui.vertical(|ui| self.renag_editor(ui, t));
+            spotlight::anchor(ui, "routine-renag", renag.response.rect);
+            design::group_gap(ui);
+            ui.vertical(|ui| self.escalation_editor(ui, t));
         });
         changed
     }
 
     /// The person's own Heads-ups (obf-1046): each set, the earliest
-    /// warning first, with its ✕, and "Add heads-up" offering those not
-    /// set yet, whole days only on an all-day schedule.
+    /// warning first, a custom one too, with its ✕, and "Add heads-up"
+    /// offering those not set yet, whole days only on an all-day
+    /// schedule, and "Custom…" at the end (obf-1087).
     fn heads_ups_editor(&mut self, ui: &mut Ui, t: &L10n) {
         let text = ui.visuals().text_color();
-        ui.label(RichText::new(t.heads_ups_heading()).strong().color(text));
+        ui.label(RichText::new(t.heads_ups_heading()).strong());
         let mut removed = None;
         for minutes in self.kept_heads_ups().into_iter().rev() {
             // Its own id: every ✕ says the same.
@@ -1119,9 +1139,6 @@ impl RoutineEditor {
             self.heads_ups.retain(|m| *m != gone);
         }
         let offered = self.heads_up_choices();
-        if offered.is_empty() {
-            return;
-        }
         let add = ui.button(RichText::new(t.add_heads_up()).color(text));
         let mut picked = None;
         egui::Popup::menu(&add).show(|ui| {
@@ -1134,6 +1151,14 @@ impl RoutineEditor {
                     picked = Some(minutes);
                     ui.close();
                 }
+            }
+            // Also with every one above set.
+            if ui
+                .button(RichText::new(t.heads_up_custom()).color(text))
+                .clicked()
+            {
+                self.custom_asked = true;
+                ui.close();
             }
         });
         if let Some(minutes) = picked {
@@ -1158,11 +1183,7 @@ impl RoutineEditor {
         self.sentence_typing = typing;
         self.show_sentence(t, typing);
         let simple = !self.advanced;
-        let label = ui.label(
-            RichText::new(t.schedule_sentence_label())
-                .strong()
-                .color(text),
-        );
+        let label = ui.label(RichText::new(t.schedule_sentence_label()).strong());
         let unknown = self.sentence_unknown.clone();
         let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, wrap: f32| {
             let typed = typed.as_str();
@@ -1324,7 +1345,7 @@ impl RoutineEditor {
         self.advanced = advanced;
     }
 
-    fn simple_editor(&mut self, ui: &mut Ui, t: &L10n, tones: Tones) -> bool {
+    fn simple_editor(&mut self, ui: &mut Ui, t: &L10n) -> bool {
         let text = ui.visuals().text_color();
         let mut kind = self.kind;
         let kinds = [
@@ -1382,7 +1403,7 @@ impl RoutineEditor {
             ui.horizontal_wrapped(|ui| {
                 for day in 1..=7 {
                     let on = self.weekdays.contains(&day);
-                    if pill(ui, tones, on, weekday_text(t, day)).clicked() {
+                    if design::chip(ui, on, weekday_text(t, day)).clicked() {
                         if on {
                             self.weekdays.remove(&day);
                         } else {
@@ -1491,7 +1512,7 @@ impl RoutineEditor {
         let weak = ui.visuals().weak_text_color();
         ui.label(RichText::new(t.rrule_label()).color(text));
         let field = ui.add(
-            TextEdit::singleline(&mut self.rule)
+            crate::theme::field(ui, &mut self.rule)
                 .id(Id::new("rrule"))
                 .hint_text(t.rrule_label())
                 .text_color(text)
@@ -1523,20 +1544,19 @@ impl RoutineEditor {
         &mut self,
         ui: &mut Ui,
         t: &L10n,
-        tones: Tones,
         once: bool,
         shown_now: NaiveDateTime,
     ) -> bool {
         let mut changed = false;
         let text = ui.visuals().text_color();
-        ui.label(RichText::new(t.times_heading()).strong().color(text));
+        ui.label(RichText::new(t.times_heading()).strong());
         ui.horizontal_wrapped(|ui| {
             if self.times.is_empty() {
-                pill(ui, tones, false, t.all_day());
+                design::chip(ui, false, t.all_day());
             }
             let mut removed = None;
             for time in &self.times {
-                ui.label(RichText::new(clock_text(*time)).strong().color(text));
+                ui.label(RichText::new(clock_text(*time)).strong());
                 let label = t.remove_time(&clock_text(*time));
                 if icon_button(ui, icons::CLOSE, &label, text).clicked() {
                     removed = Some(*time);
@@ -1554,7 +1574,7 @@ impl RoutineEditor {
             }
             ui.horizontal(|ui| {
                 let field = ui.add(
-                    TextEdit::singleline(&mut self.time_text)
+                    crate::theme::field(ui, &mut self.time_text)
                         .id(Id::new("new time"))
                         .hint_text(t.time_hint())
                         .text_color(text)
@@ -1592,7 +1612,7 @@ impl RoutineEditor {
         let weak = ui.visuals().weak_text_color();
         let own = self.renag;
         let device = self.device_renag;
-        ui.label(RichText::new(t.renag_heading()).strong().color(text));
+        ui.label(RichText::new(t.renag_heading()).strong());
         ui.label(RichText::new(t.renag_summary(own.unwrap_or(device))).color(text));
         ui.label(RichText::new(t.renag_explain()).small().color(weak));
         // A value set elsewhere stays pickable.
@@ -1614,7 +1634,7 @@ impl RoutineEditor {
     fn escalation_editor(&mut self, ui: &mut Ui, t: &L10n) {
         let text = ui.visuals().text_color();
         let weak = ui.visuals().weak_text_color();
-        ui.label(RichText::new(t.escalation_heading()).strong().color(text));
+        ui.label(RichText::new(t.escalation_heading()).strong());
         let summary = match self.escalation {
             None => t.escalation_off().to_string(),
             Some(after) => t.escalation_summary(after),
@@ -1646,8 +1666,9 @@ impl RoutineEditor {
     }
 }
 
-/// A number from `min` to `max` with a minus and a plus button, and its
-/// `unit` after it; whether it changed.
+/// A number from `min` to `max` with a minus and a plus button, each in
+/// a frame ([`design::framed_icon_button`], obf-1112), and its `unit`
+/// after it; whether it changed.
 pub(crate) fn stepper(
     ui: &mut Ui,
     t: &L10n,
@@ -1658,13 +1679,13 @@ pub(crate) fn stepper(
     let text = ui.visuals().text_color();
     let mut changed = false;
     ui.horizontal(|ui| {
-        if *value > min && icon_button(ui, icons::REMOVE, t.fewer(), text).clicked() {
+        if *value > min && design::framed_icon_button(ui, icons::REMOVE, t.fewer()).clicked() {
             *value -= 1;
             changed = true;
         }
-        ui.label(RichText::new(value.to_string()).strong().color(text));
+        ui.label(RichText::new(value.to_string()).strong());
         if max.is_none_or(|max| *value < max)
-            && icon_button(ui, icons::ADD, t.more(), text).clicked()
+            && design::framed_icon_button(ui, icons::ADD, t.more()).clicked()
         {
             *value += 1;
             changed = true;
@@ -1694,7 +1715,7 @@ fn day_stepper(ui: &mut Ui, t: &L10n, day: &mut Day, text: &mut String, id: &str
         *text = day.to_string();
     }
     let field = ui.add(
-        TextEdit::singleline(text)
+        crate::theme::field(ui, text)
             .id(Id::new(id))
             .hint_text(t.date_hint())
             .text_color(colour)

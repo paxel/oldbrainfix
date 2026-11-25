@@ -266,7 +266,6 @@ List<(String, String)> settingsSections(BuildContext context) {
     ('privacy', t.settingsPrivacy),
     ('typing', t.settingsTyping),
     ('history', t.settingsHistory),
-    ('import', t.settingsImport),
     ('features', t.features),
   ];
 }
@@ -386,20 +385,27 @@ class _LinkToScreenState extends State<LinkToScreen> {
         ],
     ];
     return Scaffold(
-      appBar: pageBar(context, title: t.formatLinkTo),
+      appBar: pageBar(
+        context,
+        title: t.formatLinkTo,
+        background: searchHeaderColour(context),
+      ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: TextField(
-              key: const ValueKey('linkToSearch'),
-              controller: _search,
-              autofocus: true,
-              decoration: InputDecoration(
-                hintText: t.linkToSearch,
-                prefixIcon: const Icon(Icons.search),
+          // The targets scroll under its line (obf-1088).
+          SearchBand(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: TextField(
+                key: const ValueKey('linkToSearch'),
+                controller: _search,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: t.linkToSearch,
+                  prefixIcon: const Icon(Icons.search),
+                ),
+                onChanged: (_) => setState(() {}),
               ),
-              onChanged: (_) => setState(() {}),
             ),
           ),
           Expanded(

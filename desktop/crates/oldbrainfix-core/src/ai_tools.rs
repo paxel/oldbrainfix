@@ -28,6 +28,7 @@ use crate::checklists::{
 };
 use crate::entry::{dart_iso, parse_time};
 use crate::frogs::Frogs;
+use crate::imports::Imports;
 use crate::note_history::NoteHistory;
 use crate::note_kinds;
 use crate::notes::{Attachment, CapturedDetail, Importance, Note, Notes};
@@ -180,7 +181,7 @@ pub fn tools() -> Vec<Value> {
         ),
         tool(
             "read_note",
-            "Reads one Note in full: its text and its format (textFormat, as list_notes names it) with a Code text's language (codeLanguage: a grammar's scope as list_code_languages names it, or null), Sections, Transcripts of its recordings, Photo Texts, photos, attached files (attachments: each file's hash, name, media type, size, pages when counted, and its Attachment Text, the text read out of it, cut after 4000 characters with its whole length in textLength; textState says read, empty when none was found, waiting while it is still to be read, fromComputer while the user's computer is still to read it, removed when the user removed it, or none for a kind of file without text; fileRemoved marks a file the user removed while its text stays), Capture Context, Boxes, Routines and Reminders with each Session's pool, count and picking rule, and its kind with its parts: for every kind but a plain Note its name (the text's first line, shown as its title) and description (the rest of the text, shown small under the name), a Tally's fields, a Session's setup (its pool, count, weekday counts and picking rule) with the Routines that run it, the Lines of a Checklist or Shopping List (on a Shopping List also those checked Once today, marked gone, as they stay struck through on the Agenda for the day), how a Shopping List or a Checklist without a Routine shows on the user's own Agenda (agenda: off, count or lines), and its Frogs. A Note copied from a Pack another person sent, kept with its \"From\" badge, names that person under from.",
+            "Reads one Note in full: its text and its format (textFormat, as list_notes names it) with a Code text's language (codeLanguage: a grammar's scope as list_code_languages names it, or null), Sections, Transcripts of its recordings, Photo Texts, photos, attached files (attachments: each file's hash, name, media type, size, pages when counted, and its Attachment Text, the text read out of it, cut after 4000 characters with its whole length in textLength; textState says read, empty when none was found, waiting while it is still to be read, fromComputer while the user's computer is still to read it, removed when the user removed it, or none for a kind of file without text; fileRemoved marks a file the user removed while its text stays), Capture Context, Boxes, Routines and Reminders with each Session's pool, count and picking rule, and its kind with its parts: for every kind but a plain Note its name (the text's first line, shown as its title) and description (the rest of the text, shown small under the name), a Tally's fields, a Session's setup (its pool, count, weekday counts and picking rule) with the Routines that run it, the Lines of a Checklist or Shopping List (on a Shopping List also those checked Once today, marked gone, as they stay struck through on the Agenda for the day), how a Shopping List or a Checklist without a Routine shows on the user's own Agenda (agenda: off, count or lines), and its Frogs. A Note copied from a Pack another person sent, kept with its \"From\" badge, names that person under from. A Note an Import made names under importedFrom the path of its file inside the folder or export imported (path) and the Area that Import made (importArea), where a second Import of the same source adds only what is missing; it cannot be changed here.",
             true,
             json!({"id": id("Note")}),
             &["id"],
@@ -266,7 +267,7 @@ pub fn tools() -> Vec<Value> {
         ),
         tool(
             "read_settings",
-            "Reads this Device's settings: the Re-nag interval, the Nudge's repeat, Quiet Hours, from when all-day Routines and Reminders remind (allDayFrom, HH:MM; before it they only show on the Agenda), whether alerts are on, whether the Agenda hides what is checked instead of striking it through (agendaHidesChecked), whether text, icons and tap targets show 1.3 times their size (fatFingers), how large the text of Notes, Lines, Sections, the Agenda's rows and Ask's answers shows, on top of that (textSize: normal, larger at 1.15 or largest at 1.3 times), whether Done on a one-time Reminder that is a plain Note's only Routine or Reminder moves the Note to the trash, a setting of the person kept on all of their own Devices (trashesDoneReminder), when today's quiet day ends, a setting of the person too, on which nothing notifies while the Agenda still shows everything (quietDayUntil: midnight, or when End was tapped, as an instant; null while today is not quiet), whether the person chose Simple or Advanced, a setting of the person too (features: simple or advanced; Simple only hides making Tallies, Sessions, Frogs and Topics, the format bar and Shared Area roles in the apps, while every set-up tool here stays available either way), the grammars the person added to colour code in more languages, a setting of the person too (grammars: each one's name and scope; one of a built-in language's scope replaces the built-in one; they are added and removed in the apps only), what the quick note shows besides its text (quickNote: each control switched on, and whether the three Nudge buttons show instead of a single Save), the theme (system, light or dark), who may connect to this port (aiReach: local for this computer only, docker for Docker containers on this computer), whether the user switched on AI (experimental) on this computer (aiOn: the Ask panel and the phone's questions; this port works either way), and whether the Ask panel lets an OpenAI-compatible provider's model think before it answers (askThinks: off asks it not to). They cannot be changed here.",
+            "Reads this Device's settings: the Re-nag interval, the Nudge's repeat, Quiet Hours, from when all-day Routines and Reminders remind (allDayFrom, HH:MM; before it they only show on the Agenda), whether alerts are on, whether the Agenda hides what is checked instead of striking it through (agendaHidesChecked), whether text, icons and tap targets show 1.3 times their size (fatFingers), how large the text of Notes, Lines, Sections, the Agenda's rows and Ask's answers shows, on top of that (textSize: normal, larger at 1.15 or largest at 1.3 times), whether the screens show their tips, each explaining one button once (tipsOn: Show tips; off, no screen shows one), after how many seconds of a pause a voice recording on this Device ends on its own once something was said, kept as Stop keeps it (recordingPauseSeconds: 2, 3, 5 or 10; null while it is Off, as by default, and pauses are ignored), whether Done on a one-time Reminder that is a plain Note's only Routine or Reminder moves the Note to the trash, a setting of the person kept on all of their own Devices (trashesDoneReminder), when today's quiet day ends, a setting of the person too, on which nothing notifies while the Agenda still shows everything (quietDayUntil: midnight, or when End was tapped, as an instant; null while today is not quiet), whether the person chose Simple or Advanced, a setting of the person too (features: simple or advanced; Simple only hides making Tallies, Sessions, Frogs and Topics, the format bar and Shared Area roles in the apps, while every set-up tool here stays available either way), the grammars the person added to colour code in more languages, a setting of the person too (grammars: each one's name and scope; one of a built-in language's scope replaces the built-in one; they are added and removed in the apps only), what the quick note shows besides its text (quickNote: each control switched on, and whether the three Nudge buttons show instead of a single Save), the theme (system, light or dark), who may connect to this port (aiReach: local for this computer only, docker for Docker containers on this computer), whether the user switched on AI (experimental) on this computer (aiOn: the Ask panel and the phone's questions; this port works either way), and whether the Ask panel lets an OpenAI-compatible provider's model think before it answers (askThinks: off asks it not to). They cannot be changed here.",
             true,
             json!({}),
             &[],
@@ -1288,11 +1289,11 @@ impl Store {
 
     /// Answers the call of the Ask panel's tool `name` ([`ASK_TOOLS`])
     /// with `args` (#267, ADR 0051), as the AI sees the store. A tool that
-    /// reads runs in no AI Task, so asking does not pause sync; the first
-    /// change opens the AI Task ([`Store::open_ai_task`]) into `task`,
-    /// where it and every later one are drafted as [`Store::ai_tool`]
-    /// drafts them. A tool the panel does not offer, or one that fails,
-    /// says why in an output marked as an error.
+    /// reads runs in no AI Task; the first change opens the AI Task
+    /// ([`Store::open_ai_task`]) into `task`, where it and every later one
+    /// are drafted as [`Store::ai_tool`] drafts them. A tool the panel does
+    /// not offer, or one that fails, says why in an output marked as an
+    /// error.
     pub fn ask_tool(
         &self,
         name: &str,
@@ -1576,6 +1577,15 @@ impl Store {
                     if let Some(from) = self.pack_from(id)? {
                         all.insert("from".into(), json!(from.name));
                     }
+                    // Where a Note an Import made came from (obf-1078);
+                    // an Area hidden from the AI goes unnamed.
+                    if let Some(from) = Imports::new(self).source_of(id)? {
+                        let area = (!self.ai_hides(&from.area_id)?).then_some(from.area_id);
+                        all.insert(
+                            "importedFrom".into(),
+                            json!({ "importArea": area, "path": from.path }),
+                        );
+                    }
                     all.insert("lines".into(), lines);
                     all.insert("mayChange".into(), json!(self.may_change(id)?));
                     all.insert(
@@ -1830,6 +1840,8 @@ impl Store {
                     "allDayFrom": settings.all_day_from()?.to_string(),
                     "fatFingers": settings.fat_fingers()?,
                     "textSize": settings.text_size()?.name(),
+                    "tipsOn": settings.tips_on()?,
+                    "recordingPauseSeconds": settings.recording_pause_seconds()?,
                     "nudgeRepeatMinutes": settings.nudge_repeat()?.num_minutes(),
                     "quickNote": {
                         "fileInto": shows(QuickNoteControl::FileInto)?,

@@ -7,6 +7,7 @@ typedef FakeEvent = ({
   String calendar,
   String? uid,
   String title,
+  String description,
   Occurrence? start,
   String? rule,
 });
@@ -49,6 +50,7 @@ class FakeMirror implements MirrorPlatform {
       calendar: calendar,
       uid: null,
       title: title,
+      description: '',
       start: null,
       rule: null,
     );
@@ -109,6 +111,7 @@ class FakeMirror implements MirrorPlatform {
       calendar: calendarId,
       uid: event.uid,
       title: event.summary,
+      description: event.description,
       start: event.start,
       rule: event.rule,
     );

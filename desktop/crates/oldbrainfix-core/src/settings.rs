@@ -31,11 +31,19 @@ const STREAKS_OFF: &str = "streaksOff";
 const AGENDA_HIDE_CHECKED: &str = "agendaHideChecked";
 const FAT_FINGERS: &str = "fatFingers";
 const TEXT_SIZE: &str = "textSize";
+const TIPS_OFF: &str = "tipsOff";
+const RECORDING_PAUSE_SECONDS: &str = "recordingPauseSeconds";
 const QUICK_NOTE_NUDGE_BUTTONS_OFF: &str = "quickNoteNudgeButtonsOff";
 const LAST_SHOPPING_LIST: &str = "lastShoppingList";
 const THEME: &str = "theme";
 const RECENTLY_FILED_INTO: &str = "recentlyFiledInto";
 const RECENTLY_ADDED_TO: &str = "recentlyAddedTo";
+pub(crate) const SPEECH_MODEL: &str = "speechModel";
+pub(crate) const SPEECH_MODEL_OFFER: &str = "speechModelOffer";
+
+/// The pauses, in seconds, after which a recording may end on its own
+/// (obf-1053), besides Off; the phone offers the same.
+pub const RECORDING_PAUSE_CHOICES: [u32; 4] = [2, 3, 5, 10];
 
 /// How many places filed into File into… shows at its top (#272), and
 /// how many Notes added to Add to Note… shows at its top (#308).
@@ -170,6 +178,63 @@ impl QuickNoteControl {
 
 /// The playback speeds of voice recordings offered, 1 being normal speed.
 pub const PLAYBACK_SPEEDS: [f64; 5] = [0.5, 0.75, 1.0, 1.5, 2.0];
+
+/// The speech models a Device may name (ADR 0007), as both apps call
+/// them: whisper.cpp's `base` and `small`.
+pub const SPEECH_MODEL_NAMES: [&str; 2] = ["base", "small"];
+
+/// How the speech model in use came onto a Device (obf-1098), as the
+/// Dart core's `SpeechModelSource`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SpeechModelSource {
+    /// Downloaded from Old Brain Fix's own release.
+    Download,
+    /// Taken from a file the user picked.
+    File,
+}
+
+impl SpeechModelSource {
+    /// How it is stored, as the Dart core's enum names it.
+    pub fn name(self) -> &'static str {
+        match self {
+            SpeechModelSource::Download => "download",
+            SpeechModelSource::File => "file",
+        }
+    }
+}
+
+/// The speech model chosen on a Device, by one of
+/// [`SPEECH_MODEL_NAMES`], and how it came there (obf-1098), as the Dart
+/// core's `SpeechModelChoice`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct SpeechModelChoice {
+    pub name: String,
+    pub source: SpeechModelSource,
+}
+
+impl SpeechModelChoice {
+    /// As a local setting keeps it: `base:download`, `small:file`.
+    fn text(&self) -> String {
+        format!("{}:{}", self.name, self.source.name())
+    }
+
+    /// The choice in `text`, written as [`Self::text`] writes it.
+    fn read(text: &str) -> Option<SpeechModelChoice> {
+        let (name, source) = text.split_once(':')?;
+        if !SPEECH_MODEL_NAMES.contains(&name) {
+            return None;
+        }
+        let source = match source {
+            "download" => SpeechModelSource::Download,
+            "file" => SpeechModelSource::File,
+            _ => return None,
+        };
+        Some(SpeechModelChoice {
+            name: name.to_owned(),
+            source,
+        })
+    }
+}
 
 /// `speed` as the Dart core writes it: "1.0", "1.5", "0.75".
 pub(crate) fn speed_text(speed: f64) -> String {
@@ -390,6 +455,46 @@ impl<'a> DeviceSettings<'a> {
         self.store.set_local_setting(FAT_FINGERS, &on.to_string())
     }
 
+    /// Whether this Device shows its Spotlights (obf-1060): "Show tips"
+    /// in the Settings, on until switched off; off is kept as "true",
+    /// as the phone keeps it under the same key.
+    pub fn tips_on(&self) -> Result<bool> {
+        Ok(self.store.local_setting(TIPS_OFF)?.as_deref() != Some("true"))
+    }
+
+    pub fn set_tips_on(&self, on: bool) -> Result<()> {
+        if on {
+            self.store.remove_local_setting(TIPS_OFF)
+        } else {
+            self.store.set_local_setting(TIPS_OFF, "true")
+        }
+    }
+
+    /// After how many seconds of a pause a voice recording on this Device
+    /// ends on its own (obf-1053): "End a recording after a pause", one
+    /// of [`RECORDING_PAUSE_CHOICES`]; `None` while it is Off, as by
+    /// default, also for anything else kept, and pauses are ignored. Kept
+    /// under the phone's key, absent while Off.
+    pub fn recording_pause_seconds(&self) -> Result<Option<u32>> {
+        Ok(self
+            .store
+            .local_setting(RECORDING_PAUSE_SECONDS)?
+            .and_then(|text| text.parse::<u32>().ok())
+            .filter(|seconds| RECORDING_PAUSE_CHOICES.contains(seconds)))
+    }
+
+    /// Keeps `seconds`, one of [`RECORDING_PAUSE_CHOICES`], as the pause;
+    /// `None` turns it Off.
+    pub fn set_recording_pause_seconds(&self, seconds: Option<u32>) -> Result<()> {
+        match seconds {
+            None => self.store.remove_local_setting(RECORDING_PAUSE_SECONDS),
+            Some(seconds) if RECORDING_PAUSE_CHOICES.contains(&seconds) => self
+                .store
+                .set_local_setting(RECORDING_PAUSE_SECONDS, &seconds.to_string()),
+            Some(seconds) => Err(Error::Invalid(format!("no pause of {seconds} s offered"))),
+        }
+    }
+
     /// The step of this Device's text (#326, obf-1019); normal unless
     /// one was picked.
     pub fn text_size(&self) -> Result<TextSize> {
@@ -539,8 +644,8 @@ impl<'a> DeviceSettings<'a> {
     }
 
     /// How fast this Device plays voice recordings: one of
-    /// [`PLAYBACK_SPEEDS`], normal speed when none was chosen. The one
-    /// Device setting a Backup carries (ADR 0016).
+    /// [`PLAYBACK_SPEEDS`], normal speed when none was chosen. A Backup
+    /// carries it in a record of its own (ADR 0016, #86).
     pub fn playback_speed(&self) -> Result<f64> {
         Ok(self.chosen_playback_speed()?.unwrap_or(1.0))
     }
@@ -562,6 +667,47 @@ impl<'a> DeviceSettings<'a> {
         }
         self.store
             .set_local_setting(PLAYBACK_SPEED, &speed_text(speed))
+    }
+
+    /// The speech model in use on this Device and how it came, as the app
+    /// keeps it once a model is checked and in use (obf-1098); `None`
+    /// while there is none. A Backup carries it, never the model's file.
+    pub fn speech_model(&self) -> Result<Option<SpeechModelChoice>> {
+        Ok(self
+            .store
+            .local_setting(SPEECH_MODEL)?
+            .and_then(|text| SpeechModelChoice::read(&text)))
+    }
+
+    /// `None` once the model is dropped; a name not in
+    /// [`SPEECH_MODEL_NAMES`] is refused.
+    pub fn set_speech_model(&self, choice: Option<&SpeechModelChoice>) -> Result<()> {
+        match choice {
+            None => self.store.remove_local_setting(SPEECH_MODEL),
+            Some(choice) if SPEECH_MODEL_NAMES.contains(&choice.name.as_str()) => {
+                self.store.set_local_setting(SPEECH_MODEL, &choice.text())
+            }
+            Some(choice) => Err(Error::Invalid(format!(
+                "{} is no speech model",
+                choice.name
+            ))),
+        }
+    }
+
+    /// The speech model a restored Backup's Device had chosen, while the
+    /// app has not offered it yet (obf-1098): to download once more with
+    /// one click, or to pick from a file again when it was taken from
+    /// one. `None` when there is none to offer.
+    pub fn speech_model_offer(&self) -> Result<Option<SpeechModelChoice>> {
+        Ok(self
+            .store
+            .local_setting(SPEECH_MODEL_OFFER)?
+            .and_then(|text| SpeechModelChoice::read(&text)))
+    }
+
+    /// Forgets the offer, once the user took it or turned it down.
+    pub fn drop_speech_model_offer(&self) -> Result<()> {
+        self.store.remove_local_setting(SPEECH_MODEL_OFFER)
     }
 
     /// The ids of the Areas and Topics this Device last filed into, the

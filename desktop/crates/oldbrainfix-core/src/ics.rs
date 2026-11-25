@@ -36,9 +36,10 @@ impl CalendarEvent {
     pub const LENGTH_MINUTES: u32 = 15;
 }
 
-/// The events of `routine`, whose Note reads `text`: one per time of day,
-/// each repeating on the Routine's days, or one all-day event; none when
-/// the schedule has no Occurrence at all.
+/// The events of `routine`, whose Note reads `text`
+/// ([`crate::notes::Note::calendar_text`]): one per time of day, each
+/// repeating on the Routine's days, or one all-day event; none when the
+/// schedule has no Occurrence at all.
 pub fn routine_events(routine: &Routine, text: &str) -> Vec<CalendarEvent> {
     let schedule = &routine.schedule;
     let Some(first) = schedule.next(schedule.start, 1).first().copied() else {

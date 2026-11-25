@@ -13,24 +13,18 @@ import 'browser.dart';
 import 'calendar_screen.dart';
 import 'capture_context_screen.dart';
 import 'context_platform.dart';
-import 'failure_dialog.dart';
 import 'features_choice.dart';
 import 'feedback_screen.dart';
 import 'file_platform.dart';
-import 'folder_import.dart';
-import 'folder_platform.dart';
-import 'import_run.dart';
-import 'import_screen.dart';
-import 'keep_import.dart';
+import 'imports_screen.dart';
 import 'l10n.dart';
 import 'lock_settings.dart';
 import 'look.dart';
 import 'named_places_screen.dart';
 import 'page_bar.dart';
-import 'place_names.dart';
 import 'print_platform.dart';
+import 'recording_pause.dart';
 import 'routine_editor_screen.dart';
-import 'run_over.dart';
 import 'schedule_text.dart';
 import 'settings_search.dart';
 import 'setup_screen.dart';
@@ -38,6 +32,8 @@ import 'speech_model_screen.dart';
 import 'speech_platform.dart';
 import 'spotlight.dart';
 import 'system_bars.dart';
+import 'tap_mark.dart';
+import 'voice_platform.dart';
 
 export 'settings_search.dart' show SettingsHeading, SettingsSection;
 
@@ -49,10 +45,11 @@ enum _UnitChoice { region, metric, imperial }
 /// page: the theme, the text size (#326, obf-1019) and "Fat fingers"; the units of Tallies; the alarm setup, the default Re-nag interval and the
 /// alarm sound; the
 /// Nudges' repeat and Quiet Hours; the Named Places, the Capture Context
-/// switches, the speech model and Print to Old Brain Fix (#293); what the quick note shows; the way to the Calendar page; the App Lock and
-/// the Area Locks; whether Streaks show; the Import of a folder or of a
-/// Google Keep export; in Advanced, Ask (#333); Show tips again
-/// (obf-1043); the person's own Code languages (obf-1037); and Send
+/// switches, the speech model, End a recording after a pause (obf-1053) and Print to Old Brain Fix (#293); what the quick note shows; the way to the Calendar page; the App Lock and
+/// the Area Locks; whether Streaks show; while searching for the Imports,
+/// a line that leads to the Areas list, whose ⋮ holds them (obf-1096); in
+/// Advanced, Ask (#333); Show tips (obf-1060)
+/// and Show tips again (obf-1043); the person's own Code languages (obf-1037); and Send
 /// feedback (#214). About is on the Profile page (#325). Each is a local setting, never synced,
 /// and applies at once; the alarms are armed again after each change.
 class SettingsScreen extends StatefulWidget {
@@ -63,8 +60,8 @@ class SettingsScreen extends StatefulWidget {
   /// to show it at once.
   final VoidCallback? onThemeChanged;
 
-  /// The notes browser's way back in, which the Area an Import made
-  /// opens as the last selected one.
+  /// The notes browser's way back in, for the Areas list the line about
+  /// the Imports opens (obf-1096).
   final BrowserTrail? trail;
 
   /// The section an app link opens the page at (#261), by its link's
@@ -116,8 +113,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.dispose();
   }
 
+  /// Show tips (obf-1060), which "No more tips" on a tip over this page
+  /// switches off too.
+  late final _tips = TipsSwitch.of(widget.store);
+
+  /// Show button taps (obf-1143).
+  late final _tapMarks = TapMarkSwitch.of(widget.store);
+
   /// Show tips again (obf-1043): every screen of this Device shows its
-  /// Spotlights again on its next visit, and the top says so.
+  /// Spotlights again on its next visit, "Show tips" on, and the top
+  /// says so.
   void _showTips() {
     resetSpotlights(widget.store);
     AnnouncementsScope.of(context)?.announce(context.t.settingsShowTipsDone);
@@ -146,6 +151,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late bool _advanced = widget.store.advanced;
   late bool _twoRows = widget.store.twoRowEditorOn;
   late bool _askOn = widget.store.askOn;
+  late int _pauseSeconds = recordingPause(widget.store)?.inSeconds ?? 0;
   late String? _sound = widget.store.alarmSound;
   late ClockTime _allDayFrom = widget.store.allDayFrom;
   late _UnitChoice _units = switch (widget.store.chosenUnitSystem) {
@@ -254,344 +260,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _askOn = on);
   }
 
+  /// End a recording after a pause (obf-1053): its seconds, 0 for Off;
+  /// the next recording follows it.
+  void _setPause(int seconds) {
+    setRecordingPause(widget.store, seconds == 0 ? null : seconds);
+    setState(() => _pauseSeconds = seconds);
+  }
+
   void _setTwoRows(bool on) {
     widget.store.twoRowEditorOn = on;
     setState(() => _twoRows = on);
   }
 
-  /// Picks a folder with the system's picker and makes Notes of its
-  /// Markdown and text files in a new Area (ADR 0036), announced as
-  /// [_runImport] does.
-  Future<void> _import(ImportJobs jobs) async {
-    if (jobs.running.value != null) return;
-    final t = context.t;
-    final folders = FolderScope.of(context);
-    final announcements = AnnouncementsScope.of(context);
-    final navigator = Navigator.of(context, rootNavigator: true);
+  /// The Areas list on top, whose ⋮ holds Import… (obf-1096).
+  void _openAreas() {
     final store = widget.store;
-    final folder = await folders.pick();
-    if (folder == null || jobs.running.value != null) return;
-    final name = await folders.displayName(folder);
-    if (jobs.running.value != null) return;
-    await _runImport(
-      ImportKind.folder,
-      t,
-      announcements,
-      navigator,
-      jobs,
-      work: folderImport(folder, t.importAreaName(name)),
-      finished: (summary, area) => [
-        t.importFinishedNotes(summary.notes, area),
-        if (summary.skipped > 0) ...[
-          '',
-          t.importFinishedSkipped(summary.skipped),
-          t.importSkippedDetails(name, summary.notText, summary.tooLarge),
-        ],
-      ].join('\n'),
-      nothing: (summary) => (
-        announced: t.importNothing,
-        cause: t.importNothingCause,
-        fix: t.importNothingFix,
-        details: t.importSkippedDetails(
-          name,
-          summary.notText,
-          summary.tooLarge,
-        ),
-      ),
-      failed: (
-        announced: t.importFailed,
-        cause: t.importFailedCause,
-        fix: t.importFailedFix,
-      ),
-      // The folder was picked for this Import alone: its lasting access
-      // goes, unless the app syncs or backs up through it.
-      release: () =>
-          folders.release(folder, [?store.syncFolder, ?store.backupFolder]),
-    );
-  }
-
-  /// Asks whether the Google Takeout export is still a zip or an unpacked
-  /// folder, picks it with the system's picker and makes Notes of its
-  /// Google Keep notes in the new Area "From Google Keep" (ADR 0036),
-  /// announced as [_runImport] does.
-  Future<void> _importKeep(ImportJobs jobs) async {
-    if (jobs.running.value != null) return;
-    final t = context.t;
-    final folders = FolderScope.of(context);
-    final announcements = AnnouncementsScope.of(context);
-    final navigator = Navigator.of(context, rootNavigator: true);
-    final store = widget.store;
-    final zip = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(context.t.importKeep),
-        // The two answers stacked full width, Cancel below (UI laws).
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(context.t.importKeepAsk),
-              const SizedBox(height: 16),
-              FilledButton.tonal(
-                key: const ValueKey('importKeepZip'),
-                onPressed: () => Navigator.of(context).pop(true),
-                child: Text(context.t.importKeepZip),
-              ),
-              const SizedBox(height: 8),
-              FilledButton.tonal(
-                key: const ValueKey('importKeepFolder'),
-                onPressed: () => Navigator.of(context).pop(false),
-                child: Text(context.t.importKeepFolder),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(context.t.cancel),
-          ),
-        ],
-      ),
-    );
-    if (zip == null || !mounted || jobs.running.value != null) return;
-    final source = zip ? await folders.pickZip() : await folders.pick();
-    if (source == null || jobs.running.value != null) return;
-    await _runImport(
-      ImportKind.keep,
-      t,
-      announcements,
-      navigator,
-      jobs,
-      work: keepImport(source, t.importKeepAreaName, zip: zip),
-      finished: (summary, area) => [
-        t.importFinishedNotes(summary.notes, area),
-        if (summary.checklists > 0) t.importKeepChecklists(summary.checklists),
-        if (summary.photos > 0) t.importKeepPhotos(summary.photos),
-        if (summary.skipped > 0) ...[
-          '',
-          t.importKeepSkipped(summary.skipped),
-          _keepSkipped(t, summary),
-        ],
-      ].join('\n'),
-      nothing: (summary) => (
-        announced: t.importKeepNothing,
-        cause: t.importKeepNothingCause,
-        fix: t.importKeepNothingFix,
-        details: _keepSkipped(t, summary),
-      ),
-      failed: (
-        announced: t.importKeepFailed,
-        cause: t.importKeepFailedCause,
-        fix: t.importKeepFailedFix,
-      ),
-      // A zip leaves no lasting access behind, only the copies of its
-      // files; a folder's goes as for any Import.
-      release: () => zip
-          ? Future<void>.value()
-          : folders.release(source, [?store.syncFolder, ?store.backupFolder]),
-    );
-  }
-
-  static String _keepSkipped(AppLocalizations t, ImportSummary summary) =>
-      t.importKeepSkippedDetails(
-        summary.trashed,
-        summary.missing,
-        summary.notPhoto,
-        summary.tooLarge,
-        summary.notText,
-      );
-
-  /// Runs the Import [kind] as [work] beside the app in [jobs]
-  /// (obf-1061), on a page of its own that counts its Notes and that the
-  /// user may leave, and announces at the top in [t], taken before any
-  /// await, once done, even after this page closed, without values (UI
-  /// laws): its tap shows what went where, [finished] says it of the new
-  /// Area, with a way into the Area; or, with nothing to import, why
-  /// ([nothing]); or that it [failed]. The page says the same. Then gives
-  /// up what was picked for it ([release]).
-  Future<void> _runImport(
-    ImportKind kind,
-    AppLocalizations t,
-    Announcements? announcements,
-    NavigatorState navigator,
-    ImportJobs jobs, {
-    required ImportWork work,
-    required String Function(ImportSummary summary, String area) finished,
-    required ({String announced, String cause, String fix, String details})
-    Function(ImportSummary summary)
-    nothing,
-    required ({String announced, String cause, String fix}) failed,
-    required Future<void> Function() release,
-  }) async {
-    final store = widget.store;
-    final trail = widget.trail ?? BrowserTrail();
-    final job = ImportJob(kind);
-    _showImport(navigator, store, trail, job);
-    try {
-      final summary = await jobs.run(job, work);
-      // A Restart ended this run of the app meanwhile: its store is
-      // closed, and nobody is left to tell.
-      if (runOver(store)) return;
-      final area = switch (summary.areaId) {
-        final id? => Places(store).areaById(id),
-        null => null,
-      };
-      if (area == null) {
-        final why = nothing(summary);
-        job.ended(ImportEnd('${why.announced}\n\n${why.cause} ${why.fix}'));
-        announceFailureWith(
-          announcements,
-          navigator,
-          why.announced,
-          title: t.importNothingTitle,
-          cause: why.cause,
-          fix: why.fix,
-          details: why.details,
-        );
-        return;
-      }
-      final details = finished(summary, areaName(t, area));
-      job.ended(ImportEnd(details, area: area));
-      announcements?.announce(
-        t.importFinished,
-        onTap: () => unawaited(
-          showDialog<void>(
-            context: navigator.context,
-            builder: (context) => AlertDialog(
-              title: Text(context.t.importFinished),
-              content: SingleChildScrollView(child: Text(details)),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text(context.t.close),
-                ),
-                TextButton(
-                  key: const ValueKey('importOpenArea'),
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    _openImported(navigator, store, trail, area);
-                  },
-                  child: Text(context.t.importOpenArea),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    } on Exception catch (e) {
-      if (runOver(store)) return;
-      job.ended(
-        ImportEnd('${failed.announced}\n\n${failed.cause} ${failed.fix}'),
-      );
-      announceFailureWith(
-        announcements,
-        navigator,
-        failed.announced,
-        title: t.importFailedTitle,
-        cause: failed.cause,
-        fix: failed.fix,
-        details: '$e',
-      );
-    } finally {
-      // Not on a store a Restart closed meanwhile, which [release] reads.
-      if (!runOver(store)) unawaited(release());
-    }
-  }
-
-  /// The notes browser on top, the Areas list and in it the imported
-  /// [area], chosen as the last selected one; the Areas list alone while
-  /// [area] was locked and is closed meanwhile.
-  static void _openImported(
-    NavigatorState navigator,
-    Store store,
-    BrowserTrail trail,
-    Area area,
-  ) {
-    final notes = Notes(store);
-    final places = Places(store);
-    trail.choseArea(area);
     unawaited(
-      navigator.push(
+      Navigator.of(context).push(
         BrowserRoute<void>(
-          builder: (_) =>
-              AreasScreen(notes: notes, places: places, trail: trail),
-        ),
-      ),
-    );
-    final closed =
-        LockScope.of(navigator.context)?.isAreaClosed(area.id) ?? false;
-    if (closed) return;
-    unawaited(
-      navigator.push(
-        BrowserRoute<void>(
-          builder: (_) => AreaScreen(
-            notes: notes,
-            places: places,
-            trail: trail,
-            areaId: area.id,
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// The row of the Import [kind] in [jobs]: [title] over [detail], or
-  /// over [reading] with a spinner while it runs, its tap then opening
-  /// its page again (obf-1061); the other row takes no tap meanwhile.
-  Widget _importRow(
-    ImportJobs jobs,
-    ImportKind kind, {
-    required Key key,
-    required IconData icon,
-    required String title,
-    required String detail,
-    required String reading,
-    required VoidCallback onTap,
-  }) => ValueListenableBuilder<ImportJob?>(
-    valueListenable: jobs.running,
-    builder: (context, job, _) {
-      final running = job != null && job.kind == kind;
-      return ListTile(
-        key: key,
-        leading: Icon(icon),
-        title: Text(title),
-        subtitle: Text(running ? reading : detail),
-        trailing: running
-            ? const SizedBox.square(
-                dimension: 24,
-                child: CircularProgressIndicator(strokeWidth: 3),
-              )
-            : null,
-        enabled: job == null || running,
-        onTap: running
-            ? () => _showImport(
-                Navigator.of(context, rootNavigator: true),
-                widget.store,
-                widget.trail ?? BrowserTrail(),
-                job,
-              )
-            : onTap,
-      );
-    },
-  );
-
-  /// The page of the Import [job] on top, its Open opening the new Area
-  /// as [_openImported] does; once left, the running Import's row opens
-  /// it again.
-  static void _showImport(
-    NavigatorState navigator,
-    Store store,
-    BrowserTrail trail,
-    ImportJob job,
-  ) {
-    unawaited(
-      navigator.push(
-        MaterialPageRoute<void>(
-          builder: (_) => ImportScreen(
-            job: job,
-            onOpen: (area) => _openImported(navigator, store, trail, area),
+          builder: (_) => AreasScreen(
+            notes: Notes(store),
+            places: Places(store),
+            trail: widget.trail ?? BrowserTrail(),
           ),
         ),
       ),
@@ -616,20 +306,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
     final soundDetail = _sound == null ? t.alarmSoundOwn : t.alarmSoundChosen;
     final typed = _search.text.trim();
-    final imports = ImportJobsScope.of(context);
     return Scaffold(
-      appBar: pageBar(context, title: t.settingsTitle),
+      appBar: pageBar(
+        context,
+        title: t.settingsTitle,
+        background: searchHeaderColour(context),
+      ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // At the top, above the page it filters (#282).
-          Spotlight(
-            id: 'settings-search',
-            child: BrowserSearchField(
-              key: const ValueKey('settingsSearch'),
-              controller: _search,
-              hint: t.settingsSearchHint,
-              onChanged: _searched,
+          // At the top, above the page it filters (#282), on its band, so
+          // the page scrolls under a line, not an edge (obf-1088).
+          SearchBand(
+            child: Spotlight(
+              id: 'settings-search',
+              child: BrowserSearchField(
+                key: const ValueKey('settingsSearch'),
+                controller: _search,
+                hint: t.settingsSearchHint,
+                onChanged: _searched,
+              ),
             ),
           ),
           Expanded(
@@ -661,42 +357,51 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       heading: t.settingsLook,
                       headingKey: _heading('look'),
                       children: [
-                        SettingsRow(
-                          words: [t.themeSystem, t.themeLight, t.themeDark],
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: ChoiceChips<ThemeChoice>(
-                              key: const ValueKey('theme'),
-                              value: _theme,
-                              options: [
-                                RadioOption(
-                                  value: ThemeChoice.system,
-                                  title: Text(t.themeSystem),
-                                  secondary: const Icon(
-                                    Icons.brightness_auto_outlined,
-                                  ),
-                                ),
-                                RadioOption(
-                                  value: ThemeChoice.light,
-                                  title: Text(t.themeLight),
-                                  secondary: const Icon(
-                                    Icons.light_mode_outlined,
-                                  ),
-                                ),
-                                RadioOption(
-                                  value: ThemeChoice.dark,
-                                  title: Text(t.themeDark),
-                                  secondary: const Icon(
-                                    Icons.dark_mode_outlined,
-                                  ),
-                                ),
-                              ],
-                              onChanged: _setTheme,
-                            ),
-                          ),
-                        ),
                         SettingsSection(
                           children: [
+                            SettingsRow(
+                              words: [t.themeSystem, t.themeLight, t.themeDark],
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  8,
+                                  16,
+                                  0,
+                                ),
+                                // At the card's start, not its middle.
+                                child: Align(
+                                  alignment: AlignmentDirectional.centerStart,
+                                  child: ChoiceChips<ThemeChoice>(
+                                    key: const ValueKey('theme'),
+                                    value: _theme,
+                                    options: [
+                                      RadioOption(
+                                        value: ThemeChoice.system,
+                                        title: Text(t.themeSystem),
+                                        secondary: const Icon(
+                                          Icons.brightness_auto_outlined,
+                                        ),
+                                      ),
+                                      RadioOption(
+                                        value: ThemeChoice.light,
+                                        title: Text(t.themeLight),
+                                        secondary: const Icon(
+                                          Icons.light_mode_outlined,
+                                        ),
+                                      ),
+                                      RadioOption(
+                                        value: ThemeChoice.dark,
+                                        title: Text(t.themeDark),
+                                        secondary: const Icon(
+                                          Icons.dark_mode_outlined,
+                                        ),
+                                      ),
+                                    ],
+                                    onChanged: _setTheme,
+                                  ),
+                                ),
+                              ),
+                            ),
                             SettingsRow(
                               words: [
                                 t.textSize,
@@ -744,6 +449,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 subtitle: Text(t.fatFingersDetail),
                               ),
                             ),
+                            SettingsRow(
+                              words: [t.tapMarks, t.tapMarksDetail],
+                              child: ValueListenableBuilder<bool>(
+                                valueListenable: _tapMarks,
+                                builder: (context, on, _) => SwitchBelow(
+                                  switchKey: const ValueKey('tapMarks'),
+                                  leading: const Icon(Icons.priority_high),
+                                  value: on,
+                                  onChanged: _tapMarks.set,
+                                  title: Text(t.tapMarks),
+                                  subtitle: Text(t.tapMarksDetail),
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       ],
@@ -752,56 +471,64 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       heading: t.settingsUnits,
                       headingKey: _heading('units'),
                       children: [
-                        SettingsRow(
-                          words: [
-                            t.settingsUnitsDetail,
-                            regionUnits,
-                            t.unitSystemMetric,
-                            t.unitSystemImperial,
+                        SettingsSection(
+                          children: [
+                            SettingsRow(
+                              words: [
+                                t.settingsUnitsDetail,
+                                regionUnits,
+                                t.unitSystemMetric,
+                                t.unitSystemImperial,
+                              ],
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      16,
+                                      12,
+                                      16,
+                                      0,
+                                    ),
+                                    child: Text(t.settingsUnitsDetail),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                    ),
+                                    child: RadioColumn<_UnitChoice>(
+                                      key: const ValueKey('unitSystem'),
+                                      value: _units,
+                                      options: [
+                                        RadioOption(
+                                          key: const ValueKey(
+                                            'unitSystem-region',
+                                          ),
+                                          value: _UnitChoice.region,
+                                          title: Text(regionUnits),
+                                        ),
+                                        RadioOption(
+                                          key: const ValueKey(
+                                            'unitSystem-metric',
+                                          ),
+                                          value: _UnitChoice.metric,
+                                          title: Text(t.unitSystemMetric),
+                                        ),
+                                        RadioOption(
+                                          key: const ValueKey(
+                                            'unitSystem-imperial',
+                                          ),
+                                          value: _UnitChoice.imperial,
+                                          title: Text(t.unitSystemImperial),
+                                        ),
+                                      ],
+                                      onChanged: _setUnits,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ],
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(
-                                  24,
-                                  0,
-                                  24,
-                                  0,
-                                ),
-                                child: Text(t.settingsUnitsDetail),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                ),
-                                child: RadioColumn<_UnitChoice>(
-                                  key: const ValueKey('unitSystem'),
-                                  value: _units,
-                                  options: [
-                                    RadioOption(
-                                      key: const ValueKey('unitSystem-region'),
-                                      value: _UnitChoice.region,
-                                      title: Text(regionUnits),
-                                    ),
-                                    RadioOption(
-                                      key: const ValueKey('unitSystem-metric'),
-                                      value: _UnitChoice.metric,
-                                      title: Text(t.unitSystemMetric),
-                                    ),
-                                    RadioOption(
-                                      key: const ValueKey(
-                                        'unitSystem-imperial',
-                                      ),
-                                      value: _UnitChoice.imperial,
-                                      title: Text(t.unitSystemImperial),
-                                    ),
-                                  ],
-                                  onChanged: _setUnits,
-                                ),
-                              ),
-                            ],
-                          ),
                         ),
                       ],
                     ),
@@ -988,6 +715,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   ),
                                 ),
                               ),
+                            if (VoiceScope.of(context).available)
+                              SettingsRow(
+                                words: [
+                                  t.recordingPause,
+                                  t.recordingPauseDetail,
+                                ],
+                                child: ControlBelow(
+                                  leading: const Icon(Icons.mic_off_outlined),
+                                  title: Text(t.recordingPause),
+                                  subtitle: Text(t.recordingPauseDetail),
+                                  control: ChoiceChips<int>(
+                                    key: const ValueKey('recordingPause'),
+                                    value: _pauseSeconds,
+                                    onChanged: _setPause,
+                                    options: [
+                                      RadioOption(
+                                        value: 0,
+                                        title: Text(t.recordingPauseOff),
+                                      ),
+                                      for (final s in recordingPauseChoices)
+                                        RadioOption(
+                                          value: s,
+                                          title: Text(
+                                            t.recordingPauseSeconds(s),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                             if (PrintScope.of(context) case final printing
                                 when printing.available)
                               SettingsRow(
@@ -1085,37 +842,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       ],
                     ),
-                    if (FolderScope.of(context).available && imports != null)
+                    // The Imports are in the Areas list's ⋮ (obf-1096);
+                    // a search for them says so, and its tap leads there.
+                    if (_query.isNotEmpty && ImportsScreen.offered(context))
                       SettingsGroup(
-                        heading: t.settingsImport,
-                        headingKey: _heading('import'),
                         children: [
                           SettingsSection(
                             children: [
                               SettingsRow(
-                                words: [t.importFolder, t.importFolderDetail],
-                                child: _importRow(
-                                  imports,
-                                  ImportKind.folder,
-                                  key: const ValueKey('importFolder'),
-                                  icon: Icons.drive_folder_upload_outlined,
-                                  title: t.importFolder,
-                                  detail: t.importFolderDetail,
-                                  reading: t.importReading,
-                                  onTap: () => unawaited(_import(imports)),
-                                ),
-                              ),
-                              SettingsRow(
-                                words: [t.importKeep, t.importKeepDetail],
-                                child: _importRow(
-                                  imports,
-                                  ImportKind.keep,
-                                  key: const ValueKey('importKeep'),
-                                  icon: Icons.sticky_note_2_outlined,
-                                  title: t.importKeep,
-                                  detail: t.importKeepDetail,
-                                  reading: t.importKeepReading,
-                                  onTap: () => unawaited(_importKeep(imports)),
+                                // Found by the Imports' words, not
+                                // by the Areas list's.
+                                words: [
+                                  t.settingsImport,
+                                  t.importFolder,
+                                  t.importKeep,
+                                ],
+                                child: ListTile(
+                                  key: const ValueKey('settingsImportMoved'),
+                                  leading: const Icon(
+                                    Icons.drive_folder_upload_outlined,
+                                  ),
+                                  title: Text(t.settingsImportMoved),
+                                  onTap: _openAreas,
                                 ),
                               ),
                             ],
@@ -1151,13 +899,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                         ],
                       ),
-                    // The last of this phone's own (obf-1043): every
-                    // screen explains itself again.
+                    // The last of this phone's own: whether tips show
+                    // (obf-1060), and every screen explaining itself
+                    // again (obf-1043).
                     SettingsGroup(
+                      heading: t.settingsTips,
                       children: [
-                        const SizedBox(height: 16),
                         SettingsSection(
                           children: [
+                            SettingsRow(
+                              words: [
+                                t.settingsTipsSwitch,
+                                t.settingsTipsSwitchDetail,
+                              ],
+                              child: Spotlight(
+                                id: 'settings-tips-switch',
+                                child: ValueListenableBuilder<bool>(
+                                  valueListenable: _tips,
+                                  builder: (context, on, _) => SwitchBelow(
+                                    switchKey: const ValueKey('tipsOn'),
+                                    leading: const Icon(
+                                      Icons.lightbulb_outline,
+                                    ),
+                                    value: on,
+                                    onChanged: _tips.set,
+                                    title: Text(t.settingsTipsSwitch),
+                                    subtitle: Text(t.settingsTipsSwitchDetail),
+                                  ),
+                                ),
+                              ),
+                            ),
                             SettingsRow(
                               words: [t.settingsShowTips],
                               child: Spotlight(
@@ -1183,21 +954,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       heading: t.features,
                       headingKey: _heading('features'),
                       children: [
-                        SettingsRow(
-                          words: [
-                            t.featuresDetail,
-                            t.featuresSimple,
-                            t.featuresSimpleDetail,
-                            t.featuresAdvanced,
-                            t.featuresAdvancedDetail,
-                          ],
-                          child: Spotlight(
-                            id: 'settings-features',
-                            child: FeaturesChoice(
-                              advanced: _advanced,
-                              onChanged: _setAdvanced,
+                        SettingsSection(
+                          children: [
+                            SettingsRow(
+                              words: [
+                                t.featuresDetail,
+                                t.featuresSimple,
+                                t.featuresSimpleDetail,
+                                t.featuresAdvanced,
+                                t.featuresAdvancedDetail,
+                              ],
+                              child: Spotlight(
+                                id: 'settings-features',
+                                child: FeaturesChoice(
+                                  advanced: _advanced,
+                                  onChanged: _setAdvanced,
+                                  detailPadding: const EdgeInsets.fromLTRB(
+                                    16,
+                                    12,
+                                    16,
+                                    0,
+                                  ),
+                                ),
+                              ),
                             ),
-                          ),
+                          ],
                         ),
                       ],
                     ),
@@ -1287,10 +1068,11 @@ class _PrintServiceRowState extends State<_PrintServiceRow> {
         PrintServiceState.off => t.printServiceOff,
         PrintServiceState.unknown || null => t.printServiceUnknown,
       }, key: const ValueKey('printService-state')),
-      control: TextButton(
+      control: TextButton.icon(
         key: const ValueKey('printService-open'),
         onPressed: () => unawaited(widget.printing.openSettings()),
-        child: Text(t.printServiceOpen),
+        icon: const Icon(Icons.open_in_new),
+        label: Text(t.printServiceOpen),
       ),
     );
   }

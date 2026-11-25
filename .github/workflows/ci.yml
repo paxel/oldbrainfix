@@ -73,7 +73,7 @@ jobs:
         run: flutter test test/screenshots/screenshots_test.dart --run-skipped --concurrency=1 --plain-name 'guide frames'
       - name: The changed phone frames, for a look
         if: failure()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: guide-frames-phone
           path: build/guide-frames
@@ -183,11 +183,40 @@ jobs:
         run: cargo test -p oldbrainfix-gui --test screenshots --locked -- --ignored guide_frames
       - name: The changed desktop frames, for a look
         if: failure()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: guide-frames-desktop
           path: build/guide-frames
           if-no-files-found: ignore
+
+  # The desktop's Windows and macOS code (the named pipe, the open
+  # documents Apple Event, obf-1056) compiles and passes clippy before a
+  # tag: the release builds there, nothing else in CI does.
+  desktop-platforms:
+    name: ${{ github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork && format('Desktop on {0} (runs on push)', matrix.os) || format('Desktop on {0}', matrix.os) }}
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.fork
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            os: Windows
+          - runner: macos-latest
+            os: macOS
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable branch, 2026-10-16
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: desktop
+      - name: Lint every target of the desktop app
+        working-directory: desktop
+        run: cargo clippy -p oldbrainfix-gui --all-targets --locked -- -D warnings
 
   # The Flatpak (#45): the files Flathub gets are current and pass its
   # linters, and the manifest builds from source for both arches.

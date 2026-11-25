@@ -4,9 +4,11 @@
 //! Not today, and their choices in place, #269), shows again in place of
 //! the one with the same key, and is closed once its Occurrence is Done
 //! or skipped. A Windows toast offers the same buttons but is neither
-//! replaced nor closed: notify-rust shows each one anew and closes none. On macOS a click on it is heard, but
-//! it offers no buttons: more than one would go under a menu titled
-//! "Options" in English only.
+//! replaced nor closed: notify-rust shows each one anew and closes none.
+//! On macOS it offers no buttons: more than one would go under a menu
+//! titled "Options" in English only. On every system a click on the
+//! notification itself is heard as [`crate::alerts::OPEN`], and the
+//! notification goes once clicked (obf-1039).
 
 use std::sync::{Arc, Mutex};
 
@@ -182,10 +184,15 @@ impl Notifier for DesktopNotifier {
         std::thread::spawn(move || {
             // Unset, the library posts as Finder, and a click brings up
             // Finder instead of this app. The first call sets it; later
-            // ones only answer that it is set already.
-            drop(mac_notification_sys::set_application(
-                "io.github.paxel.oldbrainfix",
-            ));
+            // ones only answer that it is set already. One the system
+            // does not know, as a binary run outside its .app, posts as
+            // Terminal, where the click then goes: said once.
+            use mac_notification_sys::error::{ApplicationError, Error};
+            if let Err(Error::Application(ApplicationError::CouldNotSet(id))) =
+                mac_notification_sys::set_application(oldbrainfix_core::APP_ID)
+            {
+                eprintln!("oldbrainfix: notifications post as Terminal: {id} is not installed");
+            }
             let mut n = mac_notification_sys::Notification::new();
             n.title(&title)
                 .message(&body)

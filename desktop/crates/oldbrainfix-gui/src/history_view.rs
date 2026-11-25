@@ -75,12 +75,7 @@ pub fn page(ui: &mut Ui, t: &L10n, tones: Tones, shown: Option<&HistoryShown>, w
         ui.spacing_mut().item_spacing.y = 12.0;
         ui.add_space(4.0);
         let title: Vec<&str> = shown.title.trim().lines().take(TITLE_LINES).collect();
-        ui.label(
-            RichText::new(title.join("\n"))
-                .size(16.0)
-                .strong()
-                .color(text),
-        );
+        ui.label(RichText::new(title.join("\n")).size(16.0).strong());
         ui.label(RichText::new(&shown.schedule).color(text));
         if shown.streaks {
             embossed(ui, tones, false, None, |ui| {
@@ -88,7 +83,7 @@ pub fn page(ui: &mut Ui, t: &L10n, tones: Tones, shown: Option<&HistoryShown>, w
             });
         }
         embossed(ui, tones, false, None, |ui| adherence_panel(ui, t, history));
-        ui.label(RichText::new(t.history_log()).strong().color(text));
+        ui.label(RichText::new(t.history_log()).strong());
         ui.label(RichText::new(t.snoozes_here_device()).small().color(weak));
         if history.entries.is_empty() {
             ui.label(RichText::new(t.history_empty()).color(text));
@@ -103,7 +98,7 @@ pub fn page(ui: &mut Ui, t: &L10n, tones: Tones, shown: Option<&HistoryShown>, w
 /// The current and longest Streak, and the last seven days as dots.
 fn streak_panel(ui: &mut Ui, t: &L10n, tones: Tones, history: &RoutineHistory) {
     let text = ui.visuals().text_color();
-    ui.label(RichText::new(t.streak_heading()).strong().color(text));
+    ui.label(RichText::new(t.streak_heading()).strong());
     ui.columns(2, |columns| {
         for (ui, (label, count)) in columns.iter_mut().zip([
             (t.streak_now(), history.current_streak),
@@ -169,7 +164,7 @@ fn tertiary(ui: &Ui) -> Color32 {
 fn adherence_panel(ui: &mut Ui, t: &L10n, history: &RoutineHistory) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
-    ui.label(RichText::new(t.adherence_heading()).strong().color(text));
+    ui.label(RichText::new(t.adherence_heading()).strong());
     for (label, adherence) in [
         (t.adherence_this_week(), history.this_week),
         (t.adherence_this_month(), history.this_month),

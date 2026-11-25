@@ -19,7 +19,7 @@
 <li>After speaking, tap <strong>Stop</strong>.</li>
 <li>Tap <strong>10 min</strong>, <strong>30 min</strong> or <strong>1 h</strong>.</li>
 </box-tab>
-<box-tab device="desktop" alt="The quick note as a dialog over the desktop Agenda with a typed text, More and the Nudge buttons">
+<box-tab device="desktop" alt="The quick note as a dialog over the desktop Agenda with a typed text, the Nudge buttons and Open in the editor">
 <li>Press Ctrl+N, or click <strong>File ▸ New Note</strong>.</li>
 <li>Type what's on your mind.</li>
 <li>Click <strong>10 min</strong>, <strong>30 min</strong> or <strong>1 h</strong>.</li>
@@ -33,7 +33,9 @@
   <strong>Paste</strong> opens the capture screen filled from the clipboard, and <strong>File</strong>
   opens the system's file picker and attaches the files picked (see
   <a href="formatted-text-transcripts-photo-texts.html#attach-a-file-to-a-note">Attach a file to a Note</a>).
-  Voice, Photo, Gallery, Paste and File show only where the Device has them. While the fan is open, "+" reads as Close; tapping
+  Voice, Photo, Gallery, Paste and File show only where the Device has them. At the top of the
+  Agenda's fan, <strong>Editor</strong> opens an empty Note in the Note editor instead of the quick
+  note, Unsorted with a Nudge in 1 h; left empty, it makes nothing. While the fan is open, "+" reads as Close; tapping
   it again, tapping outside or Back closes the fan. A long press on "+" opens the capture screen
   with the keyboard up at once, as Text does, without the fan; a screen reader names it with the
   button, and on the iPhone VoiceOver lists it among the button's actions.
@@ -41,17 +43,19 @@
 <p>
   The capture screen, the quick note, holds the text field ("What's on your mind?") at the top,
   under it "Remind me to sort it in" with <strong>10 min</strong>, <strong>30 min</strong> and
-  <strong>1 h</strong>, and <strong>More</strong>; nothing else, in Simple and Advanced alike. Each
+  <strong>1 h</strong>, and under them the wide button <strong>Open in the editor</strong>; nothing
+  else, in Simple and Advanced alike. On the phone they sit right under the text and stay
+  there when the keyboard opens. Each
   of the three saves the Note and sets its Nudge to that time. Everything else, Photo, Voice,
   Gallery, Paste, File, the Kind, Add to Note…, Remind me…, File into…, the Frog, the Importance and
-  the format bar, is in the Note editor that More opens (see
+  the format bar, is in the Note editor that Open in the editor opens (see
   <a href="#sort-while-capturing">Sort while capturing</a>).
 </p>
 <ul>
-  <li><strong>Voice</strong>: the elapsed time runs above one big <strong>Stop</strong> button. There is no holding a button and no stop on silence. After Stop you are back on the quick note with the recording above the text and can type. The screen stays on while recording. Locked anyway, the iPhone goes on recording until you stop it; on Android, locking the phone or leaving the app ends the recording and keeps it. The first time, the app explains why it needs the microphone and asks for it.</li>
+  <li><strong>Voice</strong>: the elapsed time runs above one big <strong>Stop</strong> button. There is no holding a button. A pause is ignored unless <strong>Settings ▸ Capture ▸ End a recording after a pause</strong> is set on this Device to 2, 3, 5 or 10 s: then, once you have said something and stay silent that long, the recording ends and is kept as Stop keeps it, in the editor too. After Stop you are back on the quick note with the recording above the text and can type. With a speech model, "Transcribing…" and a moving line show under the recording; the Transcript then goes into the text, as a new paragraph after what you typed, once you pause typing for a second, and stays folded under the recording as <strong>Transcript</strong>. Leaving before it is done saves the Note without it in the text; the recording gets its Transcript all the same. The screen stays on while recording. Locked anyway, the iPhone goes on recording until you stop it or such a pause ends it; on Android, locking the phone or leaving the app ends the recording and keeps it. The first time, the app explains why it needs the microphone and asks for it.</li>
   <li><strong>Photo</strong>, <strong>Gallery</strong> and <strong>File</strong>: what was taken or picked shows above the text field, and the text becomes optional ("A few words about it (optional)").</li>
   <li><strong>Paste</strong>: the clipboard is read only on this tap. Its text goes into the field, its picture into the Note as a photo. When it holds neither, a line above the field says so.</li>
-  <li><strong>More</strong> saves the Note at once, Unsorted with a Nudge in 1 h, and opens it in the Note editor in place of the quick note, with everything the editor offers. Filing it there drops the Nudge, as filing always does. Leaving the editor goes back to where the capture was opened from. More waits until something is typed, recorded or picked, and behind the App Lock it is not offered, as the editor shows the Areas.</li>
+  <li><strong>Open in the editor</strong> saves the Note at once, Unsorted with a Nudge in 1 h, and opens it in the Note editor in place of the quick note, with everything the editor offers. Filing it there drops the Nudge, as filing always does. Leaving the editor goes back to where the capture was opened from. It waits until something is typed, recorded or picked, and behind the App Lock it is not offered, as the editor shows the Areas.</li>
 </ul>
 <p>
   Back, on the iPhone the back arrow at the top left, and the app going to the background save as
@@ -61,21 +65,27 @@
   tap switches it to its compact view and back.
 </p>
 <p>
-  On the desktop, <strong>File ▸ New Note</strong>, Ctrl+N (Cmd+N on macOS) and "New Note", the "+"
-  at the top of the Agenda and of Unsorted, open the quick note as the dialog "New Note" over the
-  window, its field reading "What's on your mind?". In All Notes, an Area or a Topic, the "+" is
-  "Add here"; its <strong>Note</strong> opens the quick note. The dialog's cross, Esc, Alt+Left and a
+  On the desktop, <strong>File ▸ New Note</strong> and Ctrl+N (Cmd+N on macOS) open the quick note
+  as the dialog "New Note" over the window, its field reading "What's on your mind?". "New Note",
+  the "+" at the top of the Agenda, and "+ New Note" at the top of Unsorted open a small menu:
+  <strong>Quick note</strong> opens the same dialog, <strong>Editor</strong> the Note dialog on an
+  empty Unsorted Note with a Nudge in 1 h, the cursor in its text; left empty, it is not kept. In All Notes, an Area or a Topic, "+ New Note"
+  opens a menu; its <strong>Note</strong> opens the quick note in All Notes and the Note dialog in an
+  Area or a Topic, as <strong>File ▸ New Note</strong> and Ctrl+N do there. Files dropped onto an
+  Area or a Topic still open the quick note, with one <strong>Save</strong> in place of the Nudge
+  buttons. The dialog's cross, Esc, Alt+Left and a
   click beside it close it and keep what is typed with a Nudge in 1 h. Enter starts a new line;
   Ctrl+Enter (Cmd+Enter on macOS) saves the Note with a Nudge in 1 h, or without one once the Note
   is sorted, and Ctrl+1, Ctrl+2 and Ctrl+3 save it with a Nudge in 10 min, 30 min or 1 h. Once
-  something is typed or waits in it, <strong>More</strong> and "Remind me to sort it in" with
-  <strong>10 min</strong>, <strong>30 min</strong> and <strong>1 h</strong> appear; nothing else.
+  something is typed or waits in it, "Remind me to sort it in" with <strong>10 min</strong>,
+  <strong>30 min</strong> and <strong>1 h</strong> appears, and under it the wide button
+  <strong>Open in the editor</strong> with the pencil; nothing else.
 </p>
 <ul>
-  <li><strong>More</strong> saves the Note at once, Unsorted with a Nudge in 1 h, and opens it in the Note dialog in place of the quick note, its text ready for typing. The list stays where it was. Record voice, Paste, Attach a file…, Merge into…, Add to a Shopping List and the badges are there.</li>
-  <li>With an Area or Topic shown in the list, the Note is filed there and needs no Nudge: one <strong>Save</strong> takes the place of the three Nudge buttons, and More files it there too.</li>
+  <li><strong>Open in the editor</strong> saves the Note at once, Unsorted with a Nudge in 1 h, and opens it in the Note dialog in place of the quick note, its text ready for typing. The list stays where it was. The badges are there under This Note, Voice, Paste and Attach a file… under Add, and Merge into… and Add to a Shopping List under Tidy.</li>
+  <li>With an Area or Topic shown in the list, the Note is filed there and needs no Nudge: one <strong>Save</strong> takes the place of the three Nudge buttons, and Open in the editor files it there too.</li>
   <li>Ctrl+V in the empty field puts the clipboard's text into the field. A pasted picture waits above the field as a "Photo" line and is saved with what is typed as the Note's photo.</li>
-  <li>Files dropped onto the window, and <strong>File ▸ Attach a file…</strong> with no Note open, open the quick note. They wait above the field, a picture as a "Photo" line, a sound file as a "Voice recording" line and any other file as a line with its name, and are saved with what is typed as one Note, the other files as its Attachments (see <a href="formatted-text-transcripts-photo-texts.html#attach-a-file-to-a-note">Attach a file to a Note</a>).</li>
+  <li>Files dropped onto the window open the quick note. They wait above the field, a picture as a "Photo" line, a sound file as a "Voice recording" line and any other file as a line with its name, and are saved with what is typed as one Note, the other files as its Attachments (see <a href="formatted-text-transcripts-photo-texts.html#attach-a-file-to-a-note">Attach a file to a Note</a>).</li>
 </ul>
 <p>
   Text still typed, and pictures and files still waiting, when the window closes are kept as a
@@ -92,38 +102,39 @@
 <guide-box name="sort-while-capturing">
 <h2>Sort while capturing</h2>
 <p>File the Note, or set it up, before you leave it.</p>
-<box-tab device="phone" alt="The Note editor opened with More from the quick note, the typed text and its badges">
+<box-tab device="phone" alt="The Note editor opened with Open in the editor from the quick note, the typed text and its badges">
 <li>Tap <strong>+</strong> ▸ <strong>Text</strong> and type.</li>
-<li>Tap <strong>More</strong>.</li>
+<li>Tap <strong>Open in the editor</strong>.</li>
 <li>Tap the place badge and pick an Area.</li>
 <li>Tap Back.</li>
 </box-tab>
-<box-tab device="desktop" alt="The Note dialog opened with More from the quick note, the typed text and its badges">
+<box-tab device="desktop" alt="The Note dialog opened with Open in the editor from the quick note, the typed text and its badges">
 <li>Press Ctrl+N and type.</li>
-<li>Click <strong>More</strong>.</li>
+<li>Click <strong>Open in the editor</strong>.</li>
 <li>Click the place badge and pick an Area.</li>
 <li>Press Esc.</li>
 </box-tab>
 <box-more>
 <p>
   The quick note is meant for getting a thought out of the head: it holds the text, the three
-  Nudge buttons and <strong>More</strong>, nothing else. More saves the Note, Unsorted with a Nudge
-  in 1 h, and opens it in the Note editor, on the desktop in the Note dialog, where everything else
-  is: the badges for the Kind, the place (File into…), the Importance and "+" with
-  <strong>Remind me…</strong>, in Advanced also Frog and Session; <strong>Merge into…</strong>,
-  which adds it to a Note you already have as a Section; the format bar;
+  Nudge buttons and <strong>Open in the editor</strong>, nothing else. Open in the editor saves the Note,
+  Unsorted with a Nudge in 1 h, and opens it in the Note editor, on the desktop in the Note dialog, where everything else
+  is: under <strong>This Note</strong> the badges for the Kind, the place (File into…) and the
+  Importance; the format bar; at the end of the page or the dialog, under <strong>Tidy</strong>,
+  <strong>Merge into…</strong>, which adds it to a Note you already have as a Section, and under
+  <strong>Add</strong> "+" with <strong>Remind me…</strong>, in Advanced also Frog and Session,
   and the buttons to add more:
 </p>
 <ul>
-  <li><strong>Photo</strong>, <strong>Gallery</strong> and <strong>Paste</strong> on the phone, <strong>Paste</strong> on the desktop: a photo, pictures picked or the clipboard's text and picture go onto the Note. On a phone-wide bar most of them sit in ⋮.</li>
-  <li><strong>Voice</strong> on the phone opens the recording page with its big <strong>Stop</strong>; <strong>Record voice</strong> in the Note dialog records under the Note's files. Stop, Back and closing keep the recording on the Note.</li>
+  <li><strong>Photo</strong>, <strong>Gallery</strong> and <strong>Paste</strong> on the phone, <strong>Paste</strong> on the desktop: a photo, pictures picked or the clipboard's text and picture go onto the Note.</li>
+  <li><strong>Voice</strong> on the phone opens the recording page with its big <strong>Stop</strong>; <strong>Voice</strong> in the Note dialog records under the Note's files, with its time and a big <strong>Stop</strong> over the groups. Stop, Back and closing keep the recording on the Note. On either, a pause ends the recording and keeps it only where <strong>Settings ▸ Capture ▸ End a recording after a pause</strong> is set to 2, 3, 5 or 10 s on that Device, once you have said something and stay silent that long.</li>
   <li><strong>Attach a file…</strong> picks files of any kind.</li>
   <li><strong>Add to a Shopping List</strong>: each line of a Plain Note becomes a Line of the list picked, and the Note goes. With one list it names it, such as <strong>Add to Weekly</strong>. It is offered for a Note without photos, files or Sections and with nothing set up from it.</li>
 </ul>
 <p>
   Filing the Note, or setting up a Routine, Reminder, Frog, Session or Tally, drops its Nudge, as
-  it always does. A capture opened inside an Area goes into that Area, and one
-  <strong>Save</strong> takes the place of the Nudge buttons.
+  it always does. In an Area or a Topic, "+" ▸ <strong>Note</strong> opens the Note editor, on the
+  desktop the Note dialog, on a new Note filed there and without a Nudge, not the quick note.
 </p>
 <p>
   A Note with a recording can go into a Shopping List too, with or without the speech model: say
@@ -146,14 +157,14 @@
 <guide-box name="capture-outside">
 <h2 id="the-hotkey-and-the-popup">Capture without opening the app</h2>
 <p>Start a Note from the home screen, or from anywhere on the computer.</p>
-<box-tab device="phone" alt="The quick note with a typed text, the three Nudge buttons and More">
+<box-tab device="phone" alt="The quick note with a typed text, the three Nudge buttons and Open in the editor">
 <li>Long-press the Old Brain Fix icon.</li>
 <li>Tap <strong>Voice</strong>, <strong>Text</strong> or <strong>Photo</strong>.</li>
 <li>Type, speak or take the photo.</li>
 <li>After speaking, tap <strong>Stop</strong>.</li>
 <li>Tap <strong>10 min</strong>, <strong>30 min</strong> or <strong>1 h</strong>.</li>
 </box-tab>
-<box-tab device="desktop" alt="The capture popup with a typed text, More and the Nudge buttons">
+<box-tab device="desktop" alt="The capture popup with a typed text, the Nudge buttons and Open in the editor">
 <li>Press Ctrl+Alt+N anywhere.</li>
 <li>Type what's on your mind.</li>
 <li>Press Enter.</li>
@@ -172,18 +183,18 @@
   <li><strong>Sharing</strong>: text, pictures and sound files shared from another app open the capture screen filled in, sound files as voice recordings. The app they came from is recorded with the Note.</li>
 </ul>
 <p>
-  While the App Lock is on, its lock screen has its own "+" with the same fan and the same long
-  press, and every quick entry point opens Capture without unlocking.
+  While the App Lock is on, its lock screen has its own "+" with the same fan, without Editor, and
+  the same long press, and every quick entry point opens Capture without unlocking.
 </p>
 <p>
   On the desktop, the hotkey, Ctrl+Alt+N unless changed, opens the popup "Capture a Note" over all
   other windows; <strong>File ▸ Quick note</strong> opens it too. It works while Old Brain Fix runs;
   where there is a tray, the app keeps running there after its window is closed. The popup holds a
-  field, <strong>More</strong> and the Nudge buttons, nothing else. Enter saves
+  field, the Nudge buttons and under them <strong>Open in the editor</strong>, nothing else. Enter saves
   the Note with a Nudge in 1 h, or without one once the Note is sorted, and Shift+Enter starts a
   new line; Ctrl+1, Ctrl+2 and Ctrl+3 (Cmd on macOS) save it with a Nudge in 10 min, 30 min or 1 h,
   as the Nudge buttons do. Esc and the close button
-  keep what is typed the same way, and an empty popup just closes. More saves the Note the
+  keep what is typed the same way, and an empty popup just closes. Open in the editor saves the Note the
   same way, closes the popup and opens the Note in the window's Note dialog, bringing the window back
   from the tray; it waits until something is typed.
 </p>
@@ -192,7 +203,7 @@
   pressed next, and the field "Hotkey" takes them typed out; it needs Ctrl, Alt or Super. On X11, Windows and macOS the app takes the key itself. On Wayland the desktop manages it:
   it asks once and lets you change the key in its own keyboard settings. Where the key is taken or no
   hotkey is possible, the line under the field says so. The tray's menu also has
-  <strong>Capture a Note</strong>.
+  <strong>Quick note</strong>.
 </p>
 <p>The command line:</p>
 <ul>
@@ -224,10 +235,10 @@
 <li>Tap the folder, <strong>File into…</strong>, in the bar.</li>
 <li>Pick the Area or Topic.</li>
 </box-tab>
-<box-tab device="desktop" alt="Unsorted in the desktop app, both of its cards selected, with File into… in a card's right-click menu">
+<box-tab device="desktop" alt="Unsorted in the desktop app, both of its cards selected, with This Note and File into… in a card's right-click menu">
 <li>Click the Nudge, or <strong>Unsorted</strong> in the sidebar.</li>
 <li>Ctrl-click the cards of the Notes.</li>
-<li>Right-click one of them ▸ <strong>File into…</strong>.</li>
+<li>Right-click one of them ▸ <strong>This Note ▸ File into…</strong>.</li>
 <li>Pick the Area or Topic.</li>
 </box-tab>
 <box-more>
@@ -251,19 +262,19 @@
   Unsorted" as well, which opens Unsorted.
 </p>
 <p>
-  On the desktop, File into… is also in a card's right-click menu and under <strong>Note ▸ File
-  into…</strong> (Ctrl+M), and the badge "Area and Topic" in the Note dialog opens it. A card can be
+  On the desktop, File into… is also under This Note in a card's right-click menu and its ⋮, Ctrl+M opens it, and
+  the badge "Area and Topic" in the Note dialog opens it. A card can be
   dragged onto an Area or Topic in the sidebar. Ctrl-click and Shift-click select several cards;
-  File into… then files all of them. A selected card's right-click also offers <strong>Merge
-  into…</strong>, <strong>Importance</strong> and <strong>Move to trash</strong> for all of them, and
+  File into… then files all of them. A selected card's right-click also offers
+  <strong>Importance</strong> under This Note, <strong>Merge into…</strong> and <strong>Move to
+  trash</strong> under Tidy for all of them, and
   in the Trash <strong>Restore</strong>; Ctrl+Z takes back the trash or the Merge of all of them at
   once.
 </p>
 <p>
-  On the card of an Unsorted Note, on the phone and on the desktop, Merge into… is called
-  <strong>Add to Note…</strong>: it merges the Note into the one picked, which it then shows as a
-  Section, the Notes added to last at the top.
-  On a filed Note's card, in the Note editor and in the Note menu it stays Merge into….
+  On the card of an Unsorted Note, on the phone and on the desktop, <strong>Merge into…</strong>
+  merges the Note into the one picked, which it then shows as a Section, the Notes added to last at
+  the top; it has the same name as on a filed Note's card and in the Note editor.
 </p>
 <p>
   A Note opened from Unsorted, or on the phone from "Waiting to be sorted", moves on once it is
@@ -287,9 +298,23 @@
   bar then says how many are ticked and offers <strong>File into…</strong>, <strong>Merge
   into…</strong>, which merges all of them into the Note picked, a ticked one included,
   <strong>Importance</strong> and <strong>Move to trash</strong>, which asks nothing: the
-  announcement "Moved to the Trash" at the top brings all of them back with one tap. In the Trash it
+  announcement "Moved to the trash" at the top brings all of them back with one tap. In the Trash it
   offers <strong>Restore</strong>. The card's own File into… still files that Note alone. Back or
   <strong>Stop selecting</strong> ends the selection without changing anything.
+</p>
+<p>
+  On the phone, <strong>Empty the trash now</strong> in the Trash's bar deletes what is in it for
+  good at once, instead of after 30 days. It asks once, such as "Delete 128 Notes and 4 Routines
+  for good? They can't come back."; <strong>Delete for good</strong> removes them with their
+  photos, recordings and files on this Device, and Cancel keeps them. Notes you may not change in a
+  Shared Area stay in the Trash, and so do Frogs. The line under the bar moves while it runs.
+</p>
+<p>
+  On the desktop, <strong>Empty the trash now</strong> stands beside the Trash's search field. It is
+  greyed while nothing in the Trash can be deleted, and asks the same question with
+  <strong>Delete for good</strong> and Cancel. It cannot be undone, Ctrl+Z included. While the Trash
+  is emptied, the line under the menu bar moves and the page Running lists it, without Abort; the
+  Trash shows what is left once it is done.
 </p>
 <p>
   File into… starts with a filter: typing shows the Areas and Topics whose names hold the text.
@@ -312,7 +337,7 @@
 <guide-box name="edit">
 <h2 id="the-note-editor">Change a Note</h2>
 <p>Change a Note's text and its settings.</p>
-<box-tab device="phone" alt="The Note editor with the text and two dated Sections under it in one box, then the badges Plain Note, Important, Household, the capture time, the text format and Hidden from AI, and the + badge">
+<box-tab device="phone" alt="The Note editor with the text and two dated Sections under it in one box, then under This Note the badges Plain Note, Important, Household, the capture time, the text format and Hidden from AI">
 <li>Long-press the Note's card.</li>
 <li>Change the text.</li>
 <li>Tap a badge to change its setting.</li>
@@ -339,7 +364,7 @@
   <a href="routines-and-agenda.html">Routines, Reminders and the Agenda</a>).
 </p>
 <p>
-  The Note's settings sit under the text and its Sections, or under the Lines or the Tally, in one row of badges.
+  The Note's settings sit under the text and its Sections, or under the Lines or the Tally, in one row of badges under <strong>This Note</strong>.
   Each starts with the setting's icon, the same whatever its value, then shows the value: as an icon
   where the setting has a few fixed values, such as the Importance, Show on the Agenda and
   Show ticks, and as short text otherwise, such as "Household" or "Every day · 08:00". The kind comes
@@ -351,7 +376,7 @@
   <li><strong>Area and Topic</strong>: where the Note is filed, or Unsorted, or "Not filed" for a Note with a Routine or the like and no Area. A tap opens File into….</li>
   <li><strong>Captured</strong>: when the Note was captured; its editor also shows the place, the calendar event, the Bluetooth device and the app it was shared from, as far as they were recorded. Each of these but the time has <strong>Remove</strong> beside it, which asks once and then takes the detail off the Note on every Device; the time it was captured stays. Under its text, each Section shows its own in one small grey line, such as "12:40 · Home · Dentist", its time alone when it was captured the same day as the part before it; a tap on the line opens the same details, with the same Remove. In a Shared Area, the Note's author and the Area's Managers may remove them.</li>
   <li>Each <strong>Routine</strong> and <strong>Reminder</strong> of the Note with its schedule, such as "Every day · 08:00". A tap opens its editor.</li>
-  <li><strong>Frog</strong>, while the Note has an open Frog or one eaten today or yesterday: Open, Eaten today or Eaten yesterday. A tap offers <strong>Eat now</strong> while it is open and <strong>Remove the Frog</strong> (see <a href="lists-tallies-sessions-frogs.html#eat-a-frog">Eat a frog</a>).</li>
+  <li><strong>Frog</strong>, while the Note has an open Frog or one eaten today or yesterday: Open, Eaten today or Eaten yesterday. A tap offers <strong>Eat now</strong> while it is open and <strong>Move to trash</strong> (see <a href="lists-tallies-sessions-frogs.html#eat-a-frog">Eat a frog</a>).</li>
   <li><strong>Text format</strong>, for a Plain Note: <strong>Plain text</strong>, <strong>Formatted text</strong> or <strong>Code</strong>, as choice chips; a formatted text does not become plain again (see <a href="formatted-text-transcripts-photo-texts.html">Formatted text</a>).</li>
   <li><strong>Show on the Agenda</strong> of a Checklist without a Routine or Reminder, and of a Shopping List: Off, One row with the number of open Lines, or Each open Line on its own row, with radio buttons in its editor.</li>
   <li><strong>Show ticks</strong>, while the Note has a box: On or Off, with a switch in its editor.</li>
@@ -361,11 +386,33 @@
   A tap on a badge opens its small editor, which names the setting beside the same icon, shows its
   values in words and changes it at once; the badge then shows the new value. A setting that does
   not apply has no badge, and where you may not change a setting, as on another person's Note in a
-  Shared Area, its badge only shows it. The row ends with <strong>+</strong> where you may set
-  things up; it offers <strong>Remind me…</strong>, <strong>Frog</strong>
-  and <strong>Session</strong>, as the alarm clock on the card does, in Simple only Remind me…,
+  Shared Area, its badge only shows it. <strong>+</strong>, first under <strong>Add</strong>, is
+  there where you may set things up; it offers <strong>Remind me…</strong>, <strong>Frog</strong>
+  and <strong>Session…</strong>, as the alarm clock on the card does, in Simple only Remind me…,
   no Frog while the Note has an open one, and no Session on a Session or a Code text. A screen reader reads each badge as its
   setting and value, such as "Importance: Important".
+</p>
+<p>
+  On the phone, the Note's actions follow at the end of the page in three more groups, as in the
+  Note dialog on the desktop: <strong>Add</strong> with "+", <strong>Voice</strong>,
+  <strong>Photo</strong>, <strong>Gallery</strong>, <strong>Paste</strong>, <strong>Attach a
+  file…</strong> and <strong>Add a part</strong>; <strong>Share</strong> with <strong>Send to a
+  person</strong>, <strong>Share to an app</strong> and <strong>Export as Pack…</strong>;
+  <strong>Tidy</strong> with <strong>Merge into…</strong>, <strong>Add to a Shopping List</strong>
+  and <strong>Move to trash</strong>. Voice, Photo, Gallery, Paste and Attach a file… show where the
+  phone has them, and a group shows only what you may do with the Note. The top bar keeps
+  <strong>Undo</strong>, <strong>Redo</strong>, <strong>Find in Note</strong>, the calendar,
+  <strong>History</strong> and <strong>Revert all changes</strong>.
+</p>
+<p>
+  In the Note dialog on the desktop, and in a Note's own window, the same three groups follow the
+  Note's files, Sections and Linked from, side by side where the dialog is wide enough:
+  <strong>Add</strong> with "+", <strong>Voice</strong>, <strong>Paste</strong>, <strong>Attach a
+  file…</strong> and <strong>Add a part</strong>; <strong>Share</strong> with <strong>Send to a
+  person</strong>, <strong>Copy text</strong>, <strong>Save as Markdown…</strong> and <strong>Export as
+  Pack…</strong>; <strong>Tidy</strong> with <strong>Merge into…</strong>, <strong>Add to a Shopping
+  List</strong> and <strong>Move to trash</strong>. The desktop takes no photos; a picture comes in
+  by Paste, Attach a file… or a drop.
 </p>
 <p>
   The text of each Section, an Amend or a Note merged in, is edited in place like the Note's own
@@ -376,16 +423,39 @@
   Ann". The text before every edit stays in the log.
 </p>
 <p>
-  <strong>Copy text</strong>, under <strong>Share…</strong> in the ⋮ of a Note's card, puts the text of the Note and of each of its
+  On the phone, <strong>Add a part</strong> under <strong>Add</strong> at the end of the page adds a
+  Section: it opens <strong>Add a part</strong> with "What's new?", and <strong>Add</strong> puts
+  what was typed under the Note with its own time and place. The editor shows no field for it until
+  then. A Note just made, in the editor opened by <strong>Open in the editor</strong> or by a list's
+  "+", has no Add a part; it is there once the Note is opened again.
+</p>
+<p>
+  <strong>Copy text</strong>, under <strong>Share</strong> in the ⋮ of a Note's card, puts the text of the Note and of each of its
   Sections on the clipboard, as they show, oldest first, with a blank line between them; a
   Checklist's or Shopping List's Lines come after its text as Markdown tasks. In the editor, a text that is only read, such as another person's Section, is selected with a long press;
-  the menu beside it offers <strong>Copy</strong> and <strong>Select all</strong>.
+  the toolbar just above it offers <strong>Copy</strong> and <strong>Find in Note</strong>.
+</p>
+<p>
+  On the phone, <strong>Undo</strong> and <strong>Redo</strong> come first in the editor's top bar.
+  They take back, and make again, one step at a time, what changed since the editor opened: the
+  text, a table's cells, the Lines of a list and the badges. Typing is one step until a pause of a
+  second or a new word. <strong>Revert all changes</strong>, on the bar after History, in ⋮ where the bar is full, asks once and then brings the Note
+  back to how it was when it was opened; Redo brings the changes back one by one. Undo does not make
+  a formatted text plain again, nor a Tally or a Session a Plain Note.
+</p>
+<p>
+  On the desktop, <strong>Undo</strong>, <strong>Redo</strong> and ⋮ stand in the Note dialog's bar,
+  before "Open in its own window" and the cross, and in a Note's own window before "Reading view".
+  They go through the same steps; outside a text field Ctrl+Z is Undo, Ctrl+Shift+Z and Ctrl+Y are
+  Redo (Cmd on macOS). Typing is one step until a pause of a second, a new word, leaving the field or
+  Save; a table's row or column menu is a step of its own. In a text field Ctrl+Z still undoes only
+  that field's typing. <strong>Revert all changes</strong> in ⋮ asks once, as on the phone.
 </p>
 <p>
   On the desktop, a double-click on a card, its pencil or Edit in its ⋮ opens the Note dialog; a
   single click only selects the card. The dialog shows the same badges and the same Done at the
-  top. Esc, its cross or a click beside it close it and keep the text. <strong>Copy as text</strong>,
-  in the dialog, the card's ⋮ and the Note menu, copies the Note's text, a list's Lines as Markdown tasks; text that is only read can
+  top. Esc, its cross or a click beside it close it and keep the text. <strong>Copy text</strong>,
+  in the dialog and under Share in the card's ⋮, copies the Note's text, a list's Lines as Markdown tasks; text that is only read can
   be selected and copied.
 </p>
 </box-more>
@@ -401,7 +471,7 @@
 </box-tab>
 <box-tab device="desktop" alt="The History of the kitchen tap's Note over the Note dialog">
 <li>Double-click the Note's card.</li>
-<li>Click <strong>Note ▸ History</strong>.</li>
+<li>Click <strong>⋮ ▸ History</strong> at the top of the Note dialog.</li>
 <li>Click <strong>Use this version</strong> under an older text.</li>
 </box-tab>
 <box-more>
@@ -416,8 +486,8 @@
   the History keeps every version.
 </p>
 <p>
-  On the desktop, <strong>Note ▸ History</strong> opens the same list as a dialog for the Note open
-  in the Note dialog.
+  On the desktop, <strong>History</strong> in the ⋮ at the top of the Note dialog opens the same
+  list as a dialog for the Note open in it.
 </p>
 </box-more>
 </guide-box>

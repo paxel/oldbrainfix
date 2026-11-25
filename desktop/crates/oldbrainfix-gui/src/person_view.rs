@@ -8,7 +8,7 @@
 //! changes to Ann" saves a bundle for all of their Devices (#108); once
 //! saved, the Changes Nudge no longer waits for them (#109).
 
-use egui::{Id, RichText, TextEdit, Ui, WidgetInfo, WidgetType};
+use egui::{Id, RichText, Ui, WidgetInfo, WidgetType};
 use oldbrainfix_core::{Profile, Store};
 
 use crate::l10n::L10n;
@@ -126,7 +126,7 @@ pub fn form(
         person_picture(ui, pictures, &person.theirs, 72.0, &theirs);
         ui.add_space(12.0);
         ui.vertical(|ui| {
-            ui.heading(RichText::new(&theirs).color(text));
+            crate::design::dialog_title(ui, &theirs);
             if let Some(code) = &person.code {
                 ui.horizontal(|ui| {
                     ui.label(RichText::new(t.profile_their_code()).color(weak));
@@ -214,7 +214,7 @@ pub fn form(
         actions.push(PersonAction::TheirNotes);
     }
     ui.separator();
-    ui.label(RichText::new(t.person_for_me()).strong().color(text));
+    ui.label(RichText::new(t.person_for_me()).strong());
     ui.label(RichText::new(t.person_for_me_detail()).small().color(weak));
     // Saved by a newer version of the app: shown, not changed here (ADR
     // 0034).
@@ -273,7 +273,7 @@ fn for_me(
     });
     ui.label(RichText::new(t.person_for_me_name()).color(text));
     let field = ui.add(
-        TextEdit::singleline(name)
+        crate::theme::field(ui, name)
             .id(Id::new("person name"))
             .hint_text(theirs)
             .desired_width(320.0),

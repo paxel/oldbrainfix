@@ -370,6 +370,7 @@
         "dentist": [],
         "x-ray": [],
         "müller": [],
+        "MULLER": [],
         "called": [],
         "loop": [],
         " e ": [
@@ -396,6 +397,15 @@
           "note:00000000000000000000000000000008",
           "note:00000000000000000000000000000001"
         ]
+      },
+      "findings": {
+        "MULLER": {},
+        "dentist": {},
+        "receipt": {},
+        "called": {},
+        "loop": {},
+        "lease": {},
+        "rent due": {}
       },
       "conflicts": []
     },
@@ -610,6 +620,7 @@
         "dentist": [],
         "x-ray": [],
         "müller": [],
+        "MULLER": [],
         "called": [],
         "loop": [],
         " e ": [
@@ -632,6 +643,15 @@
           "note:00000000000000000000000000000008",
           "note:00000000000000000000000000000001"
         ]
+      },
+      "findings": {
+        "MULLER": {},
+        "dentist": {},
+        "receipt": {},
+        "called": {},
+        "loop": {},
+        "lease": {},
+        "rent due": {}
       },
       "conflicts": []
     },
@@ -1138,6 +1158,7 @@
         "dentist": [],
         "x-ray": [],
         "müller": [],
+        "MULLER": [],
         "called": [],
         "loop": [],
         " e ": [
@@ -1173,6 +1194,15 @@
           "note:00000000000000000000000000000008",
           "note:00000000000000000000000000000001"
         ]
+      },
+      "findings": {
+        "MULLER": {},
+        "dentist": {},
+        "receipt": {},
+        "called": {},
+        "loop": {},
+        "lease": {},
+        "rent due": {}
       },
       "conflicts": []
     },
@@ -1607,6 +1637,7 @@
         "dentist": [],
         "x-ray": [],
         "müller": [],
+        "MULLER": [],
         "called": [],
         "loop": [],
         " e ": [
@@ -1638,6 +1669,15 @@
           "note:00000000000000000000000000000008",
           "note:00000000000000000000000000000001"
         ]
+      },
+      "findings": {
+        "MULLER": {},
+        "dentist": {},
+        "receipt": {},
+        "called": {},
+        "loop": {},
+        "lease": {},
+        "rent due": {}
       },
       "conflicts": []
     },

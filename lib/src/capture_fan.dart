@@ -7,10 +7,12 @@ import 'package:flutter/semantics.dart';
 import 'file_platform.dart';
 import 'l10n.dart';
 import 'photo_platform.dart';
+import 'tap_mark.dart';
 import 'voice_platform.dart';
 
-/// A way the Agenda's "+" fans out to capture a Note.
-enum CaptureWay { text, voice, photo, gallery, paste, file }
+/// A way the Agenda's "+" fans out to capture a Note; [editor] opens an
+/// empty Note in the Note editor (obf-1141).
+enum CaptureWay { text, voice, photo, gallery, paste, file, editor }
 
 /// One entry of a fan: its key, its icon and its words.
 typedef FanEntry = ({Key key, Widget icon, String label});
@@ -64,12 +66,14 @@ class FanRoute<T> extends PopupRoute<T> {
       final (:key, :icon, :label) = describe(context, value);
       return Padding(
         padding: const EdgeInsets.only(top: 12),
-        child: FloatingActionButton.extended(
-          key: key,
-          heroTag: null,
-          onPressed: () => Navigator.of(context).pop(value),
-          icon: icon,
-          label: Text(label),
+        child: TapMarked(
+          child: FloatingActionButton.extended(
+            key: key,
+            heroTag: null,
+            onPressed: () => Navigator.of(context).pop(value),
+            icon: icon,
+            label: Text(label),
+          ),
         ),
       );
     }
@@ -102,12 +106,14 @@ class FanRoute<T> extends PopupRoute<T> {
             ),
             Positioned.fromRect(
               rect: anchor,
-              child: FloatingActionButton(
-                key: closeKey,
-                heroTag: null,
-                tooltip: context.t.captureFanClose,
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Icon(Icons.close),
+              child: TapMarked(
+                child: FloatingActionButton(
+                  key: closeKey,
+                  heroTag: null,
+                  tooltip: context.t.captureFanClose,
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Icon(Icons.close),
+                ),
               ),
             ),
           ],
@@ -169,11 +175,13 @@ class CapturePlus extends StatelessWidget {
               unawaited(Feedback.forLongPress(context));
               onLongPress();
             },
-            child: FloatingActionButton(
-              key: plusKey,
-              heroTag: heroTag,
-              onPressed: onPressed,
-              child: const Icon(Icons.add),
+            child: TapMarked(
+              child: FloatingActionButton(
+                key: plusKey,
+                heroTag: heroTag,
+                onPressed: onPressed,
+                child: const Icon(Icons.add),
+              ),
             ),
           ),
         ),
@@ -204,6 +212,7 @@ class CaptureFanRoute extends FanRoute<CaptureWay> {
       CaptureWay.gallery => (Icons.photo_library_outlined, t.gallery),
       CaptureWay.paste => (Icons.content_paste, t.paste),
       CaptureWay.file => (Icons.attach_file, t.file),
+      CaptureWay.editor => (Icons.edit_outlined, t.captureFanEditor),
     };
     return (
       key: ValueKey('captureFan-${way.name}'),
@@ -214,8 +223,14 @@ class CaptureFanRoute extends FanRoute<CaptureWay> {
 }
 
 /// The fan for the "+" button laid out at [plus], with the ways this
-/// Device has; Text always. Null while [plus] is not laid out.
-CaptureFanRoute? captureFanFor(BuildContext context, GlobalKey plus) {
+/// Device has; Text always, and with [editor] Editor at the top
+/// (obf-1141): the Agenda's, not the lock screen's, as the editor shows
+/// the Areas. Null while [plus] is not laid out.
+CaptureFanRoute? captureFanFor(
+  BuildContext context,
+  GlobalKey plus, {
+  bool editor = false,
+}) {
   final anchor = fanAnchor(context, plus.currentContext);
   if (anchor == null) return null;
   final photos = PhotoScope.of(context);
@@ -228,6 +243,7 @@ CaptureFanRoute? captureFanFor(BuildContext context, GlobalKey plus) {
       if (photos.pickable) CaptureWay.gallery,
       if (photos.pasteable) CaptureWay.paste,
       if (FileScope.of(context).pickable) CaptureWay.file,
+      if (editor) CaptureWay.editor,
     ],
     barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
   );

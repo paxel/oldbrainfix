@@ -15,6 +15,7 @@ use oldbrainfix_core::{
     OpenedPack, Pack, PackItem, PackItemKind, PackNote, PackTicks, text_format,
 };
 
+use crate::design;
 use crate::icons;
 use crate::l10n::L10n;
 use crate::profile_view::{self, Pictures};
@@ -106,20 +107,15 @@ pub fn export_form(
     asked: &mut Option<PackAsk>,
 ) {
     heading(ui, t.pack_export_title());
-    let text = ui.visuals().text_color();
     let (_, size) = worked.of(pack, ticks);
-    ui.label(
-        RichText::new(t.pack_size(&size_text(t, size)))
-            .strong()
-            .color(text),
-    );
+    ui.label(RichText::new(t.pack_size(&size_text(t, size))).strong());
     tick_buttons(ui, t, pack, ticks);
     tree(ui, t, pack, ticks, &BTreeSet::new());
     ui.separator();
     tick_with_hint(ui, profile, t.pack_add_profile(), t.pack_add_profile_hint());
     let picked = worked.of(pack, ticks).0 > 0;
     ui.horizontal(|ui| {
-        if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+        if design::row_button(ui, t.cancel()).clicked() {
             *asked = Some(PackAsk::Cancel);
         }
         if theme::main_action(ui, picked && !busy, t.pack_save()) {
@@ -150,7 +146,7 @@ pub fn import_form(
         let said = t.pack_from(name);
         ui.horizontal(|ui| {
             profile_view::person_picture(ui, pictures, from, 40.0, &t.author_picture(name));
-            ui.label(RichText::new(&said).strong().color(text));
+            ui.label(RichText::new(&said).strong());
         });
         if !opened.from_kept
             && ui
@@ -170,7 +166,7 @@ pub fn import_form(
     }
     let picked = worked.of(pack, ticks).0 > 0;
     ui.horizontal(|ui| {
-        if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+        if design::row_button(ui, t.cancel()).clicked() {
             *asked = Some(PackAsk::Cancel);
         }
         if theme::main_action(ui, picked, t.pack_add()) {
@@ -181,8 +177,7 @@ pub fn import_form(
 }
 
 fn heading(ui: &mut Ui, title: &str) {
-    let text = ui.visuals().text_color();
-    ui.label(RichText::new(title).size(18.0).strong().color(text));
+    crate::design::dialog_title(ui, title);
 }
 
 /// "Tick all" and "Untick all", in place of the phone's bar.
@@ -288,7 +283,7 @@ fn row(
                 } else {
                     14.0
                 };
-                ui.label(RichText::new(name).size(size).strong().color(text));
+                ui.label(RichText::new(name).size(size).strong());
             });
             for child in &item.children {
                 row(

@@ -8,6 +8,8 @@ import 'package:oldbrainfix/src/text_marks_view.dart';
 import 'package:oldbrainfix/src/two_row_text_field.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'table_menu.dart';
+
 /// A table of a formatted text edited as a grid in place of its lines in
 /// the editor's field (#257): its cells typed into there, its rows and
 /// columns added, moved, deleted and lined up, the cursor going into it
@@ -372,6 +374,7 @@ void main() {
   Future<void> pick(WidgetTester tester, String heading, String item) async {
     await tester.tap(key(heading));
     await tester.pumpAndSettle();
+    await openTableGroup(tester, item);
     await tester.tap(key(item));
     await tester.pumpAndSettle();
   }
@@ -429,6 +432,69 @@ void main() {
     expect(controller.text, 'Shop\n\n\nBread');
   });
 
+  testWidgets('the table\'s ⋮ copies it, moves it past the block above or '
+      'below and deletes it, asking once while it holds words (obf-1050)', (
+    tester,
+  ) async {
+    final copied = <String?>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied.add((call.arguments as Map)['text'] as String?);
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    final controller = await pumpField(tester, shop);
+    const table = '| Item | Qty |\n| --- | --: |\n| milk | 2 |\n| oat | 1 |';
+
+    await pick(tester, 'grid-menu', 'table-menu-copy');
+    expect(copied, [table]);
+    expect(controller.text, shop);
+
+    await pick(tester, 'grid-menu', 'table-menu-up');
+    expect(controller.text, '$table\n\nShop\n\nBread');
+    await tester.tap(key('grid-menu'));
+    await tester.pumpAndSettle();
+    PopupMenuItem<Object?> item(String name) =>
+        tester.widget<PopupMenuItem<Object?>>(key(name));
+    expect(item('table-menu-up').enabled, isFalse);
+    expect(item('table-menu-down').enabled, isTrue);
+    await tester.tap(key('table-menu-down'));
+    await tester.pumpAndSettle();
+    expect(controller.text, shop);
+    await pick(tester, 'grid-menu', 'table-menu-down');
+    expect(controller.text, 'Shop\n\nBread\n\n$table');
+
+    await pick(tester, 'grid-menu', 'table-menu-delete');
+    expect(find.text('Delete the table?'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(controller.text, 'Shop\n\nBread\n\n$table');
+    await pick(tester, 'grid-menu', 'table-menu-delete');
+    await tester.tap(key('table-delete-confirm'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TableGrid), findsNothing);
+    expect(controller.text, 'Shop\n\nBread\n');
+  });
+
+  testWidgets('an empty table\'s ⋮ deletes it without asking', (tester) async {
+    final controller = await pumpField(
+      tester,
+      'Shop\n\n|  |  |\n| --- | --- |\n|  |  |',
+    );
+    await pick(tester, 'grid-menu', 'table-menu-delete');
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(controller.text, 'Shop\n');
+  });
+
   testWidgets('a column\'s menu lines it up, the way it does checked', (
     tester,
   ) async {
@@ -442,9 +508,11 @@ void main() {
 
     await tester.tap(key('grid-column-1'));
     await tester.pumpAndSettle();
+    await openTableGroup(tester, 'table-alignRight');
     expect(check('table-alignRight'), isNotNull);
     expect(check('table-alignLeft'), isNull);
     expect(check('table-alignCenter'), isNull);
+    await openTableGroup(tester, 'table-alignCenter');
     await tester.tap(key('table-alignCenter'));
     await tester.pumpAndSettle();
     expect(controller.text, contains('| --- | :-: |'));
@@ -462,12 +530,69 @@ void main() {
     expect(cell.textAlign, TextAlign.center);
   });
 
+  testWidgets('a column\'s menu sorts the rows by it in the text, ascending '
+      'or descending (obf-1052)', (tester) async {
+    final controller = await pumpField(tester, shop);
+    String lines() => controller.text.split('\n\n')[1];
+
+    await pick(tester, 'grid-column-1', 'table-sortUp');
+    expect(lines(), '| Item | Qty |\n| --- | --: |\n| oat | 1 |\n| milk | 2 |');
+    await pick(tester, 'grid-column-0', 'table-sortDown');
+    expect(lines(), '| Item | Qty |\n| --- | --: |\n| oat | 1 |\n| milk | 2 |');
+    await pick(tester, 'grid-column-0', 'table-sortUp');
+    expect(lines(), '| Item | Qty |\n| --- | --: |\n| milk | 2 |\n| oat | 1 |');
+    expect(controller.text, startsWith('Shop\n\n'));
+    expect(controller.text, endsWith('\n\nBread'));
+  });
+
+  testWidgets('a column\'s menu groups its entries: Insert, Move, Align, '
+      'Sort rows, Delete column and, on the first, First column as '
+      'headings (obf-1014)', (tester) async {
+    await pumpField(tester, shop);
+    List<String> shown() => [
+      for (final entry in [
+        'table-group-insert',
+        'table-group-move',
+        'table-group-align',
+        'table-group-sort',
+        'table-delete',
+        'table-headings',
+        'table-before',
+        'table-alignLeft',
+        'table-sortUp',
+      ])
+        if (key(entry).evaluate().isNotEmpty) entry,
+    ];
+
+    await tester.tap(key('grid-column-0'));
+    await tester.pumpAndSettle();
+    expect(shown(), [
+      'table-group-insert',
+      'table-group-move',
+      'table-group-align',
+      'table-group-sort',
+      'table-delete',
+      'table-headings',
+    ]);
+    await tester.tapAt(Offset.zero);
+    await tester.pumpAndSettle();
+    await tester.tap(key('grid-column-1'));
+    await tester.pumpAndSettle();
+    expect(shown(), contains('table-delete'));
+    expect(shown(), isNot(contains('table-headings')));
+    await tester.tap(key('table-group-sort'));
+    await tester.pumpAndSettle();
+    expect(find.text('Sort rows by this column'), findsOneWidget);
+    expect(find.text('Sort rows by this column, descending'), findsOneWidget);
+  });
+
   testWidgets('a column lining up on the left without saying so has Align '
       'left checked, and picking it keeps its line', (tester) async {
     final controller = await pumpField(tester, shop);
     final text = controller.text;
     await tester.tap(key('grid-column-0'));
     await tester.pumpAndSettle();
+    await openTableGroup(tester, 'table-alignLeft');
     expect(
       find.descendant(
         of: key('table-alignLeft'),
@@ -475,6 +600,7 @@ void main() {
       ),
       findsOneWidget,
     );
+    await openTableGroup(tester, 'table-alignLeft');
     await tester.tap(key('table-alignLeft'));
     await tester.pumpAndSettle();
     expect(controller.text, text);
@@ -595,6 +721,16 @@ void main() {
     await tester.tap(key('two-row-insert-box'));
     await tester.pumpAndSettle();
     expect(controller.text, contains('| **☐oat** | 1 |'));
+    // Code in an empty cell is inline code, never a code block.
+    editing(tester).value = const TextEditingValue(
+      text: '',
+      selection: TextSelection.collapsed(offset: 0),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(key('format-code'));
+    await tester.pumpAndSettle();
+    expect(editing(tester).text, '``');
+    expect(controller.text, isNot(contains('```')));
     await tester.pumpWidget(const SizedBox.shrink());
 
     // Simple: no bar while a cell is edited.

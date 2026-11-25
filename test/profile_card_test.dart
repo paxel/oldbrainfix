@@ -321,6 +321,21 @@ void main() {
       expect(find.byKey(const ValueKey('compare-codes')), findsNothing);
     });
 
+    testWidgets('Add is the one filled button; Scan their QR is outlined '
+        '(obf-1100)', (tester) async {
+      await start(tester);
+      await openAddPerson(tester);
+      expect(
+        tester.widget(find.byKey(const ValueKey('add-person-scan'))),
+        isA<OutlinedButton>(),
+      );
+      expect(find.byWidgetPredicate((w) => w is FilledButton), findsOneWidget);
+      expect(
+        tester.widget(find.byKey(const ValueKey('add-person-open'))),
+        isA<FilledButton>(),
+      );
+    });
+
     testWidgets('a QR in a picture adds them, not verified', (tester) async {
       pairing.text = ann.profileCard();
       await start(tester);

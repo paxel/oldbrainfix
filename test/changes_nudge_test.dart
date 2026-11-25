@@ -159,6 +159,18 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // It sends: a text button with its icon (obf-1108).
+    expect(
+      tester.widget(find.byKey(const ValueKey('sendChanges'))),
+      isA<TextButton>(),
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('sendChanges')),
+        matching: find.byIcon(Icons.send_outlined),
+      ),
+      findsOneWidget,
+    );
     files.shares = false;
     await tester.tap(find.text('Send changes to Ann'));
     await tester.pumpAndSettle();

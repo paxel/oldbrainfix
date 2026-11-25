@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'agenda_widget.dart';
+import 'notification_taps.dart';
 
 /// The access alarms need (ADR 0004), each granted by the user.
 enum AlarmPermission {
@@ -261,7 +262,8 @@ class ChecklistTapped extends AlarmAction {
 typedef WidgetPick = ({String sessionId, String occurrenceKey, String noteId});
 
 /// An Occurrence's notification tapped (#270): the Occurrence
-/// [occurrenceKey] of the Routine [routineId], whose Note opens.
+/// [occurrenceKey] of the Routine [routineId], which the Agenda shows
+/// marked (obf-1039).
 typedef OpenedOccurrence = ({String routineId, String occurrenceKey});
 
 /// A snooze tapped on the Nudge: the Notes Unsorted then wait until
@@ -360,6 +362,12 @@ abstract interface class AlarmPlatform {
   /// asked, or null; asking clears it.
   Future<OpenedOccurrence?> occurrenceOpened();
 
+  /// The last notification tap since this was last asked, for the trace
+  /// of the taps (obf-1039): its kind, how the app was then and when;
+  /// null when there was none or the platform does not tell. Asking
+  /// clears it.
+  Future<TapArrival?> tapArrived();
+
   /// The taps not acknowledged yet, oldest first.
   Future<List<AlarmAction>> pendingActions();
 
@@ -433,6 +441,9 @@ class NoAlarms implements AlarmPlatform {
 
   @override
   Future<OpenedOccurrence?> occurrenceOpened() async => null;
+
+  @override
+  Future<TapArrival?> tapArrived() async => null;
 
   @override
   Future<List<AlarmAction>> pendingActions() async => const [];
@@ -668,6 +679,14 @@ class AndroidAlarms implements AlarmPlatform {
   }
 
   @override
+  Future<TapArrival?> tapArrived() async {
+    final raw = await _call(
+      () => _channel.invokeMapMethod<String, Object?>('tapArrived'),
+    );
+    return tapArrivalOf(raw);
+  }
+
+  @override
   Future<List<AlarmAction>> pendingActions() async {
     final raw =
         await _call(
@@ -810,6 +829,21 @@ class AndroidAlarms implements AlarmPlatform {
       _ => null,
     };
   }
+}
+
+/// The tap [raw] tells of (android/…/NotificationTaps.kt): its kind, how
+/// the app was ("running", "background", "cold") and when, in
+/// milliseconds; null for none or one it cannot read.
+TapArrival? tapArrivalOf(Map<String, Object?>? raw) {
+  final (kind, from, at) = (raw?['kind'], raw?['from'], raw?['at']);
+  if (kind is! String || kind.isEmpty || at is! int) return null;
+  return (
+    kind: kind,
+    from:
+        TapFrom.values.where((f) => f.name == from).firstOrNull ??
+        TapFrom.unknown,
+    at: DateTime.fromMillisecondsSinceEpoch(at, isUtc: true),
+  );
 }
 
 /// The iPhone's alarm layer (ios/Runner/AlarmsChannel.swift): the same

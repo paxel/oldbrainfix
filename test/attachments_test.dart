@@ -445,6 +445,20 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(NoteEditorScreen), findsOneWidget);
 
+    // Both remove: filled on the error colour (obf-1107).
+    for (final name in ['remove-text:$hash', 'remove:$hash']) {
+      expect(
+        tester
+            .widget<Material>(
+              find
+                  .descendant(of: key(name), matching: find.byType(Material))
+                  .first,
+            )
+            .color,
+        Theme.of(tester.element(key(name))).colorScheme.error,
+        reason: name,
+      );
+    }
     await tap(tester, key('remove-text:$hash'));
     expect(notes.byId(id)!.removedAttachmentTexts, [hash]);
     expect(announcements.visible, 'Attachment Text removed');

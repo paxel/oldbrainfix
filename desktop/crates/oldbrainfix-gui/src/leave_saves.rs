@@ -37,12 +37,7 @@ impl Leaving {
 /// `Some(true)` for Discard, `Some(false)` for Keep editing.
 pub fn question(ui: &mut Ui, t: &L10n) -> Option<bool> {
     let text = ui.visuals().text_color();
-    ui.label(
-        RichText::new(t.leave_discard_title())
-            .size(18.0)
-            .strong()
-            .color(text),
-    );
+    crate::design::dialog_title(ui, t.leave_discard_title());
     ui.label(RichText::new(t.leave_discard_body()).color(text));
     let mut answer = None;
     ui.horizontal_wrapped(|ui| {

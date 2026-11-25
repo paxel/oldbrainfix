@@ -72,6 +72,10 @@ pub const UNIMPORTANT_OPACITY: f32 = 0.55;
 pub struct TextTones {
     /// Plain text, also on a marked row.
     pub text: Color32,
+    /// Strong text, a heading's (obf-1126): set off from plain text,
+    /// darker in light and brighter in dark, as egui's strong is only a
+    /// colour.
+    pub strong: Color32,
     /// Text that matters less: hints, times, explanations.
     pub weak: Color32,
     /// Links and text in the accent; the accent itself is for marks and
@@ -83,6 +87,7 @@ pub struct TextTones {
 
 pub const LIGHT_TEXT: TextTones = TextTones {
     text: Color32::from_gray(60),
+    strong: Color32::from_gray(15),
     weak: Color32::from_gray(90),
     link: argb(0xFF00695C),
     error: argb(0xFFA8231C),
@@ -91,6 +96,7 @@ pub const LIGHT_TEXT: TextTones = TextTones {
 
 pub const DARK_TEXT: TextTones = TextTones {
     text: Color32::from_gray(220),
+    strong: Color32::WHITE,
     weak: Color32::from_gray(180),
     link: argb(0xFF80CBC4),
     error: argb(0xFFFFB4AB),
@@ -108,6 +114,39 @@ pub const BUTTON_RADIUS: u8 = 8;
 
 /// The room between a button's words and its outline.
 const BUTTON_PADDING: egui::Vec2 = egui::vec2(10.0, 4.0);
+
+/// The room left and right of a field's text (obf-1128).
+const FIELD_SIDE: i8 = 8;
+
+/// The room around a single-line field's text in `font` (obf-1128):
+/// [`FIELD_SIDE`] at its sides, and above and below what makes it as tall
+/// as a button beside it, whatever its font and the text size.
+pub fn field_margin(ui: &Ui, font: &egui::FontId) -> egui::Margin {
+    let words = egui::TextStyle::Button.resolve(ui.style());
+    // A button is as tall as its words' line, a field at least as its
+    // font's row.
+    let line = |f: &mut egui::epaint::text::FontsView<'_>, font: &egui::FontId| {
+        f.layout_no_wrap("Mg".into(), font.clone(), Color32::PLACEHOLDER)
+            .size()
+            .y
+    };
+    let (button, own) = ui.ctx().fonts_mut(|f| {
+        let own = line(f, font).max(f.row_height(font));
+        (line(f, &words), own)
+    });
+    let height = (button + 2.0 * BUTTON_PADDING.y).max(ui.spacing().interact_size.y);
+    let margin = ((height - own) / 2.0).max(0.0).round() as i8;
+    egui::Margin::symmetric(FIELD_SIDE, margin)
+}
+
+/// A framed single-line field over `text` (UI laws, "Design system",
+/// obf-1128): every field of the desktop the same height, a button's,
+/// its text clear of its outline. A field in another font takes
+/// [`field_margin`] of that font after it.
+pub fn field<'t>(ui: &Ui, text: &'t mut dyn egui::TextBuffer) -> egui::TextEdit<'t> {
+    let body = egui::TextStyle::Body.resolve(ui.style());
+    egui::TextEdit::singleline(text).margin(field_margin(ui, &body))
+}
 
 /// What a button does (#218): the main action of a dialog or page, one
 /// that deletes or removes, or any other.
@@ -281,6 +320,19 @@ pub fn code_tint(text: Color32) -> Color32 {
     Color32::from_rgba_unmultiplied(text.r(), text.g(), text.b(), alpha)
 }
 
+/// The tint behind a place a search or a find bar found (obf-1047), the
+/// current one's stronger, in the dark look while `dark`: amber, which
+/// the look uses nowhere else, behind the text's own colour, dark on the
+/// light look's and light on the dark look's.
+pub fn found_tint(dark: bool, current: bool) -> Color32 {
+    match (dark, current) {
+        (false, false) => argb(0xFFFFE9A8),
+        (false, true) => argb(0xFFFFC34D),
+        (true, false) => argb(0xFF5C4A12),
+        (true, true) => argb(0xFF8A6400),
+    }
+}
+
 /// The colour a part of code of the kind `part` is drawn in (obf-1036),
 /// in the dark look while `dark`, readable on [`code_tint`]: GitHub's
 /// palette, as the phone's.
@@ -324,6 +376,9 @@ pub fn visuals(dark: bool) -> Visuals {
     v.selection.bg_fill = t.accent.gamma_multiply(SELECTION_TINT);
     v.selection.stroke = Stroke::new(1.0, t.accent);
     paint_buttons(&mut v, button_tones(dark, ButtonKind::Secondary));
+    // egui reads strong text's colour from a pressed widget's (obf-1126);
+    // a pressed button's words take it too, readable on its fill.
+    v.widgets.active.fg_stroke.color = x.strong;
     v
 }
 
@@ -335,6 +390,45 @@ pub fn install(ctx: &Context) {
     for theme in [Theme::Light, Theme::Dark] {
         ctx.style_mut_of(theme, |s| s.spacing.button_padding = BUTTON_PADDING);
     }
+    text_styles(ctx);
+}
+
+/// The size of content, a Note's or Section's text, a Line, what is
+/// typed (UI laws, "Text sizes", obf-1122), before the text size grows
+/// it through [`content`].
+pub const CONTENT: f32 = 16.0;
+
+/// The size of a label's and a button's words (UI laws, "Spacing and
+/// type", obf-1081), before the text size: egui's body and button text.
+pub const LABEL: f32 = 14.0;
+
+/// The size of a caption, a meta line or a hint (obf-1081), before the
+/// text size: egui's small text, `.small()`.
+pub const CAPTION: f32 = 12.0;
+
+/// The size of a page's or band's title (obf-1121), before the text
+/// size: egui's heading text, `ui.heading`.
+pub const TITLE: f32 = 22.0;
+
+/// Sets egui's text styles to the design's sizes (obf-1081): body and
+/// buttons [`LABEL`], small text [`CAPTION`], headings [`TITLE`]
+/// (obf-1121), grown by this Device's text size as a card's text is;
+/// code keeps egui's.
+fn text_styles(ctx: &Context) {
+    let factor = text_factor(ctx);
+    for theme in [Theme::Light, Theme::Dark] {
+        ctx.style_mut_of(theme, |s| {
+            for (style, size) in [
+                (egui::TextStyle::Body, LABEL),
+                (egui::TextStyle::Button, LABEL),
+                (egui::TextStyle::Small, CAPTION),
+                (egui::TextStyle::Heading, TITLE),
+            ] {
+                s.text_styles
+                    .insert(style, egui::FontId::proportional(size * factor));
+            }
+        });
+    }
 }
 
 /// Where the context keeps the factor of this Device's text size.
@@ -343,10 +437,12 @@ fn text_size_id() -> egui::Id {
 }
 
 /// Shows the text of Notes, Lines, Sections, the Agenda's rows and Ask's
-/// answers at `size`'s factor (#326, obf-1019), on top of the zoom of
-/// "Bigger text and icons"; the context keeps it, for every window.
+/// answers at `size`'s factor (#326, obf-1019), and the labels, buttons
+/// and captions around them (obf-1081), on top of the zoom of "Bigger
+/// text and icons"; the context keeps it, for every window.
 pub fn set_text_size(ctx: &Context, size: TextSize) {
     ctx.data_mut(|d| d.insert_temp(text_size_id(), size.factor()));
+    text_styles(ctx);
 }
 
 /// The factor of the text size shown around `ctx`; 1 until one is set.
@@ -355,8 +451,9 @@ pub fn text_factor(ctx: &Context) -> f32 {
 }
 
 /// `size`, a content text's usual size in points, at the text size of
-/// this Device (#326, obf-1019). Buttons, icons and labels around the
-/// text keep theirs.
+/// this Device (#326, obf-1019). Labels, buttons and captions grow with
+/// it through egui's text styles ([`LABEL`], [`CAPTION`]); icons keep
+/// their size.
 pub fn content(ui: &Ui, size: f32) -> f32 {
     size * text_factor(ui.ctx())
 }
@@ -453,6 +550,41 @@ pub fn tear_line(ui: &mut Ui) -> Response {
         ui.painter().extend(shapes);
     }
     response
+}
+
+/// The fill of the band a search field stands on over what it lists
+/// (obf-1088): the marks' tone, clearly set off from a dialog's card and
+/// a shade off the window's ground, where its line sets it off most, in
+/// the light and the dark look.
+pub fn band_fill(tones: Tones) -> Color32 {
+    tones.mark
+}
+
+/// The band a search field stands on over what scrolls under it
+/// (obf-1088, the phone's `SearchBand`): `add`'s field on [`band_fill`]
+/// across the width, a separator's line along its bottom, and nothing
+/// between it and what comes next, so a list right under it scrolls
+/// under the line, not under an edge in the page's own colour.
+pub fn search_band<R>(ui: &mut Ui, add: impl FnOnce(&mut Ui) -> R) -> R {
+    let fill = band_fill(tones(ui.visuals()));
+    let line = ui.visuals().widgets.noninteractive.bg_stroke;
+    let spacing = ui.spacing().item_spacing.y;
+    // The room after an item is taken as it is placed: none after the band.
+    ui.spacing_mut().item_spacing.y = 0.0;
+    let band = egui::Frame::NONE
+        .fill(fill)
+        .inner_margin(egui::Margin::symmetric(8, 8))
+        .show(ui, |ui| {
+            ui.spacing_mut().item_spacing.y = spacing;
+            ui.set_min_width(ui.available_width());
+            add(ui)
+        });
+    ui.spacing_mut().item_spacing.y = spacing;
+    let rect = band.response.rect;
+    // Inside the band, so what scrolls under it does not cover it.
+    let y = rect.bottom() - line.width / 2.0;
+    ui.painter().hline(rect.x_range(), y, line);
+    band.inner
 }
 
 #[cfg(test)]

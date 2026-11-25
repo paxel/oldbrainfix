@@ -4,15 +4,19 @@
 //! Note in a dialog, one at a time, which Esc, its cross and back close,
 //! keeping what was typed, the menu bar at hand over it and Tab kept off
 //! the list beneath; Ctrl+N, File ▸
-//! New Note and "+" open the quick note, and no list has a capture
-//! field; each setting is a badge read as "setting: value" whose small
+//! New Note and "+" open the quick note, in an Area or a Topic the Note
+//! dialog on a new Note filed there, which goes again left empty
+//! (obf-1140), and no list has a capture field; each setting is a badge read as "setting: value" whose small
 //! editor changes it; "+" makes a Note, a Checklist, a Shopping List, a
 //! Tally, a Session or a Frog where the list is, and the last card of a
 //! list scrolls fully clear of the window's edge (#158); a captured
 //! detail of the Note, in its Captured badge, or of a Section, in the
 //! dialog its line under it opens (#170),
 //! goes with its Remove after one question while the time stays, and
-//! where this Device may change the Note only (#162).
+//! where this Device may change the Note only (#162). The Amend box
+//! shows only once "Add a part" opened it (obf-1072). The dialog's
+//! buttons stand in four named groups, side by side where they fit
+//! (obf-1073).
 
 // A test may unwrap, expect, panic and index, its helpers too (#229).
 #![allow(
@@ -38,6 +42,7 @@ use oldbrainfix_core::{
     PairedDevice, PersonSettings, Places, Recurrence, Routines, Schedule, Sessions, ShoppingLists,
     SigningKey, Store, Tallies, TallyRule,
 };
+use oldbrainfix_gui::window_sizes::NOTE_DIALOG_SIZE;
 use oldbrainfix_gui::{App, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -179,6 +184,46 @@ fn a_card_opens_its_note_in_a_dialog_which_esc_closes_keeping_the_text() -> Test
     Ok(())
 }
 
+/// The sizes `words` are drawn at, wherever they are drawn.
+fn sizes_of(harness: &Harness<'_, App>, words: &str) -> Vec<f32> {
+    fn flat(shape: &egui::Shape, words: &str, into: &mut Vec<f32>) {
+        match shape {
+            egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| flat(s, words, into)),
+            egui::Shape::Text(text) if text.galley.text() == words => into.extend(
+                text.galley
+                    .job
+                    .sections
+                    .iter()
+                    .map(|s| s.format.font_id.size),
+            ),
+            _ => {}
+        }
+    }
+    let mut sizes = Vec::new();
+    for clipped in &harness.output().shapes {
+        flat(&clipped.shape, words, &mut sizes);
+    }
+    sizes
+}
+
+#[test]
+fn the_note_dialogs_text_is_content_16_as_on_the_card() -> TestResult {
+    let (store, _) = store()?;
+    let milk = Notes::new(&store).capture("Milk", None, None)?.id;
+    let mut harness = window(&store, Selection::All);
+    harness.state_mut().select_note(&milk);
+    harness.run();
+    assert!(harness.state().note_open());
+    // The card's and the dialog's field's.
+    let sizes = sizes_of(&harness, "Milk");
+    assert!(sizes.len() >= 2, "drawn at {sizes:?}");
+    assert!(
+        sizes.iter().all(|s| (s - 16.0).abs() < 0.01),
+        "drawn at {sizes:?}"
+    );
+    Ok(())
+}
+
 #[test]
 fn the_menu_bar_stays_at_hand_over_the_note_dialog() -> TestResult {
     let (store, household) = store()?;
@@ -186,17 +231,20 @@ fn the_menu_bar_stays_at_hand_over_the_note_dialog() -> TestResult {
     let mut harness = window(&store, Selection::All);
     harness.state_mut().select_note(&tap);
     harness.run();
-    bar(&harness, "Note").click();
+    bar(&harness, "File").click();
     harness.run();
-    let entry = last(&harness, "File into… Ctrl+M");
+    let entry = last(&harness, "Save as Markdown…");
     assert!(!entry.accesskit_node().is_disabled());
-    entry.click();
+    bar(&harness, "File").click();
+    harness.run();
+    // Ctrl+M files the Note open, with no Note menu (obf-1065).
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::M);
     harness.run();
     last(&harness, "Household").click();
     harness.run();
     let filed = Notes::new(&store).by_id(&tap)?.ok_or("the Note")?;
     assert_eq!(filed.place.as_deref(), Some(household.as_str()));
-    // Ctrl+M too, over the dialog.
+    // Ctrl+M again, over the dialog.
     assert!(harness.state().note_open());
     harness.key_press_modifiers(Modifiers::COMMAND, Key::M);
     harness.run();
@@ -252,8 +300,9 @@ fn ctrl_n_file_new_note_and_plus_open_the_quick_note_and_no_list_has_a_capture_f
     assert!(harness.state().quick_note_open());
     click(&mut harness, "Close");
     assert!(!harness.state().quick_note_open());
-    // The Agenda's "+".
+    // The Agenda's "+", its Quick note (obf-1141).
     click(&mut harness, "New Note");
+    click(&mut harness, "Quick note");
     assert!(harness.state().quick_note_open());
     Ok(())
 }
@@ -429,7 +478,8 @@ fn plus_badge_offers_remind_me_frog_and_session() -> TestResult {
         .get_by_label("Routine, Reminder, Frog or Session")
         .click();
     harness.run();
-    for label in ["Remind me…", "Frog", "Session"] {
+    // Session… as in every spawn menu (obf-1014, C11).
+    for label in ["Remind me…", "Frog", "Session…"] {
         assert!(shows(&harness, label), "{label}");
     }
     click(&mut harness, "Frog");
@@ -471,7 +521,8 @@ fn plus_offers_the_six_kinds_where_the_list_is_and_a_topic_in_an_area() -> TestR
     let mut harness = window(&store, Selection::Place(household.clone()));
     harness.get_by_label("Add here").click();
     harness.run();
-    for label in kinds.iter().chain(&["Topic"]) {
+    // New Topic, as everywhere (obf-1014, C12).
+    for label in kinds.iter().chain(&["New Topic"]) {
         assert!(shows(&harness, label), "{label}");
     }
     let mut harness = window(&store, Selection::All);
@@ -480,25 +531,216 @@ fn plus_offers_the_six_kinds_where_the_list_is_and_a_topic_in_an_area() -> TestR
     for label in kinds {
         assert!(shows(&harness, label), "{label}");
     }
-    assert!(!shows(&harness, "Topic"));
-    // Note opens the quick note, filed where the list is.
+    assert!(!shows(&harness, "New Topic"));
+    // Note opens the Note dialog on a Note filed where the list is
+    // (obf-1140).
     let mut harness = window(&store, Selection::Place(household.clone()));
     harness.get_by_label("Add here").click();
     harness.run();
     click(&mut harness, "Note");
-    assert!(harness.state().quick_note_open());
+    assert!(!harness.state().quick_note_open());
+    assert!(harness.state().note_open());
     typed(&mut harness, "Descale the kettle");
-    click(&mut harness, "Save");
+    harness.state_mut().close_note();
+    harness.run();
     let kettle = Notes::new(&store)
         .all()?
         .into_iter()
         .find(|n| n.text == "Descale the kettle")
         .ok_or("the Note")?;
     assert_eq!(kettle.place.as_deref(), Some(household.as_str()));
-    // Unsorted's "+" opens the quick note at once.
+    // Unsorted's "+" offers the quick note and the Note dialog
+    // (obf-1141).
     let mut harness = window(&store, Selection::Unsorted);
     click(&mut harness, "New Note");
+    click(&mut harness, "Quick note");
     assert!(harness.state().quick_note_open());
+    Ok(())
+}
+
+/// Opens the Note dialog by `how` over `harness`: 0 "+ New Note ▸ Note",
+/// 1 File ▸ New Note, 2 Ctrl+N.
+fn new_note_by(harness: &mut Harness<'_, App>, how: usize) {
+    match how {
+        0 => {
+            harness.get_by_label("Add here").click();
+            harness.run();
+            click(harness, "Note");
+        }
+        1 => {
+            bar(harness, "File").click();
+            harness.run();
+            last(harness, "New Note Ctrl+N").click();
+            harness.run();
+        }
+        _ => {
+            harness.key_press_modifiers(Modifiers::COMMAND, Key::N);
+            harness.run();
+        }
+    }
+    // The cursor waits in its text from the frame after it opened.
+    harness.run();
+}
+
+#[test]
+fn in_an_area_or_a_topic_new_note_opens_the_note_dialog_on_a_note_filed_there() -> TestResult {
+    let (store, household) = store()?;
+    let kitchen = Places::new(&store).add_topic(&household, "Kitchen")?.id;
+    for place in [household.clone(), kitchen.clone()] {
+        for how in 0..3 {
+            let mut harness = window(&store, Selection::Place(place.clone()));
+            new_note_by(&mut harness, how);
+            assert!(!harness.state().quick_note_open(), "{how}");
+            let id = harness
+                .state()
+                .selected_note()
+                .ok_or("the Note dialog")?
+                .to_string();
+            let made = Notes::new(&store).by_id(&id)?.ok_or("the Note")?;
+            assert_eq!(made.place.as_deref(), Some(place.as_str()), "{how}");
+            // Sorted, it needs no Nudge; just made, no "Add a part".
+            assert_eq!(store.current(&id, "nudge")?, None);
+            assert!(!shows(&harness, "Add a part"), "{how}");
+            // Its text has the keyboard; what is typed is kept.
+            let focused = harness.get_by(|n| n.is_focused());
+            assert_eq!(focused.accesskit_node().role(), Role::MultilineTextInput);
+            let words = format!("Descale the kettle {how}");
+            typed(&mut harness, &words);
+            harness.key_press(Key::Escape);
+            harness.run();
+            assert!(!harness.state().note_open());
+            assert_eq!(text_of(&store, &id)?, words);
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn a_new_note_left_empty_in_an_area_leaves_nothing() -> TestResult {
+    let (store, household) = store()?;
+    let mut harness = window(&store, Selection::Place(household.clone()));
+    for how in 0..3 {
+        new_note_by(&mut harness, how);
+        assert!(harness.state().note_open(), "{how}");
+        harness.key_press(Key::Escape);
+        harness.run();
+        assert!(!harness.state().note_open(), "{how}");
+    }
+    // Ctrl+N twice over the dialog piles none up either.
+    new_note_by(&mut harness, 2);
+    new_note_by(&mut harness, 2);
+    assert!(harness.state().note_open());
+    harness.state_mut().close_note();
+    harness.run();
+    assert!(Notes::new(&store).all()?.is_empty());
+    // Typed and wiped out again, it goes too; a Checklist made of it
+    // stays, though it holds no word.
+    new_note_by(&mut harness, 2);
+    typed(&mut harness, "x");
+    harness.key_press(Key::Backspace);
+    harness.run();
+    harness.state_mut().close_note();
+    harness.run();
+    assert!(Notes::new(&store).all()?.is_empty());
+    new_note_by(&mut harness, 2);
+    let id = harness
+        .state()
+        .selected_note()
+        .ok_or("the Note dialog")?
+        .to_string();
+    Checklists::new(&store).make(&id)?;
+    harness.state_mut().close_note();
+    harness.run();
+    assert_eq!(Notes::new(&store).all()?.len(), 1);
+    // Open as the window closes, it goes with it.
+    new_note_by(&mut harness, 2);
+    assert!(harness.state().note_open());
+    harness.state_mut().flush();
+    assert_eq!(Notes::new(&store).all()?.len(), 1);
+    Ok(())
+}
+
+/// The entries of the menu "+" opened, top to bottom.
+fn menu_entries(harness: &Harness<'_, App>) -> Vec<String> {
+    let mut entries: Vec<(f32, String)> = harness
+        .query_all_by_role(Role::Button)
+        .filter_map(|n| {
+            let label = n.accesskit_node().label()?;
+            ["Quick note", "Editor"]
+                .contains(&label.as_str())
+                .then(|| (n.rect().min.y, label))
+        })
+        .collect();
+    entries.sort_by(|a, b| a.0.total_cmp(&b.0));
+    entries.into_iter().map(|(_, label)| label).collect()
+}
+
+#[test]
+fn the_agendas_and_unsorteds_plus_offer_the_quick_note_and_the_editor() -> TestResult {
+    let (store, _) = store()?;
+    for selection in [Selection::Agenda, Selection::Unsorted] {
+        let mut harness = window(&store, selection.clone());
+        click(&mut harness, "New Note");
+        assert_eq!(
+            menu_entries(&harness),
+            ["Quick note", "Editor"],
+            "{selection:?}"
+        );
+        click(&mut harness, "Editor");
+        assert!(!harness.state().quick_note_open(), "{selection:?}");
+        let id = harness
+            .state()
+            .selected_note()
+            .ok_or("the Note dialog")?
+            .to_string();
+        // An empty Unsorted Note, nudged in 1 h as Open in the editor
+        // nudges, the cursor in its text, no "Add a part".
+        let made = Notes::new(&store).by_id(&id)?.ok_or("the Note")?;
+        assert!(made.is_unsorted());
+        assert_eq!(made.text, "");
+        let hour = oldbrainfix_core::dart_iso(store.now() + Duration::hours(1));
+        let nudge = store.current(&id, "nudge")?.ok_or("a Nudge")?;
+        assert!(nudge <= hour, "{nudge} {hour}");
+        assert!(!shows(&harness, "Add a part"));
+        harness.run();
+        let focused = harness.get_by(|n| n.is_focused());
+        assert_eq!(focused.accesskit_node().role(), Role::MultilineTextInput);
+        // Left empty, it makes nothing.
+        harness.key_press(Key::Escape);
+        harness.run();
+        assert!(!harness.state().note_open());
+        assert!(Notes::new(&store).all()?.is_empty(), "{selection:?}");
+        // Typed, it is kept.
+        click(&mut harness, "New Note");
+        click(&mut harness, "Editor");
+        harness.run();
+        typed(&mut harness, "Call the dentist");
+        harness.key_press(Key::Escape);
+        harness.run();
+        let dentist = Notes::new(&store)
+            .all()?
+            .into_iter()
+            .find(|n| n.text == "Call the dentist")
+            .ok_or("the Note")?;
+        assert!(dentist.is_unsorted());
+        Notes::new(&store).discard(&dentist.id)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn new_note_keeps_the_quick_note_on_the_agenda_unsorted_and_all_notes() -> TestResult {
+    let (store, _) = store()?;
+    for selection in [Selection::Agenda, Selection::Unsorted, Selection::All] {
+        // All Notes' "+ New Note ▸ Note" too.
+        let first = if selection == Selection::All { 0 } else { 1 };
+        for how in first..3 {
+            let mut harness = window(&store, selection.clone());
+            new_note_by(&mut harness, how);
+            assert!(harness.state().quick_note_open(), "{selection:?} {how}");
+            assert!(!harness.state().note_open(), "{selection:?} {how}");
+        }
+    }
     Ok(())
 }
 
@@ -515,7 +757,7 @@ fn in_simple_plus_offers_note_checklist_and_shopping_list_and_a_tally_stays() ->
     for label in ["Note", "Checklist", "Shopping List"] {
         assert!(shows(&harness, label), "{label}");
     }
-    for label in ["Tally", "Session", "Frog", "Topic"] {
+    for label in ["Tally", "Session", "Frog", "New Topic"] {
         assert!(!shows(&harness, label), "{label}");
     }
     Ok(())
@@ -647,6 +889,8 @@ fn a_tally_with_its_fields_takes_one_page_and_one_save_in_their_order() -> TestR
         typed(&mut harness, name);
     }
     // A row left without a name is dropped.
+    // "Add field" a text button with its plus (obf-1112).
+    assert!(in_accent(&harness, "Add field"));
     click(&mut harness, "Add field");
     // The first field's unit, typed with suggestions; its rule follows.
     harness
@@ -779,6 +1023,133 @@ fn the_last_card_of_a_list_scrolls_fully_clear() -> TestResult {
         "{last_card:?} in {height}"
     );
     assert!(add.bottom() < last_card.top(), "{add:?} {last_card:?}");
+    Ok(())
+}
+
+/// Whether the Amend box shows: its field, by its hint.
+fn amend_box(harness: &Harness<'_, App>) -> bool {
+    harness
+        .query_by(|n| n.placeholder() == Some("What's new?"))
+        .is_some()
+}
+
+/// Whether the dialog's Undo can be clicked.
+fn undoes(harness: &Harness<'_, App>) -> bool {
+    !last(harness, "Undo").accesskit_node().is_disabled()
+}
+
+#[test]
+fn the_amend_box_shows_only_once_add_a_part_opens_it() -> TestResult {
+    let (store, _) = store()?;
+    let tap = Notes::new(&store).capture("Fix the tap", None, None)?.id;
+    let mut harness = window(&store, Selection::All);
+    harness.state_mut().select_note(&tap);
+    harness.run();
+    // Neither its field nor "Add to Note", only the button.
+    assert!(!amend_box(&harness));
+    assert!(!shows(&harness, "Add to Note"));
+    assert!(shows(&harness, "Add a part"));
+    // Over the find bar too, which stays; opening it is no step.
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::F);
+    harness.run();
+    assert!(shows(&harness, "Close the find bar"));
+    click(&mut harness, "Add a part");
+    harness.run();
+    assert!(amend_box(&harness));
+    assert!(!shows(&harness, "Add a part"));
+    assert!(shows(&harness, "Close the find bar"));
+    assert!(!undoes(&harness));
+    // Its field has the keyboard.
+    let focused = harness.get_by(|n| n.is_focused());
+    assert_eq!(focused.accesskit_node().placeholder(), Some("What's new?"));
+    typed(&mut harness, "Washer bought");
+    // The box confirms with Add (obf-1014, C1).
+    click(&mut harness, "Add");
+    let sections = Notes::new(&store).sections(&tap)?;
+    assert_eq!(sections.len(), 1);
+    assert_eq!(sections[0].text, "Washer bought");
+    // Added, it goes until asked again.
+    assert!(!amend_box(&harness));
+    assert!(shows(&harness, "Add a part"));
+    Ok(())
+}
+
+#[test]
+fn a_part_typed_and_left_is_kept_and_the_box_shows_no_more() -> TestResult {
+    let (store, _) = store()?;
+    let tap = Notes::new(&store).capture("Fix the tap", None, None)?.id;
+    let mut harness = window(&store, Selection::All);
+    harness.state_mut().select_note(&tap);
+    harness.run();
+    click(&mut harness, "Add a part");
+    harness.run();
+    typed(&mut harness, "Plumber called");
+    harness.key_press(Key::Escape);
+    harness.run();
+    assert!(!harness.state().note_open());
+    let sections = Notes::new(&store).sections(&tap)?;
+    assert_eq!(sections.len(), 1);
+    assert_eq!(sections[0].text, "Plumber called");
+    // Opened again, the box waits to be asked.
+    harness.state_mut().select_note(&tap);
+    harness.run();
+    assert!(!amend_box(&harness));
+    assert!(shows(&harness, "Add a part"));
+    Ok(())
+}
+
+#[test]
+fn a_checklist_just_made_opens_without_the_amend_box() -> TestResult {
+    let (store, household) = store()?;
+    let mut harness = window(&store, Selection::Place(household));
+    harness.get_by_label("Add here").click();
+    harness.run();
+    click(&mut harness, "Checklist");
+    typed(&mut harness, "Packing");
+    click(&mut harness, "Create");
+    harness.run();
+    assert!(harness.state().note_open());
+    assert!(!amend_box(&harness));
+    assert!(!shows(&harness, "Add to Note"));
+    assert!(!shows(&harness, "Add a part"));
+    // Opened again, it has the button.
+    let packing = harness.state().selected_note().ok_or("the Checklist")?;
+    let packing = packing.to_string();
+    harness.state_mut().close_note();
+    harness.run();
+    harness.state_mut().select_note(&packing);
+    harness.run();
+    assert!(shows(&harness, "Add a part"));
+    Ok(())
+}
+
+#[test]
+fn a_note_from_the_quick_notes_open_in_the_editor_has_no_add_a_part() -> TestResult {
+    let (store, _) = store()?;
+    let mut harness = window(&store, Selection::All);
+    harness.state_mut().new_note();
+    harness.run();
+    harness
+        .get_by(|n| n.placeholder() == Some("What's on your mind?"))
+        .click();
+    harness.run();
+    typed(&mut harness, "Buy bread");
+    click(&mut harness, "Open in the editor");
+    harness.run();
+    assert!(harness.state().note_open());
+    assert!(!amend_box(&harness));
+    assert!(!shows(&harness, "Add a part"));
+    // Opened again, it has the button.
+    let bread = harness
+        .state()
+        .selected_note()
+        .ok_or("the Note")?
+        .to_string();
+    harness.state_mut().close_note();
+    harness.run();
+    harness.state_mut().select_note(&bread);
+    harness.run();
+    assert!(shows(&harness, "Add a part"));
     Ok(())
 }
 
@@ -1022,4 +1393,192 @@ fn a_member_has_no_remove_on_another_persons_note() -> TestResult {
             .is_none()
     );
     Ok(())
+}
+
+/// The group headings shown, each with its rect, top to bottom and left
+/// to right (obf-1073).
+fn headings(harness: &Harness<'_, App>) -> Vec<(String, egui::Rect)> {
+    let mut shown: Vec<(String, egui::Rect)> = harness
+        .query_all_by(|n| n.role() == Role::Heading)
+        .filter_map(|n| Some((n.accesskit_node().value()?, n.rect())))
+        .collect();
+    shown.sort_by(|a, b| {
+        (a.1.top(), a.1.left())
+            .partial_cmp(&(b.1.top(), b.1.left()))
+            .unwrap()
+    });
+    shown
+}
+
+fn heading_names(harness: &Harness<'_, App>) -> Vec<String> {
+    headings(harness)
+        .into_iter()
+        .map(|(name, _)| name)
+        .collect()
+}
+
+/// The heading `label`'s button stands under: the nearest one above it
+/// that begins left of its middle.
+fn group_of(harness: &Harness<'_, App>, label: &str) -> String {
+    let button = harness
+        .query_all_by(|n| n.label().is_some_and(|l| l.starts_with(label)))
+        .last()
+        .unwrap_or_else(|| panic!("no {label}"))
+        .rect();
+    headings(harness)
+        .into_iter()
+        .filter(|(_, at)| at.bottom() <= button.top() && at.left() <= button.center().x)
+        .max_by(|a, b| {
+            (a.1.top(), a.1.left())
+                .partial_cmp(&(b.1.top(), b.1.left()))
+                .unwrap()
+        })
+        .map(|(name, _)| name)
+        .unwrap_or_else(|| panic!("no heading over {label}"))
+}
+
+/// Each button and badge of the dialog's groups under its heading.
+fn assert_grouped(harness: &Harness<'_, App>) {
+    for (label, group) in [
+        ("Kind:", "This Note"),
+        ("Importance:", "This Note"),
+        ("Area and Topic:", "This Note"),
+        ("Routine, Reminder, Frog or Session", "Add"),
+        ("Attach a file…", "Add"),
+        ("Add a part", "Add"),
+        ("Send to a person", "Share"),
+        ("Copy text", "Share"),
+        ("Save as Markdown…", "Share"),
+        ("Export as Pack…", "Share"),
+        ("Merge into…", "Tidy"),
+        ("Move to trash", "Tidy"),
+    ] {
+        assert_eq!(group_of(harness, label), group, "{label}");
+    }
+}
+
+#[test]
+fn the_dialogs_buttons_stand_in_four_named_groups() -> TestResult {
+    let (store, _) = store()?;
+    let tap = Notes::new(&store).capture("Fix the tap", None, None)?.id;
+    let mut harness = window(&store, Selection::All);
+    harness.state_mut().select_note(&tap);
+    harness.run();
+    let names = heading_names(&harness);
+    assert_eq!(names[0], "This Note");
+    for name in ["Add", "Share", "Tidy"] {
+        assert!(names.iter().any(|n| n == name), "{names:?}");
+    }
+    assert_grouped(&harness);
+    // The badges under their heading, the rest after the Note.
+    let at = |name: &str| {
+        headings(&harness)
+            .into_iter()
+            .find(|h| h.0 == name)
+            .unwrap()
+            .1
+    };
+    assert!(at("This Note").top() < at("Add").top());
+    assert!(at("Add").top() <= at("Share").top());
+    assert!(at("Share").top() <= at("Tidy").top());
+    Ok(())
+}
+
+#[test]
+fn the_groups_stand_side_by_side_where_they_fit_and_one_under_another_where_not() -> TestResult {
+    let (store, _) = store()?;
+    let tap = Notes::new(&store).capture("Fix the tap", None, None)?.id;
+    store.set_local_setting(NOTE_DIALOG_SIZE, "1200,1000")?;
+    let mut harness = window(&store, Selection::All);
+    harness.state_mut().select_note(&tap);
+    harness.run();
+    let top = |harness: &Harness<'_, App>, name: &str| {
+        headings(harness)
+            .into_iter()
+            .find(|h| h.0 == name)
+            .unwrap()
+            .1
+            .top()
+    };
+    assert_eq!(top(&harness, "Add"), top(&harness, "Share"));
+    assert!(top(&harness, "Add") > top(&harness, "This Note"));
+    assert_grouped(&harness);
+    harness.state_mut().close_note();
+    harness.run();
+    // As narrow as the dialog goes, one under another.
+    store.set_local_setting(NOTE_DIALOG_SIZE, "320,1000")?;
+    let mut harness = window(&store, Selection::All);
+    harness.state_mut().select_note(&tap);
+    harness.run();
+    assert!(top(&harness, "Add") < top(&harness, "Share"));
+    assert!(top(&harness, "Share") < top(&harness, "Tidy"));
+    assert_grouped(&harness);
+    Ok(())
+}
+
+#[test]
+fn a_group_with_nothing_this_device_may_do_shows_nothing() -> TestResult {
+    // A Member on another person's Note: Add a part and Share, no Tidy.
+    let (ben, tap) = shared_captured()?;
+    let mut harness = window(&ben, Selection::All);
+    harness.state_mut().select_note(&tap);
+    harness.run();
+    assert_eq!(heading_names(&harness), ["This Note", "Add", "Share"]);
+    assert_eq!(group_of(&harness, "Add a part"), "Add");
+    assert!(!shows(&harness, "Attach a file…"));
+    assert!(!shows(&harness, "Move to trash"));
+    // A Note in the trash: its settings and Restore only.
+    let (store, _) = store()?;
+    let tap = Notes::new(&store).capture("Fix the tap", None, None)?.id;
+    Notes::new(&store).trash(&tap)?;
+    let mut harness = window(&store, Selection::Trash);
+    harness.state_mut().select_note(&tap);
+    harness.run();
+    assert_eq!(heading_names(&harness), ["This Note"]);
+    assert!(shows(&harness, "Restore"));
+    assert!(!shows(&harness, "Copy text"));
+    Ok(())
+}
+
+#[test]
+fn the_group_headings_are_in_german_too() -> TestResult {
+    let (store, _) = store()?;
+    let tap = Notes::new(&store).capture("Wasserhahn", None, None)?.id;
+    let mut app = App::new(store.clone(), "de");
+    app.select(Selection::All);
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(1280.0, 1200.0))
+        .build_ui_state(
+            |ui, app: &mut App| {
+                App::install(ui.ctx());
+                app.show(ui);
+            },
+            app,
+        );
+    harness.run();
+    harness.state_mut().select_note(&tap);
+    harness.run();
+    let names = heading_names(&harness);
+    for name in ["Diese Notiz", "Hinzufügen", "Teilen", "Aufräumen"] {
+        assert!(names.iter().any(|n| n == name), "{names:?}");
+    }
+    Ok(())
+}
+
+/// Whether the words `label` are drawn in the accent's text colour, as a
+/// text button's (obf-1112).
+fn in_accent(harness: &Harness<'_, App>, label: &str) -> bool {
+    fn flat(shape: &egui::Shape, label: &str, accent: egui::Color32) -> bool {
+        match shape {
+            egui::Shape::Vec(shapes) => shapes.iter().any(|s| flat(s, label, accent)),
+            egui::Shape::Text(text) => text.galley.text() == label && text.fallback_color == accent,
+            _ => false,
+        }
+    }
+    let accent = harness.ctx.global_style().visuals.hyperlink_color;
+    harness
+        .output()
+        .shapes
+        .iter()
+        .any(|clipped| flat(&clipped.shape, label, accent))
 }

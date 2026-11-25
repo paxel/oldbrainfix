@@ -387,7 +387,7 @@ class _BackupScreenState extends State<BackupScreen> {
                 icon: const Icon(Icons.print_outlined),
                 label: Text(t.backupSheetPrint),
               ),
-              FilledButton.tonalIcon(
+              OutlinedButton.icon(
                 key: const ValueKey('sheet-share'),
                 onPressed: _sheetBusy ? null : () => _sheet(print: false),
                 icon: const Icon(Icons.share_outlined),
@@ -428,7 +428,7 @@ class _BackupScreenState extends State<BackupScreen> {
             const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerLeft,
-              child: FilledButton.tonalIcon(
+              child: OutlinedButton.icon(
                 key: const ValueKey('backup-folder'),
                 onPressed: _backingUp ? null : _pickFolder,
                 icon: const Icon(Icons.folder_open_outlined),
@@ -487,7 +487,7 @@ class _BackupScreenState extends State<BackupScreen> {
                 const SizedBox(height: 8),
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: FilledButton.tonalIcon(
+                  child: OutlinedButton.icon(
                     key: const ValueKey('backup-open'),
                     onPressed: () => unawaited(
                       openBackupFile(context, _store, derive: widget.derive),

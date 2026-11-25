@@ -26,11 +26,16 @@ class _GatedRunner implements JobRunner {
   _GatedRunner(this.folders);
 
   @override
-  Future<T> run<T>(Store store, LongWork<T> work, JobProgress progress) async {
+  Future<T> run<T>(
+    Store store,
+    LongWork<T> work,
+    JobProgress progress,
+    JobStop stop,
+  ) async {
     told = progress;
     await gate.future;
     if (fails) throw const FileSystemException('disk full');
-    return work(store, folders, progress);
+    return work(store, folders, progress, () => File(stop.path).existsSync());
   }
 }
 

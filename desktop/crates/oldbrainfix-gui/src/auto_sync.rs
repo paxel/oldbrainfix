@@ -30,6 +30,10 @@ pub struct Syncing {
     running: Arc<AtomicUsize>,
     /// Since when syncs run without a pause, while any does.
     since: Arc<Mutex<Option<Instant>>>,
+    /// Raised by Abort on the page Running (obf-1078): what runs ends,
+    /// and no automatic sync starts until Sync now or Go on lowers it,
+    /// or the app starts again.
+    paused: Arc<AtomicBool>,
     wake: Option<Arc<dyn Fn() + Send + Sync>>,
 }
 
@@ -39,6 +43,7 @@ impl Syncing {
         Syncing {
             running: Arc::default(),
             since: Arc::default(),
+            paused: Arc::default(),
             wake: Some(Arc::new(wake)),
         }
     }
@@ -60,6 +65,31 @@ impl Syncing {
                 .ok()
                 .and_then(|since| *since)
                 .is_some_and(|since| since.elapsed() < limit)
+    }
+
+    /// Since when syncs run without a pause, while any does.
+    pub fn since(&self) -> Option<Instant> {
+        self.since.lock().ok().and_then(|since| *since)
+    }
+
+    /// Pauses the automatic syncs (obf-1078): a round or answer under
+    /// way cannot be cut in the middle and ends; after it, the shared
+    /// folder is not synced on its own, and a paired Device asking to sync
+    /// is told to come back later, until [`Syncing::go_on`].
+    pub fn pause(&self) {
+        self.paused.store(true, Ordering::SeqCst);
+        self.wake();
+    }
+
+    /// Ends the pause [`Syncing::pause`] began.
+    pub fn go_on(&self) {
+        self.paused.store(false, Ordering::SeqCst);
+        self.wake();
+    }
+
+    /// Whether the automatic syncs are paused.
+    pub fn paused(&self) -> bool {
+        self.paused.load(Ordering::SeqCst)
     }
 
     /// Runs `work` as a sync: [`Syncing::running`] meanwhile.
@@ -212,6 +242,13 @@ impl PairedHosting {
                     Some(desk) => desk.take(request),
                     None => request.reply(oldbrainfix_core::lan::Response::status(404)),
                 }
+                next = host.next_request();
+                continue;
+            }
+            // Paused on the page Running (obf-1078): the Device tries
+            // again on its own later.
+            if syncing.paused() {
+                request.reply(oldbrainfix_core::lan::Response::status(503));
                 next = host.next_request();
                 continue;
             }

@@ -114,6 +114,26 @@ fn click(harness: &mut Harness<'_, App>, label: &str) -> TestResult {
     Ok(())
 }
 
+/// Opens the card menu `menu`, then its submenus `path` (obf-1014).
+fn open_menu(harness: &mut Harness<'_, App>, menu: &str, path: &[&str]) -> TestResult {
+    click(harness, menu)?;
+    for part in path {
+        let label = format!("{part} ⏵");
+        harness
+            .query_all_by_label(&label)
+            .last()
+            .ok_or(format!("{label:?}"))?
+            .click();
+        harness.run();
+    }
+    Ok(())
+}
+
+/// The card's This Note ▸ Show on the Agenda ▸ of `menu`, opened.
+fn agenda_ways(harness: &mut Harness<'_, App>, menu: &str) -> TestResult {
+    open_menu(harness, menu, &["This Note", SETTING])
+}
+
 /// Whether the last radio button `label` shows chosen, or `None` while
 /// none shows.
 fn radio(harness: &Harness<'_, App>, label: &str) -> Option<bool> {
@@ -469,20 +489,17 @@ fn shown_as_its_count_it_is_its_heading_with_how_many_are_open() -> TestResult {
 #[test]
 fn the_cards_menu_offers_the_three_ways() -> TestResult {
     let (store, note) = packing()?;
-    // A Line checked, so "Uncheck all" shows after the choice.
+    // A Line checked, so "Uncheck all" shows.
     Checklists::new(&store).check(&line_id(&store, &note, "Ticket")?)?;
     let mut harness = window(&store, Selection::All, None);
-    click(&mut harness, "More: Packing")?;
+    // Uncheck all under Tidy ▸, the ways under This Note ▸ (obf-1014).
+    open_menu(&mut harness, "More: Packing", &["Tidy"])?;
+    assert!(shows(&harness, "Uncheck all"));
+    harness.key_press(egui::Key::Escape);
+    harness.run();
+    agenda_ways(&mut harness, "More: Packing")?;
     assert!(no_switch(&harness));
     assert_eq!(chosen(&harness), [Some(false), Some(false), Some(true)]);
-    let below = top(&harness, "Uncheck all")?;
-    let lines_top = harness
-        .query_all_by_role_and_label(Role::RadioButton, LINES)
-        .last()
-        .ok_or("the choice")?
-        .rect()
-        .top();
-    assert!(lines_top < below);
     pick(&mut harness, COUNT)?;
     let lists = Checklists::new(&store);
     assert_eq!(lists.on_agenda(&note)?, ListOnAgenda::Count);
@@ -492,7 +509,7 @@ fn the_cards_menu_offers_the_three_ways() -> TestResult {
     assert!(line_box(&harness, "Passport").is_none());
     harness.state_mut().select(Selection::All);
     harness.run();
-    click(&mut harness, "More: Packing")?;
+    agenda_ways(&mut harness, "More: Packing")?;
     assert_eq!(chosen(&harness), [Some(false), Some(true), Some(false)]);
     pick(&mut harness, OFF)?;
     assert_eq!(lists.on_agenda(&note)?, ListOnAgenda::Off);
@@ -502,7 +519,7 @@ fn the_cards_menu_offers_the_three_ways() -> TestResult {
     assert!(shows(&harness, NOTHING_TODAY));
     harness.state_mut().select(Selection::All);
     harness.run();
-    click(&mut harness, "More: Packing")?;
+    agenda_ways(&mut harness, "More: Packing")?;
     pick(&mut harness, LINES)?;
     assert_eq!(lists.on_agenda(&note)?, ListOnAgenda::Lines);
     Ok(())

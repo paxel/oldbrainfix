@@ -1,10 +1,11 @@
 //! The quick note (#142, #352) in the capture popup and the window's
 //! quick note dialog (#146), driven headless by egui_kittest over a store
 //! with its clock held still: it shows the text, the three Nudge buttons
-//! and More, nothing else, also where the five old switches of Settings ▸
-//! Quick note are on, whose rows are gone; with the Nudge buttons off one
-//! Save nudges in 1 h; a filed capture shows Save; Esc saves as the 1 h
-//! button does, an empty one nothing; More saves the Note and opens it in
+//! and under them Open in the editor across the width (obf-1080), nothing
+//! else, also where the five old switches of Settings ▸ Quick note are
+//! on, whose rows are gone; with the Nudge buttons off one Save nudges in
+//! 1 h; a filed capture shows Save; Esc saves as the 1 h button does, an
+//! empty one nothing; Open in the editor saves the Note and opens it in
 //! the Note dialog.
 
 use std::sync::Arc;
@@ -22,12 +23,15 @@ use oldbrainfix_gui::{App, Page, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
+/// The button that saves the Note and opens the Note dialog (obf-1080).
+const OPEN: &str = "Open in the editor";
+
 /// What the quick note no longer shows (#352): the alarm clock, the
 /// buttons for recordings, pictures and files, To full editor, Add to
 /// Note…, File into… and the format bar.
 const GONE: [&str; 9] = [
     "Routine, Reminder, Frog or Session",
-    "Record voice",
+    "Voice",
     "Paste",
     "From file…",
     "To full editor",
@@ -90,9 +94,9 @@ fn enabled<S>(harness: &Harness<'_, S>, label: &str) -> bool {
 }
 
 /// Whether the quick note shows the text, the three Nudge buttons and
-/// More, and nothing of [`GONE`] nor the Kind choice.
-fn only_text_nudges_and_more<S>(harness: &Harness<'_, S>) {
-    for label in ["10 min", "30 min", "1 h", "More"] {
+/// Open in the editor, and nothing of [`GONE`] nor the Kind choice.
+fn only_text_nudges_and_open<S>(harness: &Harness<'_, S>) {
+    for label in ["10 min", "30 min", "1 h", OPEN] {
         assert!(shows(harness, label), "{label}");
     }
     for label in GONE {
@@ -103,6 +107,19 @@ fn only_text_nudges_and_more<S>(harness: &Harness<'_, S>) {
             .query_all_by_role_and_label(Role::RadioButton, "Checklist")
             .next()
             .is_none()
+    );
+}
+
+/// Whether Open in the editor sits under the button `above`, as wide as
+/// the text field, which has the keyboard (obf-1080).
+fn under_and_across<S>(harness: &Harness<'_, S>, above: &str) {
+    let open = harness.get_by_role_and_label(Role::Button, OPEN).rect();
+    let above = harness.get_by_role_and_label(Role::Button, above).rect();
+    let field = harness.get_by(|n| n.is_focused()).rect();
+    assert!(open.min.y >= above.max.y, "{open:?} under {above:?}");
+    assert!(
+        open.width() >= field.width() - 1.0,
+        "{open:?} across {field:?}"
     );
 }
 
@@ -169,28 +186,31 @@ fn type_in_window(harness: &mut Harness<'_, App>, text: &str) {
 }
 
 #[test]
-fn the_popup_shows_only_the_text_the_nudge_buttons_and_more() -> TestResult {
+fn the_popup_shows_only_the_text_the_nudge_buttons_and_open_in_the_editor() -> TestResult {
     let (store, _) = store()?;
     let mut harness = popup(&store);
-    only_text_nudges_and_more(&harness);
-    // More waits while there is nothing to save.
-    assert!(!enabled(&harness, "More"));
+    only_text_nudges_and_open(&harness);
+    // Open in the editor waits while there is nothing to save.
+    assert!(!enabled(&harness, OPEN));
     type_in_popup(&mut harness, "Buy stamps");
-    assert!(enabled(&harness, "More"));
-    only_text_nudges_and_more(&harness);
+    assert!(enabled(&harness, OPEN));
+    only_text_nudges_and_open(&harness);
+    under_and_across(&harness, "1 h");
     Ok(())
 }
 
 #[test]
-fn the_window_quick_note_shows_only_the_text_the_nudge_buttons_and_more() -> TestResult {
+fn the_window_quick_note_shows_only_the_text_the_nudge_buttons_and_open_in_the_editor() -> TestResult
+{
     let (store, _) = store()?;
     let mut harness = window(&store, Selection::All);
     harness.state_mut().new_note();
     harness.run();
-    // Nothing typed, nothing to save: no More yet.
-    assert!(!shows(&harness, "More"));
+    // Nothing typed, nothing to save: no Open in the editor yet.
+    assert!(!shows(&harness, OPEN));
     type_in_window(&mut harness, "Buy stamps");
-    only_text_nudges_and_more(&harness);
+    only_text_nudges_and_open(&harness);
+    under_and_across(&harness, "1 h");
     Ok(())
 }
 
@@ -206,10 +226,10 @@ fn the_old_switches_bring_nothing_back() -> TestResult {
     oldbrainfix_core::ShoppingLists::new(&store).make(&list)?;
     let mut harness = popup(&store);
     type_in_popup(&mut harness, "Buy stamps");
-    only_text_nudges_and_more(&harness);
+    only_text_nudges_and_open(&harness);
     let mut harness = window(&store, Selection::All);
     type_in_window(&mut harness, "Post the letter");
-    only_text_nudges_and_more(&harness);
+    only_text_nudges_and_open(&harness);
     // What they stored stays.
     for control in SWITCHES {
         assert!(settings.quick_note_shows(control)?, "{control:?}");
@@ -250,7 +270,8 @@ fn the_settings_card_offers_only_the_nudge_buttons() -> TestResult {
     type_in_window(&mut harness, "Buy stamps");
     assert!(!shows(&harness, "10 min"));
     assert!(shows(&harness, "Save"));
-    assert!(shows(&harness, "More"));
+    assert!(shows(&harness, OPEN));
+    under_and_across(&harness, "Save");
     Ok(())
 }
 
@@ -278,11 +299,22 @@ fn without_the_nudge_buttons_one_save_nudges_in_an_hour() -> TestResult {
 #[test]
 fn a_filed_capture_shows_save_instead_of_the_nudge_buttons() -> TestResult {
     let (store, household) = store()?;
-    // In the window, inside an Area, it goes there.
+    // A file dropped onto an Area opens the quick note there (obf-1140),
+    // and the Note goes there.
+    let dir = tempfile::tempdir()?;
+    let list = dir.path().join("list.txt");
+    std::fs::write(&list, "Washers")?;
     let mut harness = window(&store, Selection::Place(household.clone()));
+    harness.input_mut().dropped_files = vec![egui::DroppedFile {
+        path: Some(list),
+        ..Default::default()
+    }];
+    harness.run();
+    assert!(harness.state().quick_note_open());
     type_in_window(&mut harness, "Fix the tap");
     assert!(!shows(&harness, "10 min"));
-    assert!(shows(&harness, "More"));
+    assert!(shows(&harness, OPEN));
+    under_and_across(&harness, "Save");
     assert!(shows(&harness, "Ctrl+Enter saves it."));
     click(&mut harness, "Save");
     let tap = note(&store, "Fix the tap")?.ok_or("the Note")?;
@@ -328,11 +360,11 @@ fn esc_saves_as_the_hour_button_does_and_an_empty_one_nothing() -> TestResult {
 }
 
 #[test]
-fn more_in_the_window_saves_unsorted_and_opens_the_note_dialog() -> TestResult {
+fn open_in_the_editor_in_the_window_saves_unsorted_and_opens_the_note_dialog() -> TestResult {
     let (store, household) = store()?;
     let mut harness = window(&store, Selection::Agenda);
     type_in_window(&mut harness, "Call the plumber");
-    click(&mut harness, "More");
+    click(&mut harness, OPEN);
     let plumber = note(&store, "Call the plumber")?.ok_or("the Note")?;
     assert_eq!(plumber.place, None);
     assert_eq!(nudge(&store, &plumber.id)?, in_an_hour(&store));
@@ -342,23 +374,21 @@ fn more_in_the_window_saves_unsorted_and_opens_the_note_dialog() -> TestResult {
     assert_eq!(harness.state().selection(), &Selection::Agenda);
     let focused = harness.get_by(|n| n.is_focused());
     assert_eq!(focused.value().as_deref(), Some("Call the plumber"));
-    // Inside an Area it is filed there and needs no Nudge.
+    // Inside an Area New Note opens the Note dialog itself (obf-1140).
     let mut harness = window(&store, Selection::Place(household.clone()));
-    type_in_window(&mut harness, "Fix the tap");
-    click(&mut harness, "More");
-    let tap = note(&store, "Fix the tap")?.ok_or("the Note")?;
-    assert_eq!(tap.place.as_deref(), Some(household.as_str()));
-    assert_eq!(nudge(&store, &tap.id)?, None);
-    assert_eq!(harness.state().selected_note(), Some(tap.id.as_str()));
+    harness.state_mut().new_note();
+    harness.run();
+    assert!(!harness.state().quick_note_open());
+    assert!(harness.state().note_open());
     Ok(())
 }
 
 #[test]
-fn more_in_the_popup_hands_the_note_to_the_window() -> TestResult {
+fn open_in_the_editor_in_the_popup_hands_the_note_to_the_window() -> TestResult {
     let (store, _) = store()?;
     let mut harness = popup(&store);
     type_in_popup(&mut harness, "Call the plumber");
-    click(&mut harness, "More");
+    click(&mut harness, OPEN);
     let plumber = note(&store, "Call the plumber")?.ok_or("the Note")?;
     assert_eq!(harness.state().outcome, Outcome::Edit(plumber.id.clone()));
     assert_eq!(plumber.place, None);

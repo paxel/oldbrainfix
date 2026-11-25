@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -18,6 +17,7 @@ import 'file_into_screen.dart';
 import 'frogs_screen.dart';
 import 'hidden_from_ai_view.dart';
 import 'home_pages.dart';
+import 'imports_screen.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'merge_into_screen.dart';
@@ -31,16 +31,20 @@ import 'place_names.dart';
 import 'profile.dart';
 import 'routine_editor_screen.dart';
 import 'run_over.dart';
+import 'running.dart';
 import 'share_area_screen.dart';
 import 'spotlight.dart';
 import 'system_bars.dart';
 import 'tag_tree_screen.dart';
+import 'tap_mark.dart';
 import 'text_marks_view.dart';
 import 'trash_screen.dart';
 
 /// The notes browser's first level: a search field over every Note, and
 /// the Areas while it is empty, with "+" to add an Area. Tapping an Area
-/// opens its Topics; the app bar leads to all Notes and the trash.
+/// opens its Topics; the app bar leads to all Notes and the trash. Under
+/// the empty field a row of the most used tags searches for one, and its
+/// "All tags…" opens the tag tree (obf-1074).
 /// [query] starts the search, as a tap on a tag does (ADR 0032).
 class AreasScreen extends StatefulWidget {
   final Notes notes;
@@ -93,9 +97,29 @@ class _AreasScreenState extends State<AreasScreen>
   PersonFilter _filter = PersonFilter.everyone;
   bool _loaded = false;
 
+  /// Whether the Areas show their handles (obf-1089): from Rearrange in
+  /// ⋮ until Done, a search or leaving the page; a tap or a swipe on a row
+  /// only moves it meanwhile.
+  bool _rearranging = false;
+
   /// The Areas being deleted beside the app (obf-1093), whose rows say
   /// how far they are; none without the app.
   AreaDeletions? _deletions;
+
+  /// The most used tags under the empty search field (obf-1074), without
+  /// the Notes of the locked Areas closed, as every list. They are read
+  /// only while this page shows with no search, as reading them reads
+  /// every Note: beside the Agenda a change there would read them each
+  /// time. [_tagsStale] says a change came meanwhile. Only the chip row
+  /// follows them, so arriving here builds no more than that row.
+  final _tags = ValueNotifier<List<TagNode>>(const []);
+  var _tagsStale = true;
+
+  /// What the chip row follows: the field, which hides it, and the tags.
+  late final _tagRow = Listenable.merge([_query, _tags]);
+
+  /// The app's lock, followed for the tags.
+  AppLock? _lock;
 
   @override
   void didChangeDependencies() {
@@ -104,6 +128,12 @@ class _AreasScreenState extends State<AreasScreen>
     if (deletions != _deletions) {
       _deletions?.removeListener(_deletionsChanged);
       _deletions = deletions?..addListener(_deletionsChanged);
+    }
+    final lock = LockScope.of(context);
+    if (lock != _lock) {
+      _lock?.removeListener(_locksChanged);
+      _lock = lock?..addListener(_locksChanged);
+      _tagsStale = true;
     }
     if (_loaded) return;
     _load();
@@ -133,13 +163,56 @@ class _AreasScreenState extends State<AreasScreen>
   void dispose() {
     widget.pageShown?.removeListener(_pageChanged);
     _deletions?.removeListener(_deletionsChanged);
+    _lock?.removeListener(_locksChanged);
     _query.dispose();
+    _tags.dispose();
     super.dispose();
   }
 
   /// The Agenda came in its place: the selection goes (#273).
   void _pageChanged() {
-    if (widget.pageShown?.value != HomePager.areas) stopSelecting();
+    if (widget.pageShown?.value != HomePager.areas) {
+      stopSelecting();
+      _stopRearranging();
+    } else if (_tagsStale) {
+      _readTags();
+    }
+  }
+
+  /// Whether this page shows with an empty search field, the tags under
+  /// it.
+  bool get _tagsShown =>
+      (widget.pageShown?.value ?? HomePager.areas) == HomePager.areas &&
+      _query.text.trim().isEmpty;
+
+  /// Reads the most used tags when they show, else notes that they wait.
+  void _readTags() {
+    if (!_tagsShown) {
+      _tagsStale = true;
+      return;
+    }
+    _tagsStale = false;
+    _tags.value = mostUsedTags(
+      TagTree(widget.places.store)
+          .tree(closed: _lock?.closedAreas ?? const <String>{}),
+    );
+  }
+
+  /// An Area opened or closed, or the app locked: the tags again. Not
+  /// shown now, none stay until they are read, so a closed Area's tags
+  /// never show on the way back.
+  void _locksChanged() {
+    if (!mounted) return;
+    setState(() {
+      _readTags();
+      if (_tagsStale) _tags.value = const [];
+    });
+  }
+
+  /// Leaving the page ends rearranging (obf-1089); each move is already
+  /// kept.
+  void _stopRearranging() {
+    if (_rearranging) setState(() => _rearranging = false);
   }
 
   /// [child] under the selection's back, when this page is a route of
@@ -179,6 +252,9 @@ class _AreasScreenState extends State<AreasScreen>
             people: _filter,
           );
     keepShown(_hits);
+    // A search shows no Areas to move.
+    if (_searched.trim().isNotEmpty) _rearranging = false;
+    _readTags();
   }
 
   void _filtered(PersonFilter people) => setState(() {
@@ -275,6 +351,7 @@ class _AreasScreenState extends State<AreasScreen>
   }
 
   Future<void> _openAllNotes() async {
+    _stopRearranging();
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) =>
@@ -287,6 +364,7 @@ class _AreasScreenState extends State<AreasScreen>
 
   /// Opens the Frog view: the open Frogs and the eaten ones folded.
   Future<void> _openFrogs() async {
+    _stopRearranging();
     await openFrogs(context, widget.notes, widget.places);
     if (!mounted) return;
     _reload();
@@ -295,6 +373,7 @@ class _AreasScreenState extends State<AreasScreen>
   /// Opens the tag tree, without the Notes of the locked Areas closed;
   /// a tag tapped there is searched for here.
   Future<void> _openTags() async {
+    _stopRearranging();
     final tag = await Navigator.of(context).push(
       MaterialPageRoute<String>(
         builder: (_) => TagTreeScreen(store: widget.places.store),
@@ -305,16 +384,8 @@ class _AreasScreenState extends State<AreasScreen>
     _searchTag(context, tag);
   }
 
-  /// The row below the Areas that opens the tag tree (#267, Q623).
-  Widget _tagsRow(AppLocalizations t) => _PlaceRow(
-    key: const ValueKey('tags-row'),
-    title: t.tagsTitle,
-    leading: const Icon(Icons.tag),
-    onTap: _openTags,
-    menu: null,
-  );
-
   Future<void> _openTrash() async {
+    _stopRearranging();
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => TrashScreen(notes: widget.notes, places: widget.places),
@@ -340,6 +411,20 @@ class _AreasScreenState extends State<AreasScreen>
 
   Future<void> _openNote(Note note) async {
     await openNote(context, widget.notes, widget.places, note);
+    if (!mounted) return;
+    _reload();
+  }
+
+  /// Opens [note] at [at], a place the search found in it, with the find
+  /// bar for the search (obf-1047).
+  Future<void> _openAt(Note note, Finding at) async {
+    await openNote(
+      context,
+      widget.notes,
+      widget.places,
+      note,
+      find: (query: _searched, at: at),
+    );
     if (!mounted) return;
     _reload();
   }
@@ -463,7 +548,6 @@ class _AreasScreenState extends State<AreasScreen>
               null => t.areaDeletingStarted,
             },
             leading: _AreaMark(area: area),
-            handle: const SizedBox(width: 48, height: 48),
             menu: SizedBox(
               key: ValueKey('area-deleting-${area.id}'),
               width: 48,
@@ -476,16 +560,37 @@ class _AreasScreenState extends State<AreasScreen>
               ),
             ),
           )
+        else if (_rearranging)
+          // Rearranging (obf-1089): a drag that starts anywhere on the row,
+          // either way, takes it at once and moves it; a tap does nothing,
+          // and the handle in ⋮'s place says so. The order is the
+          // person's own, so every Area moves, a Shared one too (#280). A
+          // screen reader moves it by the row's own actions, Move up and
+          // Move down, so the handle says nothing.
+          ReorderableDragStartListener(
+            key: ValueKey('area-row-${area.id}'),
+            index: index,
+            child: _PlaceRow(
+              title: areaName(t, area),
+              subtitle: _sharedWith(t, area),
+              leading: _AreaMark(area: area),
+              locked: lock?.isAreaClosed(area.id) ?? false,
+              shared: _people.containsKey(area.id),
+              hiddenFromAi: _hidden.contains(area.id),
+              highlighted: area.id == last,
+              menu: SizedBox(
+                key: ValueKey('area-move-${area.id}'),
+                width: 48,
+                height: 48,
+                child: const Icon(Icons.drag_handle),
+              ),
+            ),
+          )
         else
           _PlaceRow(
             key: ValueKey('area-row-${area.id}'),
             title: areaName(t, area),
-            subtitle: _people[area.id] == null
-                ? null
-                : [
-                    for (final p in _people[area.id] ?? const <Person>[])
-                      profileDisplayName(t, _names[p.id] ?? ''),
-                  ].join(', '),
+            subtitle: _sharedWith(t, area),
             leading: _AreaMark(area: area),
             locked: lock?.isAreaClosed(area.id) ?? false,
             shared: _people.containsKey(area.id),
@@ -493,21 +598,18 @@ class _AreasScreenState extends State<AreasScreen>
             highlighted: area.id == last,
             onTap: () => _open(area),
             menu: _areaMenu(t, area),
-            // The order is the person's own, so every Area moves, a Shared
-            // one too (#280). A screen reader moves it by the row's own
-            // actions, Move up and Move down, so the handle says nothing.
-            handle: _VerticalDragStart(
-              key: ValueKey('area-move-${area.id}'),
-              index: index,
-              child: const SizedBox(
-                width: 48,
-                height: 48,
-                child: Icon(Icons.drag_handle),
-              ),
-            ),
           ),
     ];
   }
+
+  /// Who a Shared [area] is shared with, under its name; null for one
+  /// of the person's own.
+  String? _sharedWith(AppLocalizations t, Area area) => _people[area.id] == null
+      ? null
+      : [
+          for (final p in _people[area.id] ?? const <Person>[])
+            profileDisplayName(t, _names[p.id] ?? ''),
+        ].join(', ');
 
   /// The Area at [from] dragged to [to], counted after it was taken
   /// out: its new place, on all of the person's Devices (#280).
@@ -557,6 +659,54 @@ class _AreasScreenState extends State<AreasScreen>
     );
   }
 
+  /// ⋮ of the Areas list: Rearrange, with two Areas or more, shows the
+  /// Areas' handles (obf-1089), Import… opens the page of the Imports
+  /// (obf-1096), Running the page of what runs in the background
+  /// (obf-1078).
+  Widget _areasMenu(AppLocalizations t) => PopupMenuButton<VoidCallback>(
+    key: const ValueKey('areas-more'),
+    tooltip: t.more,
+    icon: const Icon(Icons.more_vert),
+    onSelected: (run) => run(),
+    itemBuilder: (_) => [
+      if (_areas.length > 1)
+        PopupMenuItem(
+          key: const ValueKey('areas-rearrange'),
+          value: () => setState(() => _rearranging = true),
+          child: Text(t.rearrangeAreas),
+        ),
+      if (ImportsScreen.offered(context))
+        PopupMenuItem(
+          key: const ValueKey('areas-import'),
+          value: _openImports,
+          child: Text(t.areasImport),
+        ),
+      if (RunningScope.of(context) != null)
+        PopupMenuItem(
+          key: const ValueKey('areas-running'),
+          value: () => openRunning(context),
+          child: Text(t.jobsTitle),
+        ),
+    ],
+  );
+
+  /// Whether ⋮ holds anything: it stands also with fewer than two Areas
+  /// (obf-1096).
+  bool get _hasMenu =>
+      _areas.length > 1 ||
+      ImportsScreen.offered(context) ||
+      RunningScope.of(context) != null;
+
+  /// The page of the Imports on top (obf-1096).
+  void _openImports() => unawaited(
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            ImportsScreen(store: widget.places.store, trail: widget.trail),
+      ),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     final t = context.t;
@@ -574,8 +724,9 @@ class _AreasScreenState extends State<AreasScreen>
       const EdgeInsets.symmetric(vertical: 8),
     );
     return BrowserSwipes(
-      forwardRoute: _forwardRoute,
-      onForward: _forward,
+      // Rearranging stays on the page: a swipe on a row moves it.
+      forwardRoute: _rearranging ? null : _forwardRoute,
+      onForward: _rearranging ? null : _forward,
       back: widget.onBack == null,
       child: TagSearchScope(
         onSearch: _searchTag,
@@ -627,6 +778,14 @@ class _AreasScreenState extends State<AreasScreen>
                         icon: const Icon(Icons.restore_from_trash),
                       ),
                       if (searching && mayTick(_hits)) selectButton(context),
+                      if (_rearranging)
+                        TextButton(
+                          key: const ValueKey('areas-rearrange-done'),
+                          onPressed: _stopRearranging,
+                          child: Text(t.rearrangeDone),
+                        )
+                      else if (!searching && _hasMenu)
+                        _areasMenu(t),
                     ],
             ),
             body: CustomScrollView(
@@ -644,6 +803,18 @@ class _AreasScreenState extends State<AreasScreen>
                         tags: widget.places.store,
                         closedTags: closed,
                       ),
+                      // The most used tags, while nothing is typed
+                      // (obf-1074); a search shows its own chips.
+                      ListenableBuilder(
+                        listenable: _tagRow,
+                        builder: (_, _) => _query.text.trim().isEmpty
+                            ? TagChipRow(
+                                tags: _tags.value,
+                                onPick: (tag) => _searchTag(context, tag),
+                                onAll: _openTags,
+                              )
+                            : const SizedBox.shrink(),
+                      ),
                       if (searching)
                         PersonFilterChips(
                           store: widget.places.store,
@@ -653,6 +824,7 @@ class _AreasScreenState extends State<AreasScreen>
                     ],
                   ),
                 ),
+                const SearchHeaderLine(),
                 if (searching || _areas.isEmpty)
                   SliverPadding(
                     padding: padding,
@@ -674,15 +846,17 @@ class _AreasScreenState extends State<AreasScreen>
                               onSwitch: switchView,
                               selected: selecting ? selected : null,
                               onSelect: setSelected,
+                              find: _searched,
+                              onFind: _openAt,
                             )
-                          : [...rows, _tagsRow(t)],
+                          : rows,
                     ),
                   )
                 else ...[
-                  // The Areas move by their handles only: a long press
-                  // never changes data (#280).
+                  // The Areas move only while rearranging (obf-1089): a
+                  // long press never changes data (#280).
                   SliverPadding(
-                    padding: padding.copyWith(bottom: 0),
+                    padding: padding,
                     sliver: SliverReorderableList(
                       itemCount: rows.length,
                       itemBuilder: (_, index) => rows[index],
@@ -690,17 +864,15 @@ class _AreasScreenState extends State<AreasScreen>
                       proxyDecorator: _lifted,
                     ),
                   ),
-                  SliverPadding(
-                    padding: padding.copyWith(top: 0),
-                    sliver: SliverToBoxAdapter(child: _tagsRow(t)),
-                  ),
                 ],
               ],
             ),
-            floatingActionButton: FloatingActionButton(
-              tooltip: t.newArea,
-              onPressed: _add,
-              child: const Icon(Icons.add),
+            floatingActionButton: TapMarked(
+              child: FloatingActionButton(
+                tooltip: t.newArea,
+                onPressed: _add,
+                child: const Icon(Icons.add),
+              ),
             ),
           ),
         ),
@@ -830,6 +1002,11 @@ class _AreaScreenState extends State<AreaScreen>
     _load();
   });
 
+  /// "Show" of a Note made but hidden by the filter clears it (obf-1070).
+  void _showEveryone() {
+    if (mounted) _filtered(PersonFilter.everyone);
+  }
+
   void _reloadIfMounted() {
     if (mounted) _reload();
   }
@@ -855,13 +1032,21 @@ class _AreaScreenState extends State<AreaScreen>
     );
     if (!mounted || kind == null) return;
     if (kind != NewKind.topic) {
-      await makeNew(
+      final made = await makeNew(
         context,
         widget.notes,
         widget.places,
         kind,
         place: widget.areaId,
         onChanged: _reloadIfMounted,
+      );
+      if (!mounted) return;
+      sayIfFilterHides(
+        context,
+        widget.places.store,
+        made,
+        _filter,
+        show: _showEveryone,
       );
       return;
     }
@@ -917,6 +1102,20 @@ class _AreaScreenState extends State<AreaScreen>
 
   Future<void> _openNote(Note note) async {
     await openNote(context, widget.notes, widget.places, note);
+    if (!mounted) return;
+    _reload();
+  }
+
+  /// Opens [note] at [at], a place the search found in it, with the find
+  /// bar for the search (obf-1047).
+  Future<void> _openAt(Note note, Finding at) async {
+    await openNote(
+      context,
+      widget.notes,
+      widget.places,
+      note,
+      find: (query: _searched, at: at),
+    );
     if (!mounted) return;
     _reload();
   }
@@ -1090,6 +1289,7 @@ class _AreaScreenState extends State<AreaScreen>
                   ],
                 ),
               ),
+              const SearchHeaderLine(),
               SliverPadding(
                 // Where this Device may not write, no "+" floats to clear.
                 padding: _writes
@@ -1119,6 +1319,8 @@ class _AreaScreenState extends State<AreaScreen>
                           onSwitch: switchView,
                           selected: selecting ? selected : null,
                           onSelect: setSelected,
+                          find: _searched,
+                          onFind: _openAt,
                         )
                       : _browsing(t, area),
                 ),
@@ -1130,10 +1332,12 @@ class _AreaScreenState extends State<AreaScreen>
               : Spotlight(
                   id: 'area-add',
                   child: Builder(
-                    builder: (button) => FloatingActionButton(
-                      tooltip: t.addHere,
-                      onPressed: () => _add(button),
-                      child: const Icon(Icons.add),
+                    builder: (button) => TapMarked(
+                      child: FloatingActionButton(
+                        tooltip: t.addHere,
+                        onPressed: () => _add(button),
+                        child: const Icon(Icons.add),
+                      ),
                     ),
                   ),
                 ),
@@ -1228,7 +1432,7 @@ class _TopicScreenState extends State<TopicScreen>
       newKinds(widget.places.store, widget.topicId),
     );
     if (!mounted || kind == null) return;
-    await makeNew(
+    final made = await makeNew(
       context,
       widget.notes,
       widget.places,
@@ -1236,6 +1440,19 @@ class _TopicScreenState extends State<TopicScreen>
       place: widget.topicId,
       onChanged: _reloadIfMounted,
     );
+    if (!mounted) return;
+    sayIfFilterHides(
+      context,
+      widget.places.store,
+      made,
+      _filter,
+      show: _showEveryone,
+    );
+  }
+
+  /// "Show" of a Note made but hidden by the filter clears it (obf-1070).
+  void _showEveryone() {
+    if (mounted) _filtered(PersonFilter.everyone);
   }
 
   void _reloadIfMounted() {
@@ -1268,6 +1485,20 @@ class _TopicScreenState extends State<TopicScreen>
 
   Future<void> _openNote(Note note) async {
     await openNote(context, widget.notes, widget.places, note);
+    if (!mounted) return;
+    _reload();
+  }
+
+  /// Opens [note] at [at], a place the search found in it, with the find
+  /// bar for the search (obf-1047).
+  Future<void> _openAt(Note note, Finding at) async {
+    await openNote(
+      context,
+      widget.notes,
+      widget.places,
+      note,
+      find: (query: _searched, at: at),
+    );
     if (!mounted) return;
     _reload();
   }
@@ -1360,6 +1591,7 @@ class _TopicScreenState extends State<TopicScreen>
                   ],
                 ),
               ),
+              const SearchHeaderLine(),
               SliverPadding(
                 // Where this Device may not write, no "+" floats to clear.
                 padding: _writes
@@ -1389,6 +1621,8 @@ class _TopicScreenState extends State<TopicScreen>
                           onSwitch: switchView,
                           selected: selecting ? selected : null,
                           onSelect: setSelected,
+                          find: _searched,
+                          onFind: _openAt,
                         )
                       : _diary.isEmpty
                       ? [
@@ -1423,10 +1657,12 @@ class _TopicScreenState extends State<TopicScreen>
               : Spotlight(
                   id: 'area-add',
                   child: Builder(
-                    builder: (button) => FloatingActionButton(
-                      tooltip: t.addHere,
-                      onPressed: () => _add(button),
-                      child: const Icon(Icons.add),
+                    builder: (button) => TapMarked(
+                      child: FloatingActionButton(
+                        tooltip: t.addHere,
+                        onPressed: () => _add(button),
+                        child: const Icon(Icons.add),
+                      ),
                     ),
                   ),
                 ),
@@ -1476,6 +1712,8 @@ List<Widget> _hitCards(
   required void Function(Note note) onSwitch,
   Set<String>? selected,
   void Function(Note note, bool on)? onSelect,
+  required String find,
+  required void Function(Note note, Finding at) onFind,
 }) => hits.isEmpty
     ? [BrowserEmpty(text: context.t.nothingFound)]
     : diaryCards(
@@ -1493,6 +1731,8 @@ List<Widget> _hitCards(
         onSwitch: onSwitch,
         selected: selected,
         onSelect: onSelect,
+        find: find,
+        onFind: onFind,
       );
 
 /// Opens "file into…" for [note] and files it; true when it moved.
@@ -1532,25 +1772,8 @@ class _AreaMark extends StatelessWidget {
 }
 
 /// One Area or Topic as an embossed row with its menu.
-/// A drag handle that takes only a drag up or down: a swipe sideways
-/// that starts on it still moves between the pages (#280).
-class _VerticalDragStart extends ReorderableDragStartListener {
-  const _VerticalDragStart({
-    super.key,
-    required super.index,
-    required super.child,
-  });
-
-  @override
-  MultiDragGestureRecognizer createRecognizer() =>
-      VerticalMultiDragGestureRecognizer(debugOwner: this);
-}
-
 class _PlaceRow extends StatelessWidget {
   final String title;
-
-  /// Where the row is dragged to another place in the list: an Area's.
-  final Widget? handle;
 
   /// Under the title: who a Shared Area is shared with.
   final String? subtitle;
@@ -1576,7 +1799,6 @@ class _PlaceRow extends StatelessWidget {
     super.key,
     required this.title,
     required this.menu,
-    this.handle,
     this.subtitle,
     this.leading,
     this.onTap,
@@ -1641,7 +1863,6 @@ class _PlaceRow extends StatelessWidget {
                       Icons.lock_outline,
                       semanticLabel: context.t.areaLocked,
                     ),
-                  ?handle,
                   if (menu case final menu?)
                     menu
                   else
@@ -1830,13 +2051,7 @@ Widget _cancel(BuildContext context, AppLocalizations t) => TextButton(
   child: Text(t.cancel),
 );
 
-/// A confirm button for a destructive step: its verb in the error colour
-/// (UI laws).
+/// A confirm button for a step that deletes: filled on the error colour
+/// (UI laws, "Design system").
 Widget _destructive(BuildContext context, String label, VoidCallback onTap) =>
-    TextButton(
-      style: TextButton.styleFrom(
-        foregroundColor: Theme.of(context).colorScheme.error,
-      ),
-      onPressed: onTap,
-      child: Text(label),
-    );
+    DestructiveButton(onPressed: onTap, child: Text(label));

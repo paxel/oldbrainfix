@@ -379,7 +379,7 @@ class _HostScreenState extends State<HostScreen> {
 
   Widget _again(String label) => Align(
     alignment: Alignment.centerLeft,
-    child: FilledButton.tonal(
+    child: OutlinedButton(
       key: const ValueKey('host-again'),
       onPressed: _restart,
       child: Text(label),

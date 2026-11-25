@@ -172,6 +172,26 @@ fn ai_ask_and_ctrl_k_show_the_panel_with_the_cursor_in_its_field() -> TestResult
 }
 
 #[test]
+fn the_question_field_is_as_tall_as_the_ask_button_beside_it() -> TestResult {
+    let (store, _) = store()?;
+    let mut harness = harness(store, &Fake::default());
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::K);
+    harness.run();
+    let t = L10n::new("en");
+    let at = field(&harness, t.ask_hint()).rect();
+    let button = harness
+        .get_by_role_and_label(Role::Button, t.ask_button())
+        .rect();
+    // One height for fields and buttons (obf-1128), one row.
+    assert!(
+        (at.height() - button.height()).abs() <= 1.0,
+        "the field {at:?}, the button {button:?}"
+    );
+    assert!((at.center().y - button.center().y).abs() <= 1.0);
+    Ok(())
+}
+
+#[test]
 fn the_ai_is_off_by_default_also_with_a_provider_set_up_before() -> TestResult {
     // Anthropic's key entered before the switch came, never switched on.
     let (store, _) = store()?;
@@ -519,7 +539,7 @@ fn a_note_hidden_from_ai_is_in_no_request() -> TestResult {
 }
 
 #[test]
-fn a_change_the_model_makes_waits_for_its_review_with_sync() -> TestResult {
+fn a_change_the_model_makes_waits_for_its_review() -> TestResult {
     let (store, passport) = store()?;
     let area = Places::new(&store).add_area("Papers")?;
     let fake = Fake::new(vec![
@@ -533,14 +553,12 @@ fn a_change_the_model_makes_waits_for_its_review_with_sync() -> TestResult {
     let t = L10n::new("en");
     let mut harness = harness(store, &fake);
     ask(&mut harness, "Where is my passport?");
-    // Asking reads only: no AI Task, sync goes on.
+    // Asking reads only: no AI Task.
     assert_eq!(harness.state().store().ai_task()?, None);
-    assert!(!harness.state().store().sync_paused()?);
     assert!(!shows(&harness, t.ask_task_waits()));
 
     ask(&mut harness, "Sort what's new");
     assert!(harness.state().store().ai_task()?.is_some());
-    assert!(harness.state().store().sync_paused()?);
     assert!(shows(&harness, t.ask_task_waits()));
     harness
         .get_by_role_and_label(Role::Button, t.ai_review_open())
@@ -652,7 +670,7 @@ fn a_question_not_answered_stays_under_it_with_its_cause_and_fix_until_asked_aga
         assert!(harness.state().ask_panel().exchanges.is_empty());
         // Nothing to copy, keep, add or save under a failure (#316).
         for action in [
-            t.copy_as_text(),
+            t.copy_text(),
             t.ask_keep(),
             t.add_to_note(),
             t.save_as_markdown(),
@@ -1279,7 +1297,7 @@ fn copy_as_text_puts_the_answer_with_its_links_on_the_clipboard_and_html_beside(
         .state_mut()
         .set_clipboard(Box::new(FakeClipboard(copied.clone())));
     ask(&mut harness, "Where is my passport?");
-    press(&mut harness, t.copy_as_text());
+    press(&mut harness, t.copy_text());
     let copied = copied.borrow();
     let [(text, html)] = copied.as_slice() else {
         panic!("copied once: {copied:?}");
@@ -1295,6 +1313,48 @@ fn copy_as_text_puts_the_answer_with_its_links_on_the_clipboard_and_html_beside(
     assert_eq!(harness.state().notice(), None);
     assert!(!shows(&harness, t.ask_kept()));
     Ok(())
+}
+
+#[test]
+fn the_answers_lesser_actions_are_text_buttons_in_the_accent() -> TestResult {
+    let (store, passport) = store()?;
+    let fake = Fake::new(vec![
+        tool_use("read_note", json!({"id": passport})),
+        end_turn("In the blue folder."),
+    ]);
+    let t = L10n::new("en");
+    let mut harness = harness(store, &fake);
+    ask(&mut harness, "Where is my passport?");
+    let accent = harness.ctx.global_style().visuals.hyperlink_color;
+    let mut words = Vec::new();
+    for egui::epaint::ClippedShape { shape, .. } in &harness.output().shapes {
+        flat(shape, &mut words);
+    }
+    // Inside the card, each in the accent's text colour with no frame
+    // (obf-1103), as the design system's text button.
+    for label in [
+        t.copy_text(),
+        t.ask_keep(),
+        t.add_to_note(),
+        t.save_as_markdown(),
+    ] {
+        assert!(
+            words
+                .iter()
+                .any(|(text, colour)| text == label && *colour == accent),
+            "{label} in the accent"
+        );
+    }
+    Ok(())
+}
+
+/// Every text drawn, out of its lists, with its colour.
+fn flat(shape: &egui::Shape, into: &mut Vec<(String, egui::Color32)>) {
+    match shape {
+        egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| flat(s, into)),
+        egui::Shape::Text(text) => into.push((text.galley.text().to_string(), text.fallback_color)),
+        _ => {}
+    }
 }
 
 #[test]

@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:meta/meta.dart';
+
 import 'area_keys.dart';
 import 'entry.dart';
 import 'notes.dart';
@@ -218,30 +220,59 @@ extension Sync on Store {
   );
 
   /// The blobs the log refers to whose bytes are not here, as
-  /// `photo/<hash>`, `audio/<hash>` and `file/<hash>`, sorted.
+  /// `photo/<hash>`, `audio/<hash>` and `file/<hash>`, sorted. A Note
+  /// purged ([_refersTo]) wants none of its files back.
   List<String> missingBlobs() {
     final missing = <String>{};
     for (final (kind, prefix) in blobKinds) {
       for (final (entity, field) in fieldsWithPrefix(prefix)) {
         final hash = field.substring(prefix.length);
-        if (current(entity, field) == null) continue;
+        if (!_refersTo(entity, field)) continue;
         if (blob(kind, hash) == null) missing.add('$kind/$hash');
       }
     }
     return missing.toList()..sort();
   }
 
+  /// Whether the blob [field] of [entity] is one the log refers to now:
+  /// it is set, and the Note holding it was not purged (its `$type` is
+  /// null), by the 30-day purge, "Empty the trash now" (obf-1095) or a
+  /// discard. Read from the entity's fields once.
+  bool _refersTo(String entity, String field) =>
+      _refers(currentFields(entity), field);
+
+  /// [_refersTo] of the current [fields] of an entity.
+  static bool _refers(Map<String, String?> fields, String field) =>
+      fields[field] != null && fields[NoteKeys.type] != null;
+
+  /// Every blob the log refers to now, as [knowsBlob] knows each, read
+  /// in one pass for all of them: for many at once (obf-1095).
+  @internal
+  Set<String> knownBlobs() {
+    final named = [
+      for (final (kind, prefix) in blobKinds)
+        for (final (entity, field) in fieldsWithPrefix(prefix))
+          (entity, field, '$kind/${field.substring(prefix.length)}'),
+    ];
+    final fields = currentFieldsOf({for (final (e, _, _) in named) e});
+    return {
+      for (final (entity, field, ref) in named)
+        if (fields[entity] case final held? when _refers(held, field)) ref,
+    };
+  }
+
   /// Whether the log refers to the blob [ref] (`photo/<hash>` or
   /// `audio/<hash>`) now: only those are taken from another Device,
   /// anything else would be storage filled by whoever holds the PIN. A
-  /// removed one stays out (ADR 0020).
+  /// removed one stays out (ADR 0020), as does one only a purged Note
+  /// holds (obf-1095).
   bool knowsBlob(String ref) {
     final (kind, hash) = splitBlobRef(ref);
     for (final (k, prefix) in blobKinds) {
       if (k != kind) continue;
       final field = '$prefix$hash';
       for (final (entity, f) in fieldsWithPrefix(field)) {
-        if (f == field && current(entity, f) != null) return true;
+        if (f == field && _refersTo(entity, f)) return true;
       }
     }
     return false;

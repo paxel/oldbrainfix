@@ -395,7 +395,7 @@ impl PendingFiles for MemoryPendingFiles {
 
 /// The fields `field` stands or falls with: its whole schedule for a
 /// Routine's, else itself.
-fn unit_fields(field: &str) -> Vec<String> {
+pub(crate) fn unit_fields(field: &str) -> Vec<String> {
     match conflict_unit(field) {
         Some(unit) => conflict_unit_fields(unit)
             .into_iter()

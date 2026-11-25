@@ -215,7 +215,6 @@ fn a_change_drafted_on_the_asking_connection_waits_for_the_windows_review() -> T
     // The window's own connection sees the review waiting.
     let task = window.ai_task()?.ok_or("the AI Task")?;
     assert!(!window.ai_review(&task)?.is_empty());
-    assert!(window.sync_paused()?);
     Ok(())
 }
 
@@ -351,7 +350,7 @@ fn the_phones_question_is_answered_with_its_notes_and_hidden_ones_stay_out() -> 
 }
 
 #[test]
-fn a_change_waits_for_the_review_and_the_phone_hears_so_while_sync_waits() -> TestResult {
+fn a_change_waits_for_the_review_and_the_phone_hears_so() -> TestResult {
     let (desk, phone) = paired(false)?;
     let note = Notes::new(&desk).capture("Dentist on Friday", None, None)?;
     let area = Places::new(&desk).add_area("Health")?;
@@ -364,8 +363,8 @@ fn a_change_waits_for_the_review_and_the_phone_hears_so_while_sync_waits() -> Te
     ]);
     let (request, _) = asked(&desk, &phone, "POST", ASK_PATH, &question("Sort"), true)?;
     assert!(reply_of(&desk.serve_ask(&request, &fake, &utc)?)?.review);
-    assert!(desk.sync_paused()?);
-    // Asked again while sync waits: answered, and the review still
+    assert!(desk.ai_task()?.is_some());
+    // Asked again while the review waits: answered, and it still
     // waits.
     let (request, _) = asked(&desk, &phone, "POST", ASK_PATH, &question("And?"), true)?;
     let reply = reply_of(&desk.serve_ask(&request, &fake, &utc)?)?;

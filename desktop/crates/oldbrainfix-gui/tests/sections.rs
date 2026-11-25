@@ -353,7 +353,7 @@ fn a_note_in_the_trash_reads_its_sections_and_they_select_to_be_copied() -> Test
 }
 
 #[test]
-fn copy_as_text_copies_the_note_and_its_edited_sections_as_they_show() -> TestResult {
+fn copy_text_copies_the_note_and_its_edited_sections_as_they_show() -> TestResult {
     let store = store()?;
     let notes = Notes::new(&store);
     let trip = notes.capture("Trip", None, None)?.id;
@@ -373,10 +373,13 @@ fn copy_as_text_copies_the_note_and_its_edited_sections_as_they_show() -> TestRe
         .ok_or("the card's ⋮")?
         .click_accesskit();
     harness.run();
+    // Under Share ▸ (obf-1014).
+    harness.get_by_label("Share ⏵").click();
+    harness.run();
     harness
-        .query_all_by_label("Copy as text")
+        .query_all_by_label("Copy text")
         .last()
-        .ok_or("Copy as text")?
+        .ok_or("Copy text")?
         .click_accesskit();
     harness.run();
     let copied = copied.borrow();

@@ -97,8 +97,8 @@ struct Texts {
     /// tyres' Note, `{id}` its id.
     ask_question: &'static str,
     ask_answer: &'static str,
-    /// The menu bar's Note menu.
-    note_menu: &'static str,
+    /// The ⋮ of the Note dialog (obf-1051), which holds its History.
+    note_more: &'static str,
     /// The first start's "New to Old Brain Fix".
     new_here: &'static str,
     /// The menu bar's File menu, its Import…, and Google Keep… in the
@@ -106,7 +106,7 @@ struct Texts {
     file_menu: &'static str,
     import: &'static str,
     keep: &'static str,
-    /// The Note menu's History.
+    /// The History in the Note dialog's ⋮ (obf-1065).
     history: &'static str,
     /// The Agenda's "New Routine or Reminder", the hint of its text, the
     /// schedule's Weekdays and the Escalation's switch.
@@ -116,8 +116,6 @@ struct Texts {
     /// The repeat chip of a Reminder.
     once: &'static str,
     escalate: &'static str,
-    /// The start of an Agenda row's ⋮, "More for {title}".
-    more_for: &'static str,
     /// The Household's lists (#174): a packing Checklist, its first line
     /// its name, a group under one of its Lines; the weekly Shopping
     /// List; a Tally of the pages read in the evenings, with its field
@@ -181,7 +179,7 @@ const EN: Texts = Texts {
     fixed: "Pick up the parcel for Dana at the post office tomorrow",
     ask_question: "Where are the winter tyres?",
     ask_answer: "In the cellar, on the left shelf, with the wheel bolts ([Winter tyres](oldbrainfix://note/{id})).",
-    note_menu: "Note",
+    note_more: "More for this Note",
     new_here: "New to Old Brain Fix",
     file_menu: "File",
     import: "Import…",
@@ -192,7 +190,6 @@ const EN: Texts = Texts {
     weekdays: "Weekdays",
     once: "Once",
     escalate: "Escalate to an urgent alarm with sound",
-    more_for: "More for",
     packing: "Packing for the weekend at the lake\n✓ Toothbrush\nPhone charger\nHiking gear\n  ✓ Boots\n  Rain jacket",
     groceries: "Weekly shopping\nMilk\nBread\nCoffee\nApples\nWashing-up liquid",
     reading: "Reading before bed",
@@ -247,7 +244,7 @@ const DE: Texts = Texts {
     fixed: "Paket für Dana morgen bei der Post abholen",
     ask_question: "Wo sind die Winterreifen?",
     ask_answer: "Im Keller, im linken Regal, mit den Radschrauben ([Winterreifen](oldbrainfix://note/{id})).",
-    note_menu: "Notiz",
+    note_more: "Mehr zu dieser Notiz",
     new_here: "Neu bei Old Brain Fix",
     file_menu: "Datei",
     import: "Importieren …",
@@ -258,7 +255,6 @@ const DE: Texts = Texts {
     weekdays: "Wochentage",
     once: "Einmal",
     escalate: "Zum dringenden Alarm mit Ton eskalieren",
-    more_for: "Mehr zu",
     packing: "Packen fürs Wochenende am See\n✓ Zahnbürste\nLadekabel fürs Handy\nWandersachen\n  ✓ Wanderschuhe\n  Regenjacke",
     groceries: "Wocheneinkauf\nMilch\nBrot\nKaffee\nÄpfel\nSpülmittel",
     reading: "Lesen vor dem Schlafen",
@@ -969,8 +965,8 @@ fn all_guide_frames() -> TestResult {
                 &box_frame("getting-started", "import-keep"),
             )?);
             // A thought typed into the quick note, opened over the Agenda
-            // as File ▸ New Note opens it (#146): More and the Nudge times
-            // show under the text, nothing else (#352).
+            // as File ▸ New Note opens it (#146): the Nudge times and Open
+            // in the editor show under the text, nothing else (#352).
             let mut harness = window(texts, language, theme)?;
             harness.state_mut().new_note();
             harness.run();
@@ -984,12 +980,12 @@ fn all_guide_frames() -> TestResult {
                 &mut harness,
                 &box_frame("capture-and-sort", "capture"),
             )?);
-            // Capture and sort: the quick note's More, which saves it and
-            // opens the Note dialog on it, where it is sorted (#352); the
-            // capture popup of the hotkey, the Unsorted Notes, the Note
-            // dialog and its History.
+            // Capture and sort: the quick note's Open in the editor, which
+            // saves it and opens the Note dialog on it, where it is sorted
+            // (#352); the capture popup of the hotkey, the Unsorted Notes,
+            // the Note dialog and its History.
             harness
-                .get_by_role_and_label(Role::Button, L10n::new(language).more())
+                .get_by_role_and_label(Role::Button, L10n::new(language).capture_open_in_editor())
                 .click();
             harness.run();
             problems.extend(match_frame(
@@ -1023,6 +1019,14 @@ fn all_guide_frames() -> TestResult {
             harness
                 .get_by_role_and_label(Role::Button, book)
                 .click_secondary();
+            harness.run();
+            // File into… under This Note ▸ (obf-1014).
+            let this_note = format!("{} ⏵", harness.state().t().editor_group_this_note());
+            harness
+                .query_all_by_label(&this_note)
+                .last()
+                .ok_or("This Note ⏵")?
+                .click();
             harness.run();
             problems.extend(match_frame(
                 &mut harness,
@@ -1082,19 +1086,27 @@ fn all_guide_frames() -> TestResult {
                 &tap,
                 &box_frame(DESKTOP, "note-window"),
             )?);
-            // The menu bar's Note menu over it, for that Note.
-            harness
-                .get_all_by_label(texts.note_menu)
-                .next()
-                .ok_or("the Note menu")?
-                .click();
-            harness.run();
+            // The menu bar's File menu over it (obf-1065: no Note menu),
+            // ahead of the window's widgets of that name.
+            let file_menu = |harness: &mut Harness<'static, App>| -> TestResult {
+                harness
+                    .get_all_by_label(texts.file_menu)
+                    .next()
+                    .ok_or("the File menu")?
+                    .click();
+                harness.run();
+                Ok(())
+            };
+            file_menu(&mut harness)?;
             problems.extend(match_frame(&mut harness, &box_frame(DESKTOP, "menu-bar"))?);
-            // Note ▸ History of that Note.
+            file_menu(&mut harness)?;
+            // ⋮ ▸ History of that Note.
+            harness.get_by_label(texts.note_more).click();
+            harness.run();
             harness
                 .get_all_by_label(texts.history)
                 .last()
-                .ok_or("Note ▸ History")?
+                .ok_or("⋮ ▸ History")?
                 .click();
             harness.run();
             problems.extend(match_frame(
@@ -1211,12 +1223,10 @@ fn all_guide_frames() -> TestResult {
                 &mut harness,
                 &box_frame("routines-and-agenda", "all-routines"),
             )?);
+            // A calendar file of them all from Export (obf-1014: the
+            // Occurrence's menu has no Share).
             let mut harness = window(texts, language, theme)?;
-            harness
-                .get_all_by_label(&format!("{} {}", texts.more_for, texts.snack))
-                .nth(1)
-                .ok_or("the snack's ⋮")?
-                .click();
+            harness.state_mut().select(Selection::AllRoutines);
             harness.run();
             problems.extend(match_frame(
                 &mut harness,
@@ -1911,17 +1921,18 @@ fn sharing_frames(
             click_first(harness, &afar)
         }),
         ("roles", shared, |harness, _, texts| {
-            let people = harness.state().t().people_title().to_string();
+            // Its people are on Share with people… (obf-1014).
+            let people = harness.state().t().share_area().to_string();
             area_menu(harness, texts.work, &people)
         }),
         ("share-to-app", plain, |harness, people, _| {
             harness.state_mut().select_note(&people.note);
             harness.run();
-            let copy = harness.state().t().copy_as_text().to_string();
+            let copy = harness.state().t().copy_text().to_string();
             harness
                 .query_all_by_label(&copy)
                 .last()
-                .ok_or("Copy as text")?
+                .ok_or("Copy text")?
                 .scroll_to_me();
             harness.run();
             Ok(())
@@ -1929,7 +1940,7 @@ fn sharing_frames(
         ("send-note", plain, |harness, people, _| {
             harness.state_mut().select_note(&people.note);
             harness.run();
-            let send = harness.state().t().send_button().to_string();
+            let send = harness.state().t().send_to_person().to_string();
             click_first(harness, &send)
         }),
         ("receive-note", plain, |harness, people, _| {
@@ -2264,7 +2275,7 @@ fn desktop_frames(
         problems.extend(match_frame(&mut harness, &box_frame(name))?);
     }
     // The Note dialog's Paste and Attach a file…, the desktop's ways to a
-    // photo without a camera (#352); Paste and Record voice show where a
+    // photo without a camera (#352); Paste and Voice show where a
     // clipboard and a microphone are.
     let mut harness = Box::new(window(texts, language, theme)?);
     let captured = Notes::new(harness.state().store()).capture(texts.capture, None, None)?;

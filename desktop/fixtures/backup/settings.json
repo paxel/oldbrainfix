@@ -47,6 +47,46 @@
     [
       "playbackSpeed",
       "1.5"
+    ],
+    [
+      "theme",
+      "dark"
+    ],
+    [
+      "quietHours",
+      "21:30-07:00"
+    ],
+    [
+      "renagMinutes",
+      "15"
+    ],
+    [
+      "recordingPauseSeconds",
+      "5"
+    ],
+    [
+      "tipsOff",
+      "true"
+    ],
+    [
+      "twoRowEditorOff",
+      "true"
+    ],
+    [
+      "alertsOff",
+      "true"
+    ],
+    [
+      "speechModel",
+      "small:file"
+    ],
+    [
+      "textSize",
+      "huge"
+    ],
+    [
+      "alarmSound",
+      "content://media/internal/audio/media/42"
     ]
   ]
 }

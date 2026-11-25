@@ -1,5 +1,5 @@
 {
-  "now": "2026-01-02T10:00:45.000Z",
+  "now": "2026-01-02T10:02:03.000Z",
   "device": "65b60673d6ed884bf01c2c222d82ada0",
   "areas": [
     {
@@ -21,6 +21,22 @@
     {
       "id": "area:0000000000000000000000000000000c",
       "name": "From Notes (3)",
+      "starter": null,
+      "colour": null,
+      "icon": null,
+      "topics": []
+    },
+    {
+      "id": "area:0000000000000000000000000000000e",
+      "name": "From Notes (4)",
+      "starter": null,
+      "colour": null,
+      "icon": null,
+      "topics": []
+    },
+    {
+      "id": "area:00000000000000000000000000000017",
+      "name": "From Notes (5)",
       "starter": null,
       "colour": null,
       "icon": null,
@@ -297,23 +313,274 @@
       "removedTranscripts": [],
       "removedPhotoTexts": [],
       "wordless": "photo"
+    },
+    {
+      "id": "note:0000000000000000000000000000000f",
+      "text": "Müller\nHerr Müller € 12,50",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2024-11-05T17:30:00.123Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": "area:0000000000000000000000000000000e",
+      "importance": "normal",
+      "trashed": "2026-01-01T10:01:33.000Z",
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000010",
+      "text": "dentist\nTuesday 9:00\nbring the X-ray",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2024-11-05T17:30:00.123Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": "area:00000000000000000000000000000001",
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000011",
+      "text": "# Shopping\n- **milk** and ~~bread~~\n- ☐󠁸󠁹󠁶󠁣󠁿 eggs",
+      "textFormat": "markdown",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2025-03-01T08:00:00.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": "area:0000000000000000000000000000000e",
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000013",
+      "text": "# Ideas 2\\*3\n> *quoted*\n`code` [link](https://x.org)",
+      "textFormat": "markdown",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:01:04.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": "area:0000000000000000000000000000000e",
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000014",
+      "text": "～\ntilde",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2025-01-01T00:00:00.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": "area:0000000000000000000000000000000e",
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000015",
+      "text": "😀\nemoji",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2025-01-01T00:00:00.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": "area:0000000000000000000000000000000e",
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000016",
+      "text": "later\nWritten later",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:01:35.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": "area:0000000000000000000000000000000e",
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000018",
+      "text": "😀\nemoji",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2025-01-01T00:00:00.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": "area:00000000000000000000000000000017",
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
     }
   ],
   "all": [
+    "note:00000000000000000000000000000016",
+    "note:00000000000000000000000000000013",
     "note:0000000000000000000000000000000a",
     "note:0000000000000000000000000000000b",
     "note:00000000000000000000000000000008",
+    "note:00000000000000000000000000000011",
     "note:00000000000000000000000000000007",
     "note:00000000000000000000000000000005",
     "note:00000000000000000000000000000006",
+    "note:00000000000000000000000000000014",
+    "note:00000000000000000000000000000015",
+    "note:00000000000000000000000000000018",
     "note:00000000000000000000000000000003",
     "note:00000000000000000000000000000004",
-    "note:0000000000000000000000000000000d"
+    "note:0000000000000000000000000000000d",
+    "note:00000000000000000000000000000010"
   ],
   "unsorted": [],
-  "trashed": [],
+  "trashed": [
+    "note:0000000000000000000000000000000f"
+  ],
   "inside": {
-    "area:00000000000000000000000000000001": [],
+    "area:00000000000000000000000000000001": [
+      "note:00000000000000000000000000000010"
+    ],
     "area:00000000000000000000000000000002": [
       "note:0000000000000000000000000000000a",
       "note:0000000000000000000000000000000b",
@@ -326,23 +593,53 @@
     ],
     "area:0000000000000000000000000000000c": [
       "note:0000000000000000000000000000000d"
+    ],
+    "area:0000000000000000000000000000000e": [
+      "note:00000000000000000000000000000016",
+      "note:00000000000000000000000000000013",
+      "note:00000000000000000000000000000011",
+      "note:00000000000000000000000000000014",
+      "note:00000000000000000000000000000015"
+    ],
+    "area:00000000000000000000000000000017": [
+      "note:00000000000000000000000000000018"
     ]
   },
   "sections": {
+    "note:00000000000000000000000000000016": [],
+    "note:00000000000000000000000000000013": [],
     "note:0000000000000000000000000000000a": [],
     "note:0000000000000000000000000000000b": [],
     "note:00000000000000000000000000000008": [],
+    "note:00000000000000000000000000000011": [],
     "note:00000000000000000000000000000007": [],
     "note:00000000000000000000000000000005": [],
     "note:00000000000000000000000000000006": [],
+    "note:00000000000000000000000000000014": [],
+    "note:00000000000000000000000000000015": [],
+    "note:00000000000000000000000000000018": [],
     "note:00000000000000000000000000000003": [],
     "note:00000000000000000000000000000004": [],
-    "note:0000000000000000000000000000000d": []
+    "note:0000000000000000000000000000000d": [],
+    "note:00000000000000000000000000000010": [],
+    "note:0000000000000000000000000000000f": []
   },
   "untranscribed": [],
   "unreadPhotos": [],
   "removable": {},
   "shares": {
+    "note:00000000000000000000000000000016": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "later\nWritten later"
+    },
+    "note:00000000000000000000000000000013": {
+      "html": "<h1>Ideas 2*3</h1>\n<blockquote><em>quoted</em></blockquote>\n<p><code>code</code> <a href=\"https://x.org\">link</a></p>\n",
+      "photos": [],
+      "recordings": [],
+      "text": "# Ideas 2\\*3\n> *quoted*\n`code` [link](https://x.org)"
+    },
     "note:0000000000000000000000000000000a": {
       "html": "<h1>Ideas 2*3</h1>\n<blockquote><em>quoted</em></blockquote>\n<p><code>code</code> <a href=\"https://x.org\">link</a></p>\n",
       "photos": [],
@@ -356,6 +653,12 @@
       "text": "later\nWritten later"
     },
     "note:00000000000000000000000000000008": {
+      "html": "<h1>Shopping</h1>\n<ul><li><strong>milk</strong> and <del>bread</del></li><li>☐ eggs</li></ul>\n",
+      "photos": [],
+      "recordings": [],
+      "text": "# Shopping\n- **milk** and ~~bread~~\n- [ ] eggs"
+    },
+    "note:00000000000000000000000000000011": {
       "html": "<h1>Shopping</h1>\n<ul><li><strong>milk</strong> and <del>bread</del></li><li>☐ eggs</li></ul>\n",
       "photos": [],
       "recordings": [],
@@ -379,6 +682,24 @@
       "recordings": [],
       "text": "😀\nemoji"
     },
+    "note:00000000000000000000000000000014": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "～\ntilde"
+    },
+    "note:00000000000000000000000000000015": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "😀\nemoji"
+    },
+    "note:00000000000000000000000000000018": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "😀\nemoji"
+    },
     "note:00000000000000000000000000000003": {
       "html": null,
       "photos": [],
@@ -396,48 +717,80 @@
       "photos": [],
       "recordings": [],
       "text": "dentist\nTuesday 9:00\nbring the X-ray"
+    },
+    "note:00000000000000000000000000000010": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "dentist\nTuesday 9:00\nbring the X-ray"
+    },
+    "note:0000000000000000000000000000000f": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Müller\nHerr Müller € 12,50"
     }
   },
   "search": {
     "": [
+      "note:00000000000000000000000000000016",
+      "note:00000000000000000000000000000013",
       "note:0000000000000000000000000000000a",
       "note:0000000000000000000000000000000b",
       "note:00000000000000000000000000000008",
+      "note:00000000000000000000000000000011",
       "note:00000000000000000000000000000007",
       "note:00000000000000000000000000000005",
       "note:00000000000000000000000000000006",
+      "note:00000000000000000000000000000014",
+      "note:00000000000000000000000000000015",
+      "note:00000000000000000000000000000018",
       "note:00000000000000000000000000000003",
       "note:00000000000000000000000000000004",
-      "note:0000000000000000000000000000000d"
+      "note:0000000000000000000000000000000d",
+      "note:00000000000000000000000000000010"
     ],
     "sauce": [],
     "MILK": [
-      "note:00000000000000000000000000000008"
+      "note:00000000000000000000000000000008",
+      "note:00000000000000000000000000000011"
     ],
     "receipt": [],
     "dentist": [
       "note:00000000000000000000000000000004",
-      "note:0000000000000000000000000000000d"
+      "note:0000000000000000000000000000000d",
+      "note:00000000000000000000000000000010"
     ],
     "x-ray": [
       "note:00000000000000000000000000000004",
-      "note:0000000000000000000000000000000d"
+      "note:0000000000000000000000000000000d",
+      "note:00000000000000000000000000000010"
     ],
     "müller": [
+      "note:00000000000000000000000000000003"
+    ],
+    "MULLER": [
       "note:00000000000000000000000000000003"
     ],
     "called": [],
     "loop": [],
     " e ": [
+      "note:00000000000000000000000000000016",
+      "note:00000000000000000000000000000013",
       "note:0000000000000000000000000000000a",
       "note:0000000000000000000000000000000b",
       "note:00000000000000000000000000000008",
+      "note:00000000000000000000000000000011",
       "note:00000000000000000000000000000007",
       "note:00000000000000000000000000000005",
       "note:00000000000000000000000000000006",
+      "note:00000000000000000000000000000014",
+      "note:00000000000000000000000000000015",
+      "note:00000000000000000000000000000018",
       "note:00000000000000000000000000000003",
       "note:00000000000000000000000000000004",
-      "note:0000000000000000000000000000000d"
+      "note:0000000000000000000000000000000d",
+      "note:00000000000000000000000000000010"
     ],
     "heading": [],
     "format": [],
@@ -446,7 +799,9 @@
     "4711": []
   },
   "searchWithin": {
-    "area:00000000000000000000000000000001": [],
+    "area:00000000000000000000000000000001": [
+      "note:00000000000000000000000000000010"
+    ],
     "area:00000000000000000000000000000002": [
       "note:0000000000000000000000000000000a",
       "note:0000000000000000000000000000000b",
@@ -459,7 +814,96 @@
     ],
     "area:0000000000000000000000000000000c": [
       "note:0000000000000000000000000000000d"
+    ],
+    "area:0000000000000000000000000000000e": [
+      "note:00000000000000000000000000000016",
+      "note:00000000000000000000000000000013",
+      "note:00000000000000000000000000000011",
+      "note:00000000000000000000000000000014",
+      "note:00000000000000000000000000000015"
+    ],
+    "area:00000000000000000000000000000017": [
+      "note:00000000000000000000000000000018"
     ]
+  },
+  "findings": {
+    "MULLER": {
+      "note:00000000000000000000000000000003": [
+        {
+          "cell": null,
+          "context": "Müller",
+          "contextEnd": 6,
+          "contextStart": 0,
+          "end": 6,
+          "key": "",
+          "line": 0,
+          "part": "text",
+          "section": null,
+          "start": 0
+        },
+        {
+          "cell": null,
+          "context": "Herr Müller € 12,50",
+          "contextEnd": 11,
+          "contextStart": 5,
+          "end": 18,
+          "key": "",
+          "line": 1,
+          "part": "text",
+          "section": null,
+          "start": 12
+        }
+      ]
+    },
+    "dentist": {
+      "note:00000000000000000000000000000004": [
+        {
+          "cell": null,
+          "context": "dentist",
+          "contextEnd": 7,
+          "contextStart": 0,
+          "end": 7,
+          "key": "",
+          "line": 0,
+          "part": "text",
+          "section": null,
+          "start": 0
+        }
+      ],
+      "note:0000000000000000000000000000000d": [
+        {
+          "cell": null,
+          "context": "dentist",
+          "contextEnd": 7,
+          "contextStart": 0,
+          "end": 7,
+          "key": "",
+          "line": 0,
+          "part": "text",
+          "section": null,
+          "start": 0
+        }
+      ],
+      "note:00000000000000000000000000000010": [
+        {
+          "cell": null,
+          "context": "dentist",
+          "contextEnd": 7,
+          "contextStart": 0,
+          "end": 7,
+          "key": "",
+          "line": 0,
+          "part": "text",
+          "section": null,
+          "start": 0
+        }
+      ]
+    },
+    "receipt": {},
+    "called": {},
+    "loop": {},
+    "lease": {},
+    "rent due": {}
   },
   "conflicts": []
 }

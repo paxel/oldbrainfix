@@ -203,7 +203,7 @@ fn the_tools_are_answered_until_the_model_answers_with_links_to_its_notes() -> T
 }
 
 #[test]
-fn asking_opens_no_ai_task_and_leaves_sync_running() -> TestResult {
+fn asking_opens_no_ai_task() -> TestResult {
     let store = store();
     let bike = Notes::new(&store).capture("Bike lock code 4711", None, None)?;
     let fake = Fake::new(vec![
@@ -215,12 +215,11 @@ fn asking_opens_no_ai_task_and_leaves_sync_running() -> TestResult {
     ]);
     ask(&store, &fake, anthropic(), "Bike lock?")?;
     assert_eq!(store.ai_task()?, None);
-    assert!(!store.sync_paused()?);
     Ok(())
 }
 
 #[test]
-fn a_change_the_model_makes_waits_as_an_ai_task_and_sync_waits_with_it() -> TestResult {
+fn a_change_the_model_makes_waits_as_an_ai_task() -> TestResult {
     let store = store();
     let note = Notes::new(&store).capture("Dentist on Friday", None, None)?;
     let area = Places::new(&store).add_area("Health")?;
@@ -231,7 +230,6 @@ fn a_change_the_model_makes_waits_as_an_ai_task_and_sync_waits_with_it() -> Test
     let asked = ask(&store, &fake, anthropic(), "Sort what's new")?;
     let task = asked.task.ok_or("an AI Task")?;
     assert_eq!(store.ai_task()?, Some(task.clone()));
-    assert!(store.sync_paused()?);
     assert!(!store.ai_review(&task)?.is_empty());
     // In the log the Note is still Unsorted until Accept.
     let logged = store.log_only(|| Notes::new(&store).by_id(&note.id))?;
@@ -252,7 +250,6 @@ fn an_ai_task_left_without_a_change_is_declined() -> TestResult {
     let asked = ask(&store, &fake, anthropic(), "File it")?;
     assert_eq!(asked.task, None);
     assert_eq!(store.ai_task()?, None);
-    assert!(!store.sync_paused()?);
     Ok(())
 }
 

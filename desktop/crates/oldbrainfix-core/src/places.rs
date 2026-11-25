@@ -48,6 +48,11 @@ pub fn starter_date() -> DateTime<Utc> {
 /// first and after each, as the Dart core's `MoveProgress`.
 pub type MoveProgress<'a> = &'a dyn Fn(usize, usize);
 
+/// Whether a long job beside the window is to stop (obf-1078), asked
+/// before each of its steps: deleting an Area before each Note, an Import
+/// before each Note it writes. What was done before stays done.
+pub type Stopping<'a> = &'a dyn Fn() -> bool;
+
 /// Where a deleted place's Notes go.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NotesGo {
@@ -249,7 +254,8 @@ impl<'a> Places<'a> {
             .topic_by_id(topic_id)?
             .ok_or_else(|| Error::Invalid(format!("not a Topic: {topic_id}")))?;
         self.store.batch(|| {
-            self.move_notes(topic_id, notes_go, Some(&topic.area_id), &|_, _| ())?;
+            let to = Some(topic.area_id.as_str());
+            self.move_notes(topic_id, notes_go, to, (&|_, _| (), &|| false))?;
             self.store.append(topic_id, keys::TYPE, None, None)?;
             Ok(())
         })
@@ -274,18 +280,36 @@ impl<'a> Places<'a> {
         notes_go: NotesGo,
         progress: MoveProgress<'_>,
     ) -> Result<()> {
+        self.delete_area_stopping(area_id, notes_go, progress, &|| false)
+            .map(drop)
+    }
+
+    /// As [`Places::delete_area_reporting`], asking `stop` before each
+    /// Note (obf-1078): once it says so, the Notes gone stay where they
+    /// went, the others and the Area with its Topics stay, and it answers
+    /// `false`; `true` once the Area is deleted.
+    pub fn delete_area_stopping(
+        &self,
+        area_id: &str,
+        notes_go: NotesGo,
+        progress: MoveProgress<'_>,
+        stop: Stopping<'_>,
+    ) -> Result<bool> {
         self.require_area(area_id)?;
         if notes_go == NotesGo::Area {
             return Err(Error::Invalid("an Area has no Area".into()));
         }
-        self.move_notes(area_id, notes_go, None, progress)?;
+        if !self.move_notes(area_id, notes_go, None, (progress, stop))? {
+            return Ok(false);
+        }
         self.store.batch(|| {
             for topic in self.topics(area_id)? {
                 self.store.append(&topic.id, keys::TYPE, None, None)?;
             }
             self.store.append(area_id, keys::TYPE, None, None)?;
             Ok(())
-        })
+        })?;
+        Ok(true)
     }
 
     /// Plants the Starter Set entries whose slugs are in `picked`. A
@@ -343,16 +367,19 @@ impl<'a> Places<'a> {
         id: &str,
         notes_go: NotesGo,
         area_id: Option<&str>,
-        progress: MoveProgress<'_>,
-    ) -> Result<()> {
+        (progress, stop): (MoveProgress<'_>, Stopping<'_>),
+    ) -> Result<bool> {
         let notes = Notes::new(self.store).inside(id)?;
         if notes_go == NotesGo::Trash {
             // With their Routines and Reminders, as every deletion (#262),
             // those read once for all of them (obf-1093).
-            return Routines::new(self.store).trash_notes(&notes, progress);
+            return Routines::new(self.store).trash_notes_stopping(&notes, progress, stop);
         }
         progress(0, notes.len());
         for (i, note) in notes.iter().enumerate() {
+            if stop() {
+                return Ok(false);
+            }
             self.store.batch(|| {
                 if notes_go == NotesGo::Area {
                     return self
@@ -371,7 +398,7 @@ impl<'a> Places<'a> {
             })?;
             progress(i + 1, notes.len());
         }
-        Ok(())
+        Ok(true)
     }
 
     // The writes behind add_area and add_topic, for use inside one batch.

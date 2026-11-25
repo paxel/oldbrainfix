@@ -12,13 +12,14 @@
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
-use egui::{Id, RichText, TextEdit, Ui};
+use egui::{Id, RichText, Ui};
 use oldbrainfix_core::backup::{self, Header, MIN_PASSPHRASE, Problem};
 use oldbrainfix_core::profile::OwnProfile;
 use oldbrainfix_core::recovery::{self, Sheet};
 use oldbrainfix_core::{Error, PackTicks, Store};
 
 use crate::app::Wall;
+use crate::design;
 use crate::l10n::L10n;
 use crate::{pack_view, theme};
 
@@ -81,7 +82,7 @@ impl Passphrase {
 fn secret(ui: &mut Ui, t: &L10n, id: &str, hint: &str, value: &mut String) {
     let text = ui.visuals().text_color();
     let field = ui.add(
-        TextEdit::singleline(value)
+        crate::theme::field(ui, value)
             .id(Id::new(id))
             .password(true)
             .hint_text(hint)
@@ -112,9 +113,8 @@ pub fn card(
     form: &mut Passphrase,
     actions: &mut Vec<BackupAction>,
 ) {
-    let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
-    ui.label(RichText::new(t.backups_title()).strong().color(text));
+    ui.label(RichText::new(t.backups_title()).strong());
     ui.label(RichText::new(t.backups_intro()).small().color(weak));
     own_backups(ui, t, store, wall, form, actions);
 }
@@ -124,7 +124,7 @@ pub fn card(
 pub fn notes_card(ui: &mut Ui, t: &L10n) -> bool {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
-    ui.label(RichText::new(t.backup_open_title()).strong().color(text));
+    ui.label(RichText::new(t.backup_open_title()).strong());
     ui.label(RichText::new(t.backup_open_intro()).small().color(weak));
     ui.button(RichText::new(t.backup_open()).color(text))
         .clicked()
@@ -175,7 +175,7 @@ fn own_backups(
         }
         return;
     }
-    ui.label(RichText::new(t.backup_sheet_title()).strong().color(text));
+    ui.label(RichText::new(t.backup_sheet_title()).strong());
     ui.label(RichText::new(t.backup_sheet_intro()).small().color(weak));
     if ui
         .button(RichText::new(t.backup_sheet_save()).color(text))
@@ -183,7 +183,7 @@ fn own_backups(
     {
         actions.push(BackupAction::SaveSheet);
     }
-    ui.label(RichText::new(t.backup_folder_title()).strong().color(text));
+    ui.label(RichText::new(t.backup_folder_title()).strong());
     let folder = store.backup_folder().ok().flatten();
     let shown = match &folder {
         Some(path) => t.backup_folder_chosen(path),
@@ -302,13 +302,12 @@ impl Welcome {
 
 /// The text, then its button below it (UI laws, "Dialogs and pages").
 fn choice(ui: &mut Ui, detail: &str, label: &str) -> bool {
-    let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     ui.add_space(8.0);
     ui.label(RichText::new(detail).color(weak));
     ui.add_sized(
         [ui.available_width(), 32.0],
-        egui::Button::new(RichText::new(label).strong().color(text)),
+        egui::Button::new(RichText::new(label).strong()),
     )
     .clicked()
 }
@@ -330,7 +329,7 @@ pub fn welcome(
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     if let Some((done, total)) = state.rebuilding {
-        ui.heading(RichText::new(t.vault_rebuild()).color(text));
+        crate::design::dialog_title(ui, t.vault_rebuild());
         ui.horizontal(|ui| {
             ui.add(egui::Spinner::new());
             let said = t.vault_rebuilding(done as i64, total as i64);
@@ -339,7 +338,7 @@ pub fn welcome(
         return;
     }
     let Some((_, header)) = &state.file else {
-        ui.heading(RichText::new(t.first_start_title()).color(text));
+        crate::design::dialog_title(ui, t.first_start_title());
         ui.label(RichText::new(t.first_start_intro()).color(text));
         // Actions, each with what it means; not a choice of value.
         if choice(ui, t.welcome_new_detail(), t.first_start_new()) {
@@ -356,11 +355,11 @@ pub fn welcome(
         }
         return;
     };
-    ui.heading(RichText::new(t.restore_offer()).color(text));
+    crate::design::dialog_title(ui, t.restore_offer());
     ui.label(RichText::new(t.restore_intro()).small().color(weak));
     ui.add_space(8.0);
     let made = wall(header.created).format("%Y-%m-%d %H:%M").to_string();
-    ui.label(RichText::new(t.restore_file(&made)).strong().color(text));
+    ui.label(RichText::new(t.restore_file(&made)).strong());
     if ui
         .button(RichText::new(t.restore_pick()).color(text))
         .clicked()
@@ -376,7 +375,7 @@ pub fn welcome(
     );
     ui.label(RichText::new(t.restore_or()).color(weak));
     let code = ui.add(
-        TextEdit::singleline(&mut state.code)
+        crate::theme::field(ui, &mut state.code)
             .id(Id::new("restore code"))
             .hint_text(t.restore_code_label())
             .text_color(text)
@@ -394,7 +393,7 @@ pub fn welcome(
         if theme::primary(ui, true, t.restore_start()).clicked() {
             actions.push(WelcomeAction::Restore);
         }
-        if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+        if design::row_button(ui, t.cancel()).clicked() {
             actions.push(WelcomeAction::Back);
         }
     });
@@ -537,14 +536,14 @@ pub fn notes_page(
 ) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
-    ui.heading(RichText::new(t.backup_open_page_title()).color(text));
+    crate::design::dialog_title(ui, t.backup_open_page_title());
     ui.add_space(8.0);
     let created = match &state.opened {
         Some(opened) => opened.created,
         None => state.header.created,
     };
     let made = wall(created).format("%Y-%m-%d %H:%M").to_string();
-    ui.label(RichText::new(t.restore_file(&made)).strong().color(text));
+    ui.label(RichText::new(t.restore_file(&made)).strong());
     let Some(opened) = &state.opened else {
         ui.label(RichText::new(t.backup_open_unlock_intro()).color(weak));
         ui.add_space(4.0);
@@ -557,7 +556,7 @@ pub fn notes_page(
         );
         ui.label(RichText::new(t.restore_or()).color(weak));
         let code = ui.add(
-            TextEdit::singleline(&mut state.code)
+            crate::theme::field(ui, &mut state.code)
                 .id(Id::new("backup notes code"))
                 .hint_text(t.restore_code_label())
                 .text_color(text)

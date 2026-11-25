@@ -10,10 +10,11 @@
 //! Enter in the filter takes the first row shown: the latest place filed
 //! into, else the first match, else New Area… with what is typed.
 
-use egui::{Id, Key, RichText, TextEdit, Ui};
+use egui::{Id, Key, RichText, Ui};
 use oldbrainfix_core::{Area, DeviceSettings, PersonSettings, Places, Store, Topic};
 
 use crate::app::name_field;
+use crate::design;
 use crate::l10n::L10n;
 use crate::names::{area_name, topic_name};
 use crate::text_menu;
@@ -188,15 +189,19 @@ impl FileIntoPicker {
         let text = ui.visuals().text_color();
         let weak = ui.visuals().weak_text_color();
         let accent = theme::tones(ui.visuals()).accent;
-        let field = ui.add(
-            TextEdit::singleline(&mut self.query)
-                .id(Id::new("file into filter"))
-                .hint_text(t.file_into_filter_hint())
-                .text_color(text)
-                .desired_width(f32::INFINITY),
-        );
-        text_menu::show(ui, t, &field, &self.query);
-        name_field(ui, &field, t.file_into_filter_hint());
+        // On its band, so the places scroll under its line (obf-1088).
+        let field = theme::search_band(ui, |ui| {
+            let field = ui.add(
+                crate::theme::field(ui, &mut self.query)
+                    .id(Id::new("file into filter"))
+                    .hint_text(t.file_into_filter_hint())
+                    .text_color(text)
+                    .desired_width(f32::INFINITY),
+            );
+            text_menu::show(ui, t, &field, &self.query);
+            name_field(ui, &field, t.file_into_filter_hint());
+            field
+        });
         self.take_focus(ui, &field);
         let mut row = None;
         // Ctrl+Enter as Enter, as in every dialog (#277).
@@ -217,6 +222,8 @@ impl FileIntoPicker {
         }
         let list = list.show(ui, |ui| {
             ui.set_min_height(tall);
+            // Room under the band's line, inside, so the list is cut there.
+            ui.add_space(4.0);
             let place = |ui: &mut Ui, id: &str, name: String, indent: f32| {
                 ui.horizontal(|ui| {
                     ui.add_space(indent);
@@ -290,7 +297,7 @@ impl FileIntoPicker {
             }
         });
         self.tall = self.tall.max(list.content_size.y.min(LIST_HEIGHT));
-        if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+        if design::row_button(ui, t.cancel()).clicked() {
             return Some(Picked::Close);
         }
         match row? {
@@ -323,9 +330,9 @@ impl FileIntoPicker {
         } else {
             t.new_area()
         };
-        ui.label(RichText::new(heading).strong().color(text));
+        ui.label(RichText::new(heading).strong());
         let field = ui.add(
-            TextEdit::singleline(&mut naming.name)
+            crate::theme::field(ui, &mut naming.name)
                 .id(Id::new("file into name"))
                 .hint_text(t.name_hint())
                 .text_color(text)
@@ -337,7 +344,7 @@ impl FileIntoPicker {
         let mut made = ready && field.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter));
         let mut back = false;
         ui.horizontal(|ui| {
-            back = ui.button(RichText::new(t.cancel()).color(text)).clicked();
+            back = design::row_button(ui, t.cancel()).clicked();
             made |= theme::main_action(ui, ready, t.create());
         });
         let picked = made.then(|| Picked::Make {

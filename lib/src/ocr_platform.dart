@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'found_marks.dart';
+import 'import_run.dart' show ReaderBusy;
 import 'l10n.dart';
 
 /// The platform seam for Photo Texts: RustO with its models bundled in
@@ -95,6 +97,32 @@ class PhotoReader extends ChangeNotifier {
   /// The photo being read, by its hash; null while none is.
   String? get current => _current;
 
+  /// Since when it reads without a rest, and how many of how many
+  /// photos it took meanwhile; null while it rests (obf-1078).
+  ReaderBusy? get busy => _busy;
+  ReaderBusy? _busy;
+
+  /// Whether Abort on the page Running stopped it (obf-1078): the
+  /// photo under way ends and is kept; of the others, only those
+  /// asked for again are read, until [goOn] or the next start.
+  bool get stopped => _stopped;
+  var _stopped = false;
+
+  /// Stops it as [stopped] says.
+  void stop() {
+    if (_stopped || _disposed) return;
+    _stopped = true;
+    notifyListeners();
+  }
+
+  /// Reads the photos waiting again, after [stop].
+  void goOn() {
+    if (!_stopped || _disposed) return;
+    _stopped = false;
+    notifyListeners();
+    _kick();
+  }
+
   /// The Photo Text of the photo [hash] of the Note [noteId] as it is
   /// now, or null when it has none.
   String? photoTextOf(String noteId, String hash) =>
@@ -136,19 +164,34 @@ class PhotoReader extends ChangeNotifier {
       final supported = _supported ??= await platform.supported();
       if (!supported || _disposed) return;
       var read = false;
+      var took = 0;
       while (!_disposed) {
         final asked = _asked.isEmpty ? null : _asked.removeAt(0);
         waiting = asked?.done;
-        final next = asked == null
-            ? notes
+        // Stopped, only what is asked for again is read (obf-1078).
+        final left = asked == null && _stopped
+            ? const <({String noteId, String hash})>[]
+            : notes
                   .unreadPhotos()
                   .where((p) => !_skipped.contains(p.hash))
-                  .firstOrNull
+                  .toList();
+        final next = asked == null
+            ? left.firstOrNull
             : (noteId: asked.noteId, hash: asked.hash);
         if (next == null) break;
         final bytes = notes.photoBytes(next.hash);
         String? text;
         if (bytes != null) {
+          _busy = (
+            since: _busy?.since ?? DateTime.now(),
+            done: took,
+            of:
+                took +
+                1 +
+                _asked.length +
+                (_stopped ? 0 : left.length - (asked == null ? 1 : 0)),
+          );
+          took++;
           read = true;
           _current = next.hash;
           notifyListeners();
@@ -176,6 +219,10 @@ class PhotoReader extends ChangeNotifier {
       waiting?.complete(false);
       // Where RustO does not run, or gone: nothing asked for is read.
       if (_disposed || _supported == false) _dropAsked();
+      if (_busy != null) {
+        _busy = null;
+        if (!_disposed) notifyListeners();
+      }
     }
     if (_again) _kick();
   }
@@ -310,8 +357,11 @@ class _PhotoTextState extends State<PhotoText> {
     final text = _text;
     if (text == null || text.isEmpty) return const SizedBox.shrink();
     final theme = Theme.of(context);
-    final shown = Text(
+    // The places a search or the find bar found in it (obf-1047).
+    final shown = foundText(
+      context,
       text,
+      FindScope.of(context, widget.noteId, FindingPart.photoText, widget.hash),
       maxLines: widget.compact ? 3 : null,
       overflow: widget.compact ? TextOverflow.ellipsis : null,
       style: theme.textTheme.bodyMedium?.copyWith(

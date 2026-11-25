@@ -6,7 +6,6 @@ import 'browser.dart';
 import 'l10n.dart';
 import 'line_editing.dart';
 import 'look.dart';
-import 'note_editor_screen.dart';
 import 'routine_editor_screen.dart';
 import 'tick_saves.dart';
 
@@ -521,26 +520,126 @@ class _ChecklistSectionState extends State<ChecklistSection>
   bool showsLine(String id) => _lists.byNote(widget.noteId)?.line(id) != null;
 
   @override
-  String addLine(String text, {required int at, required bool inGroup}) =>
-      _lists.add(widget.noteId, text, at: at, indent: inGroup);
+  String addLine(String text, {required int at, required bool inGroup}) {
+    final id = _lists.add(widget.noteId, text, at: at, indent: inGroup);
+    recordLines(undo: () => _deleteAgain(id), redo: () => _restoreAgain(id));
+    return id;
+  }
 
   @override
-  void renameLine(String id, String text) => _lists.rename(id, text);
+  void renameLine(String id, String text) {
+    final before = _lists.byNote(widget.noteId)?.line(id)?.text;
+    _lists.rename(id, text);
+    if (before == null || before == text) return;
+    recordLines(
+      undo: () => _renameAgain(id, before),
+      redo: () => _renameAgain(id, text),
+    );
+  }
 
+  /// Its group comes up to the top; Undo puts it back under it.
   @override
-  void deleteLine(String id) => _lists.delete(id);
+  void deleteLine(String id) {
+    final group = _editableGroup(id);
+    _lists.delete(id);
+    recordLines(
+      undo: () {
+        if (!_restoreAgain(id)) return;
+        for (final line in group) {
+          if (_changeable(line)) _lists.indent(line);
+        }
+      },
+      redo: () => _deleteAgain(id),
+    );
+  }
 
   /// Its group stays a group, under the Line above now.
   @override
   void deleteJoined(String id) {
-    final group = [
-      for (final line in _list?.groupOf(id) ?? const <Line>[])
-        if (_lists.mayEdit(line.id)) line.id,
-    ];
+    _deleteJoining(id);
+    recordLines(
+      undo: () => _restoreAgain(id),
+      redo: () {
+        if (_changeable(id)) _deleteJoining(id);
+      },
+    );
+  }
+
+  void _deleteJoining(String id) {
+    final group = _editableGroup(id);
     _lists.delete(id);
     for (final line in group) {
       _lists.indent(line);
     }
+  }
+
+  /// The Lines of the group of [id] this Device may change.
+  List<String> _editableGroup(String id) => [
+    for (final line
+        in _lists.byNote(widget.noteId)?.groupOf(id) ?? const <Line>[])
+      if (_lists.mayEdit(line.id)) line.id,
+  ];
+
+  /// Whether the Line [id] shows on the list and this Device may change
+  /// it: what Undo and Redo change (obf-1051).
+  bool _changeable(String id) =>
+      linesWritable && showsLine(id) && _lists.mayEdit(id);
+
+  void _deleteAgain(String id) {
+    if (_changeable(id)) _lists.delete(id);
+  }
+
+  /// Brings the deleted Line [id] back; whether it did.
+  bool _restoreAgain(String id) {
+    if (!linesWritable || !_lists.mayEdit(id)) return false;
+    if (!_lists.deletedLines(widget.noteId).any((l) => l.id == id)) {
+      return false;
+    }
+    _lists.restore(id);
+    return true;
+  }
+
+  void _renameAgain(String id, String text) {
+    if (_changeable(id)) _lists.rename(id, text);
+  }
+
+  /// Where the Line [id] stands: before which Line, with its group, or at
+  /// the end for none, and whether in the group of the Line above.
+  ({String? before, bool inGroup})? _placeOf(String id) {
+    final lines = _lists.byNote(widget.noteId)?.lines ?? const <Line>[];
+    final at = lines.indexWhere((l) => l.id == id);
+    if (at < 0) return null;
+    final line = lines[at];
+    var end = at + 1;
+    if (!line.inGroup) {
+      while (end < lines.length && lines[end].parent == id) {
+        end++;
+      }
+    }
+    return (
+      before: end < lines.length ? lines[end].id : null,
+      inGroup: line.inGroup,
+    );
+  }
+
+  /// Puts the Line [id] back at [place], as [_placeOf] told it.
+  void _putAt(String id, ({String? before, bool inGroup}) place) {
+    if (!_changeable(id)) return;
+    final before = place.before;
+    if (before != null && !showsLine(before)) return;
+    if (_placeOf(id) == place) return;
+    _lists.move(id, before: before);
+    _lists.indent(id, under: place.inGroup);
+  }
+
+  /// Runs [move], which moves the Line [id] or puts it in or out of a
+  /// group, as a step for Undo.
+  void _moving(String id, VoidCallback move) {
+    final before = _placeOf(id);
+    move();
+    final after = _placeOf(id);
+    if (before == null || after == null || before == after) return;
+    recordLines(undo: () => _putAt(id, before), redo: () => _putAt(id, after));
   }
 
   @override
@@ -559,7 +658,7 @@ class _ChecklistSectionState extends State<ChecklistSection>
         if (under && _lists.byNote(widget.noteId)?.lines.first.id == id) {
           return;
         }
-        _lists.indent(id, under: under);
+        _moving(id, () => _lists.indent(id, under: under));
         setState(_load);
     }
   }
@@ -572,13 +671,39 @@ class _ChecklistSectionState extends State<ChecklistSection>
     final on = _list?.on;
     tickAtOnce(lineTickKey(line, on), checked, () {
       checked ? _lists.check(line, on: on) : _lists.uncheck(line, on: on);
+      recordLines(
+        undo: () => _checkAgain(line, !checked, on),
+        redo: () => _checkAgain(line, checked, on),
+      );
       // Read once with the log's change, not twice (#339).
       if (mounted) reloadSoon();
     });
   }
 
+  void _checkAgain(String id, bool checked, RoutineOccurrence? on) {
+    if (!linesWritable || !showsLine(id)) return;
+    checked ? _lists.check(id, on: on) : _lists.uncheck(id, on: on);
+  }
+
   void _uncheckAll() {
-    _lists.uncheckAll(widget.noteId, on: _list?.on);
+    final on = _list?.on;
+    final checked = [
+      for (final line
+          in _lists.shownNow(widget.noteId, deviceWallClock)?.lines ??
+              const <Line>[])
+        if (line.checked) line.id,
+    ];
+    _lists.uncheckAll(widget.noteId, on: on);
+    recordLines(
+      undo: () {
+        for (final id in checked) {
+          _checkAgain(id, true, on);
+        }
+      },
+      redo: () {
+        if (linesWritable) _lists.uncheckAll(widget.noteId, on: on);
+      },
+    );
     setState(_load);
   }
 
@@ -689,16 +814,16 @@ class _ChecklistSectionState extends State<ChecklistSection>
     switch (step) {
       case _LineStep.up:
         if (_neighbours(list, line).$1 case final before?) {
-          _lists.move(id, before: before);
+          _moving(id, () => _lists.move(id, before: before));
         }
       case _LineStep.down:
-        _moveDown(list, line);
+        _moving(id, () => _moveDown(list, line));
       case _LineStep.indent:
-        _lists.indent(id);
+        _moving(id, () => _lists.indent(id));
       case _LineStep.outdent:
-        _lists.indent(id, under: false);
+        _moving(id, () => _lists.indent(id, under: false));
       case _LineStep.delete:
-        _lists.delete(id);
+        deleteLine(id);
         offerLineUndo(
           context,
           _lists.deletedLines,
@@ -716,6 +841,7 @@ class _ChecklistSectionState extends State<ChecklistSection>
     if (!linesWritable || !_lists.mayEdit(id)) return;
     if (!_lists.deletedLines(widget.noteId).any((l) => l.id == id)) return;
     _lists.restore(id);
+    recordLines(undo: () => _deleteAgain(id), redo: () => _restoreAgain(id));
     setState(_load);
   }
 
@@ -755,59 +881,59 @@ class _ChecklistSectionState extends State<ChecklistSection>
     if (list == null) return const SizedBox.shrink();
     final t = context.t;
     final uncheck = _checks && list.checkedCount > 0;
-    // Under the text field, as the Lines are under the text on a card.
+    // In the card of the Note, under its name (obf-1071), as the Lines
+    // are under the name on a card.
     return Padding(
-      padding: const EdgeInsets.only(top: 16),
-      child: EditorPanel(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
         key: const ValueKey('checklist'),
-        heading: t.checklistHeading,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            ChecklistLines(
-              lines: [
-                for (final row in rows)
-                  (
-                    id: TypedRows.shownId(row),
-                    text: row.kept,
-                    inGroup: row.inGroup,
-                    checked: switch (row.id) {
-                      final id? => list.line(id)?.checked ?? false,
-                      null => false,
-                    },
-                    below: null,
-                    beside: null,
-                  ),
-              ],
-              on: list.on,
-              onCheck: _checks ? _check : null,
-              onMenu: _menu,
-              editable: withMenus(_editable),
-              field: _adds ? _field : null,
-              compact: true,
-            ),
-            if (uncheck) ...[
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: OutlinedButton.icon(
-                  key: const ValueKey('checklist-uncheck-all'),
-                  onPressed: _uncheckAll,
-                  icon: const Icon(Icons.check_box_outline_blank),
-                  label: Text(t.checklistUncheckAll),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ChecklistLines(
+            lines: [
+              for (final row in rows)
+                (
+                  id: TypedRows.shownId(row),
+                  text: row.kept,
+                  inGroup: row.inGroup,
+                  checked: switch (row.id) {
+                    final id? => list.line(id)?.checked ?? false,
+                    null => false,
+                  },
+                  below: null,
+                  beside: null,
                 ),
-              ),
             ],
-            if (_removed.isNotEmpty)
-              RemovedLines(
-                store: widget.notes.store,
-                lines: _removed,
-                onRestore: linesWritable
-                    ? (id) => _lists.mayEdit(id) ? () => _restore(id) : null
-                    : (_) => null,
+            on: list.on,
+            onCheck: _checks ? _check : null,
+            onMenu: _menu,
+            editable: withMenus(_editable),
+            field: _adds ? _field : null,
+            compact: true,
+          ),
+          // After the open Lines, as a list opened from the Agenda starts.
+          ?addLineField(prefix: 'checklist', hint: t.addALine, at: _afterOpen),
+          if (uncheck) ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                key: const ValueKey('checklist-uncheck-all'),
+                onPressed: _uncheckAll,
+                icon: const Icon(Icons.check_box_outline_blank),
+                label: Text(t.checklistUncheckAll),
               ),
+            ),
           ],
-        ),
+          if (_removed.isNotEmpty)
+            RemovedLines(
+              store: widget.notes.store,
+              lines: _removed,
+              onRestore: linesWritable
+                  ? (id) => _lists.mayEdit(id) ? () => _restore(id) : null
+                  : (_) => null,
+            ),
+        ],
       ),
     );
   }

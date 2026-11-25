@@ -1,7 +1,11 @@
 use super::*;
 use crate::alarms::Alarms;
-use crate::lan::{Joining, answer_sync_inviting, apply_answer_as, read_request, sync_request_as};
+use crate::lan::{
+    Joining, answer_sync_inviting, apply_answer, apply_answer_as, read_request, sync_request,
+    sync_request_as,
+};
 use crate::notes::Notes;
+use crate::pairing::PairedDevice;
 use crate::places::Places;
 use crate::routines::Routines;
 use crate::schedule::{ClockTime, Day, Schedule};
@@ -718,42 +722,214 @@ fn one_ai_task_at_a_time_and_none_drafts_into_another_set() -> TestResult {
     Ok(())
 }
 
-#[test]
-fn sync_waits_while_an_ai_task_does() -> TestResult {
-    let store = store();
-    let dir = tempfile::tempdir()?;
-    let bundle = dir.path().join("out.zip");
-    crate::profile::OwnProfile::new(&store).apply_defaults("Ann", None)?;
-    let milk = Notes::new(&store).capture("Milk", None, None)?;
-    assert!(!store.sync_paused()?);
-    let task = store.open_ai_task()?;
-    assert!(store.sync_paused()?);
+/// The desk and a phone paired with it as one of the user's own Devices,
+/// met once, so each holds the other's keys.
+fn desk_and_phone() -> Made<(Store, Store)> {
+    // One clock for both, so what was written later wins everywhere.
+    let ticks = std::sync::Arc::new(std::sync::atomic::AtomicI64::new(0));
+    let clock = |ticks: &std::sync::Arc<std::sync::atomic::AtomicI64>| -> crate::Clock {
+        let ticks = ticks.clone();
+        Box::new(move || {
+            let n = ticks.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+            let start = DateTime::<Utc>::from_timestamp(1_767_261_600, 0).unwrap_or_default();
+            start + chrono::Duration::seconds(n)
+        })
+    };
+    let desk = Store::in_memory(clock(&ticks), || Ok(SigningKey::from_seed([1; 32])))?;
+    let phone = Store::in_memory(clock(&ticks), || Ok(SigningKey::from_seed([2; 32])))?;
+    crate::profile::OwnProfile::new(&desk).apply_defaults("Ann", None)?;
+    round(&desk, &phone)?;
+    desk.remember_device(&PairedDevice {
+        id: phone.device_id()?,
+        name: "Phone".into(),
+        fingerprint: String::new(),
+        host: None,
+        port: None,
+        last_sync: desk.now(),
+        shared: false,
+    })?;
+    Ok((desk, phone))
+}
 
+/// One LAN round as the phone joins the desk, both ways, through the
+/// host's own answer; what went to the phone, as text.
+fn round(desk: &Store, phone: &Store) -> Made<String> {
+    let request = sync_request(phone, &desk.version_vector()?, "Phone", "", "")?;
+    let (answered, _) = desk.serve_sync(request.to_string().as_bytes(), "Desk")?;
+    assert_eq!(answered.status, 200);
+    let text = String::from_utf8(answered.body)?;
+    apply_answer(phone, &serde_json::from_str(&text)?)?;
+    Ok(text)
+}
+
+fn text_of(store: &Store, note: &str) -> Made<Option<String>> {
+    Ok(Notes::new(store).by_id(note)?.map(|n| n.text))
+}
+
+#[test]
+fn sync_goes_on_while_an_ai_task_waits_and_carries_none_of_its_drafts() -> TestResult {
+    let (desk, phone) = desk_and_phone()?;
+    let notes = Notes::new(&desk);
+    let milk = notes.capture("Milk", None, None)?;
+    round(&desk, &phone)?;
+    let task = desk.open_ai_task()?;
+    let bread = desk.drafting(&task, || {
+        notes.edit(&milk.id, "Oat milk, drafted")?;
+        Ok(notes.capture("Bread, drafted", None, None)?.id)
+    })?;
+    let on_phone = |phone: &Store| -> Made<()> {
+        assert_eq!(text_of(phone, &milk.id)?.as_deref(), Some("Milk"));
+        assert_eq!(text_of(phone, &bread)?, None);
+        Ok(())
+    };
+
+    // The LAN host answers, and both ways go on: the phone's Note comes
+    // in, no draft goes out.
     let vector = read_request(
         &mut std::io::Cursor::new(&b"GET /vector HTTP/1.1\r\n\r\n"[..]),
         IpAddr::V4(Ipv4Addr::LOCALHOST),
     )?
     .ok_or("a request")?;
-    let (answered, _) = store.serve(&vector, "Desk")?;
-    assert_eq!(answered.status, 503);
-    let paused = |r: Result<()>| matches!(r, Err(Error::SyncPaused));
-    assert!(paused(
-        crate::bundle::write_bundle_now(&store, &bundle, None).map(drop)
-    ));
-    assert!(paused(
-        crate::bundle::import_bundle(&store, &bundle).map(drop)
-    ));
-    let mut folder = crate::folder::LocalFolder::new(dir.path().join("folder"));
-    assert!(paused(
-        crate::folder::folder_sync(&store, &mut folder, &mut crate::folder::random_nonce).map(drop)
-    ));
-    assert!(paused(store.send_note(&milk.id, None, false).map(drop)));
-    assert!(!dir.path().join("folder").exists());
+    assert_ne!(desk.serve(&vector, "Desk")?.0.status, 503);
+    let eggs = Notes::new(&phone).capture("Eggs", None, None)?;
+    let sent = round(&desk, &phone)?;
+    assert!(!sent.contains("drafted"), "{sent}");
+    assert_eq!(text_of(&desk, &eggs.id)?.as_deref(), Some("Eggs"));
+    on_phone(&phone)?;
+    // Nor does a bundle carry one, nor the shared folder.
+    let dir = tempfile::tempdir()?;
+    let bundle = dir.path().join("out.zip");
+    let butter = notes.capture("Butter", None, None)?;
+    crate::bundle::write_bundle_now(&desk, &bundle, None)?.ok_or("a bundle")?;
+    crate::bundle::import_bundle(&phone, &bundle)?;
+    assert_eq!(text_of(&phone, &butter.id)?.as_deref(), Some("Butter"));
+    on_phone(&phone)?;
+    let mut folder = crate::folder::MemoryFolder::default();
+    let jam = notes.capture("Jam", None, None)?;
+    crate::folder::folder_sync(&desk, &mut folder, &mut crate::folder::random_nonce)?;
+    crate::folder::folder_sync(&phone, &mut folder, &mut crate::folder::random_nonce)?;
+    assert_eq!(text_of(&phone, &jam.id)?.as_deref(), Some("Jam"));
+    on_phone(&phone)?;
+    // A Note sent goes as the log has it.
+    let file = desk.send_note(&milk.id, None, false)?;
+    let opened = phone.open_sent_item(&file)?.map_err(|_| "opened")?;
+    assert_eq!(opened.item.text, "Milk");
+    assert!(desk.send_note(&bread, None, false).is_err(), "not kept yet");
 
-    store.decline_pending(&task)?;
-    assert!(!store.sync_paused()?);
-    assert!(crate::bundle::write_bundle_now(&store, &bundle, None)?.is_some());
-    assert_ne!(store.serve(&vector, "Desk")?.0.status, 503);
+    // Once accepted, the next round carries them.
+    desk.accept_pending(&task)?;
+    round(&desk, &phone)?;
+    assert_eq!(
+        text_of(&phone, &milk.id)?.as_deref(),
+        Some("Oat milk, drafted")
+    );
+    assert_eq!(text_of(&phone, &bread)?.as_deref(), Some("Bread, drafted"));
+    Ok(())
+}
+
+/// Which of the review's changes are the user's to keep and which an
+/// edit that came in by sync touches: (entity, field, `mine_wins`,
+/// `synced`), in the review's order.
+fn marks(review: &AiReview) -> Vec<(String, String, bool, bool)> {
+    review
+        .groups
+        .iter()
+        .flat_map(|(_, items)| items)
+        .flat_map(|item| {
+            item.changes
+                .iter()
+                .map(|c| (item.entity.clone(), c.field.clone(), c.mine_wins, c.synced))
+        })
+        .collect()
+}
+
+#[test]
+fn the_review_marks_a_draft_an_own_edit_synced_in_touches_and_accept_keeps_that_newer_one()
+-> TestResult {
+    let (desk, phone) = desk_and_phone()?;
+    let notes = Notes::new(&desk);
+    let milk = notes.capture("Milk", None, None)?;
+    let bread = notes.capture("Bread", None, None)?;
+    round(&desk, &phone)?;
+    let task = desk.open_ai_task()?;
+    desk.drafting(&task, || {
+        notes.edit(&milk.id, "Oat milk")?;
+        notes.edit(&bread.id, "Rye bread")
+    })?;
+    // The user fixes the Note on the phone meanwhile, and it syncs.
+    Notes::new(&phone).edit(&milk.id, "Milk, 2 l")?;
+    round(&desk, &phone)?;
+
+    let text = crate::notes::keys::TEXT.to_string();
+    assert_eq!(
+        marks(&desk.ai_review(&task)?),
+        [
+            (milk.id.clone(), text.clone(), true, true),
+            (bread.id.clone(), text, false, false),
+        ]
+    );
+    assert_eq!(text_of(&desk, &milk.id)?.as_deref(), Some("Milk, 2 l"));
+    let accepted = desk.accept_pending(&task)?;
+    assert_eq!(accepted.kept.len(), 1);
+    assert_eq!(text_of(&desk, &milk.id)?.as_deref(), Some("Milk, 2 l"));
+    assert_eq!(text_of(&desk, &bread.id)?.as_deref(), Some("Rye bread"));
+    Ok(())
+}
+
+#[test]
+fn the_review_marks_another_persons_edit_synced_in_only_where_their_role_lets_it_count()
+-> TestResult {
+    let (ann, ben, area, _, _) = member()?;
+    let tea = Notes::new(&ann).capture("Tea", Some(&area), None)?;
+    let bread = Notes::new(&ben).capture("Bread", Some(&area), None)?;
+    hand_over(&ann, &ben)?;
+    hand_over(&ben, &ann)?;
+    let task = ann.open_ai_task()?;
+    let notes = Notes::new(&ann);
+    ann.drafting(&task, || {
+        notes.edit(&tea.id, "Green tea")?;
+        notes.edit(&bread.id, "Rye bread")
+    })?;
+    // Ben edits his Note, and Ann's, as a modified app would, which a
+    // Member may not: only his own edit counts. (Dated after the share,
+    // as his clock here runs behind Ann's.)
+    Notes::new(&ben).edit(&bread.id, "Brown bread")?;
+    ben.append(
+        &tea.id,
+        crate::notes::keys::TEXT,
+        Some(&crate::StoredText::plain("Beer").encode()),
+        Some(ann.now() + chrono::Duration::days(1)),
+    )?;
+    hand_over(&ben, &ann)?;
+
+    let text = crate::notes::keys::TEXT.to_string();
+    assert_eq!(
+        marks(&ann.ai_review(&task)?),
+        [
+            (tea.id.clone(), text.clone(), false, false),
+            (bread.id.clone(), text, false, true),
+        ]
+    );
+    // The draft shows over it, as Accept will write it: no Conflict.
+    assert_eq!(text_of(&ann, &bread.id)?.as_deref(), Some("Rye bread"));
+    assert!(ann.conflicts()?.is_empty());
+    // Not one of Ann's own: Accept writes the task's over it.
+    ann.accept_pending(&task)?;
+    assert_eq!(text_of(&ann, &tea.id)?.as_deref(), Some("Green tea"));
+    assert_eq!(text_of(&ann, &bread.id)?.as_deref(), Some("Rye bread"));
+    assert!(ann.conflicts()?.is_empty());
+    Ok(())
+}
+
+/// `to` takes in every entry `from` holds, with its keys, as a sync
+/// brings them.
+fn hand_over(from: &Store, to: &Store) -> TestResult {
+    to.apply_entries(
+        &crate::sync::wire(&from.entries_since(&HashMap::new())?),
+        &from.key_records()?,
+        None,
+        &mut crate::signing::ImportReport::default(),
+    )?;
     Ok(())
 }
 

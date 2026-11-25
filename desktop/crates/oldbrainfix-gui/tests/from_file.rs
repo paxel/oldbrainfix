@@ -1,6 +1,6 @@
-//! Notes made from files in the window: File ▸ Attach a file… with no
-//! Note open, with the dialog handed in, and files dropped onto the
-//! window, held on the quick note until it is saved with Save or on
+//! Notes made from files in the window: files dropped onto the window
+//! with no Note open (File has no Attach a file… since obf-1014), held
+//! on the quick note until it is saved with Save or on
 //! leaving (#267, #352), driven headless by
 //! egui_kittest over an empty store with its clock held still. The
 //! pictures are made here; the sound file is the phone's test voice
@@ -63,16 +63,18 @@ fn window(store: Arc<Store>, locale: &str, picked: Vec<PathBuf>) -> Harness<'sta
     harness
 }
 
-/// File ▸ Attach a file…, in the words of `file` and `attach`: with no
-/// Note open, what is picked waits in the quick note, which it opens.
-fn attach<S>(harness: &mut Harness<'_, S>, (file, attach): (&str, &str)) {
-    harness.get_by_label(file).click();
-    harness.run();
-    harness.get_by_label(attach).click_accesskit();
+/// Drops `paths` onto the window: with no Note open, they wait in the
+/// quick note, which they open.
+fn attach<S>(harness: &mut Harness<'_, S>, paths: &[PathBuf]) {
+    harness.input_mut().dropped_files = paths
+        .iter()
+        .map(|path| egui::DroppedFile {
+            path: Some(path.clone()),
+            ..Default::default()
+        })
+        .collect();
     harness.run();
 }
-
-const ATTACH: (&str, &str) = ("File", "Attach a file…");
 
 fn notes(store: &Store) -> Result<Vec<Note>, Box<dyn std::error::Error>> {
     Ok(Notes::new(store).all()?)
@@ -83,14 +85,14 @@ fn shows<S>(harness: &Harness<'_, S>, label: &str) -> bool {
 }
 
 #[test]
-fn attach_a_file_makes_one_note_of_a_picture_and_a_voice_message() -> TestResult {
+fn dropped_files_make_one_note_of_a_picture_and_a_voice_message() -> TestResult {
     let store = store()?;
     let dir = tempfile::tempdir()?;
     let (picture, voice) = (dir.path().join("receipt.png"), dir.path().join("Ben.ogg"));
     std::fs::write(&picture, png(40, 30))?;
     std::fs::write(&voice, voice_message()?)?;
-    let mut harness = window(store.clone(), "en", vec![picture, voice]);
-    attach(&mut harness, ATTACH);
+    let mut harness = window(store.clone(), "en", Vec::new());
+    attach(&mut harness, &[picture, voice]);
     assert!(harness.state().quick_note_open());
     harness
         .get_by(|n| n.placeholder() == Some("What's on your mind?"))
@@ -117,18 +119,6 @@ fn attach_a_file_makes_one_note_of_a_picture_and_a_voice_message() -> TestResult
         &harness,
         "A recording from a file cannot be transcribed."
     ));
-    Ok(())
-}
-
-#[test]
-fn closing_the_dialog_without_a_file_changes_nothing() -> TestResult {
-    let store = store()?;
-    let mut harness = window(store.clone(), "en", Vec::new());
-    attach(&mut harness, ATTACH);
-    assert!(notes(&store)?.is_empty());
-    // Nothing held, nothing typed: leaving saves nothing.
-    harness.state_mut().flush();
-    assert!(notes(&store)?.is_empty());
     Ok(())
 }
 
@@ -258,13 +248,13 @@ fn a_dropped_sound_file_that_does_not_decode_is_kept_and_says_why() -> TestResul
 }
 
 #[test]
-fn attach_a_file_and_its_announcement_speak_german() -> TestResult {
+fn a_dropped_file_and_its_announcement_speak_german() -> TestResult {
     let store = store()?;
     let dir = tempfile::tempdir()?;
     let broken = dir.path().join("Sprachnachricht.mp3");
     std::fs::write(&broken, b"ID3 but nothing after it")?;
-    let mut harness = window(store.clone(), "de", vec![broken]);
-    attach(&mut harness, ("Datei", "Datei anhängen …"));
+    let mut harness = window(store.clone(), "de", Vec::new());
+    attach(&mut harness, &[broken]);
     assert!(notes(&store)?.is_empty());
     harness.get_by_label("1 Std.").click();
     harness.run();

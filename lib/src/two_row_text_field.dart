@@ -9,8 +9,10 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'app_links.dart';
 import 'box_ids.dart';
+import 'edit_history.dart';
 import 'l10n.dart';
 import 'look.dart';
+import 'selection_toolbar.dart';
 import 'table_grid.dart';
 import 'table_screen.dart';
 import 'text_marks_view.dart';
@@ -298,7 +300,9 @@ typedef FieldAction = ({
 /// of a formatted text shows the source of the cursor's line.
 ///
 /// With [lineFormats], the bar also has the formats of whole lines and
-/// the table button, which puts a new table at the cursor. A table of a
+/// the table button, which puts a new table at the cursor, and its Code
+/// makes a code block of lines, or of an empty line, as well as inline
+/// code. A table of a
 /// formatted text shows as the grid it is edited in ([TableGrid], #257):
 /// a tap on a cell edits it there, and the cursor goes into the grid
 /// with ◀ ▶ and the arrow keys rather than past it, also with the table
@@ -691,14 +695,48 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
       ),
     );
     final editable = _editable();
-    if (editable == null) {
-      controller.value = next;
-    } else {
-      editable.userUpdateTextEditingValue(next, SelectionChangedCause.toolbar);
-    }
+    // A format is a step of its own for Undo (obf-1051).
+    EditHistory.wholeStep(context, () {
+      if (editable == null) {
+        controller.value = next;
+      } else {
+        editable.userUpdateTextEditingValue(
+          next,
+          SelectionChangedCause.toolbar,
+        );
+      }
+    });
     if (change.text != text && !controller.markdown) {
       _becomeFormatted(controller);
     }
+  }
+
+  /// What Code of the bar does: with the formats of lines, a selection
+  /// over more than one line, the cursor on an empty line, or either in a
+  /// code block makes or takes off a code block ([Markdown.codeBlock]),
+  /// the cursor in a new one's first line; else the selection or the word
+  /// at the cursor becomes inline code or stops being it.
+  MarkdownChange _codeOf(
+    String text,
+    int start,
+    int end, {
+    required bool inBlock,
+  }) {
+    bool isBreak(int at) =>
+        text.codeUnitAt(at) == 0x0A || text.codeUnitAt(at) == 0x0D;
+    final (s, e) = start <= end ? (start, end) : (end, start);
+    final lines = text.substring(s, e).contains(RegExp(r'\r|\n'));
+    final empty =
+        s == e &&
+        (s == 0 || isBreak(s - 1)) &&
+        (s == text.length || isBreak(s));
+    if (widget.lineFormats && (lines || empty || inBlock)) {
+      final change = Markdown.codeBlock(text, start, end);
+      // A new block of lines puts the cursor in its first line.
+      if (inBlock) return change;
+      return (text: change.text, start: change.start, end: change.start);
+    }
+    return Markdown.toggle(text, start, end, MarkdownSpanKind.code);
   }
 
   /// Asks for the address of a link on the selection or the word at the
@@ -1015,6 +1053,10 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
         final TagTextController controller => controller.boxes,
         _ => null,
       },
+      found: switch (controller) {
+        final TagTextController controller => controller.found,
+        _ => null,
+      },
       bar: widget.bar,
       focusParent: _scope,
       onChange: _writeTable,
@@ -1207,15 +1249,54 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
     editable.userUpdateTextEditingValue(changed, SelectionChangedCause.toolbar);
   }
 
-  /// The system's menu, with Delete added for a selection.
+  /// The toolbar above a selection in place of the system's menu
+  /// (obf-1055): Copy, Paste and Search, then Delete for a selection that
+  /// may change.
   Widget _menu(BuildContext context, EditableTextState editable) {
     final value = editable.textEditingValue;
     final selection = value.selection;
-    return AdaptiveTextSelectionToolbar.buttonItems(
+    final controller = widget.controller;
+    final selected = selection.isValid && !selection.isCollapsed;
+    final words = selected
+        ? selectionWords(
+            selection.textInside(value.text),
+            controller is TagTextController && controller.markdown
+                ? TextFormats.markdown
+                : TextFormats.plain,
+          )
+        : '';
+    // A long press on an empty spot selects its line break: Paste puts
+    // in what it holds there, the line break kept.
+    final system = [
+      for (final item in editable.contextMenuButtonItems)
+        if (selected &&
+            words.isEmpty &&
+            item.type == ContextMenuButtonType.paste)
+          item.copyWith(
+            onPressed: () {
+              editable.userUpdateTextEditingValue(
+                value.copyWith(
+                  selection: TextSelection.collapsed(offset: selection.start),
+                ),
+                SelectionChangedCause.toolbar,
+              );
+              item.onPressed?.call();
+            },
+          )
+        else
+          item,
+    ];
+    return selectionToolbar(
+      context,
       anchors: editable.contextMenuAnchors,
-      buttonItems: [
-        ...editable.contextMenuButtonItems,
-        if (!widget.readOnly && selection.isValid && !selection.isCollapsed)
+      system: system,
+      words: words,
+      hide: editable.hideToolbar,
+      // The menu is built in the overlay: the field's own place knows
+      // the Note it is in.
+      onSearch: SelectionSearchScope.of(this.context),
+      extra: [
+        if (!widget.readOnly && words.isNotEmpty)
           ContextMenuButtonItem(
             label: context.t.delete,
             onPressed: () {
@@ -1272,6 +1353,7 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
           decoration: widget.decoration,
           onChanged: _userChanged,
           inputFormatters: _formatters,
+          contextMenuBuilder: _menu,
           scrollPadding: scrollPadding,
           textInputAction: _nextAction,
           onEditingComplete: _onEditingComplete,
@@ -1487,6 +1569,25 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
           active: at.spans.contains(MarkdownSpanKind.strike),
           run: () => toggle(MarkdownSpanKind.strike),
         ),
+        // Before the line formats, so that a narrow phone shows it
+        // without ⋮: the backtick is far into its keyboard (#410).
+        _Format(
+          key: 'format-code',
+          label: t.formatCode,
+          icon: (_) => const Icon(Icons.code),
+          toggles: true,
+          active:
+              at.spans.contains(MarkdownSpanKind.code) ||
+              (widget.lineFormats && at.line == MarkdownBlockKind.code),
+          run: () => _format(
+            (text, start, end) => _codeOf(
+              text,
+              start,
+              end,
+              inBlock: at.line == MarkdownBlockKind.code,
+            ),
+          ),
+        ),
         if (widget.lineFormats) ...[
           _Format(
             key: 'format-heading1',
@@ -1544,14 +1645,6 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
             icon: (_) => const Icon(Icons.add_link),
             run: () => unawaited(_linkTo(pick)),
           ),
-        _Format(
-          key: 'format-code',
-          label: t.formatCode,
-          icon: (_) => const Icon(Icons.code),
-          toggles: true,
-          active: at.spans.contains(MarkdownSpanKind.code),
-          run: () => toggle(MarkdownSpanKind.code),
-        ),
         if (widget.lineFormats) ...[
           _Format(
             key: 'format-code-block',

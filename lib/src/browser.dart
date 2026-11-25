@@ -9,6 +9,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'app_lock.dart';
 import 'card_glance.dart';
+import 'found_marks.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'note_card.dart';
@@ -807,10 +808,73 @@ mixin SearchesAfterPause<T extends StatefulWidget> on State<T> {
 }
 
 /// The fill of the header of a page with a [SearchHeaderSliver], its bar
-/// and the band under it (#351, obf-1041): set off from the page's ground
-/// in the light and the dark look.
+/// and the band under it (#351, obf-1041): the tone of the question
+/// marks, set off from the page's ground in the light and the dark look
+/// (UI laws, "Design system", obf-1081).
 Color searchHeaderColour(BuildContext context) =>
-    Theme.of(context).colorScheme.surfaceContainer;
+    LookTones.of(Theme.of(context).brightness).mark;
+
+/// The band a search bar sits on (#351, obf-1041): filled with
+/// [searchHeaderColour], which its page's bar takes too, with a line along
+/// its bottom, so bar and band read as one header set off from the page
+/// and what scrolls under it goes under a line, not an edge in the page's
+/// own colour. The list pages have it in their [SearchHeaderSliver]; the
+/// Settings, File into…, Merge into…, Add to Note… and Link to… keep it
+/// standing over what they list (obf-1088).
+class SearchBand extends StatelessWidget {
+  /// The search field, with what goes under it.
+  final Widget child;
+
+  /// Whether the band draws its line itself; in a [SearchHeaderSliver] the
+  /// [SearchHeaderLine] under it draws it, so it stays when the band has
+  /// scrolled away (obf-1129).
+  final bool line;
+
+  /// The room under the bar, its line included, so the line runs along
+  /// the band's bottom and not along the field's edge (#351, obf-1041).
+  static const _room = 8.0;
+
+  const SearchBand({super.key, required this.child, this.line = true});
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(
+      color: searchHeaderColour(context),
+      border: line ? Border(bottom: _side(context)) : null,
+    ),
+    child: Padding(
+      padding: EdgeInsets.only(bottom: line ? _room : _room - _width),
+      child: child,
+    ),
+  );
+
+  /// The line under the band, Material's outline: its variant fades into
+  /// the marks' tone.
+  static BorderSide _side(BuildContext context) =>
+      BorderSide(color: Theme.of(context).colorScheme.outline);
+
+  /// A [BorderSide]'s width.
+  static const _width = 1.0;
+}
+
+/// The line under a [SearchHeaderSliver]'s band, the sliver right after
+/// it: it runs along the band's bottom while any of the band shows, and
+/// under the page's bar once the band has scrolled away, so what scrolls
+/// goes under a line there too (obf-1129).
+class SearchHeaderLine extends StatelessWidget {
+  const SearchHeaderLine({super.key});
+
+  @override
+  Widget build(BuildContext context) => PinnedHeaderSliver(
+    child: IgnorePointer(
+      child: SizedBox(
+        height: SearchBand._width,
+        width: double.infinity,
+        child: ColoredBox(color: SearchBand._side(context).color),
+      ),
+    ),
+  );
+}
 
 /// The header of a list page with a search field, the Areas list, an
 /// Area and a Topic (#336, Q749): the first sliver of the list, it scrolls
@@ -818,10 +882,9 @@ Color searchHeaderColour(BuildContext context) =>
 /// soon as the list is scrolled up a little; one half shown at the end of
 /// a scroll snaps shown or gone. While [child]'s field has the focus or
 /// [controller] holds a search it stays, so a search being typed or shown
-/// never goes away. It sits on a band of [searchHeaderColour], which its
-/// page's bar takes too, with a line along its bottom (#351, obf-1041):
-/// bar and band read as one header set off from the page, and the cards
-/// go under it, shown over the list or with the list pulled down.
+/// never goes away. It sits on a [SearchBand] (#351, obf-1041), and the
+/// cards go under it, shown over the list or with the list pulled down.
+/// A [SearchHeaderLine] follows it in the list and draws the band's line.
 class SearchHeaderSliver extends StatefulWidget {
   /// The field's text: a search in it keeps the header.
   final TextEditingController controller;
@@ -875,26 +938,15 @@ class _SearchHeaderSliverState extends State<SearchHeaderSliver> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final header = KeyedSubtree(
       key: _kept,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: searchHeaderColour(context),
-          border: Border(
-            bottom: BorderSide(color: theme.colorScheme.outlineVariant),
-          ),
-        ),
-        // Room under the bar, so its line runs along the band's bottom and
-        // not along the field's edge (#351, obf-1041).
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Focus(
-            canRequestFocus: false,
-            skipTraversal: true,
-            onFocusChange: (focused) => setState(() => _focused = focused),
-            child: widget.child,
-          ),
+      child: SearchBand(
+        line: false,
+        child: Focus(
+          canRequestFocus: false,
+          skipTraversal: true,
+          onFocusChange: (focused) => setState(() => _focused = focused),
+          child: widget.child,
         ),
       ),
     );
@@ -1012,6 +1064,11 @@ class _TagSuggestionsState extends State<TagSuggestions> {
 /// in the Area or Topic the list is of (#330). While [selected] is given
 /// the list selects (#273): each card this Device may change has a box,
 /// ticked for those in it, whose tap runs [onSelect].
+///
+/// The cards of a search for [find] list the places it found in their
+/// Notes (obf-1047), read as each card is first built, and draw them on a
+/// tint; a tap on one runs [onFind] with it, and a tap on the card, a
+/// long press and Edit run it with the first, where there is one.
 List<Widget> diaryCards(
   BuildContext context,
   List<PlacedNote> shown,
@@ -1027,6 +1084,8 @@ List<Widget> diaryCards(
   void Function(Note note)? onSwitch,
   Set<String>? selected,
   void Function(Note note, bool on)? onSelect,
+  String find = '',
+  void Function(Note note, Finding at)? onFind,
 }) {
   final locale = Localizations.localeOf(context).toString();
   final when = DateFormat.yMd(locale).add_Hm();
@@ -1076,6 +1135,19 @@ List<Widget> diaryCards(
     closed: reads.closed ??= lock?.closedAreas ?? const <String>{},
   );
   bool full(Note note) => compact == switched.contains(note.id);
+  // The places found, with the Sections the list read or else the
+  // Note's own: a search with many hits reads only those built.
+  final query = find.trim();
+  if (reads.findQuery != query) {
+    reads.findings.clear();
+    reads.findQuery = query;
+  }
+  List<Finding> findingsOf(Note note) =>
+      reads.findings[note.id] ??= Findings.ofNote(
+        note,
+        query,
+        sections: reads.sections?[note.id] ?? notes.sections(note.id),
+      );
   return [
     for (final placed in shown)
       if (placed case (
@@ -1089,8 +1161,10 @@ List<Widget> diaryCards(
       ))
         // Built as it scrolls into sight: a card out of sight reads
         // nothing.
-        Builder(
-          builder: (_) => NoteCard(
+        _FoundCard(
+          read: query.isEmpty || onFind == null ? null : () => findingsOf(note),
+          noteId: note.id,
+          card: (found) => NoteCard(
             note: note,
             when: when,
             area: area,
@@ -1108,7 +1182,10 @@ List<Widget> diaryCards(
               notes,
               placed,
               onChanged,
-              onEdit: () => onOpen(note),
+              onEdit: switch ((found.firstOrNull, onFind)) {
+                (final at?, final find?) => () => find(note, at),
+                _ => () => onOpen(note),
+              },
               // Read once for the list, not for every card (obf-1069),
               // the Pack badges of all its Notes in one query (obf-1068).
               advanced: reads.advanced ??= notes.store.advanced,
@@ -1128,16 +1205,73 @@ List<Widget> diaryCards(
             boxes: boxTicks(notes, placed, onChanged),
             onTable: tableEdit(notes, placed, onChanged),
             occurrences: (read: () => todayOf(note), routines: routines),
-            onTap: onSwitch == null ? null : () => onSwitch(note),
-            onEdit: () => onOpen(note),
+            onTap: switch ((found.firstOrNull, onFind)) {
+              (final at?, final find?) => () => find(note, at),
+              _ => onSwitch == null ? null : () => onSwitch(note),
+            },
+            onEdit: switch ((found.firstOrNull, onFind)) {
+              (final at?, final find?) => () => find(note, at),
+              _ => () => onOpen(note),
+            },
             hiddenFromAi: hiddenFromAi(note),
             onSelect: selected == null || onSelect == null || !changes
                 ? null
                 : (on) => onSelect(note, on),
             selected: selected?.contains(note.id) ?? false,
+            findings: found,
+            onFinding: onFind == null ? null : (at) => onFind(note, at),
           ),
         ),
   ];
+}
+
+/// A card of a list, built as it scrolls into sight: with [read], the
+/// places a search found in its Note [noteId] (obf-1047), read once it
+/// is first built rather than while the list is, and drawn on a tint by
+/// the texts below it ([FindScope]).
+class _FoundCard extends StatefulWidget {
+  final List<Finding> Function()? read;
+  final String noteId;
+  final Widget Function(List<Finding> found) card;
+
+  const _FoundCard({
+    required this.read,
+    required this.noteId,
+    required this.card,
+  });
+
+  @override
+  State<_FoundCard> createState() => _FoundCardState();
+}
+
+class _FoundCardState extends State<_FoundCard> {
+  List<Finding> _found = const [];
+  Map<(String, FindingPart, String), FoundMarks> _marks = const {};
+
+  @override
+  void initState() {
+    super.initState();
+    _read();
+  }
+
+  @override
+  void didUpdateWidget(_FoundCard old) {
+    super.didUpdateWidget(old);
+    // Kept with the list: read anew only for a new list or search.
+    _read();
+  }
+
+  void _read() {
+    final found = widget.read?.call() ?? const <Finding>[];
+    if (identical(found, _found)) return;
+    _found = found;
+    _marks = foundMarksOf(widget.noteId, found);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FindScope(marks: _marks, child: widget.card(_found));
+  }
 }
 
 /// What the cards of one list read from the store, kept with the list
@@ -1174,6 +1308,10 @@ class _ListReads {
   final kinds = <String, NoteKind>{};
   final glances = <String, List<String>>{};
   Map<String, ({String id, String name})>? packFrom;
+
+  /// The places the search [findQuery] found in each Note (obf-1047).
+  String findQuery = '';
+  final findings = <String, List<Finding>>{};
 }
 
 /// The app bar buttons of a diary: order by time or by Importance, and

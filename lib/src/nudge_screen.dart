@@ -121,7 +121,7 @@ class _NudgeScreenState extends State<NudgeScreen>
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                 child: Align(
                   alignment: Alignment.centerLeft,
-                  child: FilledButton.tonal(
+                  child: OutlinedButton(
                     key: const ValueKey('nudgeMore'),
                     onPressed: _all,
                     child: Tooltip(

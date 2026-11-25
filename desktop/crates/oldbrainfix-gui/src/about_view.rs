@@ -93,7 +93,7 @@ pub fn about(ui: &mut Ui, t: &L10n, tones: Tones) -> bool {
         ui.hyperlink_to(t.documentation(), documentation_url(t.locale()));
         ui.hyperlink_to(t.privacy_policy(), privacy_policy_url(t.locale()));
         ui.add_space(8.0);
-        ui.label(RichText::new(t.source_code()).strong().color(text));
+        ui.label(RichText::new(t.source_code()).strong());
         ui.horizontal_wrapped(|ui| {
             ui.hyperlink(REPO);
             ui.label(RichText::new("Apache-2.0 / MIT").color(weak));

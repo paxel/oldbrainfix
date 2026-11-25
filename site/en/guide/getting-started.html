@@ -40,8 +40,9 @@
   Each screen explains itself on your first visit with tips: the page dims around one button and a
   card beside it says what it does. <strong>Next</strong> shows the next tip, <strong>Skip</strong>
   or a tap outside the card ends the screen's tips, and each tip shows once on this Device. Later,
-  a new thing on a screen gets its own tip once. <strong>Show tips again</strong> in Settings brings
-  them all back on this Device.
+  a new thing on a screen gets its own tip once. <strong>No more tips</strong> on any tip, or the
+  <strong>Show tips</strong> switch in Settings, turns the tips off on this Device, new ones too.
+  <strong>Show tips again</strong> under the switch turns them back on and brings them all back.
 </p>
 <p>The Starter Set, every Area and Topic ticked:</p>
 <ul>
@@ -123,8 +124,10 @@
   The Starter Set is not offered afterwards: the Areas come with the Backup.
 </p>
 <p>
-  A Backup holds Simple or Advanced and the Trash setting, but no other settings. After a restore, set alarms and locks again, choose the Backup folder
-  again and pair your other Devices again.
+  A Backup holds the Device's settings and Simple or Advanced and the Trash setting, except those
+  bound to the Device. After a restore, set the locks and the alarm sound again, choose the Backup
+  folder again and pair your other Devices again. The speech model is offered for download again
+  (see <a href="backups-locks-and-privacy.html">Backups, locks and privacy</a>).
 </p>
 <p>
   When Android's own backup brought a Backup back from your Google account together with the app,
@@ -142,9 +145,9 @@
 <guide-box name="import-folder">
 <h2>Import notes from another app</h2>
 <p>Turn a folder of Markdown, text, AsciiDoc, Org, reStructuredText or HTML files into Notes.</p>
-<box-tab device="phone" alt="The Import rows in the phone's Settings, found by its search">
-<li>Tap your Profile picture, then <strong>Settings of this Device</strong>.</li>
-<li>Type <strong>Import</strong> into the search field at the top.</li>
+<box-tab device="phone" alt="The phone's Import page, opened from the Areas list's ⋮">
+<li>Tap <strong>Search and browse</strong> on the Agenda.</li>
+<li>Tap <strong>⋮ ▸ Import…</strong> in the top bar.</li>
 <li>Tap <strong>Import a folder</strong>.</li>
 <li>Pick the folder.</li>
 <li>Tap <strong>Import finished.</strong> at the top to see what came in.</li>
@@ -152,6 +155,7 @@
 <box-tab device="desktop" alt="The Import dialog in the desktop app">
 <li>Click <strong>File ▸ Import…</strong>.</li>
 <li>Click <strong>A folder…</strong> and pick the folder.</li>
+<li>Click <strong>Fill in</strong> or <strong>Import as new</strong> when asked.</li>
 <li>Click <strong>Open the Area</strong> once the Import finishes.</li>
 </box-tab>
 <box-more>
@@ -173,17 +177,38 @@
   folder may hold all these kinds at once.
 </p>
 <p>
-  All of them land in a new Area named after the folder, such as "From Notes"; importing the same
-  folder again makes a second Area, "From Notes (2)". None of them is Unsorted, and no Nudge comes
+  All of them land in a new Area named after the folder, such as "From Notes". None of them is Unsorted, and no Nudge comes
   for them. Other files, hidden files and files too large for a Note (more than 1 MiB) are skipped.
   On the phone the Import runs beside the app on a page of its own: it says "Reading the folder…",
   then counts the Notes as they come in, such as "120 of 340 Notes". You can leave the page and use
-  the app meanwhile; the Import's row in Settings opens it again. In the desktop app the Import runs
+  the app meanwhile; the Import's row on the Import page opens it again. In the desktop app the Import runs
   beside the window, and the Import dialog says and counts the same; you can close it and use the
-  window meanwhile, and <strong>File ▸ Import…</strong> shows it again. What "Import finished."
+  window meanwhile, and <strong>File ▸ Import…</strong> shows it again. <strong>View ▸
+  Running</strong>, or a click on the line under the menu bar, offers <strong>Abort</strong>: the
+  Import stops before its next Note, the Notes it made stay, and the page says "Stopped: 120 of 340
+  imported". On the phone <strong>⋮ ▸ Running</strong> on the Agenda, or a tap on the line under
+  the bar, opens the same page; the top then says "Import stopped." What "Import finished."
   shows, and at the end the phone's page and the desktop's dialog: how many Notes went into which Area and how many files were skipped and why, with
   <strong>Open the Area</strong>. A folder without such a file changes nothing. After the Import the app keeps no access to the folder, unless it is the shared folder
   or the Backup folder.
+</p>
+<p>
+  On an Android phone, when you pick a folder you imported from before, the app asks once, before it reads
+  any file: "Fill in the Import of 3/1/2025 into From Notes?" <strong>Fill in</strong> adds only the
+  files that Import did not make a Note of to its Area; a file whose Note you moved or trashed since
+  is not added again, and a changed file neither. The page then says how many Notes went in and how
+  many were imported before, or, with nothing missing, "Nothing new: 340 already imported".
+  <strong>Import as new</strong> makes a second Area with every file, "From Notes (2)", and
+  <strong>Cancel</strong> imports nothing. A folder is known by where you picked it, never by its
+  name alone. On the iPhone a second Import always makes a new Area.
+</p>
+<p>
+  The desktop app asks the same in its window once a folder or a Google Keep export you imported
+  from before is picked, and for a Markdown file whose <strong>Import as Note…</strong> ran before:
+  <strong>Cancel</strong>, <strong>Import as new</strong> or <strong>Fill in</strong>. Esc and a
+  click beside the question import nothing too. With nothing missing the top says "Nothing new to
+  import.", and its click shows how many were imported already, with <strong>Open the
+  Area</strong>.
 </p>
 </box-more>
 </guide-box>
@@ -193,8 +218,8 @@
 <p>Turn an export of Google Keep from Google Takeout into Notes.</p>
 <box-tab device="phone" alt="The question about the export on the phone: Zip file or Folder">
 <li>Export Keep alone on <a href="https://takeout.google.com">takeout.google.com</a>.</li>
-<li>Tap your Profile picture, then <strong>Settings of this Device</strong>.</li>
-<li>Type <strong>Import</strong> into the search field at the top.</li>
+<li>Tap <strong>Search and browse</strong> on the Agenda.</li>
+<li>Tap <strong>⋮ ▸ Import…</strong> in the top bar.</li>
 <li>Tap <strong>Import from Google Keep</strong>.</li>
 <li>Tap <strong>Zip file</strong> or <strong>Folder</strong> and pick the export.</li>
 </box-tab>
@@ -202,6 +227,7 @@
 <li>Export Keep alone on <a href="https://takeout.google.com">takeout.google.com</a>.</li>
 <li>Click <strong>File ▸ Import…</strong>, then <strong>Google Keep…</strong>.</li>
 <li>Click <strong>Zip file</strong> or <strong>Folder</strong> and pick the export.</li>
+<li>Click <strong>Fill in</strong> or <strong>Import as new</strong> when asked.</li>
 </box-tab>
 <box-more>
 <p>
@@ -228,6 +254,12 @@
   skipped and why, with <strong>Open the Area</strong>. After the Import the app keeps no
   access to the zip file or the folder.
 </p>
+<p>
+  On an Android phone, picking the same zip file or folder again asks as for a folder: <strong>Fill
+  in</strong> adds only the Keep notes the first Import did not bring in to "From Google Keep",
+  <strong>Import as new</strong> makes a second Area with all of them. See
+  <a href="#import-notes-from-another-app">Import notes from another app</a>.
+</p>
 </box-more>
 </guide-box>
 
@@ -252,8 +284,11 @@
   downloaded once (148 MB) from Old Brain Fix's own release on GitHub and runs on the phone.
   <strong>Download</strong> starts the download in the background, and the setup goes on at once;
   on mobile data the screen says how much of it the download uses. The offer is made only once and
-  only where the speech model can run and none is in place yet. Settings, Speech model offers it at
-  any time later, with a choice between the base and the small model, or a file of your own.
+  only where the speech model can run and none is in place yet. After a restore it offers the model
+  the Backup names, base or small, and for a model taken from a file <strong>Pick the file
+  again</strong>. When that model is in use here already, there is no offer. Settings, Speech
+  model offers it at any time later, with a choice between the base and the small model, or a file
+  of your own.
   Recordings are kept either way.
 </p>
 <p>

@@ -193,3 +193,39 @@ fn selecting_a_card_along_moves_none_of_its_text() -> TestResult {
     assert_eq!(text_of(&harness, TAP), before);
     Ok(())
 }
+
+#[test]
+fn an_important_cards_marker_stands_clear_of_its_buttons() -> TestResult {
+    let (store, house, _) = store()?;
+    let notes = Notes::new(&store);
+    let tap = notes.all()?.into_iter().find(|n| n.text == TAP).unwrap().id;
+    notes.set_importance(&tap, oldbrainfix_core::Importance::Important)?;
+    let harness = harness(store, Selection::Place(house));
+    let card = card(&harness, TAP);
+    let pencil = edit(&harness, TAP);
+    // The marker's glyph, on the card (obf-1139).
+    let glyph = oldbrainfix_gui::icons::IMPORTANT.to_string();
+    let mut shapes = Vec::new();
+    for clipped in &harness.output().shapes {
+        shapes.push(clipped.shape.clone());
+    }
+    let marker = shapes
+        .iter()
+        .flat_map(|s| match s {
+            egui::Shape::Vec(inner) => inner.clone(),
+            other => vec![other.clone()],
+        })
+        .find_map(|s| match s {
+            egui::Shape::Text(text) if text.galley.text() == glyph => {
+                Some(text.visual_bounding_rect())
+            }
+            _ => None,
+        })
+        .unwrap_or_else(|| panic!("no Important marker"));
+    assert!(card.contains_rect(marker), "the marker {marker:?}");
+    assert!(
+        pencil.right() <= marker.left(),
+        "the pencil {pencil:?} under the marker {marker:?}"
+    );
+    Ok(())
+}

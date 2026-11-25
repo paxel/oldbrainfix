@@ -137,6 +137,42 @@ void main() {
       expect(feedbackBody('Hi'), 'Hi');
     });
 
+    test('the notification taps before the crash report, the oldest '
+        'left out where ten would not fit a mail link (obf-1039)', () {
+      final ten = [
+        for (var i = 0; i < 10; i++)
+          '2026-10-24T09:0$i:00.000Z headsUp '
+              'routine=routine:${'f' * 32} occurrence=2026-10-24T08:00 '
+              'from=background -> agenda coming day, marked',
+      ];
+      // Ten fit beside a few words; beside many, the oldest give way.
+      final words = 'The alarm opened nothing. ' * 16;
+      final body = feedbackBody(
+        words,
+        version: '0.8.0+90',
+        system: 'Android 15 (SDK 35), Google Pixel 8',
+        install: 'F-Droid',
+        taps: ten.join('\n'),
+      );
+      expect(body.length, lessThanOrEqualTo(mailBodyLimit));
+      expect(body, contains('Notification taps:\n'));
+      expect(body, contains(ten.last));
+      expect(body, isNot(contains(ten.first)));
+      expect(
+        feedbackBody('Hi', taps: ten.join('\n')),
+        contains(ten.join('\n')),
+      );
+      final withCrash = feedbackBody('Hi', taps: ten.last, crash: 'boom');
+      expect(
+        withCrash.indexOf('Notification taps:'),
+        lessThan(withCrash.indexOf('Last crash report:')),
+      );
+      expect(
+        feedbackBody('Hi', taps: ten.first),
+        'Hi\n\nNotification taps:\n${ten.first}',
+      );
+    });
+
     test('the crash report last, thinned and cut to fit a mail link', () {
       final frames = [
         for (var i = 0; i < 200; i++)
@@ -184,6 +220,7 @@ void main() {
     Future<AppLocalizations> open(
       WidgetTester tester, {
       ({String text, DateTime at})? crash,
+      ({String text, int count})? taps,
       Locale locale = const Locale('en'),
       bool tall = true,
     }) async {
@@ -203,6 +240,7 @@ void main() {
               store: store,
               facts: () async => facts,
               crash: () => crash,
+              taps: () => taps,
               mail: (body) async => mailed.add(body),
             ),
           ),
@@ -268,6 +306,68 @@ void main() {
 
       await tap(tester, find.byKey(const ValueKey('feedback-mail')));
       expect(mailed, [shown]);
+    });
+
+    testWidgets('the last notification taps go along, ticked at first, and '
+        'stay home unticked (obf-1039)', (tester) async {
+      const trace =
+          '2026-10-24T09:00:00.000Z occurrence routine=routine:a '
+          'occurrence=2026-10-24T08:00 from=background -> agenda today, marked';
+      final t = await open(tester, taps: (text: trace, count: 1));
+      expect(ticked(tester, 'taps'), isTrue);
+      expect(find.text(t.feedbackTapsKept(1)), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const ValueKey('feedback-text')),
+        'The alarm opened nothing.',
+      );
+      await tester.pump();
+      expect(
+        preview(tester),
+        feedbackBody(
+          'The alarm opened nothing.',
+          version: facts.version,
+          system: facts.system,
+          install: facts.install,
+          taps: trace,
+        ),
+      );
+      expect(preview(tester), contains('Notification taps:\n$trace'));
+
+      await tap(tester, find.byKey(const ValueKey('feedback-taps')));
+      expect(ticked(tester, 'taps'), isFalse);
+      expect(preview(tester), isNot(contains('Notification taps')));
+    });
+
+    testWidgets('each box\'s edge lines up with the start of its text '
+        '(obf-1134)', (tester) async {
+      final t = await open(tester);
+      for (final (key, title) in [
+        ('version', t.feedbackVersion),
+        ('crash', t.feedbackCrash),
+        ('notes', t.feedbackNotes),
+      ]) {
+        final box = find.byKey(ValueKey('feedback-$key'));
+        await tester.ensureVisible(box);
+        await tester.pumpAndSettle();
+        expect(
+          tester.getCenter(box).dx - Checkbox.width / 2,
+          tester.getTopLeft(find.text(title)).dx,
+          reason: key,
+        );
+      }
+    });
+
+    testWidgets('without notification taps kept their tick is greyed', (
+      tester,
+    ) async {
+      final t = await open(tester);
+      expect(find.text(t.feedbackTapsNone), findsOneWidget);
+      expect(
+        tester
+            .widget<Checkbox>(find.byKey(const ValueKey('feedback-taps')))
+            .onChanged,
+        isNull,
+      );
     });
 
     testWidgets('without a crash report kept its tick is greyed', (

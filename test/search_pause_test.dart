@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/browser.dart';
 import 'package:oldbrainfix/src/note_card.dart';
+import 'package:oldbrainfix/src/text_marks_view.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 /// A search over the Notes runs once typing pauses (obf-1068, C11): each
@@ -42,9 +43,13 @@ void main() {
   String typed(WidgetTester tester) =>
       tester.widget<EditableText>(find.byType(EditableText)).controller.text;
 
+  /// A card's text, not the places a search lists under it (obf-1047).
   Finder card(String text) => find.descendant(
     of: find.byType(NoteCard),
-    matching: find.textContaining(text, findRichText: true),
+    matching: find.descendant(
+      of: find.byType(MarkedText),
+      matching: find.textContaining(text, findRichText: true),
+    ),
   );
 
   testWidgets('the Areas list shows the letter at once and the hits once '

@@ -9,6 +9,7 @@ import 'package:cryptography/cryptography.dart' show SecretKey;
 import 'package:cryptography/dart.dart' show DartArgon2id;
 
 import 'area_keys.dart';
+import 'backup_settings.dart';
 import 'device_settings.dart';
 import 'entry.dart';
 import 'packs.dart';
@@ -22,10 +23,10 @@ import 'store.dart';
 import 'sync.dart';
 
 /// Backups (ADR 0010, 0016): an encrypted file holding everything on
-/// this Device but its settings, the playback speed aside, written by
-/// hand or weekly into a folder the user picks, and restored on a fresh
-/// install with the passphrase or the recovery key of the Recovery
-/// Sheet.
+/// this Device and those of its settings that make sense on a new one
+/// (obf-1098), written by hand or weekly into a folder the user picks,
+/// and restored on a fresh install with the passphrase or the recovery
+/// key of the Recovery Sheet.
 ///
 /// Setting Backups up makes a random backup key, which the Recovery
 /// Sheet shows, and seals it once with a key the passphrase derives
@@ -608,9 +609,10 @@ List<int> _line(String json) => utf8.encode('$json\n');
 
 /// Writes a Backup of [store] to [path]: this Device's identity, the
 /// own Profile with its binding and the backup key's version, the
-/// playback speed chosen here, every entry, Moment, Area key, pinned key
-/// and blob; none of its other settings. Backups must be set up. Keys
-/// and nonces come from [secretBytes].
+/// playback speed chosen here, the settings carried ([carriedSettings]),
+/// every entry, Moment, Area key, pinned key and blob; none of its other
+/// settings. Backups must be set up. Keys and nonces come from
+/// [secretBytes].
 Future<BackupCounts> writeBackup(Store store, String path) async {
   final backupKey = store.backupKey;
   final pass = store.backupPass;
@@ -655,6 +657,10 @@ Future<BackupCounts> writeBackup(Store store, String path) async {
     // write fractions alike.
     if (store.chosenPlaybackSpeed case final speed?) {
       await out.add(_line(jsonEncode({'playbackSpeed': '$speed'})));
+    }
+    final carried = carriedSettings(store);
+    if (carried.isNotEmpty) {
+      await out.add(_line(jsonEncode({'settings': carried})));
     }
     final entries = store.allEntries();
     for (final e in entries) {
@@ -854,6 +860,9 @@ class _Payload {
   final Object? profile;
   final int? version;
   final double? speed;
+
+  /// The settings this app takes of the Backup's ([takenSettings]).
+  final List<(String, String)> settings;
   final int blobs;
 
   const _Payload({
@@ -865,6 +874,7 @@ class _Payload {
     required this.profile,
     required this.version,
     required this.speed,
+    required this.settings,
     required this.blobs,
   });
 }
@@ -913,6 +923,7 @@ Future<_Payload> _readPayload(
   Object? profile;
   int? version;
   double? speed;
+  List<(String, String)> settings = const [];
   var blobs = 0;
   try {
     raf.setPositionSync(header.line.length + 1);
@@ -965,6 +976,10 @@ Future<_Payload> _readPayload(
           // One not offered here is passed over, as normal speed.
           final kept = double.tryParse(s);
           if (kept != null && playbackSpeeds.contains(kept)) speed = kept;
+        case {'settings': final Map<String, dynamic> s}:
+          // Only those carried with a value offered, and only those the
+          // phone has.
+          settings = takenSettings(s, SettingsApp.phone);
         case {'blob': final String ref, 'size': final int size}:
           if (size < 0 || size > _maxBlobBytes) throw damaged;
           final bytes = await payload.bytes(size);
@@ -993,6 +1008,7 @@ Future<_Payload> _readPayload(
     profile: profile,
     version: version,
     speed: speed,
+    settings: settings,
     blobs: blobs,
   );
 }
@@ -1004,9 +1020,11 @@ Future<_Payload> _readPayload(
 /// bound to it by the old Device's ([OwnProfile.restoreOwnProfile]),
 /// and keeps the backup key, so the Recovery Sheet stays good. In every
 /// Shared Area where the old Device held a role, it signs the same role
-/// for itself as the old Device. Of the old Device's settings only the
-/// playback speed comes along, if it is one offered. The log is written in one
-/// transaction, once the whole file proved sound.
+/// for itself as the old Device. Of the old Device's settings the
+/// playback speed and those carried come along, each only with a value
+/// offered here and only those the phone has ([takenSettings]); its
+/// speech model as an offer ([DeviceSettings.speechModelOffer]). The log
+/// is written in one transaction, once the whole file proved sound.
 Future<RestoreResult> restoreBackup(
   Store store,
   String path,
@@ -1058,6 +1076,9 @@ Future<RestoreResult> restoreBackup(
       ..restoreOwnProfile(payload.profile, old: from)
       ..keepBackupKeys(backupKey, header.pass, version: payload.version ?? 1);
     if (payload.speed case final speed?) store.playbackSpeed = speed;
+    for (final (key, value) in payload.settings) {
+      store.setLocalSetting(key, value);
+    }
     return _handRoles(store, from);
   });
   store.profileChanged();

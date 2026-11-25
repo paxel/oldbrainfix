@@ -17,8 +17,24 @@
 //! anew through the core. A box in a cell (ADR 0035) shows the state of
 //! its latest tick and, where this Device may tick it, opens Check, Fail,
 //! Open and its History as on a card; a tick is no edit of the table.
-//! Copy in the bar puts the table on the clipboard as an HTML table and,
-//! as plain text, as Markdown (#324), each box in the state it shows.
+//! Copy in the bar, and in the ⋮ at its top right corner (obf-1050),
+//! puts the table on the clipboard as an HTML table and, as plain text,
+//! as Markdown (#324), each box in the state it shows.
+//!
+//! The rows show sorted by a column in the view only (obf-1052), the
+//! Note's text as written: where the table is only read a click on a
+//! cell of the header row sorts them by its column ascending, then
+//! descending, then shows them as written; where it may change, the
+//! column's letter offers that, and putting in, moving or deleting a row
+//! or column shows them as written again. The view forgets it as it
+//! closes.
+//!
+//! A drag that starts on a cell picks the cells from it to the one under
+//! the pointer, in the rows as they show, and Shift+click picks too
+//! (obf-1054, [`cell_pick`]): Ctrl+C and Copy in the right-click menu of
+//! a cell picked put them on the clipboard as a table of their own. Esc,
+//! a click on a cell and a press beside them end the pick, the click
+//! doing nothing else; the cell edited selects its own words.
 
 use egui::{Color32, Frame, Id, Key, Margin, Modifiers, Rect, RichText, Sense, TextEdit, Ui};
 use std::collections::BTreeSet;
@@ -28,10 +44,14 @@ use oldbrainfix_core::markdown::Change;
 use oldbrainfix_core::markdown::table::{self, Align, Table};
 use oldbrainfix_core::{BoxState, text_boxes, text_format};
 
+use crate::cell_pick::{self, Span};
+use crate::design;
 use crate::format_bar;
 use crate::icons;
 use crate::l10n::L10n;
-use crate::text_marks_view::{self, BoxAsk, BoxLook, Found, LaidCell, Look, Spots};
+use crate::text_marks_view::{
+    self, BoxAsk, BoxLook, Found, LaidCell, Look, Spots, TABLE_MENU, TableAct, TableSort,
+};
 use crate::theme::{self, Tones};
 
 /// A table to show full screen: the text it is in and where it begins
@@ -79,6 +99,9 @@ pub struct TableView {
     ticking: Ticking,
     editing: Option<Editing>,
     deleting: Option<Deleting>,
+    sort: Option<TableSort>,
+    /// The cells picked (obf-1054), by their row as shown.
+    pick: Option<Span>,
 }
 
 /// How the boxes of the table show and what a click on one offers: as
@@ -120,6 +143,25 @@ pub(crate) enum Op {
     Headings,
     /// Lines the column's cells up so (#257).
     Align(Align),
+    /// Shows the rows sorted by the column, ascending or descending, in
+    /// the view only, and as written again (obf-1052).
+    ShowSorted(bool),
+    AsWritten,
+    /// Sorts the rows in the text by the column, ascending or descending
+    /// (obf-1052).
+    SortRows(bool),
+}
+
+/// Which sorting a column's menu offers (obf-1052).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) enum Sorts {
+    /// None, as a row's menu.
+    Nothing,
+    /// Showing the rows sorted, full screen where the table may change:
+    /// how they show sorted now.
+    View(Option<TableSort>),
+    /// Sorting the rows in the text, on the editor's grid.
+    Rows,
 }
 
 /// The room around a cell's words.
@@ -147,6 +189,8 @@ impl TableView {
             ticking: Ticking::default(),
             editing: None,
             deleting: None,
+            sort: None,
+            pick: None,
         };
         if let Some((row, column)) = opening.cell {
             view.start_editing(row, column);
@@ -276,6 +320,21 @@ impl TableView {
         if let Some(text) = self.commit() {
             asked.push(Asked::Write(text));
         }
+        match op {
+            Op::ShowSorted(descending) => {
+                self.sort = Some(TableSort {
+                    column: index,
+                    descending,
+                });
+                return;
+            }
+            Op::AsWritten => {
+                self.sort = None;
+                return;
+            }
+            Op::SortRows(_) => return,
+            _ => {}
+        }
         let Some(table) = self.table() else {
             return;
         };
@@ -309,9 +368,14 @@ impl TableView {
                 }
                 return;
             }
-            (Op::Back, _) => return,
+            (Op::Back, _) | (Op::ShowSorted(_) | Op::AsWritten | Op::SortRows(_), _) => return,
         };
+        // A row or column put in or moved shows the rows as written.
+        let reshapes = matches!(op, Op::Before | Op::After | Op::Back | Op::Forward);
         if let Some(text) = self.take(change) {
+            if reshapes {
+                self.sort = None;
+            }
             asked.push(Asked::Write(text));
         }
     }
@@ -326,6 +390,7 @@ impl TableView {
             table::delete_row(text, at, deleting.index)
         };
         if let Some(text) = self.take(change) {
+            self.sort = None;
             asked.push(Asked::Write(text));
         }
         if deleting.gone {
@@ -337,6 +402,13 @@ impl TableView {
     /// delete over it; gives what it asks of the window.
     pub fn show(&mut self, ctx: &egui::Context, t: &L10n, tones: Tones) -> Vec<Asked> {
         let mut asked = Vec::new();
+        // Esc ends the cells picked first, the view staying open.
+        if self.pick.is_some()
+            && self.deleting.is_none()
+            && ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Escape))
+        {
+            self.pick = None;
+        }
         // Esc in a cell leaves its words as they were, and the view open.
         if self.editing.is_some()
             && self.deleting.is_none()
@@ -358,10 +430,17 @@ impl TableView {
                             asked.push(Asked::Close);
                         }
                         ui.add_space(8.0);
-                        ui.label(RichText::new(t.table_title()).size(18.0).color(text));
+                        crate::design::dialog_title(ui, t.table_title());
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            // Its ⋮ at the top right corner, as on every
+                            // table drawn (obf-1050): Copy.
+                            let side = egui::vec2(TABLE_MENU, TABLE_MENU);
+                            let (at, _) = ui.allocate_exact_size(side, Sense::hover());
+                            let menu = (Id::new("table view menu"), at);
+                            let (_, act) =
+                                text_marks_view::table_menu(ui, t, menu, (false, false, false));
                             let copy = ui.button(RichText::new(t.table_copy()).color(text));
-                            if copy.clicked() {
+                            if copy.clicked() || act == Some(TableAct::Copy) {
                                 if let Some(text) = self.commit() {
                                     asked.push(Asked::Write(text));
                                 }
@@ -458,6 +537,13 @@ impl TableView {
             *height = height.max(lowest);
         }
         let (rows, columns) = (table.rows.len(), table.columns());
+        // The heading of the column the rows show sorted by holds its
+        // arrow after its words (obf-1052).
+        let sort = self.sort.filter(|s| s.column < columns);
+        let arrow = text_marks_view::sort_room(look.font().size);
+        if let Some(width) = sort.and_then(|s| widths.get_mut(s.column)) {
+            *width += arrow;
+        }
         if edits {
             widths.push(ADDING);
             heights.push(lowest);
@@ -468,7 +554,26 @@ impl TableView {
             (0.0, 0.0)
         };
         let xs = starts(lead, &widths);
-        let ys = starts(top, &heights);
+        // Each row where the order shown puts it, by its index in the
+        // table, the empty row adding one last.
+        let mut order = text_marks_view::row_order(ui.ctx(), (&self.text, &table), sort).to_vec();
+        if edits {
+            order.push(rows);
+        }
+        let placed: Vec<f32> = order
+            .iter()
+            .map(|&r| heights.get(r).copied().unwrap_or_default())
+            .collect();
+        let placed = starts(top, &placed);
+        let mut ys = vec![top; heights.len() + 1];
+        for (&r, &y) in order.iter().zip(&placed) {
+            if let Some(slot) = ys.get_mut(r) {
+                *slot = y;
+            }
+        }
+        if let (Some(end), Some(&y)) = (ys.last_mut(), placed.last()) {
+            *end = y;
+        }
         let size = egui::vec2(
             xs.last().copied().unwrap_or(lead),
             ys.last().copied().unwrap_or(top),
@@ -518,6 +623,46 @@ impl TableView {
             .filter(|&(r, c)| r < rows || c < columns)
             .collect();
         cells.sort_by_key(|&(r, c)| (r == 0, c == 0 && sticky_column));
+        // The cells picked by a drag that starts on one, or Shift+click,
+        // by their row as shown (obf-1054); the drag is taken under the
+        // cells' clicks, over the scrolling's.
+        let mut shown_at = vec![0; rows];
+        for (place, &r) in order.iter().enumerate() {
+            if let Some(slot) = shown_at.get_mut(r) {
+                *slot = place;
+            }
+        }
+        let bottom = placed.get(rows).copied().unwrap_or(top);
+        let right = xs.get(columns).copied().unwrap_or(lead);
+        let bounds = Rect::from_min_max(
+            origin + egui::vec2(lead, top),
+            origin + egui::vec2(right, bottom),
+        )
+        .intersect(ui.clip_rect());
+        let cell_at = |pos: egui::Pos2| {
+            cells
+                .iter()
+                .rev()
+                .filter(|&&(r, c)| r < rows && c < columns)
+                .find(|&&(r, c)| rect_of(r, c).contains(pos))
+                .and_then(|&(r, c)| Some((*shown_at.get(r)?, c)))
+        };
+        let pick_id = Id::new("table view pick");
+        let before = self.pick;
+        cell_pick::follow(ui, pick_id, &mut self.pick, bounds, cell_at);
+        self.pick = self.pick.filter(|s| s.within((rows, columns)));
+        // The cell edited is written and left.
+        if self.pick.is_some()
+            && self.pick != before
+            && self.editing.is_some()
+            && let Some(text) = self.commit()
+        {
+            asked.push(Asked::Write(text));
+        }
+        ui.interact(bounds, pick_id, Sense::drag());
+        let picked = self.pick.map(Span::cells);
+        let mut copy = picked.is_some() && cell_pick::copy_asked(ui);
+        let tint = ui.visuals().selection.bg_fill;
         let of = Id::new("table view cells");
         let (stroke, header) = text_marks_view::table_tones(colour);
         for (r, c) in cells {
@@ -529,16 +674,36 @@ impl TableView {
                     ui.painter().rect_filled(rect, 0.0, header);
                 }
             }
+            let real = r < rows && c < columns;
+            let shown = (shown_at.get(r).copied().unwrap_or(r), c);
+            let in_pick = real && picked.is_some_and(|p| p.holds(shown));
+            if in_pick && ui.is_rect_visible(rect) {
+                ui.painter().rect_filled(rect, 0.0, tint);
+            }
             let mut spots = Spots::default();
+            let sorted = sort.filter(|s| r == 0 && s.column == c);
             if let Some(laid) = laid {
                 let align = table.aligns.get(c).copied().unwrap_or(Align::None);
-                spots = paint_cell(ui, laid, rect, align, &look);
+                let mut words = rect;
+                if sorted.is_some() {
+                    words.max.x -= arrow;
+                }
+                spots = paint_cell(ui, laid, words, align, &look);
+            }
+            if let Some(sort) = sorted {
+                let size = look.font().size;
+                let shown = (sort.descending, size, PAD);
+                text_marks_view::paint_sort_arrow(ui, rect, shown, colour);
             }
             if ui.is_rect_visible(rect) {
                 ui.painter()
                     .rect_stroke(rect, 0.0, stroke, egui::StrokeKind::Inside);
             }
-            let sense = if edits {
+            // Where it is only read, a cell of the header row sorts the
+            // rows shown by its column.
+            let sorts = !edits && r == 0 && c < columns;
+            // A click on any cell ends the cells picked.
+            let sense = if edits || real {
                 Sense::click()
             } else {
                 Sense::hover()
@@ -562,12 +727,45 @@ impl TableView {
             } else {
                 WidgetType::Label
             };
-            resp.widget_info(|| WidgetInfo::labeled(typ, true, &label));
-            if edits && resp.on_hover_cursor(egui::CursorIcon::Text).clicked() {
-                self.edit((r, c), asked);
+            if sorts {
+                let now = sort.filter(|s| s.column == c).map(|s| s.descending);
+                resp.widget_info(|| text_marks_view::sort_info(t, &label, now));
+                if resp
+                    .clone()
+                    .on_hover_cursor(egui::CursorIcon::PointingHand)
+                    .on_hover_text(t.table_sort())
+                    .clicked()
+                    && !cell_pick::takes_click(ui, &mut self.pick)
+                {
+                    self.sort = text_marks_view::next_sort(self.sort, c);
+                }
+            } else {
+                resp.widget_info(|| WidgetInfo::labeled(typ, true, &label));
+                let clicked = if edits {
+                    resp.clone()
+                        .on_hover_cursor(egui::CursorIcon::Text)
+                        .clicked()
+                } else {
+                    resp.clicked()
+                };
+                let taken = clicked && real && cell_pick::takes_click(ui, &mut self.pick);
+                if clicked && edits && !taken {
+                    self.edit((r, c), asked);
+                }
+            }
+            // The right-click menu of a cell picked.
+            if in_pick {
+                let one = picked.is_some_and(|p| p.one());
+                let said = one.then_some(label.as_str());
+                if cell_pick::menu(&resp, t, said) == Some(cell_pick::Pick::Copy) {
+                    copy = true;
+                }
             }
             // The cell's boxes, tags and links over it, under the cells
-            // drawn after it.
+            // drawn after it; none while cells are picked or Shift picks.
+            if self.pick.is_some() || ui.input(|i| i.modifiers.shift) {
+                spots = Spots::default();
+            }
             let ticked = |id: &str| self.ticking.ticked.contains(id);
             let ticks = self.ticking.may_tick && self.boxes.is_some();
             match text_marks_view::box_clicks(ui, t, of, &spots.boxes, (ticks, &ticked)) {
@@ -581,6 +779,19 @@ impl TableView {
                 asked.push(Asked::SearchFor(tag));
             }
             text_marks_view::link_clicks(ui, of, &spots.links);
+        }
+        if let Some(cells) = picked.filter(|_| copy) {
+            let shown: Vec<usize> = order
+                .get(cells.top..=cells.bottom)
+                .unwrap_or_default()
+                .iter()
+                .copied()
+                .filter(|&r| r < rows)
+                .collect();
+            let columns = (cells.left, cells.right);
+            let states = &self.ticking.look.states;
+            let copied = cell_pick::copy(&self.text, self.at, (&shown, columns), states);
+            asked.extend(copied.map(Asked::Copy));
         }
         if edits {
             self.headings(
@@ -640,7 +851,8 @@ impl TableView {
                 if resp.clicked() {
                     adding = Some((rows, 0));
                 }
-            } else if let Some(op) = menu(t, &resp, (false, r, rows), (false, None)) {
+            } else if let Some(op) = menu(t, &resp, (false, r, rows), (false, None, Sorts::Nothing))
+            {
                 picked = Some((op, false, r));
             }
         }
@@ -679,9 +891,12 @@ impl TableView {
                 if resp.clicked() {
                     adding = Some((0, columns));
                 }
-            } else if let Some(op) =
-                menu(t, &resp, (true, c, columns), (table.heading_column, None))
-            {
+            } else if let Some(op) = menu(
+                t,
+                &resp,
+                (true, c, columns),
+                (table.heading_column, None, Sorts::View(self.sort)),
+            ) {
                 picked = Some((op, true, c));
             }
         }
@@ -808,10 +1023,10 @@ pub(crate) fn question(
             } else {
                 t.table_delete_row_question()
             };
-            ui.label(RichText::new(question).size(18.0).color(text));
+            crate::design::dialog_title(ui, question);
             ui.label(RichText::new(t.table_delete_body()).color(text));
             ui.horizontal_wrapped(|ui| {
-                if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+                if design::row_button(ui, t.cancel()).clicked() {
                     answer = Some(false);
                 }
                 if theme::destructive(ui, true, t.delete()).clicked() {
@@ -871,58 +1086,103 @@ pub(crate) fn heading(
 /// The menu of a row's number or a column's letter, `(column, index,
 /// count)` saying which of how many, opened by a click or a right-click
 /// where the pointer is; the first column's says whether it holds
-/// headings, `headings`, and a column's how it lines up its cells while
-/// `align` is that (#257). Gives what was picked.
+/// headings, `headings`, a column's how it lines up its cells while
+/// `align` is that (#257), and a column's the sorting `sorts` says
+/// (obf-1052). Gives what was picked.
 pub(crate) fn menu(
     t: &L10n,
     resp: &egui::Response,
     (column, index, count): (bool, usize, usize),
-    (headings, align): (bool, Option<Align>),
+    (headings, align, sorts): (bool, Option<Align>, Sorts),
 ) -> Option<Op> {
     let mut picked = None;
     let mut entries = |ui: &mut Ui| {
-        let text = ui.visuals().text_color();
-        let items = if column {
-            [
-                (Op::Before, t.table_column_before()),
-                (Op::After, t.table_column_after()),
+        if column {
+            column_entries(ui, t, (index, count), (headings, align, sorts), &mut picked);
+            return;
+        }
+        let items = [
+            (Op::Before, t.table_row_above()),
+            (Op::After, t.table_row_below()),
+            (Op::Back, t.table_row_up()),
+            (Op::Forward, t.table_row_down()),
+            (Op::Delete, t.table_row_delete()),
+        ];
+        op_entries(ui, (index, count), items, &mut picked);
+    };
+    // The right-click's menu has its own id: on a click the context menu
+    // closes its popup, which would otherwise be this one just opened.
+    Popup::menu(resp).show(&mut entries);
+    Popup::context_menu(resp)
+        .id(Popup::default_response_id(resp).with("context"))
+        .show(&mut entries);
+    picked
+}
+
+/// The entries `items`, Move greyed at its end and Delete in the error
+/// colour, the one picked put into `picked`, closing the menu.
+fn op_entries<const N: usize>(
+    ui: &mut Ui,
+    (index, count): (usize, usize),
+    items: [(Op, &str); N],
+    picked: &mut Option<Op>,
+) {
+    let text = ui.visuals().text_color();
+    for (op, words) in items {
+        let enabled = match op {
+            Op::Back => index > 0,
+            Op::Forward => index + 1 < count,
+            _ => true,
+        };
+        let colour = if op == Op::Delete {
+            ui.visuals().error_fg_color
+        } else {
+            text
+        };
+        if ui
+            .add_enabled(
+                enabled,
+                egui::Button::new(RichText::new(words).color(colour)),
+            )
+            .clicked()
+        {
+            *picked = Some(op);
+            ui.close();
+        }
+    }
+}
+
+/// A column's menu, at most seven entries (obf-1014): Insert ▸, Move ▸,
+/// on the editor's grid Align ▸ and Sort rows ▸ before Delete column,
+/// full screen Show sorted ▸ after it, and First column as headings on
+/// the first.
+fn column_entries(
+    ui: &mut Ui,
+    t: &L10n,
+    (index, count): (usize, usize),
+    (headings, align, sorts): (bool, Option<Align>, Sorts),
+    picked: &mut Option<Op>,
+) {
+    let text = ui.visuals().text_color();
+    ui.menu_button(RichText::new(t.table_insert_menu()).color(text), |ui| {
+        let items = [
+            (Op::Before, t.table_column_before()),
+            (Op::After, t.table_column_after()),
+        ];
+        op_entries(ui, (index, count), items, picked);
+    });
+    let moves = count > 1;
+    ui.add_enabled_ui(moves, |ui| {
+        ui.menu_button(RichText::new(t.table_move_menu()).color(text), |ui| {
+            let items = [
                 (Op::Back, t.table_column_left()),
                 (Op::Forward, t.table_column_right()),
-                (Op::Delete, t.table_column_delete()),
-            ]
-        } else {
-            [
-                (Op::Before, t.table_row_above()),
-                (Op::After, t.table_row_below()),
-                (Op::Back, t.table_row_up()),
-                (Op::Forward, t.table_row_down()),
-                (Op::Delete, t.table_row_delete()),
-            ]
-        };
-        for (op, words) in items {
-            let enabled = match op {
-                Op::Back => index > 0,
-                Op::Forward => index + 1 < count,
-                _ => true,
-            };
-            let colour = if op == Op::Delete {
-                ui.visuals().error_fg_color
-            } else {
-                text
-            };
-            if ui
-                .add_enabled(
-                    enabled,
-                    egui::Button::new(RichText::new(words).color(colour)),
-                )
-                .clicked()
-            {
-                picked = Some(op);
-                ui.close();
-            }
-        }
-        if let Some(now) = align.filter(|_| column) {
-            ui.separator();
+            ];
+            op_entries(ui, (index, count), items, picked);
+        });
+    });
+    if let Some(now) = align {
+        ui.menu_button(RichText::new(t.table_align_menu()).color(text), |ui| {
             let aligns = [
                 (Align::Left, t.table_align_left()),
                 (Align::Center, t.table_align_center()),
@@ -933,28 +1193,67 @@ pub(crate) fn menu(
                 let on = now == to || (now == Align::None && to == Align::Left);
                 let entry = egui::Button::selectable(on, RichText::new(words).color(text));
                 if ui.add(entry).clicked() {
-                    picked = Some(Op::Align(to));
+                    *picked = Some(Op::Align(to));
                     ui.close();
                 }
             }
-        }
-        if column && index == 0 {
-            ui.separator();
-            let mut on = headings;
-            let words = RichText::new(t.table_heading_column()).color(text);
-            if theme::checkbox(ui, &mut on, words).changed() {
-                picked = Some(Op::Headings);
-                ui.close();
+        });
+    }
+    let delete = [(Op::Delete, t.table_column_delete())];
+    // Shown sorted, the entry of how it shows now is left out, and As
+    // written while the rows show so.
+    let (sorting, label) = match sorts {
+        Sorts::Nothing => (Vec::new(), ""),
+        Sorts::View(now) => {
+            let this = now.filter(|s| s.column == index).map(|s| s.descending);
+            let mut entries = Vec::new();
+            if this != Some(false) {
+                entries.push((Op::ShowSorted(false), t.table_show_sorted_up()));
             }
+            if this != Some(true) {
+                entries.push((Op::ShowSorted(true), t.table_show_sorted_down()));
+            }
+            if now.is_some() {
+                entries.push((Op::AsWritten, t.table_show_as_written()));
+            }
+            (entries, t.table_show_sorted_menu())
         }
+        Sorts::Rows => (
+            vec![
+                (Op::SortRows(false), t.table_sort_rows()),
+                (Op::SortRows(true), t.table_sort_rows_down()),
+            ],
+            t.table_sort_rows_menu(),
+        ),
     };
-    // The right-click's menu has its own id: on a click the context menu
-    // closes its popup, which would otherwise be this one just opened.
-    Popup::menu(resp).show(&mut entries);
-    Popup::context_menu(resp)
-        .id(Popup::default_response_id(resp).with("context"))
-        .show(&mut entries);
-    picked
+    // Full screen Delete column comes before Show sorted ▸, on the grid
+    // after Sort rows ▸.
+    let rows_sort = sorts == Sorts::Rows;
+    if !rows_sort {
+        op_entries(ui, (index, count), delete, picked);
+    }
+    if !sorting.is_empty() {
+        ui.menu_button(RichText::new(label).color(text), |ui| {
+            for (op, words) in sorting {
+                if ui.button(RichText::new(words).color(text)).clicked() {
+                    *picked = Some(op);
+                    ui.close();
+                }
+            }
+        });
+    }
+    if rows_sort {
+        op_entries(ui, (index, count), delete, picked);
+    }
+    if index == 0 {
+        ui.separator();
+        let mut on = headings;
+        let words = RichText::new(t.table_heading_column()).color(text);
+        if theme::checkbox(ui, &mut on, words).changed() {
+            *picked = Some(Op::Headings);
+            ui.close();
+        }
+    }
 }
 
 /// Where each of the lengths `sizes` begins, one after another from

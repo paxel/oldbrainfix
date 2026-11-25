@@ -38,10 +38,10 @@ use oldbrainfix_core::{
     ShoppingLists, ShoppingOnAgenda, Store, WallClock,
 };
 
-use crate::app::{check, embossed, icon_button};
+use crate::app::{check, icon_button};
 use crate::icons;
 use crate::l10n::L10n;
-use crate::line_editing::{self, FieldOf, TypedLine, TypedLines, Typing};
+use crate::line_editing::{self, FieldOf, Listed, TypedLine, TypedLines, Typing};
 use crate::shopping_view;
 use crate::theme::{self, Tones};
 
@@ -1076,9 +1076,10 @@ pub fn card_count(ui: &mut Ui, t: &L10n, list: &Checklist) {
     ui.label(RichText::new(said).size(14.0).color(text));
 }
 
-/// The Checklist part of a Note's editor (#120), under its text: its
-/// Lines, each typed in place in `typed` where this Device may change it
-/// (#141, #184), and "Uncheck all" as `shown` allows.
+/// The Checklist part of a Note's editor (#120), under its text in its
+/// card (obf-1071): its Lines, each typed in place in `typed` where this
+/// Device may change it (#141, #184), "Add a Line" and "Uncheck all" as
+/// `shown` allows.
 pub fn section(
     ui: &mut Ui,
     (t, tones): (&L10n, Tones),
@@ -1089,8 +1090,8 @@ pub fn section(
     let text = ui.visuals().text_color();
     let list = &shown.list;
     let note = &list.note_id;
-    embossed(ui, tones, false, None, |ui| {
-        ui.label(RichText::new(t.checklist_heading()).strong().color(text));
+    // In the card of its name, which heads it (obf-1071).
+    ui.scope(|ui| {
         let rows: Vec<ShownLine> = typed
             .rows
             .iter()
@@ -1187,6 +1188,7 @@ pub fn section(
         if let Some((from, before)) = line_drop_shown(ui, tones, typed, &drags) {
             actions.push(ChecklistAction::Drop(from, before));
         }
+        line_editing::add_line(ui, t, typed, Listed::Checklist(list));
         // Show on the Agenda and Back to a plain Note are the Note
         // dialog's badges (#160).
         if shown.checks
@@ -1239,43 +1241,42 @@ pub fn line_drop_shown(
     }
 }
 
-/// The Checklist entries of a card's menu as `menu` offers them: the
-/// action clicked.
-pub fn card_menu_entries(ui: &mut Ui, t: &L10n, menu: &CardMenu) -> Option<ChecklistAction> {
+/// The entry of a card's menu, `label`, where `shown`: `action` when
+/// clicked.
+fn card_entry(
+    ui: &mut Ui,
+    (shown, label): (bool, &str),
+    action: ChecklistAction,
+) -> Option<ChecklistAction> {
     let text = ui.visuals().text_color();
-    let note = &menu.note;
-    let entries = [
-        (
-            menu.make,
-            t.make_checklist(),
-            ChecklistAction::Make(note.clone()),
-        ),
-        (
-            menu.uncheck_all,
-            t.checklist_uncheck_all(),
-            ChecklistAction::UncheckAll(note.clone()),
-        ),
-        (
-            menu.to_plain,
-            t.checklist_to_plain(),
-            ChecklistAction::ToPlain(note.clone()),
-        ),
-    ];
-    let mut picked = None;
-    for (i, (shown, label, action)) in entries.into_iter().enumerate() {
-        // "Show on the Agenda" before "Uncheck all", as on the phone: its
-        // three ways as a Shopping List's (#219).
-        if i == 1
-            && let Some(current) = menu.on_agenda
-            && let Some(shows) = shopping_view::agenda_radios(ui, t, current)
-        {
-            picked = Some(ChecklistAction::OnAgenda(note.clone(), shows));
-        }
-        if shown && ui.button(RichText::new(label).color(text)).clicked() {
-            picked = Some(action);
-        }
-    }
-    picked
+    (shown && ui.button(RichText::new(label).color(text)).clicked()).then_some(action)
+}
+
+/// "Make it a Checklist" in a card's This Note ▸ Kind ▸ (obf-1014), as
+/// `menu` offers it: the action clicked.
+pub fn card_make(ui: &mut Ui, t: &L10n, menu: &CardMenu) -> Option<ChecklistAction> {
+    let make = ChecklistAction::Make(menu.note.clone());
+    card_entry(ui, (menu.make, t.make_checklist()), make)
+}
+
+/// "Back to a plain Note" in a card's This Note ▸ Kind ▸ (obf-1014).
+pub fn card_to_plain(ui: &mut Ui, t: &L10n, menu: &CardMenu) -> Option<ChecklistAction> {
+    let plain = ChecklistAction::ToPlain(menu.note.clone());
+    card_entry(ui, (menu.to_plain, t.checklist_to_plain()), plain)
+}
+
+/// "Uncheck all" in a card's Tidy ▸ (obf-1014).
+pub fn card_uncheck_all(ui: &mut Ui, t: &L10n, menu: &CardMenu) -> Option<ChecklistAction> {
+    let uncheck = ChecklistAction::UncheckAll(menu.note.clone());
+    card_entry(ui, (menu.uncheck_all, t.checklist_uncheck_all()), uncheck)
+}
+
+/// "Show on the Agenda ▸" of a Checklist in a card's This Note ▸: its
+/// three ways as a Shopping List's (#219).
+pub fn card_on_agenda(ui: &mut Ui, t: &L10n, menu: &CardMenu) -> Option<ChecklistAction> {
+    let current = menu.on_agenda?;
+    let shows = shopping_view::agenda_menu(ui, t, current)?;
+    Some(ChecklistAction::OnAgenda(menu.note.clone(), shows))
 }
 
 /// The Lines of a Sent Item's preview, to look at, not to check.

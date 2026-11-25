@@ -14,6 +14,7 @@ import 'package:oldbrainfix/src/tally_form_screen.dart';
 import 'package:oldbrainfix/src/tally_entry_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'accent_row.dart';
 import 'open_capture.dart';
 import 'reveal.dart';
 
@@ -156,7 +157,7 @@ void main() {
       await start(tester);
       await edit(tester, id);
       await tap(tester, key('badge-add'));
-      for (final item in ['Remind me…', 'Frog', 'Session']) {
+      for (final item in ['Remind me…', 'Frog', 'Session…']) {
         expect(find.widgetWithText(PopupMenuItem<Spawn>, item), findsOneWidget);
       }
 
@@ -307,7 +308,7 @@ void main() {
       for (final item in ['Remind me…', 'Frog']) {
         expect(find.text(item), findsOneWidget);
       }
-      await tap(tester, find.text('Session'));
+      await tap(tester, find.text('Session…'));
       expect(find.byType(RoutineEditorScreen), findsOneWidget);
       expect(find.text('New Session'), findsOneWidget);
       // The rule is a column of radio buttons.
@@ -397,6 +398,18 @@ void main() {
       expect(NoteKinds(store).of(id), NoteKind.session);
       expect(sessions.setupOf(id)?.pool, [pushUps]);
       expect(sessions.ofNote(id), isEmpty, reason: 'no Routine yet');
+      // Back to the top of the page, longer with the groups at its end
+      // (obf-1073).
+      await tester.scrollUntilVisible(
+        key('note-name'),
+        -100,
+        scrollable: find
+            .descendant(
+              of: find.byType(NoteEditorScreen),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
       // Its page: the name, the pool and the count, then its badges.
       expect(key('note-name'), findsOneWidget);
       expect(key('session-pool'), findsOneWidget);
@@ -532,6 +545,8 @@ void main() {
       final made = session([tally('Push-ups')], count: 1);
       await start(tester);
       await edit(tester, made.noteId);
+      await tester.ensureVisible(key('session-new-tally'));
+      expectAccentRow(tester, key('session-new-tally'), 'New Tally');
       await tap(tester, key('session-new-tally'));
       expect(find.byType(TallyFormScreen), findsOneWidget);
       await tester.enterText(key('tally-form-name'), 'Plank');

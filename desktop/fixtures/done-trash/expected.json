@@ -339,6 +339,7 @@
     ],
     "x-ray": [],
     "müller": [],
+    "MULLER": [],
     "called": [],
     "loop": [],
     " e ": [
@@ -353,5 +354,29 @@
     "4711": []
   },
   "searchWithin": {},
+  "findings": {
+    "MULLER": {},
+    "dentist": {
+      "note:00000000000000000000000000000001": [
+        {
+          "cell": null,
+          "context": "Dentist",
+          "contextEnd": 7,
+          "contextStart": 0,
+          "end": 7,
+          "key": "",
+          "line": 0,
+          "part": "text",
+          "section": null,
+          "start": 0
+        }
+      ]
+    },
+    "receipt": {},
+    "called": {},
+    "loop": {},
+    "lease": {},
+    "rent due": {}
+  },
   "conflicts": []
 }

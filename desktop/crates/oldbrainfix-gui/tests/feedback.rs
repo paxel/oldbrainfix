@@ -333,3 +333,36 @@ fn what_the_ticks_pick_and_the_size_are_worked_out_when_they_change() -> TestRes
     assert!(shows(&harness, "With it, as a file: a Pack of 1 Note"));
     Ok(())
 }
+
+#[test]
+fn the_notification_clicks_go_along_ticked_once_there_are_any() -> TestResult {
+    // obf-1039: none yet, no tick.
+    let dir = tempfile::tempdir()?;
+    let Opened { harness, .. } = open(store()?, dir.path());
+    assert!(!shows(&harness, "Notification clicks"));
+
+    let at = chrono::DateTime::from_timestamp(1_795_510_800, 0).unwrap_or_default();
+    let tap = oldbrainfix_gui::alerts::Tap {
+        key: "routine:a@2026-11-24T09:00".into(),
+        action: oldbrainfix_gui::alerts::OPEN.into(),
+        at,
+    };
+    let Opened { mut harness, .. } = open_with(Arc::new(store()?), dir.path(), |app| {
+        app.click_trace().arrived(&tap);
+        app.click_trace().went(&tap.key, "Agenda today");
+    });
+    assert!(ticked(&harness, "Notification clicks"));
+    assert!(shows(&harness, "The last one: when, which notification"));
+    type_text(&mut harness, "It rang.");
+    let line = "2026-11-24 09:00:00Z routine:a@2026-11-24T09:00 click, window: Agenda today";
+    let body = format!(
+        "It rang.\n\nVersion: 0.4.0\nSystem: Debian GNU/Linux 13 (trixie), x86_64\nInstalled from: Flatpak\n\nNotification clicks:\n{line}"
+    );
+    assert!(shows(&harness, &body));
+    harness
+        .get_by_role_and_label(Role::CheckBox, "Notification clicks")
+        .click();
+    harness.run();
+    assert!(!shows(&harness, "Notification clicks:\n"));
+    Ok(())
+}

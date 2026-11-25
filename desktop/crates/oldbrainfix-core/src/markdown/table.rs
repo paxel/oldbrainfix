@@ -9,7 +9,8 @@
 //! was written, and the line break that followed the header row. The
 //! change it gives selects the table in the new text, so [`at`] finds it
 //! again; an edit that cannot be made gives the text as it was and its
-//! cursor where it was asked for.
+//! cursor where it was asked for. Sorting the rows ([`sort_rows`]) alone
+//! moves their lines as they were written instead.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -17,6 +18,10 @@ use std::sync::Arc;
 use crate::text_boxes::{self, BoxState};
 
 use super::{Block, BlockKind, Change, Inline, Span, blank, floor, line_at, skip_blank, slice};
+
+mod sort;
+
+pub use sort::{SortKind, sort_kind, sort_rows, sorted_rows};
 
 /// The line right before a header row that marks the first column of
 /// its table as headings. GFM has no such flag; a comment shows nowhere

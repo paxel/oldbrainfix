@@ -486,6 +486,10 @@ fn a_change_waits_and_a_read_shows_it_as_the_user_sees_it() -> TestResult {
     // The text's own step (#326, obf-1019), read only as every setting.
     assert_eq!(read.pointer("/textSize"), Some(&json!("larger")));
     assert_eq!(read.pointer("/trashesDoneReminder"), Some(&json!(true)));
+    // Show tips (obf-1060), on until switched off, read only.
+    assert_eq!(read.pointer("/tipsOn"), Some(&json!(true)));
+    // End a recording after a pause (obf-1053), Off by default, read only.
+    assert_eq!(read.pointer("/recordingPauseSeconds"), Some(&Value::Null));
     assert_eq!(read.pointer("/features"), Some(&json!("advanced")));
     // Today's quiet day (obf-1044), read only.
     assert_eq!(read.pointer("/quietDayUntil"), Some(&Value::Null));
@@ -504,7 +508,14 @@ fn a_change_waits_and_a_read_shows_it_as_the_user_sees_it() -> TestResult {
     PersonSettings::new(&store).set_advanced(false)?;
     store.set_ai_on(true)?;
     store.set_ask_thinks(true)?;
+    DeviceSettings::new(&store).set_tips_on(false)?;
+    DeviceSettings::new(&store).set_recording_pause_seconds(Some(5))?;
     let settings = call(&store, &task, "read_settings", &json!({}))?;
+    assert_eq!(json_of(&settings)?.pointer("/tipsOn"), Some(&json!(false)));
+    assert_eq!(
+        json_of(&settings)?.pointer("/recordingPauseSeconds"),
+        Some(&json!(5))
+    );
     assert_eq!(
         json_of(&settings)?.pointer("/features"),
         Some(&json!("simple"))
@@ -1690,7 +1701,6 @@ fn the_ask_panel_reads_without_an_ai_task_and_drafts_its_first_change_into_one()
     let read = store.ask_tool("read_note", &json!({"id": note.id}), &utc, &mut task)?;
     assert!(!read.is_error);
     assert_eq!((task.clone(), store.ai_task()?), (None, None));
-    assert!(!store.sync_paused()?);
     // What the panel does not offer, it refuses.
     for unoffered in ["list_notes", "read_photo", "trash_note", "no_such"] {
         let out = store.ask_tool(unoffered, &json!({}), &utc, &mut task)?;
@@ -1705,6 +1715,6 @@ fn the_ask_panel_reads_without_an_ai_task_and_drafts_its_first_change_into_one()
     )?;
     assert!(!filed.is_error, "{filed:?}");
     assert_eq!(task, store.ai_task()?);
-    assert!(task.is_some() && store.sync_paused()?);
+    assert!(task.is_some());
     Ok(())
 }

@@ -16,12 +16,17 @@
 //! the tests. Whisper is led in with the Area and Topic names as the user
 //! reads them, and for German speech with the English words German is
 //! full of (`TranscriptPrompts`); what it only repeats of that lead-in
-//! is taken out of the Transcript.
+//! is taken out of the Transcript. Aborted on the page Running
+//! (obf-1078), the one being read ends and is kept, and the others wait
+//! until Go on there or the next start; what is asked to be read again is
+//! read meanwhile.
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, Sender};
+use std::time::Instant;
 
 use ndarray::ArrayD;
 use oldbrainfix_core::file_text::{self, FileKind, FileReading};
@@ -151,6 +156,12 @@ struct Asked {
     failed: Mutex<Vec<Blob>>,
     waiters: Mutex<Vec<(String, Then)>>,
     said: Mutex<Vec<Said>>,
+    /// Since when it reads without a rest, and how many of how many it
+    /// read meanwhile, while it reads (obf-1078).
+    busy: Mutex<Option<(Instant, usize, usize)>>,
+    /// Raised by Abort on the page Running: only what is asked to be read
+    /// again is read, until Go on.
+    stopped: AtomicBool,
 }
 
 impl Enricher {
@@ -222,6 +233,29 @@ impl Enricher {
     pub fn current(&self) -> Option<String> {
         self.current.lock().clone()
     }
+
+    /// Since when it reads without a rest, and how many of how many it
+    /// has read meanwhile; `None` while it rests (obf-1078).
+    pub fn busy(&self) -> Option<(Instant, usize, usize)> {
+        *self.asked.busy.lock()
+    }
+
+    /// Lets the one being read end, and leaves the others waiting until
+    /// [`Enricher::go_on`] (obf-1078).
+    pub fn stop(&self) {
+        self.asked.stopped.store(true, Ordering::SeqCst);
+    }
+
+    /// Whether it was stopped.
+    pub fn stopped(&self) -> bool {
+        self.asked.stopped.load(Ordering::SeqCst)
+    }
+
+    /// Reads the ones waiting again, after [`Enricher::stop`].
+    pub fn go_on(&self) {
+        self.asked.stopped.store(false, Ordering::SeqCst);
+        self.kick();
+    }
 }
 
 fn run(
@@ -237,18 +271,35 @@ fn run(
     // Gone when the window is.
     while kicked.recv().is_ok() {
         while kicked.try_recv().is_ok() {}
+        let mut read = 0;
         loop {
             // What was asked for comes first, skipped before or not.
             let again = asked.waiting.lock().pop_front();
             let is_again = again.is_some();
+            let mut left = asked.waiting.lock().len();
+            let stopped = asked.stopped.load(Ordering::SeqCst);
             let next = again.or_else(|| {
-                kind.waiting(&notes)
-                    .ok()
-                    .and_then(|w| w.into_iter().find(|b| !skipped.contains(&b.hash)))
+                if stopped {
+                    return None;
+                }
+                let mut waiting = kind
+                    .waiting(&notes)
+                    .ok()?
+                    .into_iter()
+                    .filter(|b| !skipped.contains(&b.hash));
+                let next = waiting.next();
+                left += waiting.count();
+                next
             });
             let Some(blob) = next else {
                 break;
             };
+            {
+                let mut busy = asked.busy.lock();
+                let since = busy.map_or_else(Instant::now, |(since, ..)| since);
+                *busy = Some((since, read, read + 1 + left));
+            }
+            read += 1;
             let Some(bytes) = kind.bytes(&notes, &blob.hash) else {
                 skipped.insert(blob.hash.clone());
                 if is_again {
@@ -272,6 +323,10 @@ fn run(
             }
             changed();
             settle(&notes, asked, &skipped, changed);
+        }
+        *asked.busy.lock() = None;
+        if read > 0 {
+            changed();
         }
         settle(&notes, asked, &skipped, changed);
         engine.idle();

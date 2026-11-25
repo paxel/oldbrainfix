@@ -20,7 +20,7 @@
 //! all-day and then timed Occurrences, a gap, and tomorrow's dimmed,
 //! then the five days after it under their weekdays and dates, all of them checkable. Its alarm button leads
 //! to a new Routine. A Note spawns Routines and Reminders from its
-//! editor and from the Note menu; deleting a Note that spawned some asks
+//! editor and from its card's menu; deleting a Note that spawned some asks
 //! whether they go too.
 //!
 //! Every change goes through `oldbrainfix_core`, which writes the entries
@@ -34,12 +34,10 @@
 //! move the cursor; over a dialog opened from another they lead back to
 //! that one.
 //!
-//! The quick note records voice too: the microphone's button starts
-//! at once and one big stop button ends it and leaves it on the field,
-//! saved with the Note by the Nudge times or Save (UI laws, "Capture").
-//! Once something is typed, the Note card's buttons show above them;
-//! what they set up shows at the top of the field and is saved with the
-//! Note, all of it or nothing (#113). A picture pasted from the clipboard,
+//! The quick note is the text and, once something is typed or held, the
+//! Nudge buttons and Open in the editor, nothing else (UI laws,
+//! "Capture", #352); voice is recorded with Voice in the Note
+//! dialog, onto its Note. A picture pasted from the clipboard,
 //! and pictures and sound files chosen with "From file…" or dropped onto
 //! the window (where the system hands drops over: not on Wayland), wait
 //! in the quick note, which they open, as its photos and voice recordings and are saved with
@@ -82,16 +80,19 @@ use oldbrainfix_core::backup;
 use oldbrainfix_core::bundle::BundleResult;
 use oldbrainfix_core::cards::{self, CardOpened};
 use oldbrainfix_core::checklists::keys as checklist_keys;
+use oldbrainfix_core::findings::{self, Finding, FindingPart};
 use oldbrainfix_core::highlight::Grammars;
 use oldbrainfix_core::ics::routines_ics;
+use oldbrainfix_core::imports::{EarlierImport, ImportSummary};
 use oldbrainfix_core::note_kinds::{self, NoteKind};
 use oldbrainfix_core::offers::{self, HeldAreaOffer, OfferError, Transport};
 use oldbrainfix_core::packs::{self, OpenedPack, Pack, PackError, PackFrom, PackTicks};
 use oldbrainfix_core::profile::ProfileChoice;
-use oldbrainfix_core::routines::routines_by_name;
+use oldbrainfix_core::routines::{HeadsUpUnit, heads_up_keys, routines_by_name};
 use oldbrainfix_core::sent::{
     self, HeldSentItem, OpenError, Opened, Received, Recipient, SenderTrust, SentItemState,
 };
+use oldbrainfix_core::settings::RECORDING_PAUSE_CHOICES;
 use oldbrainfix_core::share::{self, NoteShare};
 use oldbrainfix_core::sync::SETTINGS_SOURCE;
 use oldbrainfix_core::{
@@ -101,14 +102,14 @@ use oldbrainfix_core::{
     ListOnAgenda, MissedSummary, Note, NoteHistory, Notes, NotesGo, Occurrence, OpenOccurrence,
     OwnProfile, Person, PersonFilter, PersonSettings, Places, Profile, QuietHours, Routine,
     RoutineOccurrence, Routines, Search, Section, SessionSetup, Sessions, ShoppingLine,
-    ShoppingList, ShoppingLists, ShoppingOnAgenda, ShownBox, Store, Tallies, TextSize, ThemeChoice,
-    Topic, UnitSystem, bundle, markdown, text_format,
+    ShoppingList, ShoppingLists, ShoppingOnAgenda, ShownBox, SpeechModelChoice, SpeechModelSource,
+    Store, Tallies, TextSize, ThemeChoice, Topic, UnitSystem, bundle, markdown, text_format,
 };
 
 use crate::about_view;
 use crate::add_to_note::{self, NoteAsk, NotePicker};
 use crate::ai_view::{self, AiAction, Client, ReviewShown};
-use crate::alerts::{Event, OccurrenceWanted};
+use crate::alerts::{AgendaWanted, CATCH_UP_KEY, CHANGES_KEY, Event, NUDGE_KEY, OccurrenceWanted};
 use crate::all_routines_view::{self, AllRoutinesAction};
 use crate::app_links;
 use crate::area_deletion::AreaDeletions;
@@ -125,13 +126,18 @@ use crate::capture_choices::{self, CaptureChoices, Captured, Held, ListTitle, Qu
 use crate::card_glance;
 use crate::card_occurrences::{self, CardOccurrence, OpenAsked};
 use crate::card_selection::CardSelection;
+use crate::cell_pick;
 use crate::checklist_view::{
     self, CardMenu, ChecklistAction, ChecklistShown, LineStep, RemovedAsk, ShownLine,
 };
-use crate::enrich::Enricher;
+use crate::click_trace::ClickTrace;
+use crate::design;
+use crate::enrich::{self, Enricher};
 use crate::feedback_view::{self, FeedbackAsk, FeedbackFacts, FeedbackForm};
 use crate::file_into::{self, FileIntoPicker, Picked};
-use crate::folder_import::{FolderImport, Imported, Importing, folder_name};
+use crate::find_bar::{self, FindBar};
+use crate::find_marks;
+use crate::folder_import::{FillIn, FolderImport, Imported, Importing, folder_name};
 use crate::folder_sync;
 use crate::format_bar::{self, Format};
 use crate::frogs_view::{self, FrogAction, FrogShown, NoteFrog};
@@ -144,16 +150,19 @@ use crate::l10n::{self, L10n};
 use crate::leave_saves::{self, Leaving};
 use crate::line_editing::{Listed, TypedLines};
 use crate::login;
+use crate::md_source;
+use crate::md_view;
 use crate::media::{
-    Clipboard, FromFile, Player, Recorder, SOUND_EXTENSIONS, from_file, photo_extension,
-    photo_from_file,
+    Clipboard, FromFile, PauseWatch, Player, Recorder, SOUND_EXTENSIONS, from_file,
+    photo_extension, photo_from_file,
 };
 use crate::media_view::{
-    self, Generated, Made, Offers, Out, Photo, PhotoCache, Recording, Speech, Viewed, Viewer, Voice,
+    self, Generated, Made, Offers, Out, Photo, PhotoCache, Recording, Speech, Viewed, Viewer,
 };
 use crate::names::{area_name, offered_area_name, topic_name};
 use crate::navigation::Navigation;
 use crate::note_history_view;
+use crate::note_steps::{self, LinesKept, See, State, Steps};
 use crate::note_window::{self, Alone, Shown};
 use crate::occurrence_answers::{self, Answer, Answers};
 use crate::pack_view::{self, PackAsk};
@@ -164,6 +173,7 @@ use crate::profile_view::{self, CardForm, ProfileAction, ProfileView, Square};
 use crate::read_text;
 use crate::ring::{self, Rung};
 use crate::routine_editor::{Intent, RENAG_CHOICES, RoutineEditor};
+use crate::running::{self, Abort, Ended, Job, JobId};
 use crate::schedule_text::{agenda_day_text, day_text, occurrence_time, schedule_text};
 use crate::search_aside::{Searching, Work};
 use crate::session_editor::{SessionDraft, SessionIntent, WEEKDAYS_OPEN};
@@ -174,7 +184,7 @@ use crate::setting_badges::{
 use crate::settings_search;
 use crate::share_note;
 use crate::shopping_view::{self, ShopStep, ShoppingAction, ShoppingShown};
-use crate::speech::SpeechModel;
+use crate::speech::{self, SpeechModel, Status as SpeechStatus};
 use crate::spotlight::{self, Spotlights};
 use crate::starter_set_view;
 use crate::sync_line;
@@ -184,15 +194,16 @@ use crate::sync_view::{
 };
 use crate::table_grid::{self, GridLook, Grids};
 use crate::table_view::{self, Opening, TableView};
-use crate::tag_tree_view::{self, TagAsked};
+use crate::tag_tree_view::{self, RowAsked, TagAsked};
 use crate::tally_page::{PageIntent, TallyPage};
 use crate::tally_view::{
     self, EntryForm, FieldForm, FormIntent, TallyAction, TallyBadge, TallyForm, TallyShown, Whose,
 };
-use crate::text_marks_view::{self, BoxAsk, BoxLook, Spots};
+use crate::text_marks_view::{self, BoxAsk, BoxLook, Spots, TableAct, TableRoom};
 use crate::text_menu::{self, Clip, Pick as MenuPick};
 use crate::theme::{self, AREA_PALETTE, Tones};
 use crate::tick_saves;
+use crate::trash_emptying::{self, TrashEmptying};
 use crate::undo::Undo;
 use crate::unsorted_steps::{self, MovedOn, Sorting};
 use crate::vault_view::{self, VaultDone, VaultJob};
@@ -208,6 +219,18 @@ struct Left {
     query: String,
     people: PersonFilter,
     scroll: f32,
+}
+
+/// How long "Made, hidden by the filter" stays at the top left alone
+/// (obf-1070), as the phone's offers do.
+const MADE_HIDDEN_LASTS: f64 = 10.0;
+
+/// A Note made in a list whose person filter hides it (obf-1070): the
+/// list it was made in, and since when the top says so, once it does.
+#[derive(Debug, Clone)]
+struct MadeHidden {
+    list: Selection,
+    shown_since: Option<f64>,
 }
 
 /// What the middle pane shows.
@@ -288,6 +311,9 @@ pub enum Page {
     /// this Device's code and the field for the other's; Sync ▸ Pair a
     /// Device. It hosts while it shows, as Sync does.
     Pair,
+    /// Every job running beside the window, with Abort (obf-1078); View ▸
+    /// Running, and a click on the line under the menu bar.
+    Running,
 }
 
 /// How a click on a card selects (#148): a plain click this card alone,
@@ -457,8 +483,73 @@ struct AgendaView {
     /// checked Lines and the picks with an entry go as they are drawn.
     hides_checked: bool,
     /// Whether today is a quiet day now (obf-1044): its line shows on
-    /// top, and the Agenda's ⋮ offers no "Quiet today".
+    /// top, and the Agenda's Quiet today reads End quiet day (obf-1066).
     quiet: bool,
+}
+
+/// The Occurrence a click on its notification asked for (obf-1039),
+/// until the Agenda is left or another is asked for.
+#[derive(Debug, Clone)]
+struct Notified {
+    routine: String,
+    occurrence: Occurrence,
+    /// The log's mark as it was clicked: an Agenda read at it or later
+    /// tells where it is listed.
+    seq: Option<i64>,
+    /// Where the Agenda lists it, once read; then it is marked.
+    place: Option<AgendaPlace>,
+    /// Whether the list is still to scroll it into view, once.
+    scroll: bool,
+}
+
+/// Where the Agenda lists an Occurrence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AgendaPlace {
+    Today,
+    Tomorrow,
+    Later(Day),
+    Missed,
+}
+
+impl AgendaPlace {
+    /// Where it went, for the trace of notification clicks.
+    fn traced(self) -> String {
+        match self {
+            AgendaPlace::Today => "Agenda today".into(),
+            AgendaPlace::Tomorrow => "Agenda tomorrow".into(),
+            AgendaPlace::Later(day) => format!("Agenda {day}"),
+            AgendaPlace::Missed => "Agenda Missed".into(),
+        }
+    }
+}
+
+/// Where `agenda` lists the Occurrence `occurrence` of the Routine
+/// `routine`: today, tomorrow, a later day, else the Missed Summary;
+/// `None` where it lists it nowhere.
+fn agenda_place(
+    agenda: &AgendaView,
+    routine: &str,
+    occurrence: &Occurrence,
+) -> Option<AgendaPlace> {
+    let listed = |rows: &[Row]| {
+        rows.iter()
+            .any(|r| r.row.routine.id == routine && r.row.occurrence == *occurrence)
+    };
+    if listed(&agenda.today) {
+        return Some(AgendaPlace::Today);
+    }
+    if listed(&agenda.tomorrow) {
+        return Some(AgendaPlace::Tomorrow);
+    }
+    if let Some((day, _)) = agenda.later.iter().find(|(_, rows)| listed(rows)) {
+        return Some(AgendaPlace::Later(*day));
+    }
+    agenda
+        .missed
+        .routines
+        .iter()
+        .any(|m| m.routine.id == routine && m.missed.iter().any(|o| o.occurrence == *occurrence))
+        .then_some(AgendaPlace::Missed)
 }
 
 /// Hands a thread its connection to the window's database.
@@ -472,6 +563,8 @@ struct AgendaReads {
     open: StoreOpener,
     /// The rows read last, shown until the next read is in.
     shown: Option<AgendaView>,
+    /// The log's mark they were read at.
+    shown_seq: Option<i64>,
     /// The read running, with whether it wrote today's picks.
     running: Option<std::sync::mpsc::Receiver<AgendaRead>>,
     /// A change asked for one more read meanwhile.
@@ -483,6 +576,36 @@ struct AgendaReads {
 
 /// What the Agenda's thread read, at its mark, and whether it wrote.
 type AgendaRead = (oldbrainfix_core::Result<(AgendaView, i64)>, bool);
+
+/// The name of the thread that reads the most used tags (obf-1074).
+pub const TAGS_THREAD: &str = "most used tags";
+
+/// The most used tags read, at the log's mark the read began at.
+type TagsRead = (i64, oldbrainfix_core::Result<Vec<String>>);
+
+/// The most used tags under All Notes' search (obf-1074), read apart from
+/// the View, as reading them reads every Note: on a thread of their own
+/// where the window has the Agenda's opener, once for each mark of the
+/// log, and on the window's thread without one.
+#[derive(Default)]
+struct TagRow {
+    /// The tags read last, shown until the next read is in.
+    tags: Vec<String>,
+    /// The log's mark they were read at.
+    seq: Option<i64>,
+    /// The read running.
+    running: Option<std::sync::mpsc::Receiver<TagsRead>>,
+}
+
+/// A Pack's work running off the window's thread (#165): its answer to
+/// come, what it does, since when, and whether Abort on the page Running
+/// dropped it (obf-1078), its answer then taken in but not shown.
+struct PackRunning {
+    arrives: std::sync::mpsc::Receiver<PackDone>,
+    kind: PackWork,
+    since: std::time::Instant,
+    dropped: bool,
+}
 
 /// What a Pack's work off the window's thread did (#165), and whether
 /// it wrote to the log there.
@@ -661,14 +784,22 @@ impl Reads {
             | Action::ClearCards
             | Action::StepCards { .. }
             | Action::SelectAllCards
-            | Action::Clip(_) => Reads::Nothing,
+            | Action::Clip(_)
+            | Action::CopyTable(_) => Reads::Nothing,
             Action::SwitchView(_) | Action::Compact(_) => Reads::Look,
-            Action::SelectNote(_) | Action::CloseNote | Action::Find | Action::Badge(_) => {
-                Reads::Detail
-            }
+            Action::SelectNote(_)
+            | Action::AddPartTo(_)
+            | Action::OpenFinding(..)
+            | Action::CloseNote
+            | Action::Find
+            | Action::Badge(_) => Reads::Detail,
             // A letter in a dialog's search changes only the dialog
             // (obf-1068).
             Action::MergeQuery | Action::AddToNotePicked(NoteAsk::Find) => Reads::Nothing,
+            // Only the Note's steps, or a question about them (obf-1051).
+            Action::WholeStep { .. } | Action::AskRevert => Reads::Nothing,
+            // Only a question, with the counts read beside (obf-1095).
+            Action::AskEmptyTrash => Reads::Nothing,
             _ => Reads::All,
         }
     }
@@ -894,12 +1025,14 @@ struct View {
     profile_newer: bool,
     /// The other Profile "Which one is you?" asks about, if it does.
     profile_question: Option<ProfileChoice>,
-    /// Whether sync waits for an AI Task (ADR 0026), and the AI Task
-    /// open or waiting for its review, by id.
-    sync_paused: bool,
+    /// The AI Task open or waiting for its review, by id (ADR 0026).
     ai_task: Option<String>,
     /// The AI Task's review, while it shows.
     ai_review: Option<ReviewShown>,
+    /// How many Notes, Sections, Routines, Areas and Topics the AI Task
+    /// changes, as its review lists them: what the top line's Review
+    /// counts (obf-1075).
+    ai_changes: usize,
     /// The provider the Ask panel asks, while it shows (#267).
     ask_provider: Option<Provider>,
     /// Whether "AI (experimental)" is switched on on this computer
@@ -998,6 +1131,8 @@ enum Dialog {
         /// are selected (#261).
         label: Option<String>,
     },
+    /// "Revert all changes?" of the Note open (obf-1051).
+    Revert,
     /// The one question before a file link opens (#261): the file, its
     /// path inside the synced folder, and the app that opens it, "" when
     /// the system does not tell.
@@ -1015,20 +1150,25 @@ enum Dialog {
         name: String,
         by: String,
     },
+    /// A custom Heads-up for the Routine editor (obf-1087): the number
+    /// typed and its unit, days and weeks only on an all-day schedule.
+    CustomHeadsUp {
+        count: String,
+        unit: HeadsUpUnit,
+        all_day: bool,
+    },
     /// Naming a new Area, or a new Topic of the Area `area`.
     NewPlace {
         area: Option<String>,
         name: String,
     },
-    /// Renaming the Area or Topic `id`, shown as `shown`.
+    /// Renaming the Area or Topic `id`, shown as `shown`; an Area's with
+    /// its colour and icon as picked, `look`, one dialog (obf-1014).
     Rename {
         id: String,
         name: String,
         shown: String,
-    },
-    /// The colour and icon of an Area.
-    Look {
-        area: String,
+        look: Option<AreaLook>,
     },
     Delete(Deleting),
     /// Picking the Note to merge `notes` into, by id and text: the
@@ -1115,10 +1255,6 @@ enum Dialog {
         held: HeldSentItem,
         blocking: Option<Vec<String>>,
     },
-    /// The people of the Shared Area `area`.
-    People {
-        area: String,
-    },
     /// Whether `person` goes from the Shared Area `area`.
     RemovePerson {
         area: String,
@@ -1172,6 +1308,10 @@ enum Dialog {
     /// Whether the Google Takeout export to import from Google Keep is
     /// still its zip or a folder unpacked from it (ADR 0036).
     ImportKeep,
+    /// The question of an Import whose source an earlier Import came
+    /// from (obf-1078), "Fill in the Import of … into …?", with Fill in,
+    /// Import as new and Cancel.
+    FillIn(String),
     /// File ▸ Import… (#145): a folder of Markdown, text and other documents, or a
     /// Google Keep export, each with what it does, or that it reads
     /// while it runs.
@@ -1179,7 +1319,7 @@ enum Dialog {
     /// File ▸ Export as vault… (#267): what it writes and how far it is;
     /// closing it leaves the vault being written, announced when done.
     Vault,
-    /// Note ▸ File into… or Ctrl+M (#145): the Area or Topic the Notes
+    /// File into… or Ctrl+M (#145): the Area or Topic the Notes
     /// go into, the selected ones together (#148), or the Note being
     /// captured, picked with a filter (#272).
     FileInto {
@@ -1213,6 +1353,12 @@ enum Dialog {
     },
     /// Whether every change of the AI Task is rejected (#112).
     RejectAi,
+    /// "Delete 128 Notes and 4 Routines for good?" (obf-1095): whether
+    /// to empty the trash at once, with what it deletes.
+    EmptyTrash {
+        notes: usize,
+        routines: usize,
+    },
     /// "Discard changes?" on leaving an edit dialog whose change can't be
     /// saved (#275).
     Discard(Leave),
@@ -1321,10 +1467,15 @@ enum Announcer {
 
 /// What "+" at the top of a list makes (#161), as the phone's
 /// `NewKind`: a Note through the quick note, a Checklist, a Shopping
-/// List, a Tally, a Session or a Frog, and in an Area a Topic.
+/// List, a Tally, a Session or a Frog, and in an Area a Topic; on the
+/// Agenda and in Unsorted the quick note or an empty Note in the Note
+/// dialog (obf-1141).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NewKind {
     Note,
+    /// "Editor" of the Agenda's and Unsorted's "+" (obf-1141): an empty
+    /// Note in the Note dialog.
+    Editor,
     Checklist,
     Shopping,
     Tally,
@@ -1338,8 +1489,6 @@ pub enum NewKind {
 enum ChangesSent {
     Saved,
     NothingNew,
-    /// Refused while an AI Task waits.
-    Paused,
     /// Not saved: whose, and the full text of why.
     Failed(String),
 }
@@ -1422,9 +1571,15 @@ enum Action {
     /// Back to the dialog this one was opened from, or none.
     PageBack,
     ClosePage,
-    /// File ▸ New Note (Ctrl+N) and "+": the quick note's dialog
-    /// (#146), the cursor in its field.
+    /// Abort or Go on on the page Running (obf-1078).
+    Running(running::Act),
+    /// The Agenda's and Unsorted's "+" and the files dropped: the quick
+    /// note's dialog (#146), the cursor in its field.
     NewNote,
+    /// File ▸ New Note (Ctrl+N) and "+ New Note ▸ Note": in an Area or a
+    /// Topic the Note dialog on a new Note filed there, the cursor in its
+    /// text (obf-1140); elsewhere the quick note, as [`Action::NewNote`].
+    NewNoteHere,
     /// Closes the quick note's dialog, keeping what is typed with a
     /// Nudge in 1 h, as leaving it does.
     CloseQuickNote,
@@ -1461,21 +1616,42 @@ enum Action {
     QuickNote,
     /// File ▸ Quit: the app ends, also where the tray would keep it.
     Quit,
-    /// Edit ▸ Find (Ctrl+F): the cursor into the list's search, of All
-    /// Notes where the list has none.
+    /// Edit ▸ Find (Ctrl+F): over a Note open, its find bar with the
+    /// cursor in it (obf-1047); else the cursor into the list's search, of
+    /// All Notes where the list has none.
     Find,
     /// Edit ▸ Cut, Copy or Paste, on the field the cursor was in.
     Clip(Clip),
     /// Edit ▸ Undo, and Ctrl+Z outside a text field (#268): takes back
-    /// the last delete, check-off, filing or Merge.
+    /// the last delete, check-off, filing or Merge, or, over the Note
+    /// open, its last step where that came later (obf-1051).
     Undo,
+    /// Undo in the bar of the Note open (obf-1051): its last step back.
+    NoteUndo,
+    /// Redo there, and Ctrl+Shift+Z or Ctrl+Y outside a text field: the
+    /// step taken back last again.
+    NoteRedo,
+    /// "Revert all changes" in its ⋮: asks once.
+    AskRevert,
+    /// The question's Revert: the Note back to what it was as it opened,
+    /// every step taken back at once, for Redo to make again one by one.
+    Revert,
+    /// The text of the Note open, or of its Section `section`, changed
+    /// whole by a menu, `before` what its field held just before (a
+    /// table's row deleted, moved or its rows sorted): what was typed up
+    /// to it is a step of its own and the change one more, so Undo takes
+    /// back the change alone (obf-1051).
+    WholeStep {
+        section: Option<String>,
+        before: String,
+    },
     /// Help ▸ User guide: the guide's desktop page in the browser.
     OpenGuide,
     /// Sync ▸ Sync now: the Sync dialog, and the shared folder synced at
     /// once if one is chosen.
     SyncNow,
-    /// Asks where the Notes with these ids are filed (Note ▸ File into…,
-    /// Ctrl+M, a card's right-click), together (#148).
+    /// Asks where the Notes with these ids are filed (Ctrl+M, a card's
+    /// right-click, the Note dialog's badge), together (#148).
     AskFileInto(Vec<String>),
     /// The Settings' Record keys: starts recording the hotkey, or with
     /// `false` stops it (#283).
@@ -1501,12 +1677,19 @@ enum Action {
     SelectAllCards,
     /// File ▸ Import…: asks which Import.
     AskImport,
+    /// File ▸ Open Markdown file… (obf-1056): asks for the file, then
+    /// shows it in a viewer of its own.
+    OpenMarkdown,
     /// File ▸ Export as vault… (#267): asks for the folder, then writes
     /// the vault off the window's thread.
     ExportVault,
     /// Opens the Note in the Note dialog (#146): a double-click on its
     /// card or Edit (#114).
     SelectNote(String),
+    /// Opens the Note in the Note dialog at a place the search found in
+    /// it (obf-1047), its find bar at that place, or at the first one
+    /// while none is given: a click on a finding under its card.
+    OpenFinding(String, Option<Box<Finding>>),
     /// Opens the Checklist or Shopping List of this Note in the Note
     /// dialog with the keyboard in a new empty Line after its open ones,
     /// as a click on its group's heading on the Agenda does (#276).
@@ -1539,11 +1722,12 @@ enum Action {
     /// detailed one and keeps the choice for that list on this Device
     /// (#114, #189).
     Compact(bool),
-    /// "Quiet today" in the Agenda's ⋮ (obf-1044): today shows as it
-    /// is, nothing notifies until midnight, on all of the user's own
-    /// Devices.
+    /// "Quiet today" in the Agenda's bar (obf-1044, obf-1066): today
+    /// shows as it is, nothing notifies until midnight, on all of the
+    /// user's own Devices.
     QuietToday,
-    /// End on the quiet day's line: today's quiet day ends now.
+    /// End on the quiet day's line, or End quiet day in the Agenda's bar
+    /// (obf-1066): today's quiet day ends now.
     EndQuietDay,
     /// Shows the theme chosen in View ▸ Theme at once and keeps it on
     /// this Device (#147).
@@ -1562,15 +1746,19 @@ enum Action {
     PhotoOut(String, Out),
     /// Shows a table of a formatted text full screen (#128).
     OpenTable(Opening),
+    /// A table's ⋮ Copy (obf-1050): the table on the clipboard as its
+    /// HTML beside its Markdown, as the table full screen copies it.
+    CopyTable(markdown::table::TableCopy),
     /// Something asked of the table shown full screen.
     Table(table_view::Asked),
     /// Captures the capture field's text and the recording running,
     /// nudged this long from now.
     Capture(Duration),
-    /// More (#142, #352): captures as leaving does and opens the Note in
-    /// the Note dialog (#146), its text taking the keyboard.
+    /// Open in the editor (#142, #352, obf-1080): captures as leaving does
+    /// and opens the Note in the Note dialog (#146), its text taking the
+    /// keyboard.
     CaptureToEditor,
-    /// Record voice in the Note dialog (#352): starts recording voice
+    /// Voice in the Note dialog (#352): starts recording voice
     /// into the Note open there.
     Record,
     /// Ends the recording and adds it to the Note it was started on.
@@ -1589,6 +1777,12 @@ enum Action {
     /// "Attach a file…" (#267): asks the system's dialog for files and
     /// does with them what a drop does.
     AttachFiles,
+    /// "Attach a file…" in a card's Add ▸ (obf-1014): asks for files and
+    /// attaches them to that Note, as a drop on its dialog does.
+    AttachFilesTo(String),
+    /// "Add a part" in a card's Add ▸ (obf-1014): opens the Note in the
+    /// Note dialog with its Amend box open.
+    AddPartTo(String),
     /// Holds these files, by name and content, on the capture field for
     /// one Note with what is typed: the pictures as photos, the sound
     /// files as voice recordings, any other file as an Attachment
@@ -1618,6 +1812,9 @@ enum Action {
     /// Shows only the Notes of these people (#53).
     FilterPeople(PersonFilter),
     Speech(Speech),
+    /// Takes the offer of a restored Backup's speech model, or, false,
+    /// turns it down (obf-1098).
+    SpeechOffer(bool),
     /// Keeps the selected Note's edited text.
     SaveText,
     /// Keeps it as a formatted text, its first format just applied
@@ -1676,6 +1873,12 @@ enum Action {
     TrashNotes(Vec<String>),
     /// Back from the trash together (#273).
     RestoreNotes(Vec<String>),
+    /// "Empty the trash now" in the Trash's band (obf-1095): asks with
+    /// what it deletes.
+    AskEmptyTrash,
+    /// "Delete for good" in that question: empties the trash, beside the
+    /// window where it has the Import's opener.
+    EmptyTrash,
     /// This Importance for each of them (#273).
     ImportanceOf(Vec<String>, Importance),
     /// Asks which Note they are merged into, together (#273).
@@ -1689,16 +1892,15 @@ enum Action {
     NewArea,
     NewTopic(String),
     Rename(String),
-    Look(String),
     Delete(String),
     StartMerge,
     /// The merge dialog's search changed.
     MergeQuery,
     CloseDialog,
+    /// Adds the custom Heads-up typed to the Routine editor (obf-1087).
+    AddCustomHeadsUp,
     AddPlace,
     SaveName,
-    Colour(String, Option<String>),
-    Icon(String, Option<String>),
     DeletePlace(NotesGo),
     Back,
     Forward,
@@ -1716,15 +1918,13 @@ enum Action {
     /// "Seen" on the Missed Summary.
     Seen,
     OpenRoutine(String),
-    /// A click on the notification of an Occurrence of this Routine
-    /// (#270): its Note opens in the Note dialog, while it is there.
-    OpenNotified(String),
+    /// A click on the notification of this Occurrence of the Routine
+    /// (obf-1039): the Agenda shows, the Occurrence marked where it lists
+    /// it.
+    OpenNotified(String, Occurrence),
     /// Saves one calendar file of every Routine and Reminder, in the
     /// order their page lists them (#115).
     ExportRoutines,
-    /// Saves the Routine with this id as a calendar file, its whole
-    /// series with its end, or the Reminder (#115).
-    ShareRoutine(String),
     /// A new Routine, or Reminder, from the Note, or with its Note made
     /// behind the scenes.
     NewRoutine {
@@ -1877,10 +2077,11 @@ enum Action {
     /// Asks for the Google Takeout export the Import dialog says, its
     /// zip (`true`) or the folder unpacked from it, and imports it.
     ImportKeep(bool),
+    /// Answers the question of the Import running about the earlier
+    /// Import of its source (obf-1078).
+    FillIn(FillIn),
     /// Shares the Area of the Share dialog and hosts its invite.
     StartInvite,
-    /// Shows who shares the Area.
-    People(String),
     SetRole {
         area: String,
         person: String,
@@ -2000,6 +2201,14 @@ enum Setting {
     QuickNoteNudgeButtons(bool),
     /// The main switch "AI (experimental)" (#334).
     AiOn(bool),
+    /// Whether the screens show their tips, "Show tips" (obf-1060).
+    Tips(bool),
+    /// Whether each button clicked shows the green "!", "Show button
+    /// clicks" (obf-1143).
+    TapMarks(bool),
+    /// After how many seconds of a pause a recording ends on its own;
+    /// `None` ignores pauses (obf-1053).
+    RecordingPause(Option<u32>),
 }
 
 /// Opens an address in the browser; tests hand in one that keeps it.
@@ -2063,6 +2272,14 @@ pub struct App {
     /// quick note's field or the search, until it has it.
     capture_focus: bool,
     search_focus: bool,
+    /// The find bar over the Note open (obf-1047), while it is open: from
+    /// a search's card, by Ctrl+F or by Edit ▸ Find; leaving the Note
+    /// closes it.
+    find: Option<(String, FindBar)>,
+    /// The places the search found on each card laid out (obf-1047), by
+    /// its Note's id, with the words searched and what they were found
+    /// in ([`found_in`]).
+    card_findings: HashMap<String, (String, u64, Arc<Vec<Finding>>)>,
     /// The tags of the tag tree whose levels below show (#267), by
     /// [`tag_tree_view::key`]: a view only, kept while the app runs.
     tags_unfolded: HashSet<String>,
@@ -2094,6 +2311,9 @@ pub struct App {
     /// The Note "To full editor" opens, until its text takes the
     /// keyboard in the Note dialog (#142).
     edit_wanted: Option<String>,
+    /// The Note whose Amend box opens once it shows in the Note dialog:
+    /// Add a part from its card (obf-1014).
+    amend_wanted: Option<String>,
     /// The selected Note's text as it is being edited, and that Note;
     /// of a Note of a kind its description, its name in `name` (#188),
     /// whether it is one in `text_kinded`.
@@ -2117,6 +2337,20 @@ pub struct App {
     amend: String,
     amend_focus: bool,
     amend_select: Option<(usize, usize)>,
+    /// Whether the Amend box shows: only once "Add a part" opened it,
+    /// until the Section is added or the Note left (obf-1072).
+    amend_open: bool,
+    /// The Note the dialog shows since it was made there, by "+" or the
+    /// quick note's "Open in the editor": no "Add a part" until it is
+    /// opened again (obf-1072).
+    made_open: Option<String>,
+    /// Whether each button clicked shows the green "!" (obf-1143), "Show
+    /// button clicks" in the Settings; read once and kept as it changes.
+    tap_marks: bool,
+    /// The Note "+ New Note ▸ Note", File ▸ New Note or Ctrl+N made empty
+    /// in an Area or a Topic and opened in the dialog (obf-1140), and the
+    /// log's mark before it was made: left as it was made, it goes.
+    blank: Option<(String, i64)>,
     dialog: Option<Dialog>,
     /// Whether the dialog's text field is to take the keyboard, once, as
     /// it opens.
@@ -2141,6 +2375,23 @@ pub struct App {
     /// What Ctrl+Z and Edit ▸ Undo take back: the last delete, check-off,
     /// filing or Merge (#268).
     undo: Option<Undo>,
+    /// The steps of the Note open (obf-1051): what its Undo, Redo and
+    /// "Revert all changes" go through; none while no Note is open.
+    steps: Option<Steps>,
+    /// Whether the window's undo above was set since the Note's last
+    /// step: Ctrl+Z and Edit ▸ Undo take back the later of the two.
+    undo_later: bool,
+    /// The Note's step, by its depth, made by what also set the window's
+    /// undo, as a Line deleted or a Note filed: taking it back takes the
+    /// window's undo with it.
+    slot_step: Option<usize>,
+    /// Whether the Note's fields forget their own typing history at the
+    /// next frame, once its Undo, Redo or Revert put other text into
+    /// them (obf-1051).
+    fields_forget: bool,
+    /// The time of the frame drawn last, in seconds, for how long typing
+    /// rested (obf-1051).
+    steps_time: f64,
     /// The Notes sorted in Unsorted before it moved on (#313), for Ctrl+Z
     /// to show them where they were sorted once it brings them back.
     moved_on: Option<MovedOn>,
@@ -2192,8 +2443,9 @@ pub struct App {
     card_reads: std::cell::Cell<usize>,
     refreshes: usize,
     /// The height each card of a list took when it was drawn last, for
-    /// the room it takes out of view (obf-1069).
-    card_heights: HashMap<(String, bool), f32>,
+    /// the room it takes out of view (obf-1069): by its Note, its view and
+    /// the words searched, whose places found show under it (obf-1047).
+    card_heights: HashMap<(String, bool, u64), f32>,
     /// How many cards the list laid out in the frame drawn last.
     cards_laid_out: usize,
     /// Tells the alerts to look again after a change here.
@@ -2226,6 +2478,10 @@ pub struct App {
     /// (#352), which it goes onto as it ends; `None` for one held on the
     /// capture field.
     recording_into: Option<String>,
+    /// What watches the recording running for a pause that ends it,
+    /// while "End a recording after a pause" was on as it started
+    /// (obf-1053).
+    pause_watch: Option<PauseWatch>,
     /// Whether the Note dialog's last Paste found nothing, said in grey
     /// under its button until the Note dialog closes (#352).
     note_paste_empty: bool,
@@ -2254,6 +2510,12 @@ pub struct App {
     /// when last looked at.
     speech: Option<SpeechModel>,
     speech_ready: bool,
+    /// The choice of speech model this Device keeps (obf-1098), as read
+    /// or last written; `None` until read.
+    speech_kept: Option<Option<SpeechModelChoice>>,
+    /// The speech model a restored Backup's Device used, offered at the
+    /// top until it is in use here or turned down (obf-1098).
+    speech_offer: Option<SpeechModelChoice>,
     /// A speech model file as typed into the Settings.
     /// Asks for a speech model file of the user's own.
     model_picker: FolderPicker,
@@ -2282,18 +2544,26 @@ pub struct App {
     /// Where the Agenda is read off the window's thread (#207); without
     /// it, the window reads it itself.
     agenda_reads: Option<AgendaReads>,
+    /// The most used tags under All Notes' search (obf-1074).
+    tag_row: TagRow,
     /// The Pack work running on threads of their own, on connections
     /// the Agenda's opener hands them, with what each does.
-    pack_work: Vec<(std::sync::mpsc::Receiver<PackDone>, PackWork)>,
+    pack_work: Vec<PackRunning>,
     /// Raised by a click on the Nudge: Unsorted is to show, as the
     /// phone's Nudge screen.
     unsorted_wanted: Option<Arc<AtomicBool>>,
     /// Raised by a click on the Changes Nudge: the bundles of the people
     /// waiting are to be saved (#109).
     changes_wanted: Option<Arc<AtomicBool>>,
-    /// Holds the Routine whose Occurrence's notification was clicked:
-    /// its Note is to open (#270).
+    /// Holds what a click on a notification asks the Agenda to show: an
+    /// Occurrence, marked, or the Agenda alone (obf-1039).
     occurrence_wanted: Option<OccurrenceWanted>,
+    /// The Occurrence a click on its notification asked for, marked on
+    /// the Agenda once read.
+    notified: Option<Notified>,
+    /// Every click on a notification, as it came and where it went, for
+    /// Send feedback (obf-1039).
+    click_trace: ClickTrace,
     /// Ask the system's dialogs where to save a bundle and which one to
     /// import.
     bundle_saver: FileSaver,
@@ -2310,6 +2580,12 @@ pub struct App {
     import_open: Option<StoreOpener>,
     /// The Areas being deleted beside the window (obf-1093).
     deletions: AreaDeletions,
+    /// "Empty the trash now" (obf-1095): what it deletes, counted while
+    /// the Trash shows, and the emptying beside the window.
+    trash_emptying: TrashEmptying,
+    /// The jobs Abort stopped on the page Running (obf-1078), while the
+    /// app runs.
+    stopped_jobs: running::Stopped,
     /// Asks the system's dialog for the folder a vault goes into, or is
     /// rebuilt from (#267).
     vault_picker: FolderPicker,
@@ -2347,6 +2623,9 @@ pub struct App {
     /// click on that notice opens it; a later notice says something else
     /// and leaves it closed.
     notice_dialog: Option<(String, Dialog)>,
+    /// A Note just made that the person filter of the list hides
+    /// (obf-1070): said at the top once back in the list, with "Show".
+    made_hidden: Option<MadeHidden>,
     /// The section of the Settings an app link opened them at (#261),
     /// scrolled to for the frames it is kept, while the dialog finds its
     /// size.
@@ -2465,6 +2744,19 @@ pub struct App {
     /// What a Note window was asked that the main window does (#287):
     /// showing a place or a dialog, opening another Note.
     for_main: Vec<Action>,
+    /// The Markdown files shown in viewers of their own beside this
+    /// window (obf-1056), and how many were opened, each having its own
+    /// viewport.
+    viewers: Vec<md_view::Viewer>,
+    viewers_opened: u64,
+    /// Asks for the Markdown file File ▸ Open Markdown file… shows.
+    markdown_picker: FolderPicker,
+    /// Inside the Flatpak (Q13): the viewers ask for the folder their
+    /// links are found in, through `link_folder_picker`, and the folders
+    /// granted so are kept while the app runs.
+    in_flatpak: bool,
+    link_folder_picker: FolderPicker,
+    link_folders: Vec<std::path::PathBuf>,
 }
 
 /// A question asked off the window's thread (#267): the provider's
@@ -2601,6 +2893,13 @@ fn pack_dialog(title: &str) -> rfd::FileDialog {
     rfd::FileDialog::new()
         .set_title(title)
         .add_filter(oldbrainfix_core::APP_NAME, &[packs::EXTENSION])
+}
+
+/// The open dialog's filter for a Markdown file (obf-1056).
+fn markdown_dialog(title: &str) -> rfd::FileDialog {
+    rfd::FileDialog::new()
+        .set_title(title)
+        .add_filter("Markdown", &["md", "markdown"])
 }
 
 /// The open dialog's filter for the zip of a Google Takeout export.
@@ -2746,9 +3045,16 @@ impl App {
         let theme = DeviceSettings::new(&store).theme().unwrap_or_default();
         // Normal when it cannot be read.
         let text_size = DeviceSettings::new(&store).text_size().unwrap_or_default();
+        // None when it cannot be read.
+        let speech_offer = DeviceSettings::new(&store)
+            .speech_model_offer()
+            .ok()
+            .flatten();
         // As they were left on this computer (#278).
         let sidebar = window_sizes::sidebar_width(&store).unwrap_or(window_sizes::DEFAULT_SIDEBAR);
         let note_kept = window_sizes::note_dialog_size(&store);
+        // On unless switched off on this computer (obf-1143).
+        let tap_marks = design::tap_marks_on(&store);
         let mut app = App {
             store,
             wall: Arc::new(local_wall),
@@ -2773,6 +3079,8 @@ impl App {
             clip: None,
             capture_focus: false,
             search_focus: false,
+            find: None,
+            card_findings: HashMap::new(),
             tags_unfolded: HashSet::new(),
             scroll_card: None,
             quit_wanted: false,
@@ -2787,6 +3095,7 @@ impl App {
             capture: String::new(),
             capture_choices: CaptureChoices::default(),
             edit_wanted: None,
+            amend_wanted: None,
             text: String::new(),
             text_of: None,
             name: String::new(),
@@ -2798,6 +3107,10 @@ impl App {
             amend: String::new(),
             amend_focus: false,
             amend_select: None,
+            amend_open: false,
+            made_open: None,
+            tap_marks,
+            blank: None,
             dialog: None,
             focus: false,
             editor: None,
@@ -2808,6 +3121,11 @@ impl App {
             badge: None,
             reappear_line: None,
             undo: None,
+            steps: None,
+            undo_later: false,
+            slot_step: None,
+            fields_forget: false,
+            steps_time: 0.0,
             moved_on: None,
             code_offer: None,
             code_guess: None,
@@ -2843,6 +3161,7 @@ impl App {
             speed,
             recorded: Vec::new(),
             recording_into: None,
+            pause_watch: None,
             note_paste_empty: false,
             held_photos: Vec::new(),
             held_files: Vec::new(),
@@ -2855,6 +3174,8 @@ impl App {
             files_reader: None,
             speech: None,
             speech_ready: false,
+            speech_kept: None,
+            speech_offer,
             model_picker: Box::new(|title| rfd::FileDialog::new().set_title(title).pick_file()),
             photos: PhotoCache::default(),
             pictures: profile_view::Pictures::default(),
@@ -2867,10 +3188,18 @@ impl App {
             folder_wanted: None,
             syncing: None,
             agenda_reads: None,
+            tag_row: TagRow::default(),
             pack_work: Vec::new(),
             unsorted_wanted: None,
             changes_wanted: None,
             occurrence_wanted: None,
+            notified: None,
+            // Shown, as the window is at first.
+            click_trace: {
+                let trace = ClickTrace::default();
+                trace.set_shown(true);
+                trace
+            },
             bundle_saver: Box::new(|title, name| {
                 bundle_dialog(title).set_file_name(name).save_file()
             }),
@@ -2880,6 +3209,8 @@ impl App {
             import: FolderImport::default(),
             import_open: None,
             deletions: AreaDeletions::default(),
+            trash_emptying: TrashEmptying::default(),
+            stopped_jobs: running::Stopped::default(),
             vault_picker: Box::new(|title| rfd::FileDialog::new().set_title(title).pick_folder()),
             vault: VaultJob::default(),
             item_saver: Box::new(|title, name| item_dialog(title).set_file_name(name).save_file()),
@@ -2916,6 +3247,7 @@ impl App {
             handed: None,
             notice: None,
             notice_dialog: None,
+            made_hidden: None,
             settings_section: None,
             settings_query: String::new(),
             settings_find: false,
@@ -2972,6 +3304,16 @@ impl App {
             windows_opened: 0,
             lines_base: 0,
             for_main: Vec::new(),
+            viewers: Vec::new(),
+            viewers_opened: 0,
+            markdown_picker: Box::new(|title| markdown_dialog(title).pick_file()),
+            in_flatpak: md_source::in_flatpak(),
+            // The file chooser portal inside the Flatpak, asking for a
+            // folder.
+            link_folder_picker: Box::new(|title| {
+                rfd::FileDialog::new().set_title(title).pick_folder()
+            }),
+            link_folders: Vec::new(),
         };
         app.hotkey_text = DeviceSettings::new(&app.store)
             .capture_hotkey()
@@ -3088,7 +3430,7 @@ impl App {
     /// The window this App's Note shows in, opened as large as `size`.
     fn note_window_builder(&self, size: egui::Vec2) -> egui::ViewportBuilder {
         let note = self.view.detail.as_ref().map(|(p, _)| &p.note);
-        let text = note.map(|n| n.visible_text()).unwrap_or_default();
+        let text = note.map(Note::shown_name).unwrap_or_default();
         let title = note_window::title(&text, self.t.app_title());
         note_window::viewport(&title, size, self.kept_on_top().unwrap_or(false))
     }
@@ -3160,6 +3502,21 @@ impl App {
     pub fn set_bundle_dialogs(&mut self, saver: FileSaver, opener: FolderPicker) {
         self.bundle_saver = saver;
         self.bundle_opener = opener;
+    }
+
+    /// Asks `picker` for the Markdown file File ▸ Open Markdown file…
+    /// shows (obf-1056) instead of the system's dialog; tests hand in a
+    /// path.
+    pub fn set_markdown_picker(&mut self, picker: FolderPicker) {
+        self.markdown_picker = picker;
+    }
+
+    /// Whether the Markdown viewers ask for the folder their links are
+    /// found in, as inside the Flatpak (Q13), and `picker` asks for it
+    /// instead of the folder portal; tests hand in a path.
+    pub fn set_link_folders(&mut self, in_flatpak: bool, picker: FolderPicker) {
+        self.in_flatpak = in_flatpak;
+        self.link_folder_picker = picker;
     }
 
     /// Asks `picker` for the folder to import instead of the system's
@@ -3437,14 +3794,7 @@ impl App {
                             t.restore_done_short(),
                             t.restore_done(restored.entries as i64),
                         );
-                        // The playback speed came with it; one that cannot
-                        // be read leaves the speed as it was.
-                        if let Ok(speed) = DeviceSettings::new(&self.store).playback_speed() {
-                            self.speed = speed;
-                            if let Some(player) = &mut self.player {
-                                player.set_speed(speed);
-                            }
-                        }
+                        self.restored_settings();
                     }
                     Err(e) => {
                         let (cause, fix) = backup_view::restore_failure(&t, &e);
@@ -3455,6 +3805,123 @@ impl App {
                             format!("restore: {e}"),
                         );
                     }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Shows the Device settings a Backup brought (obf-1098) where the
+    /// window keeps them: the playback speed, the theme, the text size,
+    /// Fat fingers, Show tips and the speech model to offer. The others
+    /// are read where they are used. One that cannot be read stays as
+    /// it was.
+    fn restored_settings(&mut self) {
+        let settings = DeviceSettings::new(&self.store);
+        if let Ok(speed) = settings.playback_speed() {
+            self.speed = speed;
+            if let Some(player) = &mut self.player {
+                player.set_speed(speed);
+            }
+        }
+        if let Ok(theme) = settings.theme() {
+            self.theme = theme;
+            self.theme_shown = false;
+        }
+        if let Ok(size) = settings.text_size() {
+            self.text_size = size;
+        }
+        self.zoom_shown = false;
+        if self.spotlights.on()
+            && let Ok(on) = settings.tips_on()
+        {
+            self.spotlights.set_tips(on);
+        }
+        if let Ok(offer) = settings.speech_model_offer() {
+            self.speech_offer = offer;
+        }
+    }
+
+    /// Keeps the choice of speech model as the model came to (obf-1098),
+    /// once it is checked or fetched: the one downloaded or taken from a
+    /// file, none once there is none. The offer of a restored Backup's
+    /// model goes once that model is in use. Not in a Note window, which
+    /// only borrows the model.
+    fn keep_speech_choice(&mut self) {
+        let Some(model) = &self.speech else {
+            return;
+        };
+        if self.alone.is_some() {
+            return;
+        }
+        let settings = DeviceSettings::new(&self.store);
+        let kept = match self.speech_kept.take() {
+            Some(kept) => kept,
+            None => match settings.speech_model() {
+                Ok(kept) => kept,
+                Err(e) => {
+                    eprintln!("speech model: {e}");
+                    None
+                }
+            },
+        };
+        let Some(now) = model.choice(kept.as_ref()) else {
+            self.speech_kept = Some(kept);
+            return;
+        };
+        if now != kept
+            && let Err(e) = settings.set_speech_model(now.as_ref())
+        {
+            // Not tried again each frame; the next start does.
+            eprintln!("speech model: {e}");
+        }
+        if let (Some(offer), Some(used)) = (&self.speech_offer, &now)
+            && offer.name == used.name
+        {
+            if let Err(e) = settings.drop_speech_model_offer() {
+                eprintln!("speech model offer: {e}");
+            }
+            self.speech_offer = None;
+        }
+        self.speech_kept = Some(now);
+    }
+
+    /// The speech model offered at the top (obf-1098): once the first
+    /// start's view is answered, in the main window, while the model is
+    /// neither checked nor fetched, so a download that failed offers it
+    /// again.
+    fn speech_offer_shows(&self) -> Option<SpeechModelSource> {
+        let offer = self.speech_offer.as_ref()?;
+        let model = self.speech.as_ref()?;
+        let idle = matches!(model.status(), SpeechStatus::Missing | SpeechStatus::Ready);
+        (idle && self.welcome.is_none() && self.alone.is_none()).then_some(offer.source)
+    }
+
+    /// Does what the speech model's offer at the top asked (obf-1098):
+    /// downloads the model, or takes its file again, from the dialog the
+    /// Settings' "Use a file of my own" opens; the offer stays until the
+    /// model is in use, also when the dialog is left. Not now turns it
+    /// down for good: the Settings still fetch any model.
+    fn speech_offer_action(&mut self, take: bool) -> oldbrainfix_core::Result<()> {
+        let Some(offer) = self.speech_offer.clone() else {
+            return Ok(());
+        };
+        if !take {
+            self.speech_offer = None;
+            return DeviceSettings::new(&self.store).drop_speech_model_offer();
+        }
+        let Some(model) = &self.speech else {
+            return Ok(());
+        };
+        match offer.source {
+            SpeechModelSource::Download => {
+                if let Some(chosen) = speech::named(&offer.name) {
+                    model.download(chosen);
+                }
+            }
+            SpeechModelSource::File => {
+                if let Some(path) = (self.model_picker)(self.t.speech_model_pick()) {
+                    model.take_file(&path);
                 }
             }
         }
@@ -3542,6 +4009,9 @@ impl App {
         self.spotlights.set_on(on);
         if on {
             spotlight::seed(&self.store, self.welcoming())?;
+            // Whether this Device shows them at all (obf-1060).
+            self.spotlights
+                .set_tips(DeviceSettings::new(&self.store).tips_on()?);
         }
         Ok(())
     }
@@ -3838,13 +4308,14 @@ impl App {
     }
 
     /// Saves `list` as one calendar file where the user says, made at the
-    /// store's now, each titled with its Note's text: every one for
+    /// store's now, each titled with the first line of what its Note's
+    /// calendar entry reads and described by the whole (obf-1049): every one for
     /// Export, or one Routine as its whole series or one Reminder for
     /// Share. The desktop has no share sheet; the file is what a calendar
     /// app imports. Backing out of the dialog writes nothing.
     fn save_calendar_file(&mut self, list: &[Routine]) -> oldbrainfix_core::Result<()> {
         let t = self.t;
-        let names = all_routines_view::names(&t, &Routines::new(&self.store), list)?;
+        let names = all_routines_view::calendar_texts(&t, &Routines::new(&self.store), list)?;
         let ics = routines_ics(
             list,
             |r| names.get(&r.id).cloned().unwrap_or_default(),
@@ -4006,19 +4477,17 @@ impl App {
     /// cause, the fix and the full text (UI laws, "Announcements").
     fn announce_join_failed(&mut self, failure: JoinFailure) {
         let t = self.t;
-        match failure {
-            JoinFailure::Paused => self.notice = Some(t.sync_paused_error().to_string()),
-            JoinFailure::Failed {
-                cause,
-                fix,
-                details,
-            } => self.announce_failure(
-                t.sync_not_done(),
-                t.sync_not_done_title(),
-                (cause, fix),
-                details,
-            ),
-        }
+        let JoinFailure {
+            cause,
+            fix,
+            details,
+        } = failure;
+        self.announce_failure(
+            t.sync_not_done(),
+            t.sync_not_done_title(),
+            (cause, fix),
+            details,
+        );
     }
 
     /// Announces that a Sent Item was not taken, refused as `error`
@@ -4068,11 +4537,6 @@ impl App {
     /// Saves a bundle for the paired Device `device`, or of everything,
     /// where the user says; nothing asked when there is nothing new.
     fn save_bundle(&mut self, device: Option<String>) -> oldbrainfix_core::Result<()> {
-        // Not even asked where to while sync waits for an AI Task.
-        if self.store.sync_paused()? {
-            self.notice = Some(self.t.sync_paused_error().to_string());
-            return Ok(());
-        }
         let since = match &device {
             Some(id) => self.store.held_by(id)?,
             None => Default::default(),
@@ -4094,9 +4558,6 @@ impl App {
         match bundle::write_bundle_now(&self.store, &path, device.as_deref()) {
             Ok(Some(_)) => self.notice = Some(t.bundle_saved().to_string()),
             Ok(None) => self.notice = Some(t.bundle_nothing_to_send().to_string()),
-            Err(oldbrainfix_core::Error::SyncPaused) => {
-                self.notice = Some(t.sync_paused_error().to_string());
-            }
             Err(e) => self.announce_failure(
                 t.bundle_not_saved(),
                 t.bundle_not_saved_title(),
@@ -4116,6 +4577,11 @@ impl App {
     /// than a Sent Item or a card file can be read off the window's
     /// thread, and every Pack opened there.
     fn open_file(&mut self, path: &std::path::Path) {
+        // A Markdown file shows in a viewer of its own (obf-1056).
+        if oldbrainfix_core::obsidian::is_markdown(&path.to_string_lossy()) {
+            self.open_viewer(path.to_path_buf());
+            return;
+        }
         let most = sent::MAX_BYTES.max(cards::MAX_FILE_BYTES) as u64;
         match pack_file(path, most) {
             PackFile::Bytes(bytes) => {
@@ -4204,21 +4670,328 @@ impl App {
             let wrote = before.is_some_and(|before| store.current_seq().ok() != Some(before));
             drop(sent.send(PackDone { done, wrote }));
         });
-        self.pack_work.push((arrives, kind));
+        self.pack_work.push(PackRunning {
+            arrives,
+            kind,
+            since: std::time::Instant::now(),
+            dropped: false,
+        });
     }
 
     /// Whether a Pack is being opened off the window's thread.
     fn pack_opening(&self) -> bool {
         self.pack_work
             .iter()
-            .any(|(_, kind)| *kind == PackWork::Opening)
+            .any(|w| w.kind == PackWork::Opening && !w.dropped)
     }
 
     /// Whether a Pack is being saved off the window's thread.
     fn pack_saving(&self) -> bool {
-        self.pack_work
+        self.pack_work.iter().any(|w| w.kind == PackWork::Saving)
+    }
+
+    /// Every job running beside the window, as the page Running lists
+    /// them (obf-1078), read from where each runs.
+    fn jobs(&self) -> Vec<Job> {
+        let t = self.t;
+        let mut jobs = Vec::new();
+        if let Some(syncing) = self.syncing.as_ref().filter(|s| s.running()) {
+            jobs.push(Job {
+                id: JobId::Sync,
+                what: t.running_sync().to_string(),
+                far: None,
+                since: syncing.since(),
+                abort: if syncing.paused() {
+                    Abort::Stopping
+                } else {
+                    Abort::Offered
+                },
+                abort_does: Some(t.running_sync_abort().to_string()),
+            });
+        }
+        if let Some(kind) = self.import.kind() {
+            jobs.push(Job {
+                id: JobId::Import,
+                what: self.import_what(kind),
+                far: self
+                    .import
+                    .progress()
+                    .map(|(done, of)| t.import_written(done as i64, of as i64)),
+                since: self.import.since(),
+                abort: if self.import.aborting() {
+                    Abort::Stopping
+                } else {
+                    Abort::Offered
+                },
+                abort_does: Some(t.running_import_abort().to_string()),
+            });
+        }
+        for (enricher, kind) in self.enrichers() {
+            let Some((since, done, of)) = enricher.busy() else {
+                continue;
+            };
+            jobs.push(Job {
+                id: JobId::Reading(kind),
+                what: reading_what(&t, kind).to_string(),
+                far: Some(t.running_read(done as i64, of as i64)),
+                since: Some(since),
+                abort: if enricher.stopped() {
+                    Abort::Stopping
+                } else {
+                    Abort::Offered
+                },
+                abort_does: Some(t.running_read_abort().to_string()),
+            });
+        }
+        if let Some(model) = &self.speech
+            && let speech::Status::Fetching {
+                downloading,
+                received,
+                total,
+            } = model.status()
+        {
+            let mb = |bytes: u64| format!("{:.0}", bytes as f64 / 1_000_000.0);
+            let size = model
+                .chosen()
+                .unwrap_or(oldbrainfix_whisper::model::WhisperModel::Base)
+                .megabytes();
+            let total = total.map_or_else(|| size.to_string(), mb);
+            jobs.push(Job {
+                id: JobId::SpeechModel,
+                what: if downloading {
+                    t.running_model_download()
+                } else {
+                    t.running_model_copy()
+                }
+                .to_string(),
+                far: downloading.then(|| t.speech_model_downloading(&mb(received), &total)),
+                since: model.since(),
+                abort: if model.cancelling() {
+                    Abort::Stopping
+                } else {
+                    Abort::Offered
+                },
+                abort_does: None,
+            });
+        }
+        for deleting in self.deletions.list() {
+            jobs.push(Job {
+                what: t.running_area_deletion(&self.area_called(&deleting.area_id)),
+                far: deleting
+                    .moved
+                    .map(|(moved, of)| t.area_deleting(moved as i64, of as i64)),
+                since: Some(deleting.since),
+                abort: if deleting.aborting {
+                    Abort::Stopping
+                } else {
+                    Abort::Offered
+                },
+                abort_does: Some(t.running_area_abort().to_string()),
+                id: JobId::AreaDeletion(deleting.area_id),
+            });
+        }
+        // One transaction, which deletes all of it or nothing: no Abort.
+        if let Some(((notes, routines), since)) = self.trash_emptying.under_way() {
+            jobs.push(Job {
+                id: JobId::TrashEmptying,
+                what: t.desk_trash_emptying().to_string(),
+                far: Some(trash_counts(&t, notes, routines)),
+                since: Some(since),
+                abort: Abort::No,
+                abort_does: None,
+            });
+        }
+        for opening in self
+            .pack_work
             .iter()
-            .any(|(_, kind)| *kind == PackWork::Saving)
+            .filter(|w| w.kind == PackWork::Opening && !w.dropped)
+        {
+            jobs.push(Job {
+                id: JobId::PackOpening,
+                what: t.pack_opening().to_string(),
+                far: None,
+                since: Some(opening.since),
+                abort: Abort::Offered,
+                abort_does: Some(t.running_pack_abort().to_string()),
+            });
+        }
+        // The window waits for it: no Abort.
+        if self.agenda_waiting() {
+            jobs.push(Job {
+                id: JobId::AgendaRead,
+                what: t.agenda_reading().to_string(),
+                far: None,
+                since: None,
+                abort: Abort::No,
+                abort_does: None,
+            });
+        }
+        jobs
+    }
+
+    /// The jobs Abort paused once what was under way ended (obf-1078),
+    /// read from where they pause, each with Go on: the automatic syncs,
+    /// and the reading of Transcripts, Photo Texts and Attachment Texts.
+    fn paused_jobs(&self) -> Vec<Ended> {
+        let t = self.t;
+        let mut paused = Vec::new();
+        if self
+            .syncing
+            .as_ref()
+            .is_some_and(|s| s.paused() && !s.running())
+        {
+            paused.push(Ended {
+                id: JobId::Sync,
+                what: t.running_sync().to_string(),
+                said: t.running_sync_paused().to_string(),
+                goes_on: true,
+            });
+        }
+        for (enricher, kind) in self.enrichers() {
+            if enricher.stopped() && enricher.busy().is_none() {
+                paused.push(Ended {
+                    id: JobId::Reading(kind),
+                    what: reading_what(&t, kind).to_string(),
+                    said: t.running_read_stopped().to_string(),
+                    goes_on: true,
+                });
+            }
+        }
+        paused
+    }
+
+    /// The threads reading Transcripts, Photo Texts and Attachment Texts
+    /// there are, each with what it reads.
+    fn enrichers(&self) -> Vec<(&Enricher, enrich::Kind)> {
+        [
+            (&self.transcriber, enrich::Kind::Transcripts),
+            (&self.reader, enrich::Kind::PhotoTexts),
+            (&self.files_reader, enrich::Kind::AttachmentTexts),
+        ]
+        .into_iter()
+        .filter_map(|(enricher, kind)| enricher.as_ref().map(|e| (e, kind)))
+        .collect()
+    }
+
+    /// What the Import `kind` is, as the page Running names it.
+    fn import_what(&self, kind: &Importing) -> String {
+        match kind {
+            Importing::Folder(name) | Importing::Markdown(name) => self.t.running_import(name),
+            Importing::Keep => self.t.running_import_keep().to_string(),
+        }
+    }
+
+    /// The name the Area `area_id` shows under in the sidebar, empty
+    /// once it is gone.
+    fn area_called(&self, area_id: &str) -> String {
+        self.view
+            .areas
+            .iter()
+            .find(|(area, _)| area.id == area_id)
+            .map(|(area, _)| area_name(&self.t, area))
+            .unwrap_or_default()
+    }
+
+    /// "Since 14:32": when a job started at `at`, as this computer's
+    /// clock shows it.
+    fn since_text(&self, at: std::time::Instant) -> String {
+        let ago = chrono::Duration::from_std(at.elapsed()).unwrap_or_default();
+        let then = (self.wall)(self.store.now() - ago);
+        self.t.running_since(&then.format("%H:%M").to_string())
+    }
+
+    /// Does what was clicked on the page Running (obf-1078): Abort stops
+    /// a job at its next safe point, Go on starts a paused one again.
+    fn running_act(&mut self, act: running::Act) {
+        let t = self.t;
+        match act {
+            // Listed as paused once the round under way ended.
+            running::Act::Abort(JobId::Sync) => {
+                if let Some(syncing) = &self.syncing {
+                    syncing.pause();
+                }
+            }
+            // Said once it has stopped, with how far it came.
+            running::Act::Abort(JobId::Import) => self.import.abort(),
+            running::Act::Abort(JobId::AreaDeletion(id)) => self.deletions.abort(&id),
+            running::Act::Abort(JobId::Reading(kind)) => {
+                if let Some((enricher, _)) = self.enrichers().into_iter().find(|(_, k)| *k == kind)
+                {
+                    enricher.stop();
+                }
+            }
+            running::Act::Abort(JobId::SpeechModel) => {
+                if let Some(model) = &self.speech {
+                    let downloading = matches!(
+                        model.status(),
+                        speech::Status::Fetching {
+                            downloading: true,
+                            ..
+                        }
+                    );
+                    model.cancel();
+                    self.stopped_jobs.push(Ended {
+                        id: JobId::SpeechModel,
+                        what: if downloading {
+                            t.running_model_download()
+                        } else {
+                            t.running_model_copy()
+                        }
+                        .to_string(),
+                        said: t.running_model_stopped().to_string(),
+                        goes_on: false,
+                    });
+                }
+            }
+            running::Act::Abort(JobId::PackOpening) => {
+                for opening in self
+                    .pack_work
+                    .iter_mut()
+                    .filter(|w| w.kind == PackWork::Opening)
+                {
+                    opening.dropped = true;
+                }
+                self.stopped_jobs.push(Ended {
+                    id: JobId::PackOpening,
+                    what: t.pack_opening().to_string(),
+                    said: t.running_pack_stopped().to_string(),
+                    goes_on: false,
+                });
+            }
+            running::Act::Abort(JobId::AgendaRead | JobId::TrashEmptying) => {}
+            running::Act::GoOn(JobId::Sync) => self.sync_goes_on(),
+            running::Act::GoOn(JobId::Reading(kind)) => {
+                if let Some((enricher, _)) = self.enrichers().into_iter().find(|(_, k)| *k == kind)
+                {
+                    enricher.go_on();
+                }
+            }
+            // Only those two pause.
+            running::Act::GoOn(_) => {}
+        }
+    }
+
+    /// Lists the Import `what` Abort stopped once it ended with `done` of
+    /// `of` Notes written (obf-1078), and says so at the top in place of
+    /// "Import finished.", what it made behind the click.
+    fn import_stopped(&mut self, what: String, (done, of): (usize, usize)) {
+        let t = self.t;
+        let said = t.running_import_stopped(done as i64, of as i64);
+        self.stopped_jobs.push(Ended {
+            id: JobId::Import,
+            what,
+            said: said.clone(),
+            goes_on: false,
+        });
+        match &mut self.notice_dialog {
+            Some((notice, Dialog::Imported { details, .. })) => {
+                *notice = t.import_stopped().to_string();
+                *details = format!("{said}\n\n{details}");
+                self.notice = Some(t.import_stopped().to_string());
+            }
+            // Stopped before its first Note: no Area to open.
+            _ => self.announce_done(t.import_stopped(), said),
+        }
     }
 
     /// Takes in what the Pack threads did once it is in; the window
@@ -4229,9 +5002,9 @@ impl App {
         }
         let mut arrived = Vec::new();
         self.pack_work
-            .retain(|(running, _)| match running.try_recv() {
+            .retain(|running| match running.arrives.try_recv() {
                 Ok(done) => {
-                    arrived.push(done);
+                    arrived.push((done, running.dropped));
                     false
                 }
                 Err(std::sync::mpsc::TryRecvError::Empty) => true,
@@ -4240,11 +5013,13 @@ impl App {
         if !self.pack_work.is_empty() {
             ctx.request_repaint_after(std::time::Duration::from_millis(30));
         }
-        for PackDone { done, wrote } in arrived {
+        for (PackDone { done, wrote }, dropped) in arrived {
             if wrote {
                 self.store.changed_elsewhere();
             }
-            self.pack_done(done);
+            if !dropped {
+                self.pack_done(done);
+            }
         }
     }
 
@@ -4861,10 +5636,6 @@ impl App {
         else {
             return Ok(());
         };
-        if self.store.sync_paused()? {
-            self.notice = Some(self.t.sync_paused_error().to_string());
-            return Ok(());
-        }
         let day = (self.wall)(self.store.now()).date().format("%Y-%m-%d");
         let Some(mut path) =
             (self.item_saver)(self.t.send_save_title(), &sent::file_name(&day.to_string()))
@@ -4938,10 +5709,6 @@ impl App {
             return Ok(());
         };
         let t = self.t;
-        if self.store.sync_paused()? {
-            self.notice = Some(t.sync_paused_error().to_string());
-            return Ok(());
-        }
         let transport = self.store.transport_with(&person)?.unwrap_or(transport);
         let mut folder = None;
         if transport == Transport::Folder && self.store.sync_folder()?.is_none() {
@@ -4993,14 +5760,9 @@ impl App {
     }
 
     /// Announces that sharing from afar failed as `error` says; the click
-    /// opens the cause, the fix and the full text. A refusal while an AI
-    /// Task waits says so instead, as it does everywhere.
+    /// opens the cause, the fix and the full text.
     fn announce_afar_failed(&mut self, error: &oldbrainfix_core::Error) {
         let t = self.t;
-        if let oldbrainfix_core::Error::SyncPaused = error {
-            self.notice = Some(t.sync_paused_error().to_string());
-            return;
-        }
         self.announce_failure(
             t.share_afar_failed(),
             t.share_afar_failed_title(),
@@ -5110,8 +5872,6 @@ impl App {
                 (t.changes_not_saved_cause(), t.changes_not_saved_fix()),
                 failed.join("\n"),
             );
-        } else if sent.contains(&ChangesSent::Paused) {
-            self.notice = Some(t.sync_paused_error().to_string());
         } else if sent.contains(&ChangesSent::Saved) {
             self.notice = Some(t.sent_saved().to_string());
         } else if !sent.is_empty() {
@@ -5128,9 +5888,6 @@ impl App {
         id: &str,
         title: &str,
     ) -> oldbrainfix_core::Result<Option<ChangesSent>> {
-        if self.store.sync_paused()? {
-            return Ok(Some(ChangesSent::Paused));
-        }
         if self.store.entries_for_person(id)?.is_empty() {
             return Ok(Some(ChangesSent::NothingNew));
         }
@@ -5151,7 +5908,6 @@ impl App {
                     ChangesSent::Saved
                 }
                 Ok(None) => ChangesSent::NothingNew,
-                Err(oldbrainfix_core::Error::SyncPaused) => ChangesSent::Paused,
                 Err(e) => {
                     let name =
                         profile_view::display_name(&self.t, &self.store.person_shown(id)?.name)
@@ -5177,9 +5933,6 @@ impl App {
                 None => self.announce_imported(&result),
             },
             Err(oldbrainfix_core::Error::Offer(e)) => self.announce_offer_not_taken(e),
-            Err(oldbrainfix_core::Error::SyncPaused) => {
-                self.notice = Some(self.t.sync_paused_error().to_string());
-            }
             Err(e) => {
                 let t = self.t;
                 self.announce_failure(
@@ -5229,7 +5982,7 @@ impl App {
     /// "Announcements"): that it finished, what went where behind the
     /// click with a way into the new Area; that nothing in it was
     /// usable; or that it failed, each with the cause and the fix.
-    fn announce_folder_imported(&mut self, name: &str, imported: Imported) {
+    fn announce_folder_imported(&mut self, name: &str, imported: Imported, fill_in: Option<&str>) {
         let t = self.t;
         let summary = match imported {
             Ok(summary) => summary,
@@ -5245,6 +5998,15 @@ impl App {
         };
         let skipped =
             t.import_skipped_details(name, summary.not_text as i64, summary.too_large as i64);
+        let skipped_block = (summary.skipped() > 0).then(|| {
+            format!(
+                "{}\n{skipped}",
+                t.import_finished_skipped(summary.skipped() as i64)
+            )
+        });
+        if self.announce_nothing_new(&summary, fill_in, skipped_block) {
+            return;
+        }
         let Some(area) = summary.area_id.clone() else {
             self.announce_failure(
                 t.import_nothing(),
@@ -5260,7 +6022,122 @@ impl App {
             Ok(Some(made)) => area_name(&t, &made),
             _ => t.import_area_name(name),
         };
-        let mut details = t.import_finished_notes(summary.notes as i64, &shown);
+        let mut details = made_line(&t, &summary, fill_in, &shown);
+        if summary.skipped() > 0 {
+            details.push_str("\n\n");
+            details.push_str(&t.import_finished_skipped(summary.skipped() as i64));
+            details.push('\n');
+            details.push_str(&skipped);
+        }
+        self.notice = Some(t.import_finished().to_string());
+        self.notice_dialog = Some((
+            t.import_finished().to_string(),
+            Dialog::Imported { details, area },
+        ));
+    }
+
+    /// Announces that an Import told to fill in the Area `fill_in`
+    /// found nothing missing (obf-1078): "Nothing new to import." at the
+    /// top, behind the click how many were imported already, then the
+    /// `skipped` lines, with a way into that Area; whether it was so.
+    fn announce_nothing_new(
+        &mut self,
+        summary: &ImportSummary,
+        fill_in: Option<&str>,
+        skipped: Option<String>,
+    ) -> bool {
+        let Some(area) = fill_in.filter(|_| {
+            summary.area_id.is_none() && summary.already > 0 && summary.stopped.is_none()
+        }) else {
+            return false;
+        };
+        let t = self.t;
+        let mut details = t.desk_import_nothing_new_details(summary.already as i64);
+        if let Some(skipped) = skipped {
+            details.push_str("\n\n");
+            details.push_str(&skipped);
+        }
+        self.notice = Some(t.desk_import_nothing_new().to_string());
+        self.notice_dialog = Some((
+            t.desk_import_nothing_new().to_string(),
+            Dialog::Imported {
+                details,
+                area: area.to_string(),
+            },
+        ));
+        true
+    }
+
+    /// "Fill in the Import of <day> into <Area>?" about the earlier
+    /// Import `earlier` (obf-1078), its Area by the name it shows under.
+    fn fill_in_question(&self, earlier: &EarlierImport) -> String {
+        let mut area = self.area_called(&earlier.area_id);
+        if area.is_empty() {
+            area = earlier.area_name.clone();
+        }
+        let day = day_text(&self.t, Day::of((self.wall)(earlier.at)));
+        self.t.desk_import_fill_in_ask(&day, &area)
+    }
+
+    /// Announces how the Import of the Markdown file `name` from its viewer
+    /// ended (obf-1056), as [`App::announce_folder_imported`] does for a
+    /// folder: that it finished, what went where behind the click with a
+    /// way into the new Area; that the file was too large to take; or
+    /// that it failed.
+    fn announce_markdown_imported(
+        &mut self,
+        name: &str,
+        imported: Imported,
+        fill_in: Option<&str>,
+    ) {
+        let t = self.t;
+        let summary = match imported {
+            Ok(summary) => summary,
+            Err(details) => {
+                self.announce_failure(
+                    t.desk_markdown_import_failed(),
+                    t.import_failed_title(),
+                    (
+                        t.desk_markdown_import_failed_cause(),
+                        t.desk_markdown_import_failed_fix(),
+                    ),
+                    details,
+                );
+                return;
+            }
+        };
+        let skipped =
+            t.desk_markdown_import_skipped(name, summary.not_text as i64, summary.too_large as i64);
+        let skipped_block = (summary.skipped() > 0).then(|| {
+            format!(
+                "{}\n{skipped}",
+                t.import_finished_skipped(summary.skipped() as i64)
+            )
+        });
+        if self.announce_nothing_new(&summary, fill_in, skipped_block) {
+            return;
+        }
+        let Some(area) = summary.area_id.clone() else {
+            self.announce_failure(
+                t.desk_markdown_import_nothing(),
+                t.import_nothing_title(),
+                (
+                    t.desk_markdown_import_nothing_cause(),
+                    t.desk_markdown_import_nothing_fix(),
+                ),
+                skipped,
+            );
+            return;
+        };
+        let shown = match Places::new(&self.store).area_by_id(&area) {
+            Ok(Some(made)) => area_name(&t, &made),
+            _ => t.import_area_name(name),
+        };
+        let mut details = made_line(&t, &summary, fill_in, &shown);
+        if summary.photos > 0 {
+            details.push('\n');
+            details.push_str(&t.import_keep_photos(summary.photos as i64));
+        }
         if summary.skipped() > 0 {
             details.push_str("\n\n");
             details.push_str(&t.import_finished_skipped(summary.skipped() as i64));
@@ -5279,7 +6156,7 @@ impl App {
     /// click, the Checklists and photos among it and what was skipped
     /// and why, in the phone's order; that the export held no note to
     /// take; or that it failed.
-    fn announce_keep_imported(&mut self, imported: Imported) {
+    fn announce_keep_imported(&mut self, imported: Imported, fill_in: Option<&str>) {
         let t = self.t;
         let summary = match imported {
             Ok(summary) => summary,
@@ -5300,6 +6177,15 @@ impl App {
             summary.too_large as i64,
             summary.not_text as i64,
         );
+        let skipped_block = (summary.skipped() > 0).then(|| {
+            format!(
+                "{}\n{skipped}",
+                t.import_keep_skipped(summary.skipped() as i64)
+            )
+        });
+        if self.announce_nothing_new(&summary, fill_in, skipped_block) {
+            return;
+        }
         let Some(area) = summary.area_id.clone() else {
             self.announce_failure(
                 t.import_keep_nothing(),
@@ -5313,7 +6199,7 @@ impl App {
             Ok(Some(made)) => area_name(&t, &made),
             _ => t.import_keep_area_name().to_string(),
         };
-        let mut details = vec![t.import_finished_notes(summary.notes as i64, &shown)];
+        let mut details = vec![made_line(&t, &summary, fill_in, &shown)];
         if summary.checklists > 0 {
             details.push(t.import_keep_checklists(summary.checklists as i64));
         }
@@ -5354,6 +6240,7 @@ impl App {
         self.agenda_reads = Some(AgendaReads {
             open: Arc::new(open),
             shown: self.view.agenda.clone(),
+            shown_seq: None,
             running: None,
             again: false,
             held: false,
@@ -5393,6 +6280,177 @@ impl App {
             drop(sent.send((read, wrote)));
         });
         reads.running = Some(arrives);
+    }
+
+    /// Reads All Notes' most used tags (obf-1074) while it shows, where
+    /// the log changed since they were read: on a thread with the
+    /// Agenda's opener, else here. The desktop has no Area Locks, so
+    /// nothing is closed.
+    fn read_tags(&mut self) {
+        if self.selection != Selection::All || self.alone.is_some() {
+            return;
+        }
+        // Its end looks at the log again. An Import or an Area being
+        // deleted writes a Note after another: read again at its end.
+        if self.tag_row.running.is_some() || self.import.running() || self.deletions.running() {
+            return;
+        }
+        let Ok(seq) = self.store.current_seq() else {
+            return;
+        };
+        if self.tag_row.seq == Some(seq) {
+            return;
+        }
+        fn read(store: &Store) -> TagsRead {
+            let seq = store.current_seq().unwrap_or_default();
+            let tags = TagTree::new(store)
+                .tree(&HashSet::new())
+                .map(|tree| tag_tree_view::most_used(&tree, tag_tree_view::MOST_USED));
+            (seq, tags)
+        }
+        match self.agenda_reads.as_ref().map(|reads| reads.open.clone()) {
+            Some(open) => {
+                let (sent, arrives) = std::sync::mpsc::channel();
+                let spawned = std::thread::Builder::new()
+                    .name(TAGS_THREAD.to_string())
+                    .spawn(move || drop(sent.send(read(&open()))));
+                match spawned {
+                    Ok(_) => self.tag_row.running = Some(arrives),
+                    // No thread to be had: read here.
+                    Err(_) => self.tags_read(read(&self.store)),
+                }
+            }
+            None => self.tags_read(read(&self.store)),
+        }
+    }
+
+    /// Keeps the most used tags `read`; one that failed says so and is
+    /// read again at the log's next mark.
+    fn tags_read(&mut self, (seq, tags): TagsRead) {
+        self.tag_row.seq = Some(seq);
+        match tags {
+            Ok(tags) => self.tag_row.tags = tags,
+            Err(e) => self.error = Some(e.to_string()),
+        }
+    }
+
+    /// Shows the most used tags from their thread once they are in, and
+    /// reads them again where the log changed meanwhile. The window looks
+    /// again shortly while the read runs.
+    fn tags_arrived(&mut self, ctx: &egui::Context) {
+        let Some(running) = &self.tag_row.running else {
+            return;
+        };
+        match running.try_recv() {
+            Ok(read) => {
+                self.tag_row.running = None;
+                self.tags_read(read);
+                self.read_tags();
+                ctx.request_repaint();
+            }
+            Err(std::sync::mpsc::TryRecvError::Empty) => {
+                ctx.request_repaint_after(std::time::Duration::from_millis(30));
+            }
+            Err(std::sync::mpsc::TryRecvError::Disconnected) => self.tag_row.running = None,
+        }
+    }
+
+    /// Counts what "Empty the trash now" deletes (obf-1095) while the
+    /// Trash shows, where the log changed since they were counted: on a
+    /// thread with the Agenda's opener, as reading them reads every Note,
+    /// else here. Not while the trash is being emptied: its end counts
+    /// again.
+    fn count_trash(&mut self) {
+        if self.selection != Selection::Trash {
+            return;
+        }
+        let Ok(seq) = self.store.current_seq() else {
+            return;
+        };
+        if !self.trash_emptying.wants_read(seq) {
+            return;
+        }
+        if let Some(open) = self.agenda_reads.as_ref().map(|reads| reads.open.clone())
+            && self
+                .trash_emptying
+                .read_aside(seq, Box::new(move || open()))
+        {
+            return;
+        }
+        let read = trash_emptying::count(&self.store);
+        self.trash_counted(seq, read);
+    }
+
+    /// Keeps the counts `read` at the log's mark `seq`; one that failed
+    /// says so.
+    fn trash_counted(&mut self, seq: i64, read: Result<trash_emptying::Counted, String>) {
+        if let Err(e) = self.trash_emptying.read_in(seq, read) {
+            self.error = Some(e);
+        }
+    }
+
+    /// Takes in the counts from their thread once they are in, and
+    /// counts again where the log changed meanwhile. The window looks
+    /// again shortly while they are counted.
+    fn trash_counts_arrived(&mut self, ctx: &egui::Context) {
+        if !self.trash_emptying.reading() {
+            return;
+        }
+        match self.trash_emptying.read_arrived() {
+            Some((seq, read)) => {
+                self.trash_counted(seq, read);
+                // A question open shows the counts as they are now, and
+                // goes where nothing is left to delete.
+                if let Some(Dialog::EmptyTrash { notes, routines }) = &mut self.dialog {
+                    match self.trash_emptying.counted() {
+                        Some(counted) if self.trash_emptying.offered() => {
+                            (*notes, *routines) = counted;
+                        }
+                        _ => self.dialog = None,
+                    }
+                }
+                self.count_trash();
+                ctx.request_repaint();
+            }
+            None => ctx.request_repaint_after(std::time::Duration::from_millis(30)),
+        }
+    }
+
+    /// Empties the trash, `counted` being what the question named
+    /// (obf-1095): beside the window on a connection of its own where
+    /// there is the Import's opener, as deleting an Area, else at once.
+    fn empty_trash(&mut self, counted: trash_emptying::Counted) {
+        if self.trash_emptying.running() {
+            return;
+        }
+        if self.import_open.is_some() {
+            let open = self.import_store();
+            self.trash_emptying.start(open, counted);
+        } else {
+            let emptied = trash_emptying::empty(&self.store);
+            self.trash_emptied(emptied);
+        }
+    }
+
+    /// Once the trash was emptied: a failure is announced at the top with
+    /// what went wrong; the alarms plan anew, as Routines and Reminders
+    /// went with their Notes.
+    fn trash_emptied(&mut self, emptied: trash_emptying::Emptied) {
+        let t = self.t;
+        if let Err(details) = emptied {
+            self.announce_failure(
+                t.desk_trash_empty_failed(),
+                t.desk_trash_empty_failed_title(),
+                (
+                    t.desk_trash_empty_failed_cause(),
+                    t.desk_trash_empty_failed_fix(),
+                ),
+                details,
+            );
+        }
+        if let Some(wake) = &self.wake {
+            drop(wake.send(Event::Wake));
+        }
     }
 
     /// Shows the Agenda's read from its thread once it is in, unless the
@@ -5439,6 +6497,7 @@ impl App {
                     self.view.agenda = Some(view.clone());
                 }
                 reads.shown = Some(view);
+                reads.shown_seq = Some(seq);
             }
             Ok(_) => reads.again = true,
             Err(e) => self.error = Some(e.to_string()),
@@ -5448,6 +6507,79 @@ impl App {
             self.read_agenda_aside();
         }
         ctx.request_repaint();
+    }
+
+    /// Places the Occurrence a click on its notification asked for
+    /// (obf-1039) once the Agenda is read at the click's mark or later:
+    /// marked, and scrolled into view once, where the Agenda lists it;
+    /// where it lists it nowhere, as one Done or skipped meanwhile, the
+    /// top says so. One still open that no day of the Agenda shows, as a
+    /// weekly one of yesterday, not Missed until its next, opens its Note
+    /// dialog over the Agenda, whose Due line answers it. Each goes into
+    /// the trace of the clicks; the mark goes once the Agenda is left.
+    fn place_notified(&mut self) {
+        let Some(notified) = &mut self.notified else {
+            return;
+        };
+        if self.selection != Selection::Agenda {
+            self.notified = None;
+            return;
+        }
+        if notified.place.is_some() {
+            return;
+        }
+        let Some(agenda) = &self.view.agenda else {
+            return;
+        };
+        // On its thread the Agenda shows the rows read last a while.
+        let read = self.agenda_reads.as_ref().is_none_or(|reads| {
+            reads
+                .shown_seq
+                .is_some_and(|seq| notified.seq.is_none_or(|at| seq >= at))
+        });
+        if !read {
+            return;
+        }
+        let key = crate::alerts::occurrence_key(&notified.routine, &notified.occurrence);
+        if let Some(place) = agenda_place(agenda, &notified.routine, &notified.occurrence) {
+            notified.place = Some(place);
+            notified.scroll = true;
+            self.click_trace.went(&key, &place.traced());
+            return;
+        }
+        let occurrence = notified.occurrence;
+        let routines = Routines::new(&self.store);
+        let routine = routines.by_id(&notified.routine).ok().flatten();
+        let note = routine
+            .as_ref()
+            .filter(|r| !r.is_trashed())
+            .and_then(|r| routines.note(r).ok().flatten())
+            .filter(|n| !n.is_trashed());
+        self.notified = None;
+        let t = self.t;
+        let (said, went) = match (routine, note) {
+            (Some(r), _) if r.done_at(&occurrence).is_some() => {
+                (Some(t.notification_already_done()), "Agenda, already done")
+            }
+            (Some(r), _) if r.skipped_at(&occurrence).is_some() => {
+                (Some(t.occurrence_skipped()), "Agenda, skipped")
+            }
+            (Some(_), Some(note)) => {
+                // A Routine editor or Tally form open keeps its draft, over
+                // the Note dialog.
+                let (editor, tally_form) = (self.editor.take(), self.tally_form.take());
+                self.apply(Action::SelectNote(note.id));
+                self.editor = editor;
+                self.tally_form = tally_form;
+                (None, "Note dialog, not on the Agenda")
+            }
+            (Some(_), None) => (None, "Agenda, not listed"),
+            (None, _) => (None, "Agenda, Routine gone"),
+        };
+        if let Some(said) = said {
+            self.notice = Some(said.to_string());
+        }
+        self.click_trace.went(&key, went);
     }
 
     /// The searches typed into (obf-1068): each runs on a thread of its
@@ -5588,15 +6720,31 @@ impl App {
         self.changes_wanted = Some(wanted);
     }
 
-    /// Opens the Note dialog of the Note of the Routine a click on an
-    /// Occurrence's notification put into `wanted` (#270).
+    /// Shows the Agenda whenever a click on a notification put into
+    /// `wanted` what it is about (obf-1039): an Occurrence scrolled into
+    /// view and marked where the Agenda lists it, else the Agenda with
+    /// "Already done" or "Skipped" at the top; the Agenda alone for the
+    /// Catch-up Notification.
     pub fn set_occurrence_wanted(&mut self, wanted: OccurrenceWanted) {
         self.occurrence_wanted = Some(wanted);
+    }
+
+    /// Notes where each click on a notification went in `trace`, which
+    /// the alerts share, and offers it to Send feedback (obf-1039).
+    pub fn set_click_trace(&mut self, trace: ClickTrace) {
+        trace.set_shown(self.shown);
+        self.click_trace = trace;
+    }
+
+    /// The trace of the clicks on notifications.
+    pub fn click_trace(&self) -> &ClickTrace {
+        &self.click_trace
     }
 
     /// Syncs through the shared folder now: on the folder thread, or here
     /// when there is none.
     fn folder_now(&mut self) -> oldbrainfix_core::Result<()> {
+        self.sync_goes_on();
         match &self.folder_wanted {
             Some(wanted) => wanted.store(true, Ordering::SeqCst),
             None => {
@@ -5604,6 +6752,14 @@ impl App {
             }
         }
         Ok(())
+    }
+
+    /// Ends a pause of the automatic syncs Abort began on the page
+    /// Running (obf-1078): syncing now by hand syncs on from then.
+    fn sync_goes_on(&self) {
+        if let Some(syncing) = self.syncing.as_ref().filter(|s| s.paused()) {
+            syncing.go_on();
+        }
     }
 
     /// The AI port while it is open (#112).
@@ -5674,9 +6830,18 @@ impl App {
                 self.review_ai()?;
             }
             AiAction::Review => {
-                if self.ai_port.is_none() {
-                    self.review_ai()?;
+                // Always the review page (obf-1077): one that changed
+                // nothing, with the port closed, is declined as at
+                // "Done, review", and the page says "No changes yet".
+                if self.ai_port.is_none()
+                    && let Some(task) = self.store.ai_task()?
+                    && self.store.ai_review(&task)?.is_empty()
+                {
+                    self.store.decline_pending(&task)?;
                 }
+                // In the list, the dialogs over it closed.
+                self.pages.clear();
+                self.go(Selection::AiReview);
             }
             AiAction::Accept => {
                 if self.ai_port.is_some() {
@@ -5704,18 +6869,15 @@ impl App {
         Ok(())
     }
 
-    /// The AI Task's review (#112), or that none waits.
+    /// The AI Task's review (#112), "No changes yet" without one, and
+    /// while the port is open the changes so far (obf-1077).
     fn ai_review_pane(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
         let t = self.t;
-        let Some(shown) = &self.view.ai_review else {
-            let text = ui.visuals().text_color();
-            ui.heading(RichText::new(t.ai_review_title()).color(text));
-            let weak = ui.visuals().weak_text_color();
-            ui.label(RichText::new(t.ai_review_none()).color(weak));
-            return;
-        };
+        let none = ReviewShown::default();
+        let shown = self.view.ai_review.as_ref().unwrap_or(&none);
+        let open = self.ai_port.is_some();
         let mut asked = None;
-        if let Some(note) = ai_view::review_page(ui, &t, tones, shown, &mut asked) {
+        if let Some(note) = ai_view::review_page(ui, &t, tones, shown, open, &mut asked) {
             actions.push(Action::SelectNote(note));
         }
         if let Some(asked) = asked {
@@ -6040,6 +7202,7 @@ impl App {
     /// into the tray and brings it back.
     pub fn set_shown(&mut self, shown: bool) {
         self.shown = shown;
+        self.click_trace.set_shown(shown);
         // Hidden, it hears no keys to record (#283).
         if !shown {
             self.record_hotkey(false);
@@ -6100,6 +7263,7 @@ impl App {
         self.reader = reader;
         self.speech = speech;
         self.speech_ready = false;
+        self.speech_kept = None;
         self.kick();
     }
 
@@ -6131,6 +7295,15 @@ impl App {
     /// before typing stopped, until the search of what is typed now is in.
     pub fn searched(&self) -> &str {
         self.searching.searched()
+    }
+
+    /// The find bar over the Note open (obf-1047), while it is open: its
+    /// words, which place found is current, counted from 0, and how many
+    /// it found.
+    pub fn find_bar(&self) -> Option<(&str, usize, usize)> {
+        self.find
+            .as_ref()
+            .map(|(_, bar)| (bar.query(), bar.at(), bar.found().len()))
     }
 
     /// Whether the search of the list shown or of a dialog runs on its
@@ -6334,13 +7507,22 @@ impl App {
     /// quick note's text as a new Note nudged in 1 h, as leaving the
     /// phone's capture screen does, and the open Note's edited text.
     pub fn flush(&mut self) {
-        // The Note windows go with the window (#287).
+        // The Note windows go with the window (#287), the Markdown files'
+        // too (obf-1056).
         self.close_note_windows();
+        self.viewers.clear();
         if !self.capture.trim().is_empty() || self.recording() || self.holds_media() {
             self.apply(Action::Capture(Notes::default_nudge()));
         }
         self.apply(Action::LeaveLines);
         self.apply(Action::SaveText);
+        // A Note "+" made and left empty goes with the window (obf-1140).
+        let blank = self.blank.as_ref().is_some_and(|(id, mark)| {
+            self.selected_note.as_ref() == Some(id) && self.is_blank(id, *mark).unwrap_or(false)
+        });
+        if blank {
+            self.apply(Action::CloseNote);
+        }
     }
 
     /// Installs the look and the fonts. Cheap enough to call every frame.
@@ -6468,6 +7650,10 @@ impl App {
             }
         }
         self.keep_cards = false;
+        // All Notes' most used tags, where the log changed (obf-1074).
+        self.read_tags();
+        // What emptying the trash deletes, while it shows (obf-1095).
+        self.count_trash();
         if let Some(e) = left {
             self.error = Some(e.to_string());
         }
@@ -6542,12 +7728,20 @@ impl App {
             self.text_of = shown.map(|n| n.id.clone());
             self.text_kinded = kinded;
             self.put_typed(stored);
+            // Its steps start as it opens (obf-1051).
+            self.steps = None;
+            self.slot_step = None;
             self.text_editing = false;
             self.text_focus = false;
             self.text_select = None;
             self.amend.clear();
             self.amend_focus = false;
             self.amend_select = None;
+            self.amend_open = false;
+            // Made and opened here, it stays so only while it shows.
+            if self.made_open.as_ref() != self.text_of.as_ref() {
+                self.made_open = None;
+            }
             self.section_texts.clear();
         } else if kinded != self.text_kinded {
             // Its kind changed while it shows: what is typed stays, now
@@ -6580,6 +7774,16 @@ impl App {
         {
             self.text_editing = true;
             self.text_focus = true;
+        }
+        // Add a part from its card: the Amend box opens, its field taking
+        // the keyboard (obf-1014).
+        if self.amend_wanted.is_some() && self.text_of == self.amend_wanted {
+            self.amend_wanted = None;
+            self.amend_open = true;
+            self.amend_focus = true;
+        } else if self.selected_note != self.amend_wanted {
+            // Another Note shows, or none: it is asked no more.
+            self.amend_wanted = None;
         }
         // The Agenda as it is now, on its thread where it has one (#207).
         if main {
@@ -6617,6 +7821,11 @@ impl App {
     /// The theme this Device chose (#147).
     pub fn theme(&self) -> ThemeChoice {
         self.theme
+    }
+
+    /// The text size this Device chose (#326).
+    pub fn text_size(&self) -> TextSize {
+        self.text_size
     }
 
     /// Whether the Note list shown shows its Notes compact (#114).
@@ -7059,6 +8268,20 @@ impl App {
             _ => None,
         };
         let ai_task = self.store.ai_task()?;
+        let ai_review = match &ai_task {
+            Some(task) if self.selection == Selection::AiReview => {
+                Some(ai_view::read_review(&self.store, &self.t, task)?)
+            }
+            _ => None,
+        };
+        let ai_changes = match (&ai_review, &ai_task) {
+            (Some(shown), _) => shown.groups.iter().map(|(_, items)| items.len()).sum(),
+            (None, Some(task)) => {
+                let review = self.store.ai_review(task)?;
+                review.groups.iter().map(|(_, items)| items.len()).sum()
+            }
+            (None, None) => 0,
+        };
         let mut trashed_routines = Vec::new();
         if self.selection == Selection::Trash {
             for routine in routines.trashed()? {
@@ -7255,13 +8478,8 @@ impl App {
             profile_code: OwnProfile::new(&self.store).code()?,
             profile_newer: OwnProfile::new(&self.store).is_newer()?,
             profile_question: OwnProfile::new(&self.store).question()?,
-            sync_paused: self.store.sync_paused()?,
-            ai_review: match &ai_task {
-                Some(task) if self.selection == Selection::AiReview && self.ai_port.is_none() => {
-                    Some(ai_view::read_review(&self.store, &self.t, task)?)
-                }
-                _ => None,
-            },
+            ai_review,
+            ai_changes,
             ai_task,
             ask_provider: if self.selection == Selection::Ask {
                 Some(self.store.ask_provider()?)
@@ -7381,6 +8599,8 @@ impl App {
             // Into the search of the list shown, from no Note: only the
             // keyboard moves.
             Action::Find if self.selected_note.is_none() && self.searches() => Reads::Nothing,
+            // Over a Note open, its find bar: the Note stays.
+            Action::Find if self.selected_note.is_some() => Reads::Nothing,
             // A letter in the list's search, searched once typing stops
             // (obf-1068).
             Action::Search if self.agenda_reads.is_some() => Reads::Nothing,
@@ -7399,6 +8619,20 @@ impl App {
             Reads::All => self.sorting_now(),
             _ => None,
         };
+        // The steps of the Note open (obf-1051): what was written
+        // elsewhere since starts them again, and what was typed is a step
+        // before what is asked now, unless it goes with the typing.
+        let seen = match &action {
+            Action::WholeStep { .. } | Action::CopyTable(_) => None,
+            Action::FormatText(_) | Action::OfferCode(..) | Action::AskLink { .. } => {
+                Some(See::Drawn(self.steps_time))
+            }
+            _ => Some(See::Before),
+        };
+        if let Some(how) = seen {
+            self.see_steps(how);
+        }
+        let slot = self.undo.clone();
         let done = self.act(action);
         // A recording into a Note that is no longer open, whatever closed
         // it, goes onto it (#352).
@@ -7452,12 +8686,21 @@ impl App {
             (Ok(()), Some(sorting)) => self.move_on(sorting),
             (done, _) => done,
         };
+        // What it changed of the Note open is a step; Ctrl+Z takes back
+        // the later of that and the window's undo.
+        let slot_set = self.undo.is_some() && self.undo != slot;
+        if self.see_steps(See::After) {
+            self.undo_later = false;
+            self.slot_step = match slot_set {
+                true => self.steps.as_ref().map(Steps::depth),
+                false => None,
+            };
+        } else if slot_set {
+            self.undo_later = true;
+            self.slot_step = None;
+        }
         match done {
             Ok(()) => {}
-            // Waiting, not failed: said with what to do.
-            Err(oldbrainfix_core::Error::SyncPaused) => {
-                self.notice = Some(self.t.sync_paused_error().to_string());
-            }
             Err(e) => self.error = Some(e.to_string()),
         }
         // Nor does anyone else need to look again.
@@ -7505,6 +8748,7 @@ impl App {
             Action::PageInto(page) => {
                 if page == Page::Feedback {
                     self.feedback = FeedbackForm::default();
+                    self.feedback.click_lines = self.click_trace.lines();
                 }
                 self.pages.push(page);
             }
@@ -7517,12 +8761,17 @@ impl App {
                 self.settings_query.clear();
                 self.backup_notes_left();
             }
+            Action::Running(act) => self.running_act(act),
             Action::NewNote => {
                 // One dialog at a time: the Note open is kept and closed.
                 self.leave_note()?;
                 self.quick_open = true;
                 self.capture_focus = true;
             }
+            Action::NewNoteHere => match self.list_place() {
+                Some(place) => self.new_note_in(Some(&place))?,
+                None => return self.act(Action::NewNote),
+            },
             Action::CloseQuickNote => {
                 // Leaving keeps what is typed, as on the phone; a failed
                 // save leaves it open, so nothing is lost.
@@ -7594,6 +8843,9 @@ impl App {
             }
             Action::QuickNote => self.quick_note_wanted = true,
             Action::Quit => self.quit_wanted = true,
+            // Over the Note open, its find bar takes the keyboard (obf-1047,
+            // C7d), opened without words where it was closed.
+            Action::Find if self.selected_note.is_some() => self.open_find(None),
             Action::Find => {
                 self.leave_note()?;
                 // All Notes, Unsorted, an Area, a Topic and the trash have
@@ -7604,6 +8856,9 @@ impl App {
                 self.search_focus = true;
             }
             Action::Clip(clip) => self.clip = Some(clip),
+            // Over the Note open, its last step where it came after the
+            // window's undo (obf-1051).
+            Action::Undo if self.steps_undo_first() => self.note_step(Way::Undo)?,
             Action::Undo => {
                 if let Some(undo) = self.undo.take() {
                     self.save_text()?;
@@ -7611,9 +8866,22 @@ impl App {
                     self.back_to_sorted()?;
                 }
             }
+            Action::NoteUndo => self.note_step(Way::Undo)?,
+            Action::NoteRedo => self.note_step(Way::Redo)?,
+            Action::AskRevert => {
+                if self.steps.as_ref().is_some_and(Steps::changed) {
+                    self.dialog = Some(Dialog::Revert);
+                }
+            }
+            Action::Revert => {
+                self.dialog = None;
+                self.note_step(Way::Revert)?;
+            }
+            Action::WholeStep { section, before } => self.whole_step(section.as_deref(), before),
             Action::OpenGuide => self.open_url = Some(about_view::guide_url(self.t.locale())),
             Action::SyncNow => {
                 self.save_text()?;
+                self.sync_goes_on();
                 self.pages = vec![Page::Sync];
                 if self.store.sync_folder()?.is_some() {
                     self.folder_now()?;
@@ -7646,17 +8914,39 @@ impl App {
             }
             Action::SelectAllCards => self.cards.select_all(&self.shown_cards()),
             Action::AskImport => self.dialog = Some(Dialog::Import),
+            Action::OpenMarkdown => {
+                if let Some(file) = (self.markdown_picker)(self.t.desk_markdown_open_title()) {
+                    self.open_viewer(file);
+                }
+            }
             Action::SelectNote(id) => {
                 // One dialog at a time: the quick note is kept and closed.
                 if self.quick_open {
                     self.act(Action::CloseQuickNote)?;
                 }
-                if self.selected_note.as_deref() != Some(id.as_str()) {
+                let other = self.selected_note.as_deref() != Some(id.as_str());
+                if other {
                     self.leave_note()?;
+                    self.find = None;
+                }
+                // Opened from a search's list, at the first place it found
+                // (obf-1047, C7b); not where its card showed none.
+                if other && let Some(query) = self.found_on_card(&id) {
+                    self.find = Some((id.clone(), FindBar::new(&query, false)));
                 }
                 self.selected_note = Some(id);
                 self.editor = None;
                 self.tally_form = None;
+            }
+            Action::OpenFinding(id, finding) => {
+                self.act(Action::SelectNote(id.clone()))?;
+                let query = self.searching.searched().trim().to_string();
+                let bar = FindBar::new(&query, false);
+                let bar = match finding {
+                    Some(finding) => bar.starting_at(*finding),
+                    None => bar,
+                };
+                self.find = Some((id, bar));
             }
             Action::StartLine(id) => {
                 self.act(Action::SelectNote(id))?;
@@ -7666,7 +8956,9 @@ impl App {
                 // A running recording is ended and kept first; held
                 // until it is, so a failed save loses nothing.
                 self.end_recording()?;
-                self.capture_note(nudge_in, &[], &[])?;
+                if let Some(id) = self.capture_note(nudge_in, &[], &[])? {
+                    self.say_if_filter_hides(&id)?;
+                }
                 // Saved, the quick note's dialog goes (#146).
                 self.quick_open = false;
                 self.capture_focus = false;
@@ -7676,9 +8968,11 @@ impl App {
                 // The quick note goes and the Note dialog opens on the Note
                 // saved, its text taking the keyboard (#142, #146).
                 if let Some(id) = self.capture_note(Notes::default_nudge(), &[], &[])? {
+                    self.say_if_filter_hides(&id)?;
                     self.quick_open = false;
                     self.capture_focus = false;
                     self.selected_note = Some(id.clone());
+                    self.made_open = Some(id.clone());
                     self.edit_wanted = Some(id);
                 }
             }
@@ -7715,6 +9009,13 @@ impl App {
                     return Ok(());
                 }
                 self.recording_into = Some(into);
+                // The setting as this recording starts (obf-1053); one
+                // that cannot be read ignores pauses.
+                self.pause_watch = DeviceSettings::new(&self.store)
+                    .recording_pause_seconds()
+                    .ok()
+                    .flatten()
+                    .map(PauseWatch::new);
             }
             Action::PasteOntoNote => self.paste_onto_note()?,
             Action::PourIntoShopping(list) => self.pour_into_shopping(&list)?,
@@ -7742,6 +9043,20 @@ impl App {
                 let paths = (self.files_picker)(self.t.attach_file_title());
                 let read = self.read_files(&paths);
                 return self.act(Action::Files(read));
+            }
+            Action::AttachFilesTo(note) => {
+                let paths = (self.files_picker)(self.t.attach_file_title());
+                let read = self.read_files(&paths);
+                // Asked again: a sync while the dialog was open may have
+                // taken it.
+                if !read.is_empty() && self.store.may_change(&note)? {
+                    self.save_text()?;
+                    self.attach_to(&note, read)?;
+                }
+            }
+            Action::AddPartTo(note) => {
+                self.act(Action::SelectNote(note.clone()))?;
+                self.amend_wanted = Some(note);
             }
             Action::Files(files) => {
                 // Onto the Note open they are its own (#267); else they
@@ -7832,11 +9147,17 @@ impl App {
                 self.searching.set_searched(&query);
                 self.query = query;
             }
-            Action::FilterPeople(people) => self.people = people,
+            Action::FilterPeople(people) => {
+                self.people = people;
+                // "Show" or another filter: nothing more to say (obf-1070).
+                self.made_hidden = None;
+            }
             Action::ViewPhoto(hash) => self.viewer = Some(Viewer::new(hash)),
             Action::ClosePhoto => self.viewer = None,
             Action::PhotoOut(hash, out) => self.photo_out(&hash, out),
             Action::OpenTable(opening) => self.open_table(opening)?,
+            // Copied says nothing (UI laws).
+            Action::CopyTable(copy) => self.put_copy(copy.markdown, Some(&copy.html)),
             Action::Table(asked) => self.table_asked(asked)?,
             Action::Fold(setting, open) => {
                 // Nothing kept means folded, the default.
@@ -7955,6 +9276,7 @@ impl App {
                     }
                 }
             }
+            Action::SpeechOffer(take) => self.speech_offer_action(take)?,
             Action::SaveText => self.save_text()?,
             Action::FormatText(None) => self.save_formatted()?,
             Action::FormatText(Some(section)) => self.save_section_formatted(&section)?,
@@ -8083,6 +9405,8 @@ impl App {
                 };
                 notes.amend_as(&selected, &self.amend, format)?;
                 self.amend.clear();
+                // Added, the box goes until asked again (obf-1072).
+                self.amend_open = false;
             }
             Action::Importance(importance) => notes.set_importance(&selected, importance)?,
             Action::File { notes: ids, place } => {
@@ -8104,6 +9428,23 @@ impl App {
             Action::Restore => Routines::new(&self.store).restore_note(&selected)?,
             Action::TrashNotes(ids) => self.trash_notes(&ids)?,
             Action::RestoreNotes(ids) => self.restore_notes(&ids)?,
+            // Asked once, with the counts read last; not over another
+            // dialog, nor while the trash is being emptied (obf-1095).
+            Action::AskEmptyTrash => {
+                if self.dialog.is_none()
+                    && self.selection == Selection::Trash
+                    && self.trash_emptying.offered()
+                    && let Some((notes, routines)) = self.trash_emptying.counted()
+                {
+                    self.dialog = Some(Dialog::EmptyTrash { notes, routines });
+                }
+            }
+            Action::EmptyTrash => {
+                if let Some(Dialog::EmptyTrash { notes, routines }) = self.dialog {
+                    self.dialog = None;
+                    self.empty_trash((notes, routines));
+                }
+            }
             Action::ImportanceOf(ids, importance) => self.importance_of(&ids, importance)?,
             Action::AskMergeNotes(ids) => {
                 let others = self.merge_candidates("", &ids)?;
@@ -8138,13 +9479,17 @@ impl App {
             }
             Action::Rename(id) => {
                 let shown = self.shown_name(&id);
+                let look = self.view.area(&id).map(|area| AreaLook {
+                    colour: area.colour.clone(),
+                    icon: area.icon.clone(),
+                });
                 self.dialog = Some(Dialog::Rename {
                     id,
                     name: shown.clone(),
                     shown,
+                    look,
                 });
             }
-            Action::Look(area) => self.dialog = Some(Dialog::Look { area }),
             // Not asked again for an Area being deleted (obf-1093).
             Action::Delete(id) if self.deletions.of(&id).is_some() => {}
             Action::Delete(id) => self.dialog = Some(Dialog::Delete(self.deleting(&id)?)),
@@ -8169,6 +9514,21 @@ impl App {
                 }
             }
             Action::CloseDialog => self.close_dialog()?,
+            Action::AddCustomHeadsUp => {
+                if let Some(Dialog::CustomHeadsUp {
+                    count,
+                    unit,
+                    all_day,
+                }) = &self.dialog
+                    && let Some(minutes) = custom_heads_up(count, *unit, *all_day)
+                {
+                    // One set already is not set twice.
+                    if let Some(editor) = &mut self.editor {
+                        editor.add_heads_up(minutes);
+                    }
+                    self.dialog = None;
+                }
+            }
             Action::AddPlace => {
                 if let Some(Dialog::NewPlace { area, name }) = &self.dialog {
                     match area {
@@ -8179,16 +9539,30 @@ impl App {
                 }
             }
             Action::SaveName => {
-                if let Some(Dialog::Rename { id, name, shown }) = &self.dialog {
+                if let Some(Dialog::Rename {
+                    id,
+                    name,
+                    shown,
+                    look,
+                }) = &self.dialog
+                {
                     // An unchanged starter name stays translatable.
                     if name.trim() != shown {
                         places.rename(id, name)?;
                     }
+                    // Only what was changed: a sync meanwhile keeps the
+                    // rest.
+                    if let (Some(look), Some(area)) = (look, self.view.area(id)) {
+                        if look.colour != area.colour {
+                            places.set_colour(id, look.colour.as_deref())?;
+                        }
+                        if look.icon != area.icon {
+                            places.set_icon(id, look.icon.as_deref())?;
+                        }
+                    }
                     self.dialog = None;
                 }
             }
-            Action::Colour(area, colour) => places.set_colour(&area, colour.as_deref())?,
-            Action::Icon(area, icon) => places.set_icon(&area, icon.as_deref())?,
             Action::DeletePlace(go) => {
                 if let Some(Dialog::Delete(deleting)) = &self.dialog {
                     if deleting.area.is_none() && self.import_open.is_some() {
@@ -8261,11 +9635,6 @@ impl App {
                     .collect();
                 self.save_calendar_file(&all)?;
             }
-            Action::ShareRoutine(id) => {
-                if let Some(routine) = Routines::new(&self.store).by_id(&id)? {
-                    self.save_calendar_file(&[routine])?;
-                }
-            }
             Action::OpenRoutine(id) => {
                 self.save_text()?;
                 let routines = Routines::new(&self.store);
@@ -8288,22 +9657,19 @@ impl App {
                     self.tally_form = None;
                 }
             }
-            Action::OpenNotified(id) => {
-                let routines = Routines::new(&self.store);
-                let Some(routine) = routines.by_id(&id)?.filter(|r| !r.is_trashed()) else {
-                    return Ok(());
-                };
-                // Gone or in the trash, it opens just the window.
-                let Some(note) = routines.note(&routine)?.filter(|n| !n.is_trashed()) else {
-                    return Ok(());
-                };
-                // A Routine editor or Tally form open keeps its draft, over
-                // the Note dialog.
-                let (editor, tally_form) = (self.editor.take(), self.tally_form.take());
-                let opened = self.act(Action::SelectNote(note.id));
-                self.editor = editor;
-                self.tally_form = tally_form;
-                opened?;
+            Action::OpenNotified(routine, occurrence) => {
+                // As a click on the Agenda in the sidebar: the Note open is
+                // kept and closed, a Routine editor or Tally form stays
+                // over it with its draft.
+                self.leave_note()?;
+                self.go(Selection::Agenda);
+                self.notified = Some(Notified {
+                    routine,
+                    occurrence,
+                    seq: self.store.current_seq().ok(),
+                    place: None,
+                    scroll: false,
+                });
             }
             Action::NewRoutine { note, reminder } => {
                 self.save_text()?;
@@ -8399,8 +9765,17 @@ impl App {
                         }
                     }
                     Some(editor) => {
-                        if editor.save(&self.store)?.is_some() {
+                        // A new Session's page makes its Note (#161).
+                        let makes_note = editor.routine.is_none()
+                            && editor.note.is_none()
+                            && editor.session().is_some();
+                        if let Some(id) = editor.save(&self.store)? {
                             self.editor = None;
+                            if makes_note
+                                && let Some(routine) = Routines::new(&self.store).by_id(&id)?
+                            {
+                                self.say_if_filter_hides(&routine.note_id)?;
+                            }
                         }
                     }
                     None => {}
@@ -8433,6 +9808,22 @@ impl App {
                 Intent::OpenNote(id) => {
                     self.editor = None;
                     self.selected_note = Some(id);
+                }
+                // Over the editor, which stays open under it.
+                Intent::CustomHeadsUp => {
+                    if let Some(editor) = &self.editor {
+                        let all_day = editor.all_day();
+                        let unit = heads_up_keys::units(all_day)
+                            .first()
+                            .copied()
+                            .unwrap_or(HeadsUpUnit::Days);
+                        self.dialog = Some(Dialog::CustomHeadsUp {
+                            count: String::new(),
+                            unit,
+                            all_day,
+                        });
+                        self.focus = true;
+                    }
                 }
                 // The History shows in the list, the editor left.
                 Intent::History(id) => {
@@ -8531,6 +9922,7 @@ impl App {
             }
             Action::ShowTipsAgain => {
                 spotlight::show_again(&self.store)?;
+                self.spotlights.set_tips(true);
                 self.notice = Some(self.t.settings_show_tips_done().to_string());
             }
             Action::Sync(SyncAction::Trust(trust)) => {
@@ -8602,6 +9994,13 @@ impl App {
                         self.dialog = Some(Dialog::Import);
                     }
                 }
+            }
+            Action::FillIn(fill_in) => {
+                let viewer = matches!(self.import.kind(), Some(Importing::Markdown(_)));
+                self.import.answer(fill_in);
+                // Answered, the Import dialog says how far it is again;
+                // one asked in a viewer says so in the viewer's bar.
+                self.dialog = (fill_in != FillIn::Cancel && !viewer).then_some(Dialog::Import);
             }
             Action::OpenFile(path) => self.open_file(&path),
             Action::SendWaitingChanges => self.send_waiting_changes()?,
@@ -8769,14 +10168,29 @@ impl App {
                 }
             }
             Action::Share(area) => {
+                // Share with people… also lists the people of a Shared
+                // Area (obf-1014), for anyone in it; only who manages it
+                // shares it.
+                let manages = matches!(
+                    self.view.access.get(&area),
+                    None | Some(AreaAccess::Owner | AreaAccess::Manager)
+                );
+                let shared = self.view.people.contains_key(&area);
                 // Asked before whom (#267): an Area hidden or holding a
-                // Note hidden from AI is not shared.
-                let marks = self.store.hidden_from_ai_in(&area)?;
-                if !marks.is_empty() {
-                    self.ask_hidden(marks, Some(&area), Action::Share(area.clone()));
-                    return Ok(());
+                // Note hidden from AI is not shared. One shared already
+                // keeps its people at hand; the invite asks the core.
+                if manages && !shared {
+                    let marks = self.store.hidden_from_ai_in(&area)?;
+                    if !marks.is_empty() {
+                        self.ask_hidden(marks, Some(&area), Action::Share(area.clone()));
+                        return Ok(());
+                    }
                 }
-                let afar = self.afar_people()?;
+                let afar = if manages {
+                    self.afar_people()?
+                } else {
+                    Vec::new()
+                };
                 self.dialog = Some(Dialog::Share {
                     area,
                     role: AreaRole::Member,
@@ -8847,7 +10261,6 @@ impl App {
             Action::Sync(SyncAction::Join) => {
                 self.sync.join(self.store.clone(), &self.sync_name, &self.t)
             }
-            Action::People(area) => self.dialog = Some(Dialog::People { area }),
             Action::SetRole { area, person, role } => self.store.set_role(&area, &person, role)?,
             Action::AskRemovePerson { area, person } => {
                 let name = self
@@ -8867,7 +10280,8 @@ impl App {
             Action::RemovePerson => {
                 if let Some(Dialog::RemovePerson { area, person, .. }) = self.dialog.take() {
                     self.store.remove_person(&area, &person)?;
-                    self.dialog = Some(Dialog::People { area });
+                    // Back on Share with people… (obf-1014).
+                    return self.act(Action::Share(area));
                 }
             }
             Action::AskRemoveMedia { note, hash, made } => {
@@ -8878,9 +10292,11 @@ impl App {
                 if let Some(Dialog::RemoveMedia { note, hash, made }) = self.dialog.take() {
                     // A sync while the dialog was open may have taken it
                     // already.
+                    let mut into_text = false;
                     if made == Made::Photo {
                         if notes.may_remove_photo(&note, &hash)? {
                             notes.remove_photo(&note, &hash)?;
+                            into_text = true;
                         }
                     } else if made == Made::File {
                         if notes.may_remove_attachment(&note, &hash)? {
@@ -8894,6 +10310,12 @@ impl App {
                             self.playing = None;
                         }
                         notes.remove_recording(&note, &hash)?;
+                        into_text = true;
+                    }
+                    // Its words went into the text (obf-1084): the field
+                    // shows them, a step Ctrl+Z takes back.
+                    if into_text && let Some(removed) = notes.by_id(&note)? {
+                        self.show_written(&note, removed.text);
                     }
                 }
             }
@@ -8931,13 +10353,7 @@ impl App {
                 // As the phone joins them, escaped into a formatted text
                 // (ADR 0033).
                 let written = notes.take_over(&note, generated, append)?;
-                if self.text_of.as_deref() == Some(note.as_str()) {
-                    self.put_typed(written);
-                } else if let Some(field) = self.section_texts.get_mut(&note) {
-                    // A Section's field shows the text it has now, or the
-                    // next save would put the old one back (#183).
-                    field.text = written;
-                }
+                self.show_written(&note, written);
             }
             Action::RemoveText { note, hash, made } => {
                 self.save_text()?;
@@ -9340,7 +10756,7 @@ impl App {
     }
 
     /// What a card's menu offers of the Note `note`'s Routines (#281), as
-    /// the Note menu and the "+" badge do: Remind me… (#344) for who
+    /// the "+" badge does: Remind me… (#344) for who
     /// may set them up (ADR 0013), in Advanced also Frog while it has none
     /// open and Session… on a plain Note without Code text (#197, #213).
     fn card_spawns(&self, note: &Note) -> oldbrainfix_core::Result<CardSpawns> {
@@ -9359,11 +10775,13 @@ impl App {
             && note.text_format != text_format::CODE;
         let marked = self.store.is_marked_hidden_from_ai(&note.id)?;
         let hides = !note.is_trashed() && (marked || self.store.may_hide_from_ai(&note.id)?);
+        let amends = !note.is_trashed() && self.store.may_write_in(&note.id)?;
         Ok(CardSpawns {
             note: note.id.clone(),
             schedules,
             frog: advanced && !frog_open,
             session: plain,
+            amends,
             hidden: hides.then_some(marked),
         })
     }
@@ -10011,6 +11429,7 @@ impl App {
     /// failure is told.
     fn end_recording(&mut self) -> oldbrainfix_core::Result<()> {
         let into = self.recording_into.take();
+        self.pause_watch = None;
         let Some(bytes) = self
             .recorder
             .as_mut()
@@ -10033,6 +11452,24 @@ impl App {
                 Err(e)
             }
         }
+    }
+
+    /// Ends the recording running as Stop does once the microphone was
+    /// quiet for the pause set after it heard something (obf-1053),
+    /// asking its level every [`PauseWatch::EVERY`] while one is watched.
+    fn watch_pause(&mut self, ctx: &egui::Context, actions: &mut Vec<Action>) {
+        let (Some(watch), Some(recorder)) = (&mut self.pause_watch, &mut self.recorder) else {
+            return;
+        };
+        if !recorder.recording() {
+            return;
+        }
+        let now = ctx.input(|i| i.time);
+        if watch.due(now) && watch.hear(recorder.level(), now) {
+            actions.push(Action::StopRecording);
+            return;
+        }
+        ctx.request_repaint_after(std::time::Duration::from_secs_f64(PauseWatch::EVERY));
     }
 
     /// Ends a recording into a Note no longer open in the Note dialog
@@ -10181,6 +11618,8 @@ impl App {
             return Ok(());
         }
         if self.selected_note.as_deref() == Some(id) {
+            // Taken into a window of its own, a Note just made stays.
+            self.blank = None;
             self.leave_note()?;
         }
         self.windows_opened += 1;
@@ -10259,9 +11698,9 @@ impl App {
     /// Closes the Note dialog, keeping what was typed into it: its text,
     /// its Lines and a Section typed into Amend (#146).
     fn leave_note(&mut self) -> oldbrainfix_core::Result<()> {
-        if self.selected_note.is_none() {
+        let Some(left) = self.selected_note.clone() else {
             return Ok(());
-        }
+        };
         self.note_paste_empty = false;
         // A recording running goes onto the Note first (#352).
         self.end_recording()?;
@@ -10269,11 +11708,128 @@ impl App {
         if !self.amend.trim().is_empty() && self.view.may.amends {
             self.act(Action::Amend)?;
         }
+        self.amend_open = false;
+        self.made_open = None;
         self.lines.leave(&self.store, &*self.wall)?;
         self.selected_note = None;
         self.badge = None;
         self.start_lines = false;
+        // Leaving the Note closes its find bar (obf-1047).
+        self.find = None;
+        // A Note "+" made goes when nothing came of it; kept, the top
+        // says so where the person filter hides it (obf-1070).
+        if let Some((blank, mark)) = self.blank.take()
+            && blank == left
+            && !self.drop_if_blank(&blank, mark)?
+        {
+            self.say_if_filter_hides(&blank)?;
+        }
         Ok(())
+    }
+
+    /// Opens the Note dialog on a new, empty Note filed into `place`, the
+    /// Area or Topic shown (obf-1140): someone who sorted wants the full
+    /// editor there, not the quick note. No Nudge, as for any sorted Note;
+    /// without a place, by the Agenda's and Unsorted's "Editor"
+    /// (obf-1141), Unsorted and nudged in 1 h, as the quick note's Open in
+    /// the editor does. Left as it was made, it goes again.
+    fn new_note_in(&mut self, place: Option<&str>) -> oldbrainfix_core::Result<()> {
+        // One dialog at a time: the quick note and the Note open are kept
+        // and closed.
+        if self.quick_open {
+            self.act(Action::CloseQuickNote)?;
+        }
+        self.leave_note()?;
+        let mark = self.store.current_seq()?;
+        let nudge = place.is_none().then(Notes::default_nudge);
+        let id = Notes::new(&self.store).capture("", place, nudge)?.id;
+        self.act(Action::SelectNote(id.clone()))?;
+        self.made_open = Some(id.clone());
+        self.edit_wanted = Some(id.clone());
+        self.blank = Some((id, mark));
+        Ok(())
+    }
+
+    /// Removes the Note `id` made empty by [`App::new_note_in`] after the
+    /// log's mark `mark` when nothing came of it ([`App::is_blank`]);
+    /// whether it went.
+    fn drop_if_blank(&mut self, id: &str, mark: i64) -> oldbrainfix_core::Result<bool> {
+        let blank = self.is_blank(id, mark)?;
+        if blank {
+            Notes::new(&self.store).discard(id)?;
+        }
+        Ok(blank)
+    }
+
+    /// Whether nothing came of the Note `id` made empty after the log's
+    /// mark `mark`, as on the phone: no text, still a plain Note, without
+    /// photo, recording, file or Section, nothing spawned from it, not in
+    /// the trash and not merged, this Device's to change; and nothing
+    /// written since names it, such as a Frog. Anything else keeps it.
+    fn is_blank(&self, id: &str, mark: i64) -> oldbrainfix_core::Result<bool> {
+        let notes = Notes::new(&self.store);
+        let Some(note) = notes.by_id(id)? else {
+            return Ok(false);
+        };
+        let empty = note.text.trim().is_empty()
+            && note.photos.is_empty()
+            && note.recordings.is_empty()
+            && note.attachments.is_empty()
+            && !note.spawned
+            && !note.is_trashed()
+            && !note.is_merged();
+        if !empty
+            || NoteKind::of(&self.store, id)? != NoteKind::Plain
+            || !notes.sections(id)?.is_empty()
+            || !self.store.may_change(id)?
+        {
+            return Ok(false);
+        }
+        let named = |e: &oldbrainfix_core::Entry| {
+            e.entity != id
+                && (e.entity.contains(id) || e.value.as_deref().is_some_and(|v| v.contains(id)))
+        };
+        Ok(!self.store.entries_after(mark)?.iter().any(named))
+    }
+
+    /// Whether the find bar of the Note open is open (obf-1047).
+    fn find_open(&self) -> bool {
+        matches!((&self.find, &self.selected_note), (Some((of, _)), Some(id)) if of == id)
+    }
+
+    /// Opens the find bar over the Note open (obf-1047), the cursor in its
+    /// field, its words selected: with `words` in it, else with those it
+    /// had while it was open, else empty. Ctrl+F opens it without words;
+    /// a right-click's Search on words selected in the Note is to open it
+    /// with them (obf-1055).
+    fn open_find(&mut self, words: Option<&str>) {
+        let Some(note) = self.selected_note.clone() else {
+            return;
+        };
+        match (&mut self.find, words) {
+            (Some((of, bar)), None) if *of == note => bar.focus(),
+            (_, words) => {
+                let bar = FindBar::new(words.unwrap_or_default(), true);
+                self.find = Some((note, bar));
+            }
+        }
+    }
+
+    /// The words the search of the list shown found the Note `id` by
+    /// (obf-1047), while it is among the cards found and its card did
+    /// not show it found nowhere in it.
+    fn found_on_card(&self, id: &str) -> Option<String> {
+        let query = self.searching.searched().trim();
+        if query.is_empty() || !self.searches() || self.alone.is_some() {
+            return None;
+        }
+        if !self.view.notes.iter().any(|p| p.note.id == id) {
+            return None;
+        }
+        match self.card_findings.get(id) {
+            Some((searched, _, found)) if searched == query && found.is_empty() => None,
+            _ => Some(query.to_string()),
+        }
     }
 
     /// Where what "+" makes goes: the Area or Topic the list shows, none
@@ -10343,14 +11899,15 @@ impl App {
         Ok(())
     }
 
-    /// Makes `kind` as "+" asked, each on its own form: the Note through
-    /// the quick note; a Checklist, a Shopping List or a Frog from its
+    /// Makes `kind` as "+" asked, each on its own form: the Note in the
+    /// Note dialog (obf-1140); a Checklist, a Shopping List or a Frog from its
     /// name; a Tally or a Session on its one page; a Topic as the Area
     /// adds one (#161).
     fn add(&mut self, kind: NewKind) -> oldbrainfix_core::Result<()> {
         let place = self.list_place();
         match kind {
-            NewKind::Note => self.act(Action::NewNote)?,
+            NewKind::Note => self.act(Action::NewNoteHere)?,
+            NewKind::Editor => self.new_note_in(place.as_deref())?,
             NewKind::Checklist | NewKind::Shopping | NewKind::Frog => {
                 self.dialog = Some(Dialog::NewKind {
                     kind,
@@ -10386,6 +11943,31 @@ impl App {
         Ok(())
     }
 
+    /// Remembers that the Note `id`, just made, is one the list's person
+    /// filter hides where it would show but for it (obf-1070): back in the
+    /// list the top says so, with "Show".
+    fn say_if_filter_hides(&mut self, id: &str) -> oldbrainfix_core::Result<()> {
+        if self.people.is_everyone() {
+            return Ok(());
+        }
+        let Some(note) = Notes::new(&self.store).by_id(id)? else {
+            return Ok(());
+        };
+        let here = match &self.selection {
+            Selection::All => true,
+            Selection::Unsorted => note.place.is_none(),
+            Selection::Place(place) => note.place.as_deref() == Some(place.as_str()),
+            _ => false,
+        };
+        if here && !self.store.wrote_by(id, &self.people)? {
+            self.made_hidden = Some(MadeHidden {
+                list: self.selection.clone(),
+                shown_since: None,
+            });
+        }
+        Ok(())
+    }
+
     /// Makes the Checklist, Shopping List or Frog the name dialog asked
     /// for, filed where the list is: a list then opens in the Note dialog
     /// with the cursor in its first Line.
@@ -10411,8 +11993,10 @@ impl App {
             }
             Ok(note.id)
         })?;
+        self.say_if_filter_hides(&made)?;
         if matches!(kind, NewKind::Checklist | NewKind::Shopping) {
-            self.act(Action::SelectNote(made))?;
+            self.act(Action::SelectNote(made.clone()))?;
+            self.made_open = Some(made);
             self.start_lines = true;
         }
         Ok(())
@@ -10443,6 +12027,8 @@ impl App {
                         }
                         (None, None) => {}
                     }
+                } else {
+                    self.say_if_filter_hides(&id)?;
                 }
                 self.tally_page = None;
             }
@@ -10704,6 +12290,15 @@ impl App {
                 // Read anew once it shows again.
                 self.ask_fields = None;
             }
+            Setting::Tips(on) => {
+                settings.set_tips_on(on)?;
+                self.spotlights.set_tips(on);
+            }
+            Setting::TapMarks(on) => {
+                design::set_tap_marks_setting(&self.store, on)?;
+                self.tap_marks = on;
+            }
+            Setting::RecordingPause(seconds) => settings.set_recording_pause_seconds(seconds)?,
         }
         Ok(())
     }
@@ -10717,6 +12312,481 @@ impl App {
         self.lines.keep(&self.store, &*self.wall)?;
         self.save_note_text()?;
         self.save_sections()
+    }
+
+    /// The Note open as its steps hold it (obf-1051): what is typed into
+    /// its fields and what is written of it; `None` while none is open.
+    fn steps_state(&self) -> Option<State> {
+        let view = &self.view;
+        let (placed, _) = view.detail.as_ref()?;
+        let note = &placed.note;
+        if self.text_of.as_deref() != Some(note.id.as_str()) {
+            return None;
+        }
+        let typed = note_steps::Typed {
+            text: self.typed_text(),
+            sections: self
+                .section_texts
+                .iter()
+                .map(|(id, field)| (id.clone(), field.text.clone()))
+                .collect(),
+        };
+        let lines = match (&view.checklist, &view.shopping) {
+            (Some(shown), _) => Some(LinesKept::of_checklist(&shown.list)),
+            (None, Some(shown)) => Some(LinesKept::of_shopping(&shown.list)),
+            (None, None) => None,
+        };
+        let on_agenda = match (&view.checklist, &view.shopping) {
+            (Some(shown), _) => shown.on_agenda,
+            (None, Some(shown)) => shown.on_agenda,
+            (None, None) => None,
+        };
+        let kept = note_steps::Kept {
+            kind: view.kind.unwrap_or(NoteKind::Plain),
+            format: note.text_format.clone(),
+            language: note.code_language.clone(),
+            importance: note.importance,
+            place: note.place.clone(),
+            lines,
+            on_agenda,
+            hidden: view.note_hidden.is_some_and(|(own, _)| own),
+            ticks: view.show_ticks.contains(&note.id),
+            tally: view
+                .tally
+                .as_ref()
+                .map(|shown| (shown.tally.bar, shown.tally.counts_in_sets)),
+            session: view.session_setup.clone(),
+        };
+        Some(State { typed, kept })
+    }
+
+    /// Looks at the Note open for a step, as `how` says (obf-1051): the
+    /// steps of a Note opened anew start with it as it is. Whether it
+    /// made a step.
+    fn see_steps(&mut self, how: See) -> bool {
+        let Some(now) = self.steps_state() else {
+            self.steps = None;
+            return false;
+        };
+        let Some(note) = self.text_of.clone() else {
+            return false;
+        };
+        let Some(steps) = self.steps.as_mut().filter(|s| s.note() == note) else {
+            self.steps = Some(Steps::new(&note, now));
+            return false;
+        };
+        if !steps.see(now, how) {
+            return false;
+        }
+        // A Tally or a Session made or unmade has no way back as it was:
+        // the steps start again from it.
+        let lists = |kind: NoteKind| {
+            matches!(
+                kind,
+                NoteKind::Plain | NoteKind::Checklist | NoteKind::ShoppingList
+            )
+        };
+        let kinds = (steps.undo_to().map(|s| s.kept.kind), steps.at().kept.kind);
+        if let (Some(was), is) = kinds
+            && was != is
+            && !(lists(was) && lists(is))
+        {
+            let now = steps.at().clone();
+            steps.restart(now);
+        }
+        true
+    }
+
+    /// Whether Ctrl+Z and Edit ▸ Undo take back the last step of the Note
+    /// open rather than the window's undo: it has one, and the window's
+    /// came before it or waits for nothing (obf-1051).
+    fn steps_undo_first(&self) -> bool {
+        self.steps.as_ref().is_some_and(|s| s.undo_to().is_some())
+            && (!self.undo_later || self.undo.is_none())
+    }
+
+    /// Undo, Redo or "Revert all changes" of the Note open (obf-1051):
+    /// what is typed is kept first, as a step of its own, then the Note
+    /// is written as the step it goes to was, as an edit does. Its fields
+    /// forget their own typing then.
+    fn note_step(&mut self, way: Way) -> oldbrainfix_core::Result<()> {
+        self.save_text()?;
+        self.refresh();
+        self.see_steps(See::After);
+        let Some(steps) = &self.steps else {
+            return Ok(());
+        };
+        let to = match way {
+            Way::Undo => steps.undo_to().cloned(),
+            Way::Redo => steps.redo_to().cloned(),
+            Way::Revert => steps.changed().then(|| steps.opened().clone()),
+        };
+        let Some(to) = to else {
+            return Ok(());
+        };
+        // The window's undo of the same change goes with it.
+        if way == Way::Undo && self.slot_step.is_some() && self.slot_step == Some(steps.depth()) {
+            self.undo = None;
+            self.slot_step = None;
+        }
+        let written = self.write_state(&to);
+        self.refresh();
+        self.fields_forget = true;
+        if let (Some(now), Some(steps)) = (self.steps_state(), self.steps.as_mut()) {
+            match way {
+                Way::Undo => steps.undone(now),
+                Way::Redo => steps.redone(now),
+                Way::Revert => steps.reverted(now),
+            }
+        }
+        written
+    }
+
+    /// The step of a text changed whole by a menu (obf-1051), as
+    /// [`Action::WholeStep`] says: the field as it was before it, then
+    /// as it is.
+    fn whole_step(&mut self, section: Option<&str>, before: String) {
+        let Some(after) = self.steps_state() else {
+            return;
+        };
+        let mut was = after.clone();
+        match section {
+            None if self.text_kinded => was.typed.text = note_kinds::join(&self.name, &before),
+            None => was.typed.text = before,
+            Some(id) => {
+                if let Some(text) = was.typed.sections.get_mut(id) {
+                    *text = before;
+                }
+            }
+        }
+        if let Some(steps) = self.steps.as_mut() {
+            steps.see(was, See::Before);
+            steps.see(after, See::Before);
+        }
+    }
+
+    /// Writes the Note open as `to` holds it (obf-1051), where it is
+    /// otherwise, by the same steps its editor writes it with: its kind
+    /// between a plain Note and the lists, the format and language of its
+    /// text, its text and its Sections' as a save keeps them, its
+    /// Importance, its Lines, its badges. A formatted text stays formatted
+    /// (ADR 0033).
+    fn write_state(&mut self, to: &State) -> oldbrainfix_core::Result<()> {
+        let Some(id) = self.text_of.clone() else {
+            return Ok(());
+        };
+        let Some(now) = self.steps_state() else {
+            return Ok(());
+        };
+        let lists = |kind: NoteKind| {
+            matches!(
+                kind,
+                NoteKind::Plain | NoteKind::Checklist | NoteKind::ShoppingList
+            )
+        };
+        let (from, kind) = (now.kept.kind, to.kept.kind);
+        if from != kind
+            && lists(from)
+            && lists(kind)
+            && KindShown::of(&self.view).choices.contains(&kind)
+        {
+            self.save_text()?;
+            self.act(kind_action(&id, from, kind))?;
+            self.refresh();
+        }
+        let Some(now) = self.steps_state() else {
+            return Ok(());
+        };
+        if now.kept.format != to.kept.format {
+            let known = [text_format::PLAIN, text_format::MARKDOWN, text_format::CODE];
+            if let Some(format) = known.into_iter().find(|f| *f == to.kept.format) {
+                self.set_text_format(format)?;
+            }
+        }
+        if now.kept.language != to.kept.language {
+            self.set_code_language(to.kept.language.as_deref())?;
+        }
+        // The texts as a save keeps them.
+        if !note_steps::same_text(&self.typed_text(), &to.typed.text) {
+            self.put_typed(to.typed.text.clone());
+        }
+        for (section, text) in &to.typed.sections {
+            if let Some(field) = self.section_texts.get_mut(section)
+                && !note_steps::same_text(&field.text, text)
+            {
+                field.text = text.clone();
+            }
+        }
+        self.save_note_text()?;
+        self.save_sections()?;
+        let (now, to) = (&now.kept, &to.kept);
+        if now.importance != to.importance {
+            Notes::new(&self.store).set_importance(&id, to.importance)?;
+        }
+        // Filed back as Ctrl+Z files it back, Unsorted included.
+        if now.place != to.place {
+            Undo::Filed(vec![(id.clone(), to.place.clone())]).apply(&self.store)?;
+        }
+        if let (Some(_), Some(lines)) = (&now.lines, &to.lines) {
+            self.restore_lines(&id, lines)?;
+        }
+        if now.on_agenda != to.on_agenda
+            && let (Some(shows), Some(lines)) = (to.on_agenda, &to.lines)
+        {
+            self.act(match lines.shopping {
+                true => Action::Shopping(ShoppingAction::OnAgenda(id.clone(), shows)),
+                false => Action::Checklist(ChecklistAction::OnAgenda(id.clone(), shows)),
+            })?;
+        }
+        if now.hidden != to.hidden {
+            self.act(Action::HideFromAi(id.clone(), to.hidden))?;
+        }
+        if now.ticks != to.ticks {
+            self.act(Action::ShowTicks {
+                note: id.clone(),
+                on: to.ticks,
+            })?;
+        }
+        if let (Some((bar, sets)), Some((was_bar, was_sets))) = (to.tally, now.tally) {
+            if bar != was_bar {
+                self.act(Action::Tally(TallyAction::Bar(bar)))?;
+            }
+            if sets != was_sets {
+                self.act(Action::Tally(TallyAction::Sets(sets)))?;
+            }
+        }
+        if let (Some(setup), Some(was)) = (&to.session, &now.session)
+            && setup != was
+        {
+            SessionDraft::of(&self.store, &self.t, &id, Some(setup))?.write(&self.store, was)?;
+        }
+        Ok(())
+    }
+
+    /// Brings the Lines of the Note `note` back to `to` (obf-1051): the
+    /// Lines added since deleted, those deleted since restored, their
+    /// texts and reappear times, then their order and groups by moves as
+    /// a drag makes them, a Shopping List's among its open Lines. Only
+    /// the Lines this Device may change.
+    fn restore_lines(&self, note: &str, to: &LinesKept) -> oldbrainfix_core::Result<()> {
+        let store = &*self.store;
+        let wall = &*self.wall;
+        let checklists = Checklists::new(store);
+        let shopping = ShoppingLists::new(store);
+        let read = || -> oldbrainfix_core::Result<Option<(LinesKept, HashSet<String>)>> {
+            Ok(match to.shopping {
+                true => shopping.by_note(note, wall)?.map(|list| {
+                    let open = list.open().into_iter().map(|l| l.id.clone()).collect();
+                    (LinesKept::of_shopping(&list), open)
+                }),
+                false => checklists.shown_now(note, wall)?.map(|list| {
+                    let all = list.lines.iter().map(|l| l.id.clone()).collect();
+                    (LinesKept::of_checklist(&list), all)
+                }),
+            })
+        };
+        let Some((now, _)) = read()? else {
+            return Ok(());
+        };
+        // Made anew, as its kind went back and forth: by their places.
+        if now.making != to.making {
+            return self.rebuild_lines(note, &now, to);
+        }
+        let deleted: HashSet<String> = match to.shopping {
+            true => shopping.deleted_lines(note)?,
+            false => checklists.deleted_lines(note)?,
+        }
+        .into_iter()
+        .map(|line| line.id)
+        .collect();
+        store.batch(|| {
+            for line in &to.lines {
+                if now.line(&line.id).is_none()
+                    && deleted.contains(&line.id)
+                    && checklists.may_edit(&line.id)?
+                {
+                    match to.shopping {
+                        true => shopping.restore(&line.id)?,
+                        false => checklists.restore(&line.id)?,
+                    }
+                }
+            }
+            for line in &now.lines {
+                if to.line(&line.id).is_none() && checklists.may_edit(&line.id)? {
+                    match to.shopping {
+                        true => shopping.delete(&line.id)?,
+                        false => checklists.delete(&line.id)?,
+                    }
+                }
+            }
+            Ok(())
+        })?;
+        let Some((now, _)) = read()? else {
+            return Ok(());
+        };
+        store.batch(|| {
+            for line in &to.lines {
+                let Some(was) = now.line(&line.id) else {
+                    continue;
+                };
+                if !checklists.may_edit(&line.id)? {
+                    continue;
+                }
+                if was.text != line.text && !line.text.trim().is_empty() {
+                    match to.shopping {
+                        true => shopping.rename(&line.id, &line.text)?,
+                        false => checklists.rename(&line.id, &line.text)?,
+                    }
+                }
+                if let Some(reappear) = line.reappear
+                    && was.reappear != Some(reappear)
+                {
+                    shopping.set_reappear(&line.id, reappear)?;
+                }
+            }
+            Ok(())
+        })?;
+        // Their order, a move at a time, from the first Line out of place;
+        // a move that changes nothing ends it.
+        let mut last = None;
+        for _ in 0..=2 * to.lines.len() {
+            let Some((now, movable)) = read()? else {
+                break;
+            };
+            if last.as_ref() == Some(&now) {
+                break;
+            }
+            // The Lines both hold that may move.
+            let shown: Vec<&note_steps::LineKept> = now
+                .lines
+                .iter()
+                .filter(|l| movable.contains(&l.id) && to.line(&l.id).is_some())
+                .collect();
+            let wanted: Vec<&note_steps::LineKept> = to
+                .lines
+                .iter()
+                .filter(|l| movable.contains(&l.id) && now.line(&l.id).is_some())
+                .collect();
+            let out = shown
+                .iter()
+                .zip(&wanted)
+                .position(|(is, wants)| is.id != wants.id || is.in_group != wants.in_group);
+            let Some(at) = out else {
+                break;
+            };
+            let (Some(is), Some(wants)) = (shown.get(at), wanted.get(at)) else {
+                break;
+            };
+            if !checklists.may_edit(&wants.id)? {
+                break;
+            }
+            match (to.shopping, is.id == wants.id) {
+                (true, _) => shopping.move_line(&wants.id, wall, Some(&is.id))?,
+                // In place, only in the wrong group.
+                (false, true) if at == 0 && wants.in_group => break,
+                (false, true) => checklists.indent(&wants.id, wants.in_group)?,
+                (false, false) => checklists.move_line(&wants.id, Some(&is.id))?,
+            }
+            last = Some(now);
+        }
+        // Their checks, a Line at a time, as a group checks with its
+        // Lines: for the Occurrence the list shows checked for.
+        let checks = match to.shopping {
+            true => shopping.may_check(note)?,
+            false => checklists.may_check(note)?,
+        };
+        if !checks {
+            return Ok(());
+        }
+        let on = match to.shopping {
+            true => None,
+            false => checklists.shown_now(note, wall)?.and_then(|l| l.on),
+        };
+        let mut last = None;
+        for _ in 0..=to.lines.len() {
+            let Some((now, _)) = read()? else {
+                break;
+            };
+            if last.as_ref() == Some(&now) {
+                break;
+            }
+            let Some(wants) = to.lines.iter().find(|wants| {
+                now.line(&wants.id)
+                    .is_some_and(|is| is.checked != wants.checked)
+            }) else {
+                break;
+            };
+            let id = wants.id.as_str();
+            match (to.shopping, wants.checked, &on) {
+                (true, true, _) => shopping.check(id, wall)?,
+                (true, false, _) => shopping.uncheck(id, wall)?,
+                (false, true, Some(on)) => checklists.check_for(id, on)?,
+                (false, false, Some(on)) => checklists.uncheck_for(id, on)?,
+                (false, true, None) => checklists.check(id)?,
+                (false, false, None) => checklists.uncheck(id)?,
+            }
+            last = Some(now);
+        }
+        Ok(())
+    }
+
+    /// Brings the Lines of the Note `note`, made anew since and read as
+    /// `now`, back to `to` by their places (obf-1051): each Line's text,
+    /// group and reappear time as the Line at its place had them, Lines
+    /// added where `to` has more and deleted where it has fewer.
+    fn rebuild_lines(
+        &self,
+        note: &str,
+        now: &LinesKept,
+        to: &LinesKept,
+    ) -> oldbrainfix_core::Result<()> {
+        let store = &*self.store;
+        let wall = &*self.wall;
+        let checklists = Checklists::new(store);
+        let shopping = ShoppingLists::new(store);
+        store.batch(|| {
+            for (at, wants) in to.lines.iter().enumerate() {
+                let id = match now.lines.get(at) {
+                    Some(is) if !checklists.may_edit(&is.id)? => continue,
+                    Some(is) => {
+                        if is.text != wants.text {
+                            match to.shopping {
+                                true => shopping.rename(&is.id, &wants.text)?,
+                                false => checklists.rename(&is.id, &wants.text)?,
+                            }
+                        }
+                        if !to.shopping && at > 0 && is.in_group != wants.in_group {
+                            checklists.indent(&is.id, wants.in_group)?;
+                        }
+                        is.id.clone()
+                    }
+                    None => match to.shopping {
+                        true => shopping.add(note, &wants.text, wall)?,
+                        false => checklists.add(note, &wants.text, None, wants.in_group)?,
+                    },
+                };
+                if let Some(reappear) = wants.reappear {
+                    shopping.set_reappear(&id, reappear)?;
+                }
+            }
+            for gone in now.lines.iter().skip(to.lines.len()) {
+                if checklists.may_edit(&gone.id)? {
+                    match to.shopping {
+                        true => shopping.delete(&gone.id)?,
+                        false => checklists.delete(&gone.id)?,
+                    }
+                }
+            }
+            Ok(())
+        })
+    }
+
+    /// Whether the Note open has a step for Undo, one for Redo, and
+    /// something "Revert all changes" goes back from (obf-1051).
+    pub fn note_steps(&self) -> (bool, bool, bool) {
+        self.steps.as_ref().map_or((false, false, false), |s| {
+            (s.undo_to().is_some(), s.redo_to().is_some(), s.changed())
+        })
     }
 
     /// Keeps the edited text of each Section of the shown Note whose
@@ -10791,6 +12861,16 @@ impl App {
             note_kinds::join(&self.name, &self.text)
         } else {
             self.text.clone()
+        }
+    }
+
+    /// Puts `written`, the text the Note or Section `note` has now, into
+    /// its field, or the next save would put the old one back (#183).
+    fn show_written(&mut self, note: &str, written: String) {
+        if self.text_of.as_deref() == Some(note) {
+            self.put_typed(written);
+        } else if let Some(field) = self.section_texts.get_mut(note) {
+            field.text = written;
         }
     }
 
@@ -10994,6 +13074,8 @@ impl App {
             self.searching.set_searched(&left.query);
             self.query = left.query;
             self.people = left.people;
+            // Its "Show" would clear another list's filter (obf-1070).
+            self.made_hidden = None;
             // The cards selected were those of the list left (#148).
             self.cards.clear();
             self.list_offset = left.scroll;
@@ -11127,9 +13209,8 @@ impl App {
                                     backup_view::welcome(ui, &t, &wall, welcome, &mut asked);
                                     return;
                                 }
-                                let text = ui.visuals().text_color();
                                 let weak = ui.visuals().weak_text_color();
-                                ui.heading(RichText::new(t.first_start_device()).color(text));
+                                design::dialog_title(ui, t.first_start_device());
                                 ui.label(RichText::new(t.first_start_device_detail()).color(weak));
                                 if let Some(action) = sync.pairing(ui, &t, tones) {
                                     synced.push(Action::Sync(action));
@@ -11145,12 +13226,10 @@ impl App {
                                     }
                                     if !hosted
                                         && ui
-                                            .add_enabled(
-                                                !joining,
-                                                egui::Button::new(
-                                                    RichText::new(t.cancel()).color(text),
-                                                ),
-                                            )
+                                            .add_enabled_ui(!joining, |ui| {
+                                                design::row_button(ui, t.cancel())
+                                            })
+                                            .inner
                                             .clicked()
                                     {
                                         asked.push(WelcomeAction::Back);
@@ -11182,7 +13261,10 @@ impl App {
     pub fn show(&mut self, ui: &mut Ui) {
         self.save_ticks(ui.ctx());
         self.agenda_arrived(ui.ctx());
+        self.place_notified();
         self.search_arrived(ui.ctx());
+        self.tags_arrived(ui.ctx());
+        self.trash_counts_arrived(ui.ctx());
         self.pack_arrived(ui.ctx());
         self.ask_arrived(ui.ctx());
         // However its page went, what a Backup opened held goes with it.
@@ -11297,16 +13379,50 @@ impl App {
         // An Import running beside the window (obf-1061), also after its
         // dialog closed: its answer is announced when it comes.
         if self.import.running() {
+            // Asking about an earlier Import of its source (obf-1078): the
+            // question shows once no other dialog does, and again when it
+            // was left otherwise than by its answer.
+            if let Some(earlier) = self.import.asking()
+                && matches!(self.dialog, None | Some(Dialog::Import))
+            {
+                self.dialog = Some(Dialog::FillIn(self.fill_in_question(&earlier)));
+                // Asked in a viewer, it is asked here: this window comes
+                // forward to ask it.
+                ui.ctx()
+                    .send_viewport_cmd_to(egui::ViewportId::ROOT, egui::ViewportCommand::Focus);
+                ui.ctx().request_repaint();
+            }
             match self.import.finished() {
-                Some((kind, imported)) => {
+                Some((kind, imported, fill_in)) => {
                     let made = imported.as_ref().is_ok_and(|s| s.area_id.is_some());
+                    // Aborted on the page Running (obf-1078): how far it came.
+                    let stopped = imported
+                        .as_ref()
+                        .ok()
+                        .and_then(|s| s.stopped.map(|of| (s.notes, of)));
+                    let what = self.import_what(&kind);
                     // Written on a connection of its own, a Note after
                     // another, also when it failed on the way: this one
                     // reads the log anew, the new Area too.
                     self.store.changed_elsewhere();
+                    let fill_in = fill_in.as_deref();
                     match kind {
-                        Importing::Folder(name) => self.announce_folder_imported(&name, imported),
-                        Importing::Keep => self.announce_keep_imported(imported),
+                        Importing::Folder(name) => {
+                            self.announce_folder_imported(&name, imported, fill_in)
+                        }
+                        Importing::Keep => self.announce_keep_imported(imported, fill_in),
+                        Importing::Markdown(name) => {
+                            self.announce_markdown_imported(&name, imported, fill_in);
+                            // Asked in a viewer, it is said here: this
+                            // window comes forward to say it.
+                            ui.ctx().send_viewport_cmd_to(
+                                egui::ViewportId::ROOT,
+                                egui::ViewportCommand::Focus,
+                            );
+                        }
+                    }
+                    if let Some(stopped) = stopped {
+                        self.import_stopped(what, stopped);
                     }
                     // What it made is announced at the top; the Import
                     // dialog, when it shows, says the same in its place,
@@ -11338,14 +13454,26 @@ impl App {
                 // the log anew.
                 self.store.changed_elsewhere();
                 let t = self.t;
-                for (_, deleted) in finished {
-                    if let Err(details) = deleted {
-                        self.announce_failure(
+                for (area_id, deleted, moved) in finished {
+                    match deleted {
+                        Ok(true) => {}
+                        // Aborted on the page Running (obf-1078): the Area
+                        // stays, listed there with how far it came.
+                        Ok(false) => {
+                            let (moved, of) = moved.unwrap_or_default();
+                            self.stopped_jobs.push(Ended {
+                                what: t.running_area_deletion(&self.area_called(&area_id)),
+                                said: t.running_area_stopped(moved as i64, of as i64),
+                                id: JobId::AreaDeletion(area_id),
+                                goes_on: false,
+                            });
+                        }
+                        Err(details) => self.announce_failure(
                             t.area_delete_failed(),
                             t.area_delete_failed_title(),
                             (t.area_delete_failed_cause(), t.area_delete_failed_fix()),
                             details,
-                        );
+                        ),
                     }
                 }
                 self.refresh();
@@ -11355,6 +13483,22 @@ impl App {
                     drop(wake.send(Event::Wake));
                 }
                 ui.ctx().request_repaint();
+            }
+        }
+        // The trash being emptied beside the window (obf-1095): in one
+        // transaction on a connection of its own; the Trash shows what
+        // is left once it is in.
+        if self.trash_emptying.running() {
+            match self.trash_emptying.finished() {
+                Some(emptied) => {
+                    self.store.changed_elsewhere();
+                    self.trash_emptied(emptied);
+                    self.refresh();
+                    ui.ctx().request_repaint();
+                }
+                None => ui
+                    .ctx()
+                    .request_repaint_after(std::time::Duration::from_millis(100)),
             }
         }
         // A vault being written or rebuilt, also after its dialog closed:
@@ -11388,6 +13532,7 @@ impl App {
             };
             self.announce_failure(t.sync_not_done(), t.sync_not_done_title(), why, details);
         }
+        self.keep_speech_choice();
         // A speech model came: what waited is transcribed now.
         let ready = self.speech.as_ref().is_none_or(|s| s.current().is_some());
         if ready != self.speech_ready {
@@ -11421,6 +13566,7 @@ impl App {
             .is_some_and(|wanted| wanted.swap(false, Ordering::SeqCst))
         {
             actions.push(Action::Select(Selection::Unsorted));
+            self.click_trace.went(NUDGE_KEY, "Unsorted");
             ui.ctx().request_repaint();
         }
         if self
@@ -11429,14 +13575,23 @@ impl App {
             .is_some_and(|wanted| wanted.swap(false, Ordering::SeqCst))
         {
             actions.push(Action::SendWaitingChanges);
+            self.click_trace.went(CHANGES_KEY, "send changes");
             ui.ctx().request_repaint();
         }
-        if let Some(routine) = self
+        if let Some(wanted) = self
             .occurrence_wanted
             .as_ref()
             .and_then(|wanted| wanted.lock().ok().and_then(|mut held| held.take()))
         {
-            actions.push(Action::OpenNotified(routine));
+            actions.push(match wanted {
+                AgendaWanted::Occurrence(routine, occurrence) => {
+                    Action::OpenNotified(routine, occurrence)
+                }
+                AgendaWanted::Agenda => {
+                    self.click_trace.went(CATCH_UP_KEY, "Agenda");
+                    Action::Select(Selection::Agenda)
+                }
+            });
             ui.ctx().request_repaint();
         }
         if !files.is_empty() {
@@ -11493,7 +13648,7 @@ impl App {
         }
         // The menu bar's keys, over the window only; they are no text
         // keys, so they work while typing too.
-        // Over the Note dialog they work, its Note the Note menu's.
+        // Over the Note dialog they work, on its Note.
         let over = self.viewer.is_some()
             || self.table.is_some()
             || self.dialog.is_some()
@@ -11521,21 +13676,26 @@ impl App {
                 && !ui.ctx().text_edit_focused()
                 && !egui::Popup::is_any_open(ui.ctx());
             let ai_on = self.view.ai_on;
+            let note_open = self.note_open();
             ui.input_mut(|i| {
                 if clears && i.consume_key(Modifiers::NONE, Key::Escape) {
                     actions.push(Action::ClearCards);
                 }
                 if i.consume_key(Modifiers::COMMAND, Key::N) {
-                    actions.push(Action::NewNote);
+                    actions.push(Action::NewNoteHere);
                 }
                 if i.consume_key(Modifiers::COMMAND, Key::F) {
                     actions.push(Action::Find);
                 }
                 // In a text field Ctrl+Z is the field's, undoing what was
                 // typed (#268); Ctrl+Shift+Z, a redo elsewhere, undoes
-                // nothing.
+                // nothing. Over the Note open it and Ctrl+Y are its Redo
+                // (obf-1051).
                 if !typing && !i.modifiers.shift && i.consume_key(Modifiers::COMMAND, Key::Z) {
                     actions.push(Action::Undo);
+                }
+                if !typing && note_open && redo_keys(i) {
+                    actions.push(Action::NoteRedo);
                 }
                 if i.consume_key(Modifiers::COMMAND, Key::Comma) {
                     actions.push(Action::OpenPage(Page::Settings));
@@ -11609,31 +13769,39 @@ impl App {
             // Under it, while a sync of this Device runs (#225).
             // Not while hidden: nobody sees it, and it would keep asking for frames.
             let drawn = self.drawn(ui.ctx());
-            if drawn
-                && self
-                    .syncing
-                    .as_ref()
-                    .is_some_and(|s| s.shows_line(sync_line::LIMIT))
+            let named = if !drawn {
+                None
+            } else if self
+                .syncing
+                .as_ref()
+                .is_some_and(|s| s.shows_line(sync_line::LIMIT))
             {
-                sync_line::show(ui, bar.response.rect, tones.accent, self.t.sync_syncing());
-            } else if drawn && self.pack_opening() {
+                Some(self.t.sync_syncing())
+            } else if self.pack_opening() {
                 // And while a Pack opens off the window's thread.
-                sync_line::show(ui, bar.response.rect, tones.accent, self.t.pack_opening());
-            } else if drawn && self.import.running() {
+                Some(self.t.pack_opening())
+            } else if self.import.running() {
                 // And while an Import runs beside the window (obf-1061).
-                sync_line::show(ui, bar.response.rect, tones.accent, self.t.import_running());
-            } else if drawn && self.deletions.running() {
+                Some(self.t.import_running())
+            } else if self.deletions.running() {
                 // And while an Area is being deleted beside it (obf-1093).
-                sync_line::show(
-                    ui,
-                    bar.response.rect,
-                    tones.accent,
-                    self.t.area_deleting_line(),
-                );
-            } else if drawn && self.agenda_waiting() {
+                Some(self.t.area_deleting_line())
+            } else if self.trash_emptying.running() {
+                // And while the trash is emptied beside it (obf-1095).
+                Some(self.t.desk_trash_emptying_line())
+            } else if self.agenda_waiting() {
                 // And while the Agenda is read for the first time
                 // (obf-1090).
-                sync_line::show(ui, bar.response.rect, tones.accent, self.t.agenda_reading());
+                Some(self.t.agenda_reading())
+            } else {
+                None
+            };
+            if let Some(named) = named {
+                let line = sync_line::show(ui, bar.response.rect, tones.accent, named);
+                // A click on it shows what runs (obf-1078).
+                if line.on_hover_text(self.t.running_line_hint()).clicked() {
+                    actions.push(Action::OpenPage(Page::Running));
+                }
             }
         }
         // What the Note dialog lies over: all but the menu bar, which
@@ -11678,7 +13846,10 @@ impl App {
         egui::CentralPanel::default()
             .frame(Frame::NONE.inner_margin(Margin::same(12)))
             .show(ui, |ui| {
-                self.nav_row(ui, &mut actions);
+                // A list of Notes has them in its band (obf-1064).
+                if self.list_hint().is_none() {
+                    self.nav_row(ui, &mut actions);
+                }
                 self.notes_pane(ui, tones, &mut actions);
             });
         if let Some(offset) = ui.data_mut(|d| d.remove_temp::<f32>(Id::new(LIST_OFFSET))) {
@@ -11723,6 +13894,14 @@ impl App {
         self.dragged(ui.ctx(), tones);
         // The menu of a text only shown, over everything (#255).
         read_text::menu(ui.ctx(), &self.t);
+        // The cells of a table being read copied (obf-1054).
+        if let Some(copy) = cell_pick::take_copy(ui.ctx()) {
+            actions.push(Action::CopyTable(copy));
+        }
+        // Search in a menu of the Note open (obf-1055).
+        if let Some(words) = text_menu::take_searched(ui.ctx()) {
+            self.open_find(Some(&words));
+        }
         // An app link clicked in any text this frame (#261).
         if let Some(link) = text_marks_view::take_app_link(ui.ctx()) {
             actions.push(Action::FollowLink(link));
@@ -11732,13 +13911,17 @@ impl App {
         let screen = self.spotlight_screen(ui.ctx());
         self.spotlights
             .show(ui.ctx(), (&self.store, &self.t, tones), screen);
+        // A pause that ends the recording (obf-1053).
+        self.watch_pause(ui.ctx(), &mut actions);
         for action in actions {
             if let Some(action) = self.tick_later(ui.ctx(), action) {
                 self.apply(action);
             }
         }
-        // The Notes in windows of their own, beside this one (#287).
+        // The Notes in windows of their own, beside this one (#287), and
+        // the Markdown files (obf-1056).
         self.show_note_windows(ui.ctx());
+        self.show_viewers(ui.ctx());
         // Once the Settings no longer show Record keys, recording stops
         // (#283).
         if !std::mem::take(&mut self.hotkey_recording.drawn) {
@@ -11761,6 +13944,10 @@ impl App {
                 None => ui.ctx().open_url(egui::OpenUrl::new_tab(url)),
             }
         }
+        // The green "!" of each button clicked (obf-1143), over it all,
+        // as this computer's setting has it.
+        design::set_tap_marks_on(ui.ctx(), self.tap_marks);
+        design::tap_marks(ui);
     }
 
     /// Draws each Note window (#287) as a viewport of this window's, with
@@ -11785,7 +13972,13 @@ impl App {
             let builder = window.app.note_window_builder(window.size);
             let app = &mut window.app;
             let shown = ctx.show_viewport_immediate(window.viewport, builder, |ui, class| {
-                app.note_window_frame(ui, class)
+                let shown = app.note_window_frame(ui, class);
+                // A window of its own marks its clicks itself (obf-1143);
+                // embedded, the main window's do.
+                if class != egui::ViewportClass::EmbeddedWindow {
+                    design::tap_marks(ui);
+                }
+                shown
             });
             self.lend(&mut window.app);
             asked.append(&mut window.app.for_main);
@@ -11816,6 +14009,105 @@ impl App {
         }
         for action in asked {
             self.apply(action);
+        }
+    }
+
+    /// Shows the Markdown file `file` in a viewer of its own (obf-1056),
+    /// or brings forward the one that shows it already.
+    fn open_viewer(&mut self, file: std::path::PathBuf) {
+        if let Some(viewer) = self.viewers.iter_mut().find(|v| v.shows(&file)) {
+            viewer.forward = true;
+            return;
+        }
+        self.viewers_opened += 1;
+        let size = window_sizes::note_window_size(&self.store);
+        let wake = self.redraw.clone();
+        let viewer = if self.in_flatpak {
+            let granted = self.link_folders.clone();
+            md_view::Viewer::open_granted(file, self.viewers_opened, size, wake, granted)
+        } else {
+            md_view::Viewer::open(file, self.viewers_opened, size, wake)
+        };
+        self.viewers.push(viewer);
+    }
+
+    /// The Markdown viewers open (obf-1056), for tests.
+    pub fn markdown_viewers(&self) -> &[md_view::Viewer] {
+        &self.viewers
+    }
+
+    /// Draws each Markdown viewer (obf-1056) as a viewport of this
+    /// window's, and does what each asked of this window.
+    fn show_viewers(&mut self, ctx: &egui::Context) {
+        if self.viewers.is_empty() {
+            return;
+        }
+        let t = self.t;
+        let importing = self.import.running();
+        let mut asked = Vec::new();
+        self.viewers.retain_mut(|viewer| {
+            if std::mem::take(&mut viewer.forward) {
+                ctx.send_viewport_cmd_to(viewer.viewport, egui::ViewportCommand::Focus);
+            }
+            let title = viewer.title(t.app_title());
+            let builder = note_window::viewport(&title, viewer.size, false);
+            let (open, mut wanted) =
+                ctx.show_viewport_immediate(viewer.viewport, builder, |ui, class| {
+                    let native = class != egui::ViewportClass::EmbeddedWindow;
+                    let asked = viewer.frame(ui, &t, importing, native);
+                    // Its clicks marked as the Note windows' (obf-1143).
+                    if native {
+                        design::tap_marks(ui);
+                    }
+                    asked
+                });
+            asked.append(&mut wanted);
+            open
+        });
+        for ask in asked {
+            match ask {
+                md_view::Asked::TextStep(larger) => self.apply(Action::TextStep(larger)),
+                md_view::Asked::SearchAll(words) => self.apply(Action::SearchFor(words)),
+                md_view::Asked::Copy(copy) => self.apply(Action::CopyTable(copy)),
+                md_view::Asked::OpenElsewhere(file) => {
+                    let opened = match &self.linked_file_opener {
+                        Some(open) => open(&file),
+                        None => app_links::open_file(&file),
+                    };
+                    if !opened {
+                        self.notice = Some(self.t.link_not_available().to_string());
+                    }
+                }
+                md_view::Asked::OpenFolder(viewport) => {
+                    if let Some(folder) =
+                        (self.link_folder_picker)(self.t.desk_markdown_folder_title())
+                    {
+                        // Kept for the files opened later while it runs.
+                        let folder = folder.canonicalize().unwrap_or(folder);
+                        if !self.link_folders.contains(&folder) {
+                            self.link_folders.push(folder.clone());
+                        }
+                        if let Some(viewer) =
+                            self.viewers.iter_mut().find(|v| v.viewport == viewport)
+                        {
+                            viewer.grant(folder);
+                        }
+                    }
+                }
+                md_view::Asked::Import { file, root, linked } => {
+                    if !self.import.running() {
+                        // Named after the file, without its ending.
+                        let name = file
+                            .file_stem()
+                            .map_or_else(String::new, |n| n.to_string_lossy().into_owned());
+                        let area = self.t.import_area_name(&name);
+                        let open = self.import_store();
+                        self.import
+                            .start_linked(open, (file, root, linked), name, area);
+                    }
+                }
+            }
+            ctx.request_repaint();
         }
     }
 
@@ -11887,6 +14179,7 @@ impl App {
         }
         let tones = theme::tones(ui.visuals());
         let mut actions = Vec::new();
+        self.steps_frame(ui.ctx());
         // Files dropped onto it go onto its Note while nothing lies over
         // it (#267); the app's own open in the main window. Embedded, the
         // drops are the main window's.
@@ -11912,6 +14205,14 @@ impl App {
             && self.table.is_none()
             && !egui::Popup::is_any_open(ui.ctx());
         if bare {
+            // Its find bar (obf-1047): Ctrl+F opens it or puts the cursor
+            // back into it, also while typing; Esc closes it first.
+            if ui.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::F)) {
+                actions.push(Action::Find);
+            }
+            if self.find_open() && ui.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Escape)) {
+                self.find = None;
+            }
             if ui.input_mut(|i| i.consume_key(Modifiers::NONE, Key::F9)) {
                 actions.push(Action::ReadingView(!reading));
             } else if reading {
@@ -11956,6 +14257,9 @@ impl App {
             {
                 // Ctrl+Z outside a text field, as in the main window (#268).
                 actions.push(Action::Undo);
+            } else if !typing && ui.input_mut(redo_keys) {
+                // And Redo, as over the Note dialog (obf-1051).
+                actions.push(Action::NoteRedo);
             }
         } else if self.viewer.is_some() {
             let back = ui.input_mut(|i| {
@@ -12004,6 +14308,11 @@ impl App {
                         .on_hover_text("F9");
                     if button.clicked() {
                         actions.push(Action::ReadingView(!reading));
+                    }
+                    // Undo, Redo and ⋮ as in the Note dialog (obf-1051),
+                    // not in the reading view.
+                    if !reading {
+                        self.step_buttons(ui, None, &mut actions);
                     }
                 });
             });
@@ -12057,6 +14366,12 @@ impl App {
             }
         }
         read_text::menu(&ctx, &self.t);
+        if let Some(copy) = cell_pick::take_copy(&ctx) {
+            actions.push(Action::CopyTable(copy));
+        }
+        if let Some(words) = text_menu::take_searched(&ctx) {
+            self.open_find(Some(&words));
+        }
         if let Some(link) = text_marks_view::take_app_link(&ctx) {
             actions.push(Action::FollowLink(link));
         }
@@ -12070,6 +14385,7 @@ impl App {
                 | Action::OpenPage(_)
                 | Action::PageInto(_)
                 | Action::NewNote
+                | Action::NewNoteHere
                 | Action::OpenAsk
                 | Action::Back
                 | Action::Forward => self.for_main.push(action),
@@ -12160,6 +14476,18 @@ impl App {
     /// card, tags and links work, a table and a photo open full screen; no
     /// badge, field, button or capture line shows.
     fn reading_view(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
+        // The find bar over it too (obf-1047), finding in its texts.
+        let marks = self.find_row(ui, true, actions);
+        let before = find_marks::set(ui.ctx(), marks);
+        // Its texts' menus offer Search (obf-1055).
+        let searched = text_menu::searches(ui.ctx(), true);
+        self.reading_content(ui, tones, actions);
+        text_menu::searches(ui.ctx(), searched);
+        find_marks::set(ui.ctx(), before);
+    }
+
+    /// What the reading view shows, as [`App::reading_view`] says.
+    fn reading_content(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
         let Some((placed, sections)) = &self.view.detail else {
             return;
         };
@@ -12192,6 +14520,9 @@ impl App {
         let output = scroll.show(ui, |ui| {
             let room = ui.available_width();
             let width = room.min(column);
+            // A table may take the window's width beyond the column, all
+            // its rows shown (obf-1048).
+            let wide = ui.max_rect().x_range().shrink(READ_EDGE);
             ui.horizontal_top(|ui| {
                 ui.spacing_mut().item_spacing.x = 0.0;
                 ui.add_space(((room - width) / 2.0).max(0.0));
@@ -12224,16 +14555,17 @@ impl App {
                             }
                             None => {
                                 let shown = ((0, named), heading);
+                                let shown = (shown, wide);
                                 read_part(ui, &t, part, shown, (looks(&note.id), ticks), actions);
                             }
                         }
                         let rest = (named, note.text.len());
                         if !note_kinds::description(&note.text).trim().is_empty() {
-                            let shown = (rest, READ_SIZE);
+                            let shown = ((rest, READ_SIZE), wide);
                             read_part(ui, &t, part, shown, (looks(&note.id), ticks), actions);
                         }
                     } else if !note.text.trim().is_empty() {
-                        let shown = (all, READ_SIZE);
+                        let shown = ((all, READ_SIZE), wide);
                         read_part(ui, &t, part, shown, (looks(&note.id), ticks), actions);
                     }
                     if let Some(shown) = checklist {
@@ -12283,7 +14615,7 @@ impl App {
                             None,
                         );
                         if !section.text.trim().is_empty() {
-                            let shown = ((0, section.text.len()), READ_SIZE);
+                            let shown = (((0, section.text.len()), READ_SIZE), wide);
                             read_part(ui, &t, part, shown, (looks(&section.id), ticks), actions);
                         }
                         let (of, photos) = (&section.id, &section.photos);
@@ -12329,7 +14661,7 @@ impl App {
                 }
                 ui.add_space(12.0);
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new(t.areas_title()).strong().color(text));
+                    ui.label(RichText::new(t.areas_title()).strong());
                     // "+" at the right end of the heading.
                     ui.add_space((ui.available_width() - 28.0).max(0.0));
                     if icon_button(ui, icons::ADD, t.new_area(), text).clicked() {
@@ -12417,6 +14749,8 @@ impl App {
                             );
                         });
                     }
+                    // The band's ⋮ has the same entries (obf-1014), at most
+                    // seven.
                     resp.context_menu(|ui| {
                         let mut items = Vec::new();
                         // Topics are made only in Advanced (#197).
@@ -12424,40 +14758,54 @@ impl App {
                             items.push((t.new_topic(), Action::NewTopic(area.id.clone())));
                         }
                         if manages {
-                            items.extend([
-                                (t.rename(), Action::Rename(area.id.clone())),
-                                (t.area_look(), Action::Look(area.id.clone())),
-                                (t.share_area(), Action::Share(area.id.clone())),
-                            ]);
+                            let look = t.desk_area_look();
+                            items.push((look, Action::Rename(area.id.clone())));
+                        }
+                        // Its people too, for anyone in a Shared Area.
+                        if manages || people.is_some() {
+                            items.push((t.share_area(), Action::Share(area.id.clone())));
+                        }
+                        let mut picked = None;
+                        for (label, action) in items {
+                            if ui.button(RichText::new(label).color(text)).clicked() {
+                                picked = Some(action);
+                            }
                         }
                         // The order is the person's own, so every Area
                         // moves, a Shared one too; not past an end
                         // (#280).
-                        for (label, up) in [(t.area_move_up(), true), (t.area_move_down(), false)] {
-                            if let Some(index) = self.view.area_step(&area.id, up) {
-                                items.push((label, Action::MoveArea(area.id.clone(), index)));
-                            }
+                        let moves: Vec<_> = [(t.area_move_up(), true), (t.area_move_down(), false)]
+                            .into_iter()
+                            .filter_map(|(label, up)| {
+                                let index = self.view.area_step(&area.id, up)?;
+                                Some((label, Action::MoveArea(area.id.clone(), index)))
+                            })
+                            .collect();
+                        if !moves.is_empty() {
+                            let label = RichText::new(t.desk_area_move()).color(text);
+                            ui.menu_button(label, |ui| {
+                                for (label, action) in moves {
+                                    if ui.button(RichText::new(label).color(text)).clicked() {
+                                        picked = Some(action);
+                                    }
+                                }
+                            });
                         }
                         // Copies of what anyone may read (#165).
-                        items.push((t.export_as_pack(), Action::ExportPack(area.id.clone())));
-                        if people.is_some() {
-                            items.push((t.people_title(), Action::People(area.id.clone())));
+                        let pack = RichText::new(t.export_as_pack()).color(text);
+                        if ui.button(pack).clicked() {
+                            picked = Some(Action::ExportPack(area.id.clone()));
                         }
-                        for (label, action) in items {
-                            if ui.button(RichText::new(label).color(text)).clicked() {
-                                actions.push(action);
-                                // Also a pick by keyboard or screen reader.
-                                ui.close();
-                            }
-                        }
-                        // In no Shared Area, or to take the mark off (#267),
-                        // before Delete as in the Area menu.
+                        // In no Shared Area, or to take the mark off (#267).
                         if let Some(asked) = hidden_entry(ui, &t, &self.view, &area.id) {
-                            actions.push(asked);
-                            ui.close();
+                            picked = Some(asked);
                         }
                         if manages && ui.button(RichText::new(t.delete()).color(text)).clicked() {
-                            actions.push(Action::Delete(area.id.clone()));
+                            picked = Some(Action::Delete(area.id.clone()));
+                        }
+                        if let Some(action) = picked {
+                            actions.push(action);
+                            // Also a pick by keyboard or screen reader.
                             ui.close();
                         }
                     });
@@ -12497,12 +14845,8 @@ impl App {
                     });
                 }
                 area_drop(ui, tones, &blocks, actions);
-                // Every tag by its levels (#267, Q623).
-                let on = self.selection == Selection::Tags;
-                let tags = Some((icons::TAG, text));
-                if row(ui, tones, on, 0.0, tags, t.tags_title(), false).clicked() {
-                    actions.push(Action::Select(Selection::Tags));
-                }
+                // The tag tree opens from All Notes' row of tags
+                // (obf-1074).
                 ui.add_space(12.0);
                 let on = self.selection == Selection::Trash;
                 let trash = Some((icons::OPEN_TRASH, text));
@@ -12516,7 +14860,24 @@ impl App {
     /// most pressing first: of the window, or of the dialog shown over it
     /// (#145).
     fn announcements(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
-        if self.error.is_some() {
+        if self.made_hidden_shows(ui) {
+            // A Note made that the filter hides, back in its list
+            // (obf-1070), before what waits; the click shows it.
+            let t = self.t;
+            egui::Panel::top("announcement")
+                .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
+                .show(ui, |ui| {
+                    let colour = ui.visuals().text_color();
+                    ui.horizontal(|ui| {
+                        let text = RichText::new(t.made_hidden_by_filter()).color(colour);
+                        let said = ui.add(egui::Label::new(text).sense(egui::Sense::click()));
+                        let show = ui.button(RichText::new(t.show_hidden()).strong().color(colour));
+                        if said.clicked() || show.clicked() {
+                            actions.push(Action::FilterPeople(PersonFilter::default()));
+                        }
+                    });
+                });
+        } else if self.error.is_some() {
             // Announcements go to the top (UI laws), without the error's
             // text: the click shows it, with the cause and the fix.
             egui::Panel::top("announcement")
@@ -12605,23 +14966,63 @@ impl App {
                 });
         } else if self.arrived > 0 && !self.pages.contains(&Page::Sync) {
             // One at a time: Conflicts from an automatic sync, a click
-            // away from the Sync dialog that lists them.
+            // away from the Sync dialog that lists them; Review beside
+            // the words, the outlined button the AI line has (obf-1113).
             let text = self.t.sync_conflicts_arrived(self.arrived as i64);
+            let review = self.t.sync_conflicts_review();
             egui::Panel::top("announcement")
                 .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
                 .show(ui, |ui| {
                     let colour = ui.visuals().text_color();
-                    let label = egui::Label::new(RichText::new(text).strong().color(colour))
-                        .sense(egui::Sense::click());
-                    if ui.add(label).clicked() {
-                        actions.push(Action::OpenPage(Page::Sync));
-                    }
+                    ui.horizontal_wrapped(|ui| {
+                        let label = egui::Label::new(RichText::new(text).strong().color(colour))
+                            .sense(egui::Sense::click());
+                        let words = ui.add(label);
+                        let button = ui.button(RichText::new(review).strong().color(colour));
+                        if words.clicked() || button.clicked() {
+                            actions.push(Action::OpenPage(Page::Sync));
+                        }
+                    });
                 });
-        } else if self.view.sync_paused {
-            // Sync waits for the AI Task, open or waiting for its review,
-            // for as long as it does, below every announcement that goes
-            // by a click; the click leads to where the wait ends.
-            let (text, asked) = if self.ai_port.is_some() {
+        } else if let Some(source) = self.speech_offer_shows() {
+            // The speech model a restored Backup's Device used (obf-1098),
+            // after "Backup restored." and below what goes by a click, as
+            // it waits for an answer; the click on the words or the
+            // button fetches it, Not now turns it down.
+            let t = self.t;
+            let (said, offered) = match source {
+                SpeechModelSource::Download => {
+                    (t.speech_model_offer(), t.speech_model_offer_download())
+                }
+                SpeechModelSource::File => (t.speech_model_offer_file(), t.speech_model_pick()),
+            };
+            egui::Panel::top("announcement")
+                .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
+                .show(ui, |ui| {
+                    let colour = ui.visuals().text_color();
+                    ui.horizontal_wrapped(|ui| {
+                        let text = RichText::new(said).color(colour);
+                        let words = ui.add(egui::Label::new(text).sense(egui::Sense::click()));
+                        let take = ui.button(RichText::new(offered).strong().color(colour));
+                        if words.clicked() || take.clicked() {
+                            actions.push(Action::SpeechOffer(true));
+                        }
+                        if ui
+                            .button(RichText::new(t.not_now()).color(colour))
+                            .clicked()
+                        {
+                            actions.push(Action::SpeechOffer(false));
+                        }
+                    });
+                });
+        } else if self.ai_port.is_some() || self.view.ai_task.is_some() {
+            // The AI port open, or its AI Task waiting for its review,
+            // below every announcement that goes by a click; sync goes
+            // on meanwhile (obf-1076). The click leads to the port or the
+            // review; beside it Review with the count of changes, or
+            // with none yet "Close the port" (obf-1075).
+            let open = self.ai_port.is_some();
+            let (text, asked) = if open {
                 (
                     self.t.ai_port_open_banner(),
                     Action::OpenAiSettings(Some(AI_PORT_SECTION)),
@@ -12629,22 +15030,82 @@ impl App {
             } else {
                 (self.t.ai_review_banner(), Action::Ai(AiAction::Review))
             };
+            // Not in a Note window, which has no list to review in.
+            let changes = self.view.ai_changes;
+            let offer = if self.alone.is_some() {
+                None
+            } else if changes > 0 {
+                Some((self.t.ai_review_changes(changes as i64), AiAction::Review))
+            } else if open {
+                Some((self.t.ai_port_close().to_string(), AiAction::Done))
+            } else {
+                None
+            };
+            // The review shows in the list: the Note dialog and the quick
+            // note close for it first, what was typed kept.
+            let mut leave = Vec::new();
+            if self.alone.is_none() {
+                if self.quick_open {
+                    leave.push(Action::CloseQuickNote);
+                }
+                if self.note_open() {
+                    leave.push(Action::CloseNote);
+                }
+            }
+            let reviews = |action: &Action| *action == Action::Ai(AiAction::Review);
             egui::Panel::top("announcement")
                 .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
                 .show(ui, |ui| {
                     let colour = ui.visuals().text_color();
-                    let label = egui::Label::new(RichText::new(text).strong().color(colour))
-                        .sense(egui::Sense::click());
-                    if ui.add(label).clicked() {
-                        actions.push(asked);
-                    }
+                    ui.horizontal(|ui| {
+                        let label = egui::Label::new(RichText::new(text).strong().color(colour))
+                            .sense(egui::Sense::click());
+                        if ui.add(label).clicked() {
+                            if reviews(&asked) {
+                                actions.extend(leave.iter().cloned());
+                            }
+                            actions.push(asked);
+                        }
+                        if let Some((offered, action)) = offer {
+                            let button = RichText::new(offered).strong().color(colour);
+                            if ui.button(button).clicked() {
+                                let action = Action::Ai(action);
+                                if reviews(&action) {
+                                    actions.extend(leave.iter().cloned());
+                                }
+                                actions.push(action);
+                            }
+                        }
+                    });
                 });
         }
     }
 
-    /// What the Note menu may do to the Note in the Note dialog (#145,
-    /// #146), as the dialog's buttons may; none while no Note is open, or
-    /// one in the trash.
+    /// Whether "Made, hidden by the filter" shows at the top (obf-1070):
+    /// once the main window's list it was made in is back in front, for
+    /// [`MADE_HIDDEN_LASTS`] from then, after which it goes by itself.
+    fn made_hidden_shows(&mut self, ui: &Ui) -> bool {
+        let back = self.announces_in() == Announcer::Window;
+        let Some(made) = &mut self.made_hidden else {
+            return false;
+        };
+        if !back || made.list != self.selection {
+            return false;
+        }
+        let now = ui.input(|i| i.time);
+        let since = *made.shown_since.get_or_insert(now);
+        let left = MADE_HIDDEN_LASTS - (now - since);
+        if left <= 0.0 {
+            self.made_hidden = None;
+            return false;
+        }
+        ui.ctx().request_repaint_after_secs(left as f32);
+        true
+    }
+
+    /// What may be done to the Note in the Note dialog (#145, #146), as
+    /// the dialog's buttons may: File ▸ Save as Markdown, its History and
+    /// Ctrl+M; none while no Note is open, or one in the trash.
     fn note_menu(&self) -> Option<NoteMenu> {
         let (placed, _) = self.view.detail.as_ref()?;
         let note = &placed.note;
@@ -12652,36 +15113,17 @@ impl App {
             return None;
         }
         let may = self.view.may;
-        let frog_open = self
-            .view
-            .note_frog
-            .as_ref()
-            .is_some_and(|f| !f.frog.is_done());
-        // A Code text becomes no Tally or Session (#213).
-        let code = note.text_format == text_format::CODE;
-        let plain = self.view.kind == Some(NoteKind::Plain) && !note.is_merged() && !code;
         Some(NoteMenu {
             id: note.id.clone(),
             changes: may.changes,
-            schedules: may.schedules,
-            frog: may.schedules && !frog_open,
-            // A Routine of a Session Note runs it already (#191).
-            session: may.schedules && self.view.kind == Some(NoteKind::Plain) && !code,
-            amends: may.amends,
-            checklist: may.amends && self.view.makes_checklist,
-            shopping: may.amends && self.view.makes_shopping,
-            tally: may.amends && may.changes && plain,
         })
     }
 
-    /// What the Area menu may do to the Area or Topic the list shows
-    /// (#279), as the sidebar's right-click offers it: none while another
-    /// place shows or a dialog lies over the list, the Note dialog and a
-    /// photo or table full screen too.
+    /// What the band's ⋮ (obf-1065) and its keys may do to the Area or
+    /// Topic the list shows (#279), as the sidebar's right-click offers
+    /// it: none while another place shows or a dialog lies over the list,
+    /// the Note dialog and a photo or table full screen too.
     fn place_menu(&self) -> Option<PlaceMenu> {
-        let Selection::Place(id) = &self.selection else {
-            return None;
-        };
         if self.top_dialog().is_some()
             || self.dialog.is_some()
             || self.badge.is_some()
@@ -12690,6 +15132,15 @@ impl App {
         {
             return None;
         }
+        self.place_shown()
+    }
+
+    /// The Area or Topic the list shows, whatever lies over it: what its
+    /// ⋮ would offer.
+    fn place_shown(&self) -> Option<PlaceMenu> {
+        let Selection::Place(id) = &self.selection else {
+            return None;
+        };
         let (area, of_area) = match self.view.area(id) {
             Some(area) => (area.id.clone(), true),
             None => (self.view.topic(id)?.area_id.clone(), false),
@@ -12708,7 +15159,7 @@ impl App {
         self.note_menu().filter(|n| n.changes).map(|n| n.id)
     }
 
-    /// The Notes Note ▸ File into… and Ctrl+M file (#148): the one in the
+    /// The Notes Ctrl+M files (#148): the one in the
     /// Note dialog, where it may be filed, else the cards selected in the
     /// list, in its order; none in the trash, whose Notes are restored.
     fn file_into_notes(&self) -> Option<Vec<String>> {
@@ -12721,9 +15172,9 @@ impl App {
         Some(self.cards.in_order(&self.shown_cards()))
     }
 
-    /// The cards selected that the Note menu's Merge into…, Importance,
-    /// Delete and Restore act on while no Note is open (#273): those this
-    /// Device may change, in the list's order.
+    /// The cards selected that Ctrl+Shift+M, Delete and 1 to 3 act on
+    /// while no Note is open (#273, #274): those this Device may change,
+    /// in the list's order.
     fn menu_cards(&self) -> Vec<String> {
         if self.note_open() {
             return Vec::new();
@@ -13272,12 +15723,10 @@ impl App {
         l10n::names_text(&self.t, &names)
     }
 
-    /// The menu bar (#145): File, Edit, View, Area (#279), Note, AI
-    /// (#279), Sync and Help, each entry with its keys where it has some,
-    /// the Note menu's greyed while no Note is open, but File into… for
-    /// the cards selected (#148), the Area menu's while no Area or Topic
-    /// shows. A pick closes its menu, also one by keyboard or screen
-    /// reader.
+    /// The menu bar (#145): File, Edit, View, AI (#279), Sync and Help,
+    /// each entry with its keys where it has some; an Area's and a Note's
+    /// actions are theirs (obf-1065). A pick closes its menu, also one by
+    /// keyboard or screen reader.
     fn menu_bar(&self, ui: &mut Ui, actions: &mut Vec<Action>) {
         let t = self.t;
         let text = ui.visuals().text_color();
@@ -13289,85 +15738,73 @@ impl App {
             Some(ctx.format_shortcut(&shortcut).replace("Comma", ","))
         };
         let keys = |key: Key| keys_with(Modifiers::COMMAND, key);
-        let note = self.note_menu();
-        let id = note.as_ref().map(|n| n.id.clone()).unwrap_or_default();
-        // File into… also files the cards selected in the list (#148),
-        // and Merge into…, Importance and Move to trash, or Restore in the
-        // trash, act on them (#273).
-        let filing = self.file_into_notes();
-        let chosen = self.menu_cards();
-        let in_trash = self.selection == Selection::Trash;
-        let listed = !chosen.is_empty() && !in_trash;
-        let open = note.as_ref().is_some_and(|n| n.changes);
-        let restores = self.view.may.changes
-            && self
-                .view
-                .detail
-                .as_ref()
-                .is_some_and(|(p, _)| p.note.is_trashed());
-        let merge = if open {
-            Action::StartMerge
-        } else {
-            Action::AskMergeNotes(chosen.clone())
-        };
-        // Delete and 1 to 3 stand beside the entries where they act on the
-        // cards selected (#274), as over the list; not on the Note open.
-        let list_keys = listed && !open;
-        let may = |f: fn(&NoteMenu) -> bool| note.as_ref().is_some_and(f);
         let field = self.last_field.is_some();
         // Full or compact where the list has cards.
         let cards = self.cards_key().is_some();
-        let place = self.place_menu();
-        let reviews = self.ai_port.is_none() && self.view.ai_task.is_some();
         egui::MenuBar::new().ui(ui, |ui| {
+            // At most seven entries (obf-1014): what opens a file under
+            // Open ▸; Attach a file… and Save as Markdown… are the Note
+            // dialog's.
             ui.menu_button(RichText::new(t.menu_file()).color(text), |ui| {
                 let items = [
-                    (t.menu_new_note(), keys(Key::N), true, Action::NewNote),
-                    // Onto the Note open, else a new one (#267).
-                    (t.attach_file_menu(), None, true, Action::AttachFiles),
+                    (t.menu_new_note(), keys(Key::N), true, Action::NewNoteHere),
                     (t.settings_quick_note(), None, true, Action::QuickNote),
                     (t.menu_import(), None, true, Action::AskImport),
-                    (t.menu_open_pack(), None, true, Action::OpenPack),
-                    (
-                        t.backup_open(),
-                        None,
-                        true,
-                        Action::Backup(BackupAction::OpenNotes),
-                    ),
-                    (
-                        t.save_as_markdown(),
-                        None,
-                        may(|n| n.amends),
-                        Action::SaveAsMarkdown(id.clone()),
-                    ),
-                    // Greyed while one is written, and while the AI port is
-                    // open or its Task waits, whose drafts are no Notes yet
-                    // (#267).
-                    (
-                        t.menu_export_vault(),
-                        None,
-                        self.may_export_vault(),
-                        Action::ExportVault,
-                    ),
                 ];
                 menu_entries(ui, items, actions);
+                ui.menu_button(RichText::new(t.desk_menu_open()).color(text), |ui| {
+                    let items = [
+                        (
+                            t.desk_open_markdown_file(),
+                            None,
+                            true,
+                            Action::OpenMarkdown,
+                        ),
+                        (t.desk_open_pack(), None, true, Action::OpenPack),
+                        (
+                            t.desk_open_backup(),
+                            None,
+                            true,
+                            Action::Backup(BackupAction::OpenNotes),
+                        ),
+                    ];
+                    menu_entries(ui, items, actions);
+                });
+                // Greyed while one is written, and while the AI port is
+                // open or its Task waits, whose drafts are no Notes yet
+                // (#267).
+                let vault = [(
+                    t.menu_export_vault(),
+                    None,
+                    self.may_export_vault(),
+                    Action::ExportVault,
+                )];
+                menu_entries(ui, vault, actions);
                 ui.separator();
                 menu_entries(ui, [(t.tray_quit(), None, true, Action::Quit)], actions);
             });
             ui.menu_button(RichText::new(t.menu_edit()).color(text), |ui| {
-                // The last delete, check-off, filing or Merge (#268).
-                let undoes = self.undo.is_some();
+                // The last delete, check-off, filing or Merge (#268), or
+                // the last step of the Note open (obf-1051).
+                let undoes = self.undo.is_some() || self.steps_undo_first();
                 menu_entries(
                     ui,
                     [(t.undo(), keys(Key::Z), undoes, Action::Undo)],
                     actions,
                 );
                 ui.separator();
+                let find = if self.selected_note.is_some() {
+                    t.find_in_note()
+                } else {
+                    t.menu_search()
+                };
                 let items = [
                     (t.menu_cut(), None, field, Action::Clip(Clip::Cut)),
                     (t.menu_copy(), None, field, Action::Clip(Clip::Copy)),
                     (t.paste(), None, field, Action::Clip(Clip::Paste)),
-                    (t.menu_find(), keys(Key::F), true, Action::Find),
+                    // Find in Note where it opens the Note's find bar,
+                    // else Search, as the list's field (obf-1014, C3).
+                    (find, keys(Key::F), true, Action::Find),
                 ];
                 menu_entries(ui, items, actions);
                 ui.separator();
@@ -13379,21 +15816,28 @@ impl App {
                 );
             });
             ui.menu_button(RichText::new(t.menu_view()).color(text), |ui| {
-                let places = [
-                    (t.agenda_title(), Selection::Agenda),
-                    (t.unsorted(), Selection::Unsorted),
-                    (t.all_notes_title(), Selection::All),
-                    (t.frogs_title(), Selection::Frogs),
-                    (t.all_routines_title(), Selection::AllRoutines),
-                ];
-                for (label, place) in places {
-                    let on = self.selection == place;
-                    let button = egui::Button::selectable(on, RichText::new(label).color(text));
-                    if ui.add(button).clicked() {
-                        actions.push(Action::Select(place));
-                        ui.close();
+                // The places under Go to ▸, at most seven entries
+                // (obf-1014).
+                ui.menu_button(RichText::new(t.desk_menu_go_to()).color(text), |ui| {
+                    let places = [
+                        (t.agenda_title(), Selection::Agenda),
+                        (t.unsorted(), Selection::Unsorted),
+                        (t.all_notes_title(), Selection::All),
+                        (t.frogs_title(), Selection::Frogs),
+                        (t.all_routines_title(), Selection::AllRoutines),
+                    ];
+                    for (label, place) in places {
+                        let on = self.selection == place;
+                        let button = egui::Button::selectable(on, RichText::new(label).color(text));
+                        if ui.add(button).clicked() {
+                            actions.push(Action::Select(place));
+                            ui.close();
+                        }
                     }
-                }
+                });
+                // What runs in the background, never greyed (obf-1078).
+                let running = Action::OpenPage(Page::Running);
+                menu_entries(ui, [(t.menu_running(), None, true, running)], actions);
                 ui.separator();
                 let compact = self.view.compact;
                 for (label, wanted) in [
@@ -13461,226 +15905,10 @@ impl App {
                     );
                 });
             });
-            // The Area or Topic the list shows, as the sidebar's
-            // right-click offers it (#279); F2 renames.
-            ui.menu_button(RichText::new(t.menu_area()).color(text), |ui| {
-                let id = place.as_ref().map(|p| p.id.clone()).unwrap_or_default();
-                let manages = place.as_ref().is_some_and(|p| p.manages);
-                let of_area = place.as_ref().is_some_and(|p| p.area && p.manages);
-                let shared = place.as_ref().is_some_and(|p| p.area && p.shared);
-                let items = [
-                    (
-                        t.rename(),
-                        keys_with(Modifiers::NONE, Key::F2),
-                        manages,
-                        Action::Rename(id.clone()),
-                    ),
-                    (t.area_look(), None, of_area, Action::Look(id.clone())),
-                    (t.share_area(), None, of_area, Action::Share(id.clone())),
-                    (t.people_title(), None, shared, Action::People(id.clone())),
-                    // Copies of what anyone may read (#165).
-                    (
-                        t.export_as_pack(),
-                        None,
-                        place.is_some(),
-                        Action::ExportPack(id.clone()),
-                    ),
-                ];
-                menu_entries(ui, items, actions);
-                // An Area's own mark (#267), greyed where the right-click
-                // leaves it out: a Topic, and an Area shared unmarked.
-                let area = place.as_ref().filter(|p| p.area);
-                let on = area.is_some_and(|p| self.view.hidden_areas.contains(&p.id));
-                let offered = on || area.is_some_and(|p| self.view.hideable_areas.contains(&p.id));
-                let switched = ui.add_enabled_ui(offered, |ui| hidden_switch(ui, &t, &id, on));
-                if let Some(asked) = switched.inner {
-                    actions.push(asked);
-                    ui.close();
-                }
-                ui.separator();
-                // Any Area moves, a Shared one too; not past an end
-                // (#280).
-                let step = |up| {
-                    place
-                        .as_ref()
-                        .filter(|p| p.area)
-                        .and_then(|p| self.view.area_step(&p.id, up))
-                };
-                let (up, down) = (step(true), step(false));
-                let items = [
-                    (
-                        t.area_move_up(),
-                        keys_with(Modifiers::ALT, Key::ArrowUp),
-                        up.is_some(),
-                        Action::MoveArea(id.clone(), up.unwrap_or_default()),
-                    ),
-                    (
-                        t.area_move_down(),
-                        keys_with(Modifiers::ALT, Key::ArrowDown),
-                        down.is_some(),
-                        Action::MoveArea(id.clone(), down.unwrap_or_default()),
-                    ),
-                ];
-                menu_entries(ui, items, actions);
-                ui.separator();
-                menu_entries(
-                    ui,
-                    [(t.delete(), None, manages, Action::Delete(id.clone()))],
-                    actions,
-                );
-            });
-            ui.menu_button(RichText::new(t.menu_note()).color(text), |ui| {
-                let items = [
-                    (
-                        t.file_into(),
-                        keys(Key::M),
-                        filing.is_some(),
-                        Action::AskFileInto(filing.clone().unwrap_or_default()),
-                    ),
-                    (
-                        t.merge_into(),
-                        keys_with(Modifiers::COMMAND | Modifiers::SHIFT, Key::M),
-                        open || listed,
-                        merge,
-                    ),
-                ];
-                menu_entries(ui, items, actions);
-                let weighs = open || listed;
-                ui.add_enabled_ui(weighs, |ui| {
-                    ui.menu_button(RichText::new(t.importance()).color(text), |ui| {
-                        // One that has it already writes nothing.
-                        if let Some(importance) = importance_entries(ui, &t, list_keys) {
-                            let weighed = if open {
-                                vec![id.clone()]
-                            } else {
-                                chosen.clone()
-                            };
-                            actions.push(Action::ImportanceOf(weighed, importance));
-                        }
-                    });
-                });
-                // One way in for a Routine or Reminder, starting as a
-                // Reminder (#344).
-                let items = [(
-                    t.remind_me(),
-                    None,
-                    may(|n| n.schedules),
-                    Action::NewRoutine {
-                        note: Some(id.clone()),
-                        reminder: true,
-                    },
-                )];
-                menu_entries(ui, items, actions);
-                // Frogs, Sessions and Tallies are made only in Advanced
-                // (#197).
-                let advanced = self.view.advanced;
-                if advanced {
-                    let items = [
-                        (
-                            t.frog(),
-                            None,
-                            may(|n| n.frog),
-                            Action::SpawnFrog(id.clone()),
-                        ),
-                        (
-                            t.session(),
-                            None,
-                            may(|n| n.session),
-                            Action::NewSession(Some(id.clone())),
-                        ),
-                    ];
-                    menu_entries(ui, items, actions);
-                }
-                ui.separator();
-                let items = [
-                    (
-                        t.make_checklist(),
-                        None,
-                        may(|n| n.checklist),
-                        Action::Checklist(ChecklistAction::Make(id.clone())),
-                    ),
-                    (
-                        t.make_shopping_list(),
-                        None,
-                        may(|n| n.shopping),
-                        Action::Shopping(ShoppingAction::Make(id.clone())),
-                    ),
-                ];
-                menu_entries(ui, items, actions);
-                if advanced {
-                    let items = [(
-                        t.make_tally(),
-                        None,
-                        may(|n| n.tally),
-                        Action::Tally(TallyAction::Make(id.clone())),
-                    )];
-                    menu_entries(ui, items, actions);
-                }
-                ui.separator();
-                let items = [
-                    (
-                        t.send_to_person(),
-                        None,
-                        may(|n| n.amends),
-                        Action::StartSend(id.clone()),
-                    ),
-                    (
-                        t.copy_as_text(),
-                        None,
-                        may(|n| n.amends),
-                        Action::CopyAsText(id.clone()),
-                    ),
-                    // Copies of what anyone may read (#165).
-                    (
-                        t.export_as_pack(),
-                        None,
-                        note.is_some(),
-                        Action::ExportPack(id.clone()),
-                    ),
-                ];
-                menu_entries(ui, items, actions);
-                ui.separator();
-                menu_entries(
-                    ui,
-                    [(
-                        t.history_title(),
-                        None,
-                        note.is_some(),
-                        Action::NoteHistory(id.clone()),
-                    )],
-                    actions,
-                );
-                ui.separator();
-                // In the trash its Notes are restored instead, as the
-                // Note dialog restores the one open there.
-                let last = if restores {
-                    (t.restore(), None, true, Action::Restore)
-                } else if in_trash && !open {
-                    (
-                        t.restore(),
-                        None,
-                        !chosen.is_empty(),
-                        Action::RestoreNotes(chosen.clone()),
-                    )
-                } else if open {
-                    (t.move_to_trash(), None, true, Action::Trash)
-                } else {
-                    // Named as on the phone and in the card's menu (#329);
-                    // the Delete key does the same.
-                    let delete = keys_with(Modifiers::NONE, Key::Delete);
-                    (
-                        t.move_to_trash(),
-                        delete,
-                        listed,
-                        Action::TrashNotes(chosen.clone()),
-                    )
-                };
-                menu_entries(ui, [last], actions);
-            });
             // The main switch first (#334), then the Ask panel (#267)
             // only while it is on, every AI setting on one page (#335) and
-            // the review of the AI Task that waits (#279), greyed while
-            // none does.
+            // the review of the AI Task (#279), never greyed: with no change
+            // yet it says so (obf-1077).
             ui.menu_button(RichText::new(t.menu_ai()).color(text), |ui| {
                 let mut on = self.view.ai_on;
                 if theme::checkbox(ui, &mut on, RichText::new(t.ai_switch()).color(text)).changed()
@@ -13703,7 +15931,7 @@ impl App {
                     (
                         t.ai_review_title(),
                         None,
-                        reviews,
+                        true,
                         Action::Ai(AiAction::Review),
                     ),
                 ];
@@ -13742,50 +15970,80 @@ impl App {
     /// Back and forward at the top of the list, and the path to the place
     /// it shows, each level above it a click away (#145).
     fn nav_row(&self, ui: &mut Ui, actions: &mut Vec<Action>) {
-        let t = self.t;
-        let text = ui.visuals().text_color();
-        let weak = ui.visuals().weak_text_color();
         let row = ui.horizontal(|ui| {
-            let arrows = [
-                (
-                    self.nav.can_go_back(),
-                    icons::ARROW_BACK,
-                    t.nav_back(),
-                    Action::Back,
-                ),
-                (
-                    self.nav.can_go_forward(),
-                    icons::ARROW_FORWARD,
-                    t.nav_forward(),
-                    Action::Forward,
-                ),
-            ];
-            for (may, icon, label, action) in arrows {
-                let colour = if may { text } else { weak };
-                let arrow = ui.add_enabled_ui(may, |ui| icon_button(ui, icon, label, colour));
-                if arrow.inner.clicked() {
-                    actions.push(action);
-                }
-            }
+            self.nav_arrows(ui, (24.0, 20.0), actions);
             ui.add_space(8.0);
-            for (i, (name, to)) in self.path().into_iter().enumerate() {
-                if i > 0 {
-                    crumb(ui, "›", weak, None);
-                }
-                match to {
-                    Some(to) => {
-                        if crumb(ui, &name, text, Some(&t.path_up(&name))) {
-                            actions.push(Action::Select(to));
-                        }
-                    }
-                    None => {
-                        crumb(ui, &name, weak, None);
-                    }
-                }
-            }
+            self.path_crumbs(ui, (14.0, None), actions);
         });
         spotlight::anchor(ui, "nav", row.response.rect);
         ui.add_space(4.0);
+    }
+
+    /// Back and forward, each `side` square with its icon `glyph` big,
+    /// greyed where they lead nowhere.
+    fn nav_arrows(&self, ui: &mut Ui, (side, glyph): (f32, f32), actions: &mut Vec<Action>) {
+        let t = self.t;
+        let text = ui.visuals().text_color();
+        let weak = ui.visuals().weak_text_color();
+        let arrows = [
+            (
+                self.nav.can_go_back(),
+                icons::ARROW_BACK,
+                t.nav_back(),
+                Action::Back,
+            ),
+            (
+                self.nav.can_go_forward(),
+                icons::ARROW_FORWARD,
+                t.nav_forward(),
+                Action::Forward,
+            ),
+        ];
+        for (may, icon, label, action) in arrows {
+            let colour = if may { text } else { weak };
+            let arrow = ui.add_enabled_ui(may, |ui| {
+                sized_icon_button(ui, (icon, label, colour), (side, glyph))
+            });
+            if arrow.inner.clicked() {
+                actions.push(action);
+            }
+        }
+    }
+
+    /// The path to the place shown (#145), its levels `size` big; with a
+    /// `title` size the place shown is the list's title at that size
+    /// (obf-1064), its rect given, otherwise a weak level as the others.
+    fn path_crumbs(
+        &self,
+        ui: &mut Ui,
+        (size, title): (f32, Option<f32>),
+        actions: &mut Vec<Action>,
+    ) -> Option<egui::Rect> {
+        let t = self.t;
+        let text = ui.visuals().text_color();
+        let weak = ui.visuals().weak_text_color();
+        let mut shown = None;
+        for (i, (name, to)) in self.path().into_iter().enumerate() {
+            if i > 0 {
+                crumb(ui, "›", (size, weak), None);
+            }
+            match (to, title) {
+                (Some(to), _) => {
+                    if crumb(ui, &name, (size, text), Some(&t.path_up(&name))) {
+                        actions.push(Action::Select(to));
+                    }
+                }
+                (None, Some(title)) => {
+                    let label =
+                        egui::Label::new(RichText::new(name).size(title).color(text)).truncate();
+                    shown = Some(ui.add(label).rect);
+                }
+                (None, None) => {
+                    crumb(ui, &name, (size, weak), None);
+                }
+            }
+        }
+        shown
     }
 
     /// The dialog of what was a view of its own (#145), over the window
@@ -13859,6 +16117,14 @@ impl App {
                             actions.extend(asked.map(Action::BackupNotes));
                         }
                     }
+                    Page::Running => {
+                        let jobs = self.jobs();
+                        let mut ended = self.paused_jobs();
+                        ended.extend_from_slice(self.stopped_jobs.list());
+                        let since = |at| self.since_text(at);
+                        let asked = running::page(ui, &t, tones, (&jobs, &ended), &since);
+                        actions.extend(asked.map(Action::Running));
+                    }
                     Page::Sync | Page::Pair => {
                         let wall = self.wall.clone();
                         let pair = page == Page::Pair;
@@ -13876,8 +16142,8 @@ impl App {
 
     /// The Note open (#146), as a dialog over the window, one at a time:
     /// its editor, the badges of its settings (#160) and their small
-    /// editors. The menu bar stays at hand over it, its Note menu acting
-    /// on this Note. Closing it saves: the cross, Esc, Alt+Left, the
+    /// editors. The menu bar stays at hand over it, Ctrl+M and
+    /// Ctrl+Shift+M acting on this Note. Closing it saves: the cross, Esc, Alt+Left, the
     /// mouse's back button and a click beside it.
     fn note_dialog(
         &mut self,
@@ -13911,8 +16177,14 @@ impl App {
             && !table_grid::cell_had_keyboard(ctx)
             && ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Escape))
         {
-            actions.push(Action::CloseNote);
+            // Its find bar closes first (obf-1047).
+            if self.find_open() {
+                self.find = None;
+            } else {
+                actions.push(Action::CloseNote);
+            }
         }
+        self.steps_frame(ctx);
         // As large as it was left on this computer (#278), in the room
         // the window has.
         let size = window_sizes::note_dialog(self.note_kept, under.size());
@@ -13929,7 +16201,7 @@ impl App {
             .corner_radius(theme::CARD_RADIUS)
             .inner_margin(Margin::same(16));
         let mut resized = None;
-        egui::Area::new(Id::new("note dialog"))
+        egui::Area::new(Id::new(design::NOTE_DIALOG))
             .order(egui::Order::Foreground)
             .fixed_pos(under.min)
             .constrain(false)
@@ -13980,6 +16252,9 @@ impl App {
                                                 actions.push(Action::OpenWindow(id.clone()));
                                             }
                                         }
+                                        // Undo, Redo and ⋮ (obf-1051).
+                                        let note = self.note_menu().map(|n| n.id);
+                                        self.step_buttons(ui, note.as_deref(), actions);
                                     },
                                 );
                             });
@@ -13998,6 +16273,82 @@ impl App {
             }
         }
         self.badge_dialog(ctx, tones, actions);
+    }
+
+    /// The steps of the Note open as it is drawn (obf-1051): typing that
+    /// rested is a step, looked at again once it may have; its fields
+    /// forget their own typing once Undo, Redo or Revert wrote them.
+    fn steps_frame(&mut self, ctx: &egui::Context) {
+        self.steps_time = ctx.input(|i| i.time);
+        self.see_steps(See::Drawn(self.steps_time));
+        if self.steps.as_ref().is_some_and(Steps::typing) {
+            ctx.request_repaint_after(std::time::Duration::from_secs_f64(note_steps::PAUSE));
+        }
+        if !std::mem::take(&mut self.fields_forget) {
+            return;
+        }
+        let Some(note) = &self.text_of else {
+            return;
+        };
+        let fields = [Id::new(("note text", note)), Id::new(("note name", note))]
+            .into_iter()
+            .chain(
+                self.section_texts
+                    .keys()
+                    .map(|id| Id::new(("section text", id))),
+            );
+        for id in fields {
+            if let Some(mut state) = egui::widgets::text_edit::TextEditState::load(ctx, id) {
+                state.clear_undoer();
+                state.store(ctx, id);
+            }
+        }
+    }
+
+    /// Undo, Redo and ⋮ with "Revert all changes" in the bar of the Note
+    /// open (obf-1051), drawn right to left: each greyed while it has
+    /// nothing to do. In the Note dialog the ⋮ also holds the Note's
+    /// `history` (#193), which the menu bar's Note menu had (obf-1065).
+    fn step_buttons(&self, ui: &mut Ui, history: Option<&str>, actions: &mut Vec<Action>) {
+        let t = self.t;
+        let text = ui.visuals().text_color();
+        let (undoes, redoes, changed) = self.note_steps();
+        let more = icon_button(ui, icons::MORE_VERT, t.desk_note_more(), text);
+        egui::Popup::menu(&more).show(|ui| {
+            let revert = egui::Button::new(RichText::new(t.desk_note_revert_all()).color(text));
+            // Closed by keyboard and screen reader too (UI laws, "Menu bar
+            // and keys").
+            if ui.add_enabled(changed, revert).clicked() {
+                actions.push(Action::AskRevert);
+                ui.close();
+            }
+            if let Some(note) = history
+                && ui
+                    .button(RichText::new(t.history_title()).color(text))
+                    .clicked()
+            {
+                actions.push(Action::NoteHistory(note.to_string()));
+                ui.close();
+            }
+        });
+        // Their keys in the tooltip, as the system writes them.
+        let ctx = ui.ctx().clone();
+        let keys = |modifiers: Modifiers| {
+            let shortcut = egui::KeyboardShortcut::new(modifiers, Key::Z);
+            ctx.format_shortcut(&shortcut)
+        };
+        let redo = format!(
+            "{} ({})",
+            t.desk_redo(),
+            keys(Modifiers::COMMAND | Modifiers::SHIFT)
+        );
+        if step_button(ui, (icons::REDO, t.desk_redo(), &redo), redoes, text).clicked() {
+            actions.push(Action::NoteRedo);
+        }
+        let undo = format!("{} ({})", t.undo(), keys(Modifiers::COMMAND));
+        if step_button(ui, (icons::UNDO, t.undo(), &undo), undoes, text).clicked() {
+            actions.push(Action::NoteUndo);
+        }
     }
 
     /// The small editor of the Note's badge clicked (#160), while it is
@@ -14120,8 +16471,7 @@ impl App {
                         let stored = note.code_language.as_deref().filter(|l| !l.is_empty());
                         let grammars = text_marks_view::grammars(ui.ctx());
                         let shows = grammars.by_scope(stored).map(|g| g.scope.as_str());
-                        let text = ui.visuals().text_color();
-                        ui.label(RichText::new(t.code_language()).strong().color(text));
+                        ui.label(RichText::new(t.code_language()).strong());
                         let mut language = shows;
                         let options = std::iter::once((None, t.code_language_none().to_string()))
                             .chain(
@@ -14327,12 +16677,7 @@ impl App {
                 }
                 let text = ui.visuals().text_color();
                 ui.horizontal(|ui| {
-                    ui.label(
-                        RichText::new(t.menu_new_note())
-                            .size(18.0)
-                            .strong()
-                            .color(text),
-                    );
+                    crate::design::dialog_title(ui, t.menu_new_note());
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if icon_button(ui, icons::CLOSE, t.close(), text).clicked() {
                             actions.push(Action::CloseQuickNote);
@@ -14437,9 +16782,11 @@ impl App {
         self.quick_open
     }
 
-    /// File ▸ New Note: the quick note's dialog, as Ctrl+N opens it.
+    /// File ▸ New Note, as Ctrl+N opens it: the quick note's dialog, in
+    /// an Area or a Topic the Note dialog on a new Note filed there
+    /// (obf-1140).
     pub fn new_note(&mut self) {
-        self.apply(Action::NewNote);
+        self.apply(Action::NewNoteHere);
     }
 
     /// Closes the Note dialog, keeping what was typed, as Esc does.
@@ -14481,44 +16828,15 @@ impl App {
         }
     }
 
-    /// The title of the middle pane.
-    fn title(&self) -> String {
-        match &self.selection {
-            Selection::Agenda => self.t.agenda_title().to_string(),
-            Selection::SentItemsWaiting => self.t.sent_items_waiting_title().to_string(),
-            Selection::AreaOffersWaiting => self.t.area_offers_waiting_title().to_string(),
-            Selection::AiReview => self.t.ai_review_title().to_string(),
-            Selection::Frogs => self.t.frogs_title().to_string(),
-            Selection::AllRoutines => self.t.all_routines_title().to_string(),
-            Selection::History(_) => self.t.history_title().to_string(),
-            Selection::All => self.t.all_notes_title().to_string(),
-            Selection::Unsorted => self.t.unsorted().to_string(),
-            Selection::Tags => self.t.tags_title().to_string(),
-            Selection::Trash => self.t.trash_title().to_string(),
-            Selection::Ask => self.t.ask_title().to_string(),
-            Selection::Place(id) => self
-                .view
-                .areas
-                .iter()
-                .find_map(|(area, topics)| {
-                    if area.id == *id {
-                        return Some(area_name(&self.t, area));
-                    }
-                    topics.iter().find(|t| t.id == *id).map(|t| {
-                        format!("{} / {}", area_name(&self.t, area), topic_name(&self.t, t))
-                    })
-                })
-                .unwrap_or_default(),
-        }
-    }
-
     /// The quick note's content (UI laws, "Capture"), in its dialog
     /// (#146): it never asks anything. The text, and once something is
-    /// typed or held, More (#352), which saves the Note and opens it in
-    /// the Note dialog, and under it the Nudge times, Ctrl+Enter taking
-    /// the 1 h one and Ctrl+1 to 3 each of them (#277); a Note filed by a
-    /// list's "+", or where the Nudge buttons are switched off, gets one
-    /// Save instead, nudging only an Unsorted Note. What the files
+    /// typed or held, the Nudge times, Ctrl+Enter taking the 1 h one and
+    /// Ctrl+1 to 3 each of them (#277), and under them Open in the editor
+    /// (#352, obf-1080), which saves the Note and opens it in the Note
+    /// dialog; a Note filed where it is opened, by files dropped onto an
+    /// Area or a Topic (obf-1140), or where the Nudge buttons are
+    /// switched off, gets one Save instead of the Nudge times,
+    /// nudging only an Unsorted Note. What the files
     /// dropped, File ▸ Attach file… and Ctrl+V brought shows above the
     /// text; everything else is the Note dialog's.
     fn capture_card(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
@@ -14603,42 +16921,41 @@ impl App {
                 return;
             }
             ui.add_space(4.0);
-            // Saves as leaving does and opens the Note dialog (#352).
-            let more = ui.button(RichText::new(t.more()).color(text));
-            spotlight::anchor(ui, "quick-more", more.rect);
-            if more.clicked() {
-                actions.push(Action::CaptureToEditor);
-            }
-            ui.add_space(4.0);
-            if sorted || !quick.nudge_buttons {
+            let hint = if sorted || !quick.nudge_buttons {
                 // A sorted Note needs no Nudge (#113); without the Nudge
                 // buttons, Save nudges in 1 h (#142).
                 if theme::primary(ui, true, t.save()).clicked() {
                     actions.push(Action::Capture(Notes::default_nudge()));
                 }
-                let hint = if sorted {
+                if sorted {
                     t.capture_keys_hint_sorted()
                 } else {
                     t.capture_keys_hint()
-                };
-                ui.label(RichText::new(hint).small().color(weak));
-                return;
-            }
-            ui.label(RichText::new(t.nudge_heading()).strong().color(text));
-            let nudges = ui.horizontal(|ui| {
-                let labels = [t.snooze10(), t.snooze30(), t.snooze60()];
-                for (label, nudge_in) in labels.into_iter().zip(capture_choices::nudge_times()) {
-                    if ui.button(RichText::new(label).color(text)).clicked() {
-                        actions.push(Action::Capture(nudge_in));
-                    }
                 }
-            });
-            spotlight::anchor(ui, "quick-nudges", nudges.response.rect);
-            ui.label(
-                RichText::new(t.capture_nudge_keys_hint())
-                    .small()
-                    .color(weak),
-            );
+            } else {
+                ui.label(RichText::new(t.nudge_heading()).strong());
+                let nudges = ui.horizontal(|ui| {
+                    let labels = [t.snooze10(), t.snooze30(), t.snooze60()];
+                    for (label, nudge_in) in labels.into_iter().zip(capture_choices::nudge_times())
+                    {
+                        if ui.button(RichText::new(label).color(text)).clicked() {
+                            actions.push(Action::Capture(nudge_in));
+                        }
+                    }
+                });
+                spotlight::anchor(ui, "quick-nudges", nudges.response.rect);
+                t.capture_nudge_keys_hint()
+            };
+            ui.add_space(4.0);
+            // Saves as leaving does and opens the Note dialog (#352,
+            // obf-1080).
+            let to_editor = capture_choices::open_in_editor(ui, &t, true);
+            spotlight::anchor(ui, "quick-more", to_editor.rect);
+            if to_editor.clicked() {
+                actions.push(Action::CaptureToEditor);
+            }
+            ui.add_space(4.0);
+            ui.label(RichText::new(hint).small().color(weak));
         });
     }
 
@@ -14696,84 +17013,17 @@ impl App {
             }
             _ => {}
         }
-        let text = ui.visuals().text_color();
-        ui.horizontal(|ui| {
-            let heading = ui.heading(RichText::new(self.title()).color(text));
-            spotlight::anchor(ui, "heading", heading.rect);
-            // Every Note list but the trash has its compact/detailed switch.
-            if self.cards_key().is_some() && compact_button(ui, tones, &self.t, self.view.compact) {
-                actions.push(Action::Compact(!self.view.compact));
-            }
-            if self.selection != Selection::Trash {
-                self.person_filter_menu(ui, actions);
-            }
-            // "+" makes what the list holds (#161), an Area's level its
-            // Topics too (UI laws, "Navigation"); last, so the buttons
-            // before it keep their place while it goes.
-            if let Some(kinds) = self.new_kinds()
-                && let Some(kind) = add_button(ui, &self.t, &kinds)
-            {
-                actions.push(Action::Add(kind));
-            }
-        });
-        if self.selection != Selection::Trash {
-            self.person_filter_chips(ui, tones, actions);
-        }
-        ui.add_space(8.0);
-        let hint = match &self.selection {
-            Selection::All => Some(self.t.search_all_hint()),
-            Selection::Unsorted => Some(self.t.search_unsorted_hint()),
-            Selection::Place(id) if self.view.area(id).is_some() => Some(self.t.search_area_hint()),
-            Selection::Place(_) => Some(self.t.search_topic_hint()),
-            Selection::Trash => Some(self.t.search_trash_hint()),
-            _ => None,
-        };
+        let hint = self.list_hint();
         if let Some(hint) = hint {
-            ui.horizontal(|ui| {
-                icons::show(ui, icons::SEARCH, 20.0, ui.visuals().weak_text_color());
-                let field = ui.add(
-                    TextEdit::singleline(&mut self.query)
-                        .id(Id::new("search"))
-                        .hint_text(hint)
-                        .text_color(text)
-                        .desired_width(ui.available_width() - 32.0),
-                );
-                spotlight::anchor(ui, "search", field.rect);
-                text_menu::show(ui, &self.t, &field, &self.query);
-                // Edit ▸ Find: after the field, so the menu's click does
-                // not take it out again.
-                if std::mem::take(&mut self.search_focus) {
-                    field.request_focus();
-                }
-                if field.changed() {
-                    actions.push(Action::Search);
-                }
-                if !self.query.is_empty()
-                    && icon_button(ui, icons::CLOSE, self.t.clear_search(), text).clicked()
-                {
-                    self.query.clear();
-                    actions.push(Action::Search);
-                }
-            });
-            // The tags starting with the "#…" typed (#267, Q639).
-            if let Some(tag) = tag_tree_view::suggestions(ui, &self.t, &self.view.tag_suggestions) {
-                // The cursor after it, to type on.
-                let end = tag.chars().count();
-                self.query = tag;
-                let id = Id::new("search");
-                let mut state =
-                    egui::text_edit::TextEditState::load(ui.ctx(), id).unwrap_or_default();
-                let at = egui::text::CCursor::new(end);
-                state
-                    .cursor
-                    .set_char_range(Some(egui::text::CCursorRange::one(at)));
-                state.store(ui.ctx(), id);
-                self.search_focus = true;
-                actions.push(Action::Search);
-            }
-            ui.add_space(8.0);
+            self.list_band(ui, tones, hint, actions);
         }
         let trash = self.selection == Selection::Trash;
+        // Room under the band before what does not scroll under it.
+        let still = trash
+            && (!self.view.trashed_routines.is_empty() || !self.view.trashed_frogs.is_empty());
+        if hint.is_some() && (still || self.view.notes.is_empty()) {
+            ui.add_space(8.0);
+        }
         if !trash {
             ui.spacing_mut().item_spacing.y = 16.0;
         }
@@ -14801,6 +17051,29 @@ impl App {
         }
         // Each place's list scrolls on its own (#278).
         let place = self.selection.clone();
+        // A search's cards show where it found their Notes (obf-1047,
+        // C7b): its places marked in them, and listed under each.
+        let searched = self.searching.searched().trim().to_string();
+        // Those of other words are of no use any more.
+        if self
+            .card_findings
+            .values()
+            .next()
+            .is_some_and(|(q, _, _)| *q != searched)
+        {
+            self.card_findings.clear();
+        }
+        let marks = (!searched.is_empty()).then(|| {
+            Arc::new(find_marks::FindMarks {
+                query: searched.clone(),
+                ..Default::default()
+            })
+        });
+        let before = find_marks::set(ui.ctx(), marks);
+        let words = match searched.is_empty() {
+            true => 0,
+            false => find_marks::text_key(&searched),
+        };
         let output = list_scroll(ui, ("notes", place), |ui| {
             // Room for the emboss around every card.
             ui.spacing_mut().item_spacing.y = 16.0;
@@ -14840,7 +17113,7 @@ impl App {
                             return 0.0;
                         };
                         let full = self.view.compact == self.view.switched.contains(&p.note.id);
-                        let held = self.card_heights.get(&(p.note.id.clone(), full));
+                        let held = self.card_heights.get(&(p.note.id.clone(), full, words));
                         held.copied().unwrap_or(CARD_LEAST) + 16.0
                     };
                     let (mut from, mut room) = (at, 0.0);
@@ -14860,7 +17133,7 @@ impl App {
                 let id = &placed.note.id;
                 let top = ui.cursor().top();
                 let full = self.view.compact == self.view.switched.contains(id);
-                let held = (id.clone(), full);
+                let held = (id.clone(), full, words);
                 let height = self.card_heights.get(&held).copied().unwrap_or(CARD_GUESS);
                 if (top > near.bottom() || top + height < near.top())
                     && !around.as_ref().is_some_and(|r| r.contains(&at))
@@ -14874,6 +17147,25 @@ impl App {
                     continue;
                 }
                 self.cards_laid_out += 1;
+                // Its places found, once per card laid out and search, not
+                // in the search itself (obf-1047).
+                let found = if searched.is_empty() {
+                    None
+                } else {
+                    let sections = self.view.sections.get(id).map_or(&[][..], Vec::as_slice);
+                    let texts = found_in(&placed.note, sections, false);
+                    let fresh = !matches!(
+                        self.card_findings.get(id),
+                        Some((q, k, _)) if *q == searched && *k == texts
+                    );
+                    if fresh {
+                        let found = findings::of_note(&placed.note, &searched, sections);
+                        show_found_rows(ui.ctx(), &placed.note, sections, &found);
+                        let found = (searched.clone(), texts, Arc::new(found));
+                        self.card_findings.insert(id.clone(), found);
+                    }
+                    self.card_findings.get(id).map(|(_, _, f)| f.clone())
+                };
                 let selected = self.selected_note.as_deref() == Some(id.as_str());
                 let picked = self.cards.contains(id);
                 // A Note in the trash is restored, not filed.
@@ -14911,6 +17203,7 @@ impl App {
                     },
                     today: self.view.card_today.get(id).map_or(&[], Vec::as_slice),
                     hidden: self.view.hidden_notes.contains(id),
+                    found: found.as_deref().map_or(&[], Vec::as_slice),
                     // A card names its place unless the list is of it: in
                     // an Area's search its Topics' hits name the Topic
                     // (#330).
@@ -14922,7 +17215,7 @@ impl App {
                 // Its own id, however many cards above were laid out.
                 let card = egui::UiBuilder::new().id(Id::new(("list card", id)));
                 let drawn = ui.scope_builder(card, |ui| {
-                    note_card(
+                    let mut clicks = note_card(
                         ui,
                         &self.t,
                         tones,
@@ -14930,14 +17223,17 @@ impl App {
                         (selected, picked, draggable),
                         look,
                         media,
-                    )
+                    );
+                    let opened = clicks.found.take();
+                    (clicks, opened)
                 });
                 let drawn_height = drawn.response.rect.height();
                 if top < view_top {
                     grown += drawn_height - height;
                 }
                 self.card_heights.insert(held, drawn_height);
-                let clicks = drawn.inner;
+                let (clicks, opened) = drawn.inner;
+                actions.extend(opened);
                 // At once: the room of the cards above it follows as they
                 // are laid out, which would end a scroll under way.
                 if scroll_to.as_deref() == Some(id.as_str()) {
@@ -14991,8 +17287,8 @@ impl App {
                     actions.push(Action::Toggle(routine, occurrence));
                 } else if let Some((entity, asked)) = clicks.tick {
                     actions.push(box_action(entity, asked));
-                } else if let Some(opening) = clicks.table {
-                    actions.push(Action::OpenTable(opening));
+                } else if let Some(asked) = clicks.table {
+                    actions.push(asked);
                 } else if let Some((line, checked)) = clicks.check {
                     if self.view.shopping_lists.contains_key(id) {
                         actions.push(Action::Shopping(ShoppingAction::Check(line, checked)));
@@ -15039,6 +17335,7 @@ impl App {
                 ui.ctx().request_repaint();
             }
         });
+        find_marks::set(ui.ctx(), before);
         if output.state.offset.y != self.scrolled {
             // The marks follow on the next pass.
             self.scrolled = output.state.offset.y;
@@ -15046,18 +17343,312 @@ impl App {
         }
     }
 
+    /// The search hint of a list of Notes (All Notes, Unsorted, an Area,
+    /// a Topic, the Trash), which have their header band (obf-1064);
+    /// nothing elsewhere.
+    fn list_hint(&self) -> Option<&'static str> {
+        let t = self.t;
+        match &self.selection {
+            Selection::All => Some(t.search_all_hint()),
+            Selection::Unsorted => Some(t.search_unsorted_hint()),
+            Selection::Place(id) if self.view.area(id).is_some() => Some(t.search_area_hint()),
+            Selection::Place(_) => Some(t.search_topic_hint()),
+            Selection::Trash => Some(t.search_trash_hint()),
+            _ => None,
+        }
+    }
+
+    /// The top of a list of Notes (obf-1064, as the phone's band,
+    /// obf-1041): one band on the search's fill with its line under it
+    /// (obf-1088), so the cards scroll under the line. Its first row
+    /// holds back, forward and the path, the place shown as the title;
+    /// its second the search field, the view switch, the person filter's
+    /// menu and its chips, and "+", all one height; under them the tags
+    /// the "#…" typed starts, or in All Notes while nothing is typed the
+    /// most used tags ending in "All tags…" (obf-1074). All of it grows
+    /// with Text size.
+    fn list_band(&mut self, ui: &mut Ui, tones: Tones, hint: &str, actions: &mut Vec<Action>) {
+        let sizes = BandSizes::of(ui);
+        theme::search_band(ui, |ui| {
+            let row = ui.horizontal(|ui| {
+                self.nav_arrows(ui, (sizes.arrow, sizes.glyph), actions);
+                ui.add_space(8.0);
+                let title = self.path_crumbs(ui, (sizes.words, Some(sizes.title)), actions);
+                if let Some(title) = title {
+                    spotlight::anchor(ui, "heading", title);
+                }
+            });
+            spotlight::anchor(ui, "nav", row.response.rect);
+            self.band_tools(ui, tones, sizes, hint, actions);
+            // The tags starting with the "#…" typed (#267, Q639).
+            if let Some(tag) =
+                tag_tree_view::suggestions(ui, &self.t, &self.view.tag_suggestions, sizes.row)
+            {
+                // The cursor after it, to type on.
+                let end = tag.chars().count();
+                self.query = tag;
+                let id = Id::new("search");
+                let mut state =
+                    egui::text_edit::TextEditState::load(ui.ctx(), id).unwrap_or_default();
+                let at = egui::text::CCursor::new(end);
+                state
+                    .cursor
+                    .set_char_range(Some(egui::text::CCursorRange::one(at)));
+                state.store(ui.ctx(), id);
+                self.search_focus = true;
+                actions.push(Action::Search);
+            }
+            // All Notes' most used tags while nothing is typed (obf-1074),
+            // gone at the first letter.
+            if self.selection == Selection::All && self.query.trim().is_empty() {
+                let tags = &self.tag_row.tags;
+                match tag_tree_view::most_used_row(ui, &self.t, tags, sizes.row) {
+                    Some(RowAsked::Search(tag)) => actions.push(Action::SearchFor(tag)),
+                    Some(RowAsked::All) => actions.push(Action::Select(Selection::Tags)),
+                    None => {}
+                }
+            }
+        });
+    }
+
+    /// The band's second row (obf-1064): the search field, then the view
+    /// switch of every list but the Trash, the Trash's "Empty the trash
+    /// now" (obf-1095), "Show Notes by…" with a chip for each person it
+    /// keeps, and "+", wrapping under the field where the list is too
+    /// narrow for them beside it.
+    fn band_tools(
+        &mut self,
+        ui: &mut Ui,
+        tones: Tones,
+        sizes: BandSizes,
+        hint: &str,
+        actions: &mut Vec<Action>,
+    ) {
+        let t = self.t;
+        let text = ui.visuals().text_color();
+        let trash = self.selection == Selection::Trash;
+        let switch = self.cards_key().is_some();
+        let kinds = self.new_kinds();
+        let gap = ui.spacing().item_spacing.x;
+        // What stands beside the field, so it takes the rest.
+        let mut beside = 0.0;
+        if switch {
+            beside += band_button_width(ui, t.menu_view(), sizes) + gap;
+        }
+        if trash {
+            beside += band_button_width(ui, t.desk_trash_empty_now(), sizes) + gap;
+        }
+        if !trash {
+            let font = FontId::proportional(sizes.words);
+            let words = ui
+                .painter()
+                .layout_no_wrap(t.person_filter().to_string(), font, text);
+            beside += words.size().x + 2.0 * ui.spacing().button_padding.x + gap;
+        }
+        let kept = if trash {
+            Vec::new()
+        } else {
+            self.filter_kept()
+        };
+        for (_, name) in &kept {
+            let chip = design::Chip::new(name).closing().height(sizes.row);
+            beside += chip.width(ui) + gap;
+        }
+        if kinds.is_some() {
+            beside += band_button_width(ui, t.menu_new_note(), sizes) + gap;
+        }
+        let place = self.place_shown();
+        if place.is_some() {
+            beside += sizes.row + gap;
+        }
+        let layout = egui::Layout::left_to_right(egui::Align::Center).with_main_wrap(true);
+        let room = egui::vec2(ui.available_width(), sizes.row);
+        ui.allocate_ui_with_layout(room, layout, |ui| {
+            let rest = ui.available_width() - beside;
+            let width = if rest >= BAND_FIELD_MIN {
+                rest
+            } else {
+                ui.available_width()
+            };
+            let search = (Id::new("search"), hint);
+            let (field, cleared) = band_search(ui, &t, &mut self.query, search, width, sizes);
+            spotlight::anchor(ui, "search", field.rect);
+            // Edit ▸ Find: after the field, so the menu's click does
+            // not take it out again.
+            if std::mem::take(&mut self.search_focus) {
+                field.request_focus();
+            }
+            if field.changed() {
+                actions.push(Action::Search);
+            }
+            if cleared {
+                // The cursor back in the field, to type anew.
+                self.search_focus = true;
+                actions.push(Action::Search);
+            }
+            // Every Note list but the trash has its compact/detailed switch.
+            if switch && compact_button(ui, tones, &t, self.view.compact, sizes) {
+                actions.push(Action::Compact(!self.view.compact));
+            }
+            // The trash empties at once (obf-1095), greyed while nothing
+            // in it can be deleted or it is being emptied.
+            if trash {
+                let word = t.desk_trash_empty_now();
+                let offered = self.trash_emptying.offered();
+                let empty = ui.add_enabled_ui(offered, |ui| {
+                    band_button(ui, (icons::TRASH, word, word), sizes, None)
+                });
+                if empty.inner.clicked() {
+                    actions.push(Action::AskEmptyTrash);
+                }
+            }
+            if !trash {
+                self.person_filter_menu(ui, sizes, actions);
+                self.person_filter_chips(ui, sizes, kept, actions);
+            }
+            // "+" makes what the list holds (#161), an Area's level its
+            // Topics too (UI laws, "Navigation"), whatever the filter
+            // (obf-1070); last, so the buttons before it keep their place
+            // where it is not.
+            if let Some(kinds) = kinds
+                && let Some(kind) = add_button(ui, &t, &kinds, Some(sizes))
+            {
+                actions.push(Action::Add(kind));
+            }
+            // An Area's or a Topic's own actions at the row's end, where
+            // the menu bar's Area menu had them (obf-1065).
+            if let Some(place) = &place {
+                self.place_more(ui, place, sizes, actions);
+            }
+        });
+    }
+
+    /// The ⋮ of the Area or Topic `place` the list shows (#279,
+    /// obf-1065), as the sidebar's right-click offers them (obf-1014):
+    /// for an Area New Topic, Name, colour and icon… (F2), Share with
+    /// people…, Move ▸ (Alt+Up, Alt+Down), Export as Pack…, Hidden from
+    /// AI and Delete, each greyed where that leaves it out; for a Topic
+    /// Rename (F2), Export as Pack… and Delete. All of them greyed while a
+    /// dialog lies over the list, so that none acts on a place behind it.
+    fn place_more(
+        &self,
+        ui: &mut Ui,
+        place: &PlaceMenu,
+        sizes: BandSizes,
+        actions: &mut Vec<Action>,
+    ) {
+        let t = self.t;
+        let text = ui.visuals().text_color();
+        let label = if place.area {
+            t.desk_area_more()
+        } else {
+            t.desk_topic_more()
+        };
+        let more = sized_icon_button(
+            ui,
+            (icons::MORE_VERT, label, text),
+            (sizes.row, sizes.glyph),
+        );
+        spotlight::anchor(ui, "place-more", more.rect);
+        let acts = self.place_menu().is_some();
+        let ctx = ui.ctx().clone();
+        // As the system writes them, as in the menu bar.
+        let keys = |modifiers: Modifiers, key: Key| {
+            let shortcut = egui::KeyboardShortcut::new(modifiers, key);
+            Some(ctx.format_shortcut(&shortcut))
+        };
+        egui::Popup::menu(&more).show(|ui| {
+            let id = &place.id;
+            let manages = acts && place.manages;
+            let delete = [(t.delete(), None, manages, Action::Delete(id.clone()))];
+            let pack = [(
+                t.export_as_pack(),
+                None,
+                acts,
+                Action::ExportPack(id.clone()),
+            )];
+            if !place.area {
+                let rename = [(
+                    t.rename(),
+                    keys(Modifiers::NONE, Key::F2),
+                    manages,
+                    Action::Rename(id.clone()),
+                )];
+                menu_entries(ui, rename, actions);
+                // Copies of what anyone may read (#165).
+                menu_entries(ui, pack, actions);
+                ui.separator();
+                menu_entries(ui, delete, actions);
+                return;
+            }
+            // Topics are made only in Advanced (#197).
+            let topics = manages && self.view.advanced;
+            let items = [
+                (t.new_topic(), None, topics, Action::NewTopic(id.clone())),
+                (
+                    t.desk_area_look(),
+                    keys(Modifiers::NONE, Key::F2),
+                    manages,
+                    Action::Rename(id.clone()),
+                ),
+                // Its people too, for anyone in a Shared Area.
+                (
+                    t.share_area(),
+                    None,
+                    manages || (acts && place.shared),
+                    Action::Share(id.clone()),
+                ),
+            ];
+            menu_entries(ui, items, actions);
+            // Any Area moves, a Shared one too; not past an end (#280).
+            let step = |up| acts.then(|| self.view.area_step(id, up)).flatten();
+            let (up, down) = (step(true), step(false));
+            let moves = up.is_some() || down.is_some();
+            ui.add_enabled_ui(moves, |ui| {
+                ui.menu_button(RichText::new(t.desk_area_move()).color(text), |ui| {
+                    let items = [
+                        (
+                            t.area_move_up(),
+                            keys(Modifiers::ALT, Key::ArrowUp),
+                            up.is_some(),
+                            Action::MoveArea(id.clone(), up.unwrap_or_default()),
+                        ),
+                        (
+                            t.area_move_down(),
+                            keys(Modifiers::ALT, Key::ArrowDown),
+                            down.is_some(),
+                            Action::MoveArea(id.clone(), down.unwrap_or_default()),
+                        ),
+                    ];
+                    menu_entries(ui, items, actions);
+                });
+            });
+            // Copies of what anyone may read (#165).
+            menu_entries(ui, pack, actions);
+            // An Area's own mark (#267), greyed where the right-click
+            // leaves it out: an Area shared unmarked.
+            let on = self.view.hidden_areas.contains(id);
+            let offered = acts && (on || self.view.hideable_areas.contains(id));
+            let switched = ui.add_enabled_ui(offered, |ui| hidden_switch(ui, &t, id, on));
+            if let Some(asked) = switched.inner {
+                actions.push(asked);
+                ui.close();
+            }
+            ui.separator();
+            menu_entries(ui, delete, actions);
+        });
+    }
+
     /// What "+" at the top of the list makes (#161), in the order its
     /// menu shows them: in All Notes, an Area and a Topic the six kinds,
     /// Session and Frog only for who may set them up there, in an Area
     /// a Topic too for who may add one; in Unsorted a Note. Tally,
-    /// Session, Frog and Topic only in Advanced (#197). Nothing among
-    /// another person's Notes, nor in the trash.
+    /// Session, Frog and Topic only in Advanced (#197). Whatever the
+    /// person filter keeps (obf-1070); nothing in the trash.
     fn new_kinds(&self) -> Option<Vec<NewKind>> {
-        if !self.people.is_everyone() {
-            return None;
-        }
         match &self.selection {
-            Selection::Unsorted => Some(vec![NewKind::Note]),
+            // The quick note or the Note dialog (obf-1141).
+            Selection::Unsorted => Some(vec![NewKind::Note, NewKind::Editor]),
             Selection::All | Selection::Place(_) => {
                 let mut kinds = vec![NewKind::Note, NewKind::Checklist, NewKind::Shopping];
                 if !self.view.advanced {
@@ -15085,16 +17676,19 @@ impl App {
     /// The person filter's menu (#53): "Me", every person of People and,
     /// while it filters, "Everyone"; it stays open while people are
     /// ticked.
-    fn person_filter_menu(&self, ui: &mut Ui, actions: &mut Vec<Action>) {
+    fn person_filter_menu(&self, ui: &mut Ui, sizes: BandSizes, actions: &mut Vec<Action>) {
         let t = &self.t;
         let text = ui.visuals().text_color();
         let filter = &self.people;
+        let label = RichText::new(t.person_filter()).size(sizes.words);
+        // Strong in the theme's strong tone (obf-1126).
         let label = if filter.is_everyone() {
-            RichText::new(t.person_filter()).color(text)
+            label.color(text)
         } else {
-            RichText::new(t.person_filter()).strong().color(text)
+            label.strong()
         };
-        MenuButton::new(label)
+        let button = egui::Button::new(label).min_size(egui::vec2(0.0, sizes.row));
+        MenuButton::from_button(button)
             .config(MenuConfig::new().close_behavior(PopupCloseBehavior::CloseOnClickOutside))
             .ui(ui, |ui| {
                 let mut me = filter.me;
@@ -15125,16 +17719,15 @@ impl App {
             });
     }
 
-    /// Who the person filter keeps, each with ✕ to take them out; nothing
-    /// while it keeps everyone, so Notes never leave the list unseen.
-    fn person_filter_chips(&self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
+    /// Who the person filter keeps, by id (none for Me) and the name
+    /// shown; nobody while it keeps everyone.
+    fn filter_kept(&self) -> Vec<(Option<String>, String)> {
         let filter = &self.people;
-        if filter.is_everyone() {
-            return;
-        }
         let t = &self.t;
-        let text = ui.visuals().text_color();
         let mut kept: Vec<(Option<String>, String)> = Vec::new();
+        if filter.is_everyone() {
+            return kept;
+        }
         if filter.me {
             kept.push((None, t.person_filter_me().to_string()));
         }
@@ -15152,22 +17745,36 @@ impl App {
                 profile_view::display_name(t, &name).to_string(),
             ));
         }
-        ui.horizontal_wrapped(|ui| {
-            ui.label(RichText::new(t.person_filter_showing()).color(text));
-            for (id, name) in kept {
-                if pill(ui, tones, true, &name)
-                    .on_hover_text(t.person_filter_remove(&name))
-                    .clicked()
-                {
-                    let mut next = filter.clone();
-                    match id {
-                        Some(id) => next.toggle(&id),
-                        None => next.me = false,
-                    }
-                    actions.push(Action::FilterPeople(next));
+        kept
+    }
+
+    /// Who the person filter keeps, `kept`, each a chip with ✕ to take
+    /// them out (obf-1064), after "Show Notes by…"; nothing while it
+    /// keeps everyone, so Notes never leave the list unseen.
+    fn person_filter_chips(
+        &self,
+        ui: &mut Ui,
+        sizes: BandSizes,
+        kept: Vec<(Option<String>, String)>,
+        actions: &mut Vec<Action>,
+    ) {
+        let filter = &self.people;
+        for (id, name) in kept {
+            let chip = design::Chip::new(&name).on(true).closing();
+            if chip
+                .height(sizes.row)
+                .show(ui)
+                .on_hover_text(self.t.person_filter_remove(&name))
+                .clicked()
+            {
+                let mut next = filter.clone();
+                match id {
+                    Some(id) => next.toggle(&id),
+                    None => next.me = false,
                 }
+                actions.push(Action::FilterPeople(next));
             }
-        });
+        }
     }
 
     /// The selected Note's editor (UI laws, "Desktop").
@@ -15178,12 +17785,73 @@ impl App {
     /// field of its own, as the Note's text (#183); a text only read
     /// selects to be copied.
     fn note_editor(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
+        // The find bar over it (obf-1047), its places marked in it.
+        let marks = self.find_row(ui, false, actions);
+        let before = find_marks::set(ui.ctx(), marks);
+        // The menus of its fields and texts offer Search (obf-1055).
+        let searched = text_menu::searches(ui.ctx(), true);
+        self.note_content(ui, tones, actions);
+        text_menu::searches(ui.ctx(), searched);
+        find_marks::set(ui.ctx(), before);
+    }
+
+    /// The find bar of the Note open (obf-1047), while it is open: drawn
+    /// across `ui`, its words found anew in the Note and its Sections as
+    /// they changed, ✕ closing it, Search all Notes searching All Notes
+    /// for its words (obf-1055). Gives what it marks in the Note drawn
+    /// under it; in the reading view, `texts`, only the places in the
+    /// texts, which alone it shows.
+    fn find_row(
+        &mut self,
+        ui: &mut Ui,
+        texts: bool,
+        actions: &mut Vec<Action>,
+    ) -> Option<Arc<find_marks::FindMarks>> {
+        let (placed, sections) = self.view.detail.as_ref()?;
+        let note = &placed.note;
+        // A bar left from another Note goes.
+        if self.find.as_ref().is_some_and(|(of, _)| *of != note.id) {
+            self.find = None;
+        }
+        let (_, bar) = self.find.as_mut()?;
+        match bar.show(ui, &self.t) {
+            Some(find_bar::Asked::Close) => {
+                self.find = None;
+                return None;
+            }
+            // As a tag clicked does, the Note left; from a Note's own
+            // window, in the main window.
+            Some(find_bar::Asked::SearchAll) => {
+                actions.push(Action::SearchFor(bar.query().trim().to_string()));
+            }
+            None => {}
+        }
+        bar.find(found_in(note, sections, texts), |query| {
+            let mut found = findings::of_note(note, query, sections);
+            if texts {
+                found.retain(|f| f.part == FindingPart::Text);
+            }
+            found
+        });
+        // A Note of a kind edited here shows its name and its description
+        // in fields of their own (#188); read, or in the reading view, it
+        // shows its whole text.
+        let kinded = self.view.kind.is_some_and(|k| k != NoteKind::Plain);
+        let writes = !note.is_trashed() && self.view.may.changes && note.text_editable;
+        let split = kinded && writes && !texts;
+        Some(bar.marks(ui.ctx(), |f| finding_text(note, sections, f, split)))
+    }
+
+    /// What the Note dialog and a Note's own window show of the Note open:
+    /// its texts, its kind's content, its media and its badges.
+    fn note_content(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
         let Some((placed, sections)) = &self.view.detail else {
             return;
         };
         let kind = KindShown::of(&self.view);
         // A Checklist, a Shopping List or a Tally shows its text as its
-        // name and its description, its content under them (#188).
+        // name and its description, its content under them in the same
+        // card (#188, obf-1071).
         let kinded = self.view.kind.is_some_and(|k| k != NoteKind::Plain);
         let linked = &self.view.routines;
         let newer_routines = self.view.newer_routines;
@@ -15219,6 +17887,8 @@ impl App {
         let amend = &mut self.amend;
         let amend_focus = &mut self.amend_focus;
         let amend_select = &mut self.amend_select;
+        let amend_open = &mut self.amend_open;
+        let just_made = self.made_open.as_deref() == Some(placed.note.id.as_str());
         let cache = &mut self.photos;
         let store = &self.store;
         let playing = self.playing.as_deref();
@@ -15250,8 +17920,8 @@ impl App {
         let today = Day::today(store.now(), &*self.wall);
         // Its one Reminder goes with it, where this Device moves it.
         let trashes = may.changes && linked.len() == 1;
-        // Record voice and Paste onto it (#352), while a microphone and
-        // a clipboard are there; Record voice only in the window's Note
+        // Voice and Paste onto it (#352), while a microphone and
+        // a clipboard are there; Voice only in the window's Note
         // dialog, as a Note's own window only borrows the microphone
         // while it draws (#287).
         let alone = self.alone.is_some();
@@ -15334,7 +18004,7 @@ impl App {
                                         boxes: look,
                                         ticks: (section_ticks, &section_ticked),
                                         name: t.section_text_field_name(),
-                                        look: (18.0, text),
+                                        look: (theme::CONTENT, text),
                                         hint: None,
                                     };
                                     let state = (
@@ -15350,7 +18020,7 @@ impl App {
                                     // formatted.
                                     ui.style_mut().interaction.selectable_labels = true;
                                     let all = (0, section.text.len());
-                                    let shown = (None, text);
+                                    let shown = (Some(theme::CONTENT), text);
                                     let spots = read_text::shown(ui, |ui| {
                                         text_marks_view::formatted_label(
                                             ui,
@@ -15361,17 +18031,25 @@ impl App {
                                         )
                                     });
                                     let of = Id::new(("text", &section.id));
-                                    if let Some(at) =
-                                        text_marks_view::table_clicks(ui, &t, of, &spots.tables)
-                                    {
-                                        actions.push(Action::OpenTable(Opening {
-                                            note: None,
-                                            text: section.text.clone(),
-                                            at,
-                                            cell: None,
-                                            tags: true,
-                                            boxes: Some(section.id.clone()),
-                                        }));
+                                    if let Some((at, act)) = text_marks_view::table_clicks(
+                                        ui,
+                                        &t,
+                                        of,
+                                        &spots.tables,
+                                        false,
+                                    ) {
+                                        actions.extend(table_action(
+                                            act,
+                                            Opening {
+                                                note: None,
+                                                text: section.text.clone(),
+                                                at,
+                                                cell: None,
+                                                tags: true,
+                                                boxes: Some(section.id.clone()),
+                                            },
+                                            look,
+                                        ));
                                     }
                                     if let Some(asked) = text_marks_view::box_clicks(
                                         ui,
@@ -15454,6 +18132,7 @@ impl App {
                                 note,
                                 writes,
                                 bar: self.view.advanced,
+                                asks: self.view.kind != Some(NoteKind::Session),
                                 boxes,
                                 ticks: (ticks, &ticked),
                             };
@@ -15469,7 +18148,7 @@ impl App {
                             let all = (0, note.text.len());
                             // A Code text moves sideways (#213).
                             if note.text_format == text_format::CODE {
-                                let look = (Some(18.0), text);
+                                let look = (Some(theme::CONTENT), text);
                                 read_text::shown(ui, |ui| {
                                     text_marks_view::code_text_label(
                                         ui,
@@ -15486,23 +18165,27 @@ impl App {
                                     ui,
                                     (&note.text, &note.text_format, boxes),
                                     all,
-                                    (Some(18.0), text),
+                                    (Some(theme::CONTENT), text),
                                     false,
                                 )
                             });
                             let of = Id::new(("text", &note.id));
                             // Its tables open to read (#128).
-                            if let Some(at) =
-                                text_marks_view::table_clicks(ui, &t, of, &spots.tables)
+                            if let Some((at, act)) =
+                                text_marks_view::table_clicks(ui, &t, of, &spots.tables, false)
                             {
-                                actions.push(Action::OpenTable(Opening {
-                                    note: None,
-                                    text: note.text.clone(),
-                                    at,
-                                    cell: None,
-                                    tags: true,
-                                    boxes: Some(note.id.clone()),
-                                }));
+                                actions.extend(table_action(
+                                    act,
+                                    Opening {
+                                        note: None,
+                                        text: note.text.clone(),
+                                        at,
+                                        cell: None,
+                                        tags: true,
+                                        boxes: Some(note.id.clone()),
+                                    },
+                                    boxes,
+                                ));
                             }
                             // A Member ticks the boxes of a Note not theirs.
                             if let Some(asked) = text_marks_view::box_clicks(
@@ -15538,7 +18221,7 @@ impl App {
                             boxes,
                             ticks: (ticks, &ticked),
                             name: t.note_text_field_name(),
-                            look: (18.0, text),
+                            look: (theme::CONTENT, text),
                             hint: None,
                         };
                         let state = (&mut *edited, &mut *editing, &mut *focus, &mut *select);
@@ -15550,28 +18233,29 @@ impl App {
                     if !kinded {
                         draw_sections(ui, &mut *cache, actions);
                     }
+                    // The kind's content under its name and description
+                    // (#188), in their card as the Lines are under them on
+                    // a card (obf-1071); nothing while the Note is no
+                    // Checklist.
+                    if let Some(shown) = checklist {
+                        let mut asked = Vec::new();
+                        checklist_view::section(ui, (&t, tones), shown, typed, &mut asked);
+                        actions.extend(asked.into_iter().map(Action::Checklist));
+                    }
+                    // Nothing while the Note is no Shopping List.
+                    if let Some(shown) = shopping {
+                        let mut asked = Vec::new();
+                        shopping_view::section(ui, (&t, tones), shown, typed, &mut asked);
+                        actions.extend(asked.into_iter().map(Action::Shopping));
+                    }
+                    // Only its setup, nothing while the Note is no Tally;
+                    // its chart and entries show on its card (#190).
+                    if let Some(tally) = tally {
+                        let mut asked = Vec::new();
+                        tally_view::setup(ui, &t, tones, tally, &mut asked);
+                        actions.extend(asked.into_iter().map(Action::Tally));
+                    }
                 });
-                // The kind's content under its name and description (#188),
-                // as the Lines are under them on a card; nothing while the
-                // Note is no Checklist.
-                if let Some(shown) = checklist {
-                    let mut asked = Vec::new();
-                    checklist_view::section(ui, (&t, tones), shown, typed, &mut asked);
-                    actions.extend(asked.into_iter().map(Action::Checklist));
-                }
-                // Nothing while the Note is no Shopping List.
-                if let Some(shown) = shopping {
-                    let mut asked = Vec::new();
-                    shopping_view::section(ui, (&t, tones), shown, typed, &mut asked);
-                    actions.extend(asked.into_iter().map(Action::Shopping));
-                }
-                // Only its setup, nothing while the Note is no Tally; its
-                // chart and entries show on its card (#190).
-                if let Some(tally) = tally {
-                    let mut asked = Vec::new();
-                    tally_view::setup(ui, &t, tones, tally, &mut asked);
-                    actions.extend(asked.into_iter().map(Action::Tally));
-                }
                 // A Session's pool and count, each change written at once;
                 // its picks and history show on its card (#191).
                 if let (Some(draft), Some(setup)) = (session_draft.as_mut(), session_setup) {
@@ -15601,12 +18285,32 @@ impl App {
                     frog: note_frog,
                     advanced: self.view.advanced,
                 };
-                note_badges(ui, (&t, tones), &shown, actions);
+                // Under their heading (obf-1073), with "Make a Tally"
+                // after them: only a Note in the lists becomes a Tally (ADR
+                // 0028); one that is adds entries in its Tally part above.
+                // A Checklist, a Shopping List or a Session is no Tally
+                // (ADR 0030, ADR 0039).
+                let tallies = self.view.advanced
+                    && may.changes
+                    && !trashed
+                    && tally.is_none()
+                    && checklist.is_none()
+                    && shopping.is_none()
+                    && session_setup.is_none()
+                    && !note.is_merged()
+                    && note.text_format != text_format::CODE;
+                ui.vertical(|ui| {
+                    ui.spacing_mut().item_spacing.y = GROUP_SPACING.y;
+                    group_heading(ui, t.editor_group_this_note());
+                    note_badges(ui, (&t, tones), &shown, actions);
+                    if tallies && group_button(ui, None, t.make_tally()).clicked() {
+                        actions.push(Action::Tally(TallyAction::Make(note.id.clone())));
+                    }
+                });
                 // A Session's past runs (#264), under its settings.
                 if session_setup.is_some() {
                     embossed(ui, tones, false, None, |ui| {
-                        let text = ui.visuals().text_color();
-                        ui.label(RichText::new(t.session_runs()).strong().color(text));
+                        ui.label(RichText::new(t.session_runs()).strong());
                         session_view::draw_runs(ui, &t, &self.view.session_runs, None);
                     });
                 }
@@ -15644,33 +18348,6 @@ impl App {
                         );
                     });
                 }
-                // A recording, the clipboard and files of any kind onto
-                // this Note (#352), as a drop on the dialog brings them
-                // (#267); a recording running ends by one big stop button.
-                if may.changes && !trashed {
-                    if has_recorder {
-                        match media_view::voice_button(ui, &t, recording) {
-                            Some(Voice::Record) => actions.push(Action::Record),
-                            Some(Voice::Stop) => actions.push(Action::StopRecording),
-                            None => {}
-                        }
-                    }
-                    ui.horizontal_wrapped(|ui| {
-                        if has_clipboard && recording.is_none() && paste::button(ui, &t) {
-                            actions.push(Action::PasteOntoNote);
-                        }
-                        let attach = ui.horizontal(|ui| {
-                            icons::show(ui, icons::ATTACH_FILE, 20.0, text);
-                            ui.button(RichText::new(t.attach_file_menu()).color(text))
-                        });
-                        if attach.inner.clicked() {
-                            actions.push(Action::AttachFiles);
-                        }
-                    });
-                    if paste_empty {
-                        paste::empty_line(ui, &t);
-                    }
-                }
                 // On the page, their text where the boxes' text begins and
                 // without the line an indent draws.
                 if kinded && !sections.is_empty() {
@@ -15691,224 +18368,266 @@ impl App {
                     }
                     return;
                 }
-                if !may.amends {
-                    return;
-                }
-                embossed(ui, tones, false, None, |ui| {
-                    // The format bar goes with the field (UI laws), as on
-                    // the phone's "Add to Note": without ☐, which the
-                    // Note's text puts in.
-                    let id = Id::new(("amend", &note.id));
-                    let focused = ui.memory(|m| m.has_focus(id));
-                    // Its tables as grids, as in the Note's text (#257).
-                    let unticked = BoxLook::default();
-                    let body = egui::TextStyle::Body.resolve(ui.style());
-                    // Typed at the Device's text size (#326, obf-1019).
-                    let mut typed_font = body.clone();
-                    typed_font.size = theme::content(ui, body.size);
-                    let grids = markdown::uses(amend).then(|| {
-                        let look = GridLook {
-                            size: body.size,
-                            colour: text,
-                            boxes: &unticked,
-                        };
-                        Grids::prepare(ui, (id, "amend"), amend, look)
-                    });
-                    let in_cell = grids.as_ref().is_some_and(|g| g.cell_focused(ui));
-                    let selected = format_bar::selection(ui, id, amend);
-                    let at = match grids.as_ref().and_then(|g| g.cell_selection(ui)) {
-                        Some((words, chosen)) => format_bar::At::of(&words, chosen, true),
-                        None => format_bar::At::of(amend, selected, markdown::uses(amend)),
-                    };
-                    let formats = &Format::ALL[1..];
-                    // Only in Advanced (#197).
-                    let mut picked = match self.view.advanced {
-                        true => format_bar::bar(ui, &t, &at, (text, tones.accent), formats),
-                        false => None,
-                    };
-                    if focused || in_cell {
-                        ui.input_mut(|i| {
-                            if i.consume_key(Modifiers::COMMAND, Key::B) {
-                                picked = Some(Format::Bold);
-                            } else if i.consume_key(Modifiers::COMMAND, Key::I) {
-                                picked = Some(Format::Italic);
-                            }
+                // Only when asked by "Add a part" (obf-1072); what is
+                // typed keeps it open.
+                let asked = may.amends && (*amend_open || !amend.trim().is_empty());
+                if asked {
+                    embossed(ui, tones, false, None, |ui| {
+                        // The format bar goes with the field (UI laws), as on
+                        // the phone's "Add to Note": without ☐, which the
+                        // Note's text puts in.
+                        let id = Id::new(("amend", &note.id));
+                        let focused = ui.memory(|m| m.has_focus(id));
+                        // Its tables as grids, as in the Note's text (#257).
+                        let unticked = BoxLook::default();
+                        // Typed at the Device's text size (#326, obf-1019),
+                        // from the label's size before it (obf-1081).
+                        let mut typed_font = egui::TextStyle::Body.resolve(ui.style());
+                        typed_font.size = theme::content(ui, theme::LABEL);
+                        let grids = markdown::uses(amend).then(|| {
+                            let look = GridLook {
+                                size: theme::LABEL,
+                                colour: text,
+                                boxes: &unticked,
+                            };
+                            Grids::prepare(ui, (id, "amend"), amend, look)
                         });
-                    }
-                    if std::mem::take(amend_focus) {
-                        match amend_select.take() {
-                            Some(range) => format_bar::select(ui, id, amend, range),
-                            None => ui.memory_mut(|m| m.request_focus(id)),
+                        let in_cell = grids.as_ref().is_some_and(|g| g.cell_focused(ui));
+                        let selected = format_bar::selection(ui, id, amend);
+                        let at = match grids.as_ref().and_then(|g| g.cell_selection(ui)) {
+                            Some((words, chosen)) => format_bar::At::of(&words, chosen, true),
+                            None => format_bar::At::of(amend, selected, markdown::uses(amend)),
+                        };
+                        let formats = &Format::ALL[1..];
+                        // Only in Advanced (#197).
+                        let mut picked = match self.view.advanced {
+                            true => format_bar::bar(ui, &t, &at, (text, tones.accent), formats),
+                            false => None,
+                        };
+                        if focused || in_cell {
+                            ui.input_mut(|i| {
+                                if i.consume_key(Modifiers::COMMAND, Key::B) {
+                                    picked = Some(Format::Bold);
+                                } else if i.consume_key(Modifiers::COMMAND, Key::I) {
+                                    picked = Some(Format::Italic);
+                                }
+                            });
                         }
-                    }
-                    let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, width: f32| {
-                        let typed = typed.as_str();
-                        let format = egui::TextFormat::simple(typed_font.clone(), text);
-                        let mut job =
-                            egui::text::LayoutJob::single_section(typed.to_string(), format);
-                        if let Some(grids) = &grids {
-                            job = grids.hide(typed, job);
+                        // Not in the dialog's first, sizing pass, which
+                        // drops a focus: opened with the dialog from a
+                        // card's Add a part (obf-1014).
+                        if !ui.is_sizing_pass() && std::mem::take(amend_focus) {
+                            match amend_select.take() {
+                                Some(range) => format_bar::select(ui, id, amend, range),
+                                None => ui.memory_mut(|m| m.request_focus(id)),
+                            }
                         }
-                        job.wrap.max_width = width;
-                        ui.fonts_mut(|f| f.layout_job(job))
-                    };
-                    let output = TextEdit::multiline(amend)
-                        .id(id)
-                        .hint_text(t.amend_hint())
-                        .text_color(text)
-                        .layouter(&mut layouter)
-                        .desired_rows(1)
-                        .desired_width(f32::INFINITY)
-                        .frame(Frame::NONE)
-                        .show(ui);
-                    let field = output.response.response.clone();
-                    if let Some(grids) = grids {
-                        let shown = (&output, &mut *amend);
-                        let ticks: table_grid::Ticks<'_> = (false, &|_| false);
-                        let grid = grids.show(ui, (&t, tones), shown, (picked, &unticked, ticks));
-                        if grid.took {
-                            picked = None;
+                        let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, width: f32| {
+                            let typed = typed.as_str();
+                            let format = egui::TextFormat::simple(typed_font.clone(), text);
+                            let mut job =
+                                egui::text::LayoutJob::single_section(typed.to_string(), format);
+                            if let Some(grids) = &grids {
+                                job = grids.hide(typed, job);
+                            }
+                            job.wrap.max_width = width;
+                            ui.fonts_mut(|f| f.layout_job(job))
+                        };
+                        let output = TextEdit::multiline(amend)
+                            .id(id)
+                            .hint_text(t.amend_hint())
+                            .text_color(text)
+                            .layouter(&mut layouter)
+                            .desired_rows(1)
+                            .desired_width(f32::INFINITY)
+                            .frame(Frame::NONE)
+                            .show(ui);
+                        let field = output.response.response.clone();
+                        if let Some(grids) = grids {
+                            let shown = (&output, &mut *amend);
+                            let ticks: table_grid::Ticks<'_> = (false, &|_| false);
+                            let grid =
+                                grids.show(ui, (&t, tones), shown, (picked, &unticked, ticks));
+                            if grid.took {
+                                picked = None;
+                            }
+                            actions.extend(grid.copy.map(Action::CopyTable));
+                            if let Some((start, end, url)) = grid.link {
+                                actions.push(Action::AskLink {
+                                    start,
+                                    end,
+                                    url,
+                                    amend: true,
+                                    section: None,
+                                    pick: false,
+                                });
+                            }
                         }
-                        if let Some((start, end, url)) = grid.link {
-                            actions.push(Action::AskLink {
-                                start,
-                                end,
-                                url,
+                        // Its right-click menu, with the bar's formats while
+                        // the bar shows (#253).
+                        let offered: &[Format] = if self.view.advanced { formats } else { &[] };
+                        match text_menu::menu(ui, &t, &field, amend, offered) {
+                            Some(MenuPick::Format(format)) => picked = Some(format),
+                            Some(pick) => text_menu::apply(ui, id, amend, pick),
+                            None => {}
+                        }
+                        match picked {
+                            // As in the Note's text (#257).
+                            Some(Format::Table) => match markdown::table::at(amend, selected.0) {
+                                Some(table) => {
+                                    let cell = table_grid::cell_at(amend, &table, selected.0);
+                                    table_grid::edit(ui, (id, "amend"), amend, table.start, cell);
+                                }
+                                None => {
+                                    let change = markdown::table::insert(amend, selected.0);
+                                    *amend = change.text;
+                                    table_grid::edit(
+                                        ui,
+                                        (id, "amend"),
+                                        amend,
+                                        change.start,
+                                        (0, 0),
+                                    );
+                                }
+                            },
+                            Some(Format::Link) => actions.push(Action::AskLink {
+                                start: selected.0,
+                                end: selected.1,
+                                url: at.url.clone(),
                                 amend: true,
                                 section: None,
                                 pick: false,
-                            });
+                            }),
+                            Some(Format::LinkTo) => actions.push(Action::AskLink {
+                                start: selected.0,
+                                end: selected.1,
+                                url: None,
+                                amend: true,
+                                section: None,
+                                pick: true,
+                            }),
+                            Some(format) => match format_bar::change(format, amend, selected) {
+                                Some(changed) => {
+                                    *amend = changed.text;
+                                    let range = (changed.start, changed.end);
+                                    format_bar::select(ui, id, amend, range);
+                                }
+                                None => ui.memory_mut(|m| m.request_focus(id)),
+                            },
+                            None => {}
                         }
-                    }
-                    // Its right-click menu, with the bar's formats while
-                    // the bar shows (#253).
-                    let offered: &[Format] = if self.view.advanced { formats } else { &[] };
-                    match text_menu::menu(ui, &t, &field, amend, offered) {
-                        Some(MenuPick::Format(format)) => picked = Some(format),
-                        Some(pick) => text_menu::apply(ui, id, amend, pick),
-                        None => {}
-                    }
-                    match picked {
-                        // As in the Note's text (#257).
-                        Some(Format::Table) => match markdown::table::at(amend, selected.0) {
-                            Some(table) => {
-                                let cell = table_grid::cell_at(amend, &table, selected.0);
-                                table_grid::edit(ui, (id, "amend"), amend, table.start, cell);
-                            }
-                            None => {
-                                let change = markdown::table::insert(amend, selected.0);
-                                *amend = change.text;
-                                table_grid::edit(ui, (id, "amend"), amend, change.start, (0, 0));
-                            }
-                        },
-                        Some(Format::Link) => actions.push(Action::AskLink {
-                            start: selected.0,
-                            end: selected.1,
-                            url: at.url.clone(),
-                            amend: true,
-                            section: None,
-                            pick: false,
-                        }),
-                        Some(Format::LinkTo) => actions.push(Action::AskLink {
-                            start: selected.0,
-                            end: selected.1,
-                            url: None,
-                            amend: true,
-                            section: None,
-                            pick: true,
-                        }),
-                        Some(format) => match format_bar::change(format, amend, selected) {
-                            Some(changed) => {
-                                *amend = changed.text;
-                                let range = (changed.start, changed.end);
-                                format_bar::select(ui, id, amend, range);
-                            }
-                            None => ui.memory_mut(|m| m.request_focus(id)),
-                        },
-                        None => {}
-                    }
-                    let ready = !amend.trim().is_empty();
-                    ui.horizontal_wrapped(|ui| {
-                        let add = ui.add_enabled(
-                            ready,
-                            egui::Button::new(RichText::new(t.amend()).color(text)),
-                        );
-                        if add.clicked() {
-                            actions.push(Action::Amend);
-                        }
-                    });
-                });
-                ui.horizontal_wrapped(|ui| {
-                    if ui
-                        .button(RichText::new(t.send_button()).color(text))
-                        .on_hover_text(t.send_to_person())
-                        .clicked()
-                    {
-                        actions.push(Action::StartSend(note.id.clone()));
-                    }
-                    // To another app (#129).
-                    if ui
-                        .button(RichText::new(t.copy_as_text()).color(text))
-                        .clicked()
-                    {
-                        actions.push(Action::CopyAsText(note.id.clone()));
-                    }
-                    if ui
-                        .button(RichText::new(t.save_as_markdown()).color(text))
-                        .clicked()
-                    {
-                        actions.push(Action::SaveAsMarkdown(note.id.clone()));
-                    }
-                    // Copies of it for another person (#165).
-                    if ui
-                        .button(RichText::new(t.export_as_pack()).color(text))
-                        .clicked()
-                    {
-                        actions.push(Action::ExportPack(note.id.clone()));
-                    }
-                });
-                if !may.changes {
-                    return;
-                }
-                ui.horizontal(|ui| {
-                    if ui
-                        .button(RichText::new(t.merge_into()).color(text))
-                        .clicked()
-                    {
-                        actions.push(Action::StartMerge);
-                    }
-                    // Its lines into a Shopping List there is (#352), the
-                    // one used last at the top (#276).
-                    if !lists.is_empty() {
-                        let label = RichText::new(t.add_to_shopping_list()).color(text);
-                        ui.menu_button(label, |ui| {
-                            if let Some(list) =
-                                capture_choices::shopping_picker(ui, &t, None, &lists)
-                            {
-                                actions.push(Action::PourIntoShopping(list));
+                        let ready = !amend.trim().is_empty();
+                        ui.horizontal_wrapped(|ui| {
+                            let add = ui.add_enabled(
+                                ready,
+                                egui::Button::new(RichText::new(t.add()).color(text)),
+                            );
+                            if add.clicked() {
+                                actions.push(Action::Amend);
                             }
                         });
-                    }
-                    if theme::destructive(ui, true, t.move_to_trash()).clicked() {
-                        actions.push(Action::Trash);
-                    }
-                });
-                // Only a Note in the lists becomes a Tally (ADR 0028); one
-                // that is adds entries in its Tally part above. A
-                // Checklist, a Shopping List or a Session is no Tally (ADR
-                // 0030, ADR 0039).
-                if self.view.advanced
-                    && tally.is_none()
-                    && checklist.is_none()
-                    && shopping.is_none()
-                    && session_setup.is_none()
-                    && !note.is_merged()
-                    && note.text_format != text_format::CODE
-                    && ui
-                        .button(RichText::new(t.make_tally()).color(text))
-                        .clicked()
+                    });
+                }
+                // A recording running ends by one big stop button, over
+                // the groups (#352).
+                if has_recorder
+                    && let Some(elapsed) = recording
+                    && media_view::recording_stop(ui, &t, elapsed)
                 {
-                    actions.push(Action::Tally(TallyAction::Make(note.id.clone())));
+                    actions.push(Action::StopRecording);
+                }
+                // Add, Share and Tidy at the Note's end (obf-1073), each
+                // only with something this Device may do.
+                let note_id = &note.id;
+                let parts = may.amends && !asked && !just_made;
+                let mut groups = Vec::new();
+                if may.schedules || may.changes || parts {
+                    let shown = &shown;
+                    let draw = move |ui: &mut Ui, actions: &mut Vec<Action>| {
+                        // In a Shared Area only a Manager sets them up (ADR
+                        // 0013).
+                        if may.schedules {
+                            add_badge(ui, (&t, tones), shown, actions);
+                        }
+                        // A recording, the clipboard and files of any kind
+                        // onto this Note (#352), as a drop on the dialog
+                        // brings them (#267).
+                        if may.changes {
+                            let idle = recording.is_none();
+                            if has_recorder
+                                && idle
+                                && group_button(ui, Some(icons::MIC), t.voice()).clicked()
+                            {
+                                actions.push(Action::Record);
+                            }
+                            if has_clipboard
+                                && idle
+                                && group_button(ui, Some(icons::PASTE), t.paste()).clicked()
+                            {
+                                actions.push(Action::PasteOntoNote);
+                            }
+                            let attach = t.attach_file();
+                            if group_button(ui, Some(icons::ATTACH_FILE), attach).clicked() {
+                                actions.push(Action::AttachFiles);
+                            }
+                        }
+                        // Opens the Amend box, the field taking the
+                        // keyboard.
+                        if parts && group_button(ui, None, t.add_a_part()).clicked() {
+                            *amend_open = true;
+                            *amend_focus = true;
+                            ui.ctx().request_repaint();
+                        }
+                    };
+                    groups.push(ActionGroup::new("add", t.add(), draw));
+                }
+                if may.amends {
+                    let draw = move |ui: &mut Ui, actions: &mut Vec<Action>| {
+                        if group_button(ui, None, t.send_to_person()).clicked() {
+                            actions.push(Action::StartSend(note_id.clone()));
+                        }
+                        // To another app (#129).
+                        if group_button(ui, None, t.copy_text()).clicked() {
+                            actions.push(Action::CopyAsText(note_id.clone()));
+                        }
+                        if group_button(ui, None, t.save_as_markdown()).clicked() {
+                            actions.push(Action::SaveAsMarkdown(note_id.clone()));
+                        }
+                        // Copies of it for another person (#165).
+                        let pack = Some(pack_view::PACK_ICON);
+                        if group_button(ui, pack, t.export_as_pack()).clicked() {
+                            actions.push(Action::ExportPack(note_id.clone()));
+                        }
+                    };
+                    groups.push(ActionGroup::new("share", t.share(), draw));
+                }
+                if may.changes {
+                    let lists = &lists;
+                    let draw = move |ui: &mut Ui, actions: &mut Vec<Action>| {
+                        if group_button(ui, None, t.merge_into()).clicked() {
+                            actions.push(Action::StartMerge);
+                        }
+                        // Its lines into a Shopping List there is (#352), the
+                        // one used last at the top (#276).
+                        if !lists.is_empty() {
+                            let label = RichText::new(t.add_to_shopping_list()).color(text);
+                            ui.menu_button(label, |ui| {
+                                if let Some(list) =
+                                    capture_choices::shopping_picker(ui, &t, None, lists)
+                                {
+                                    actions.push(Action::PourIntoShopping(list));
+                                }
+                            });
+                        }
+                        if theme::destructive(ui, true, t.move_to_trash()).clicked() {
+                            actions.push(Action::Trash);
+                        }
+                    };
+                    groups.push(ActionGroup::new("tidy", t.editor_group_tidy(), draw));
+                }
+                action_groups(ui, note_id, groups, actions);
+                if paste_empty {
+                    paste::empty_line(ui, &t);
                 }
             });
     }
@@ -15965,7 +18684,7 @@ impl App {
                                     });
                                 }
                             });
-                        if ui.button(RichText::new(t.close()).color(text)).clicked() {
+                        if design::row_button(ui, t.close()).clicked() {
                             actions.push(Action::CloseDialog);
                         }
                     }
@@ -15984,7 +18703,7 @@ impl App {
                                     note_change(ui, &t, (i, row), (text, weak), actions);
                                 }
                             });
-                        if ui.button(RichText::new(t.close()).color(text)).clicked() {
+                        if design::row_button(ui, t.close()).clicked() {
                             actions.push(Action::CloseDialog);
                         }
                     }
@@ -16044,6 +18763,11 @@ impl App {
                             }
                         });
                     }
+                    Dialog::CustomHeadsUp {
+                        count,
+                        unit,
+                        all_day,
+                    } => custom_heads_up_form(ui, &t, (count, focus), (unit, *all_day), actions),
                     Dialog::NewPlace { area, name } => {
                         let title = if area.is_some() {
                             t.new_topic()
@@ -16053,10 +18777,17 @@ impl App {
                         let form = (title, t.create(), Action::AddPlace);
                         name_form(ui, &t, form, (name, focus), actions);
                     }
-                    Dialog::Rename { name, .. } => {
+                    Dialog::Rename {
+                        name, look: None, ..
+                    } => {
                         let form = (t.rename(), t.save(), Action::SaveName);
                         name_form(ui, &t, form, (name, focus), actions);
                     }
+                    Dialog::Rename {
+                        name,
+                        look: Some(look),
+                        ..
+                    } => area_look_form(ui, &t, (name, focus), look, actions),
                     Dialog::NewKind { kind, name } => {
                         let title = match kind {
                             NewKind::Checklist => t.new_checklist(),
@@ -16066,7 +18797,6 @@ impl App {
                         let form = (title, t.create(), Action::CreateNamed);
                         name_form(ui, &t, form, (name, focus), actions);
                     }
-                    Dialog::Look { area } => look_form(ui, &t, view.area(area), actions),
                     Dialog::Delete(deleting) => delete_form(ui, &t, deleting, actions),
                     Dialog::Merge { query, others, .. } => {
                         merge_form(ui, &t, tones, (query, focus), others, actions);
@@ -16076,13 +18806,38 @@ impl App {
                             .area(area)
                             .map(|a| area_name(&t, a))
                             .unwrap_or_default();
-                        share_form(
-                            ui,
-                            &t,
-                            &shown,
-                            (role, !afar.is_empty(), view.advanced),
-                            actions,
-                        );
+                        let access = view.access.get(area);
+                        let manages =
+                            matches!(access, None | Some(AreaAccess::Owner | AreaAccess::Manager));
+                        if manages {
+                            title(ui, &t.share_title(&shown));
+                        } else {
+                            title(ui, t.people_title());
+                        }
+                        // Its people first (obf-1014), where it is shared.
+                        if let Some(people) = view.people.get(area) {
+                            let mine = view.mine.get(area).map(String::as_str);
+                            let names = &view.names;
+                            let shown = (&view.shown, &mut *pictures);
+                            let roles = access == Some(&AreaAccess::Manager);
+                            people_form(
+                                ui,
+                                &t,
+                                area,
+                                (people, names, mine),
+                                shown,
+                                (roles, view.advanced),
+                                actions,
+                            );
+                            ui.separator();
+                        }
+                        if manages {
+                            share_form(ui, &t, (role, !afar.is_empty(), view.advanced), actions);
+                        } else {
+                            if design::row_button(ui, t.close()).clicked() {
+                                actions.push(Action::CloseDialog);
+                            }
+                        }
                     }
                     Dialog::ShareAfar {
                         area,
@@ -16133,10 +18888,7 @@ impl App {
                             {
                                 actions.push(Action::CloseDialog);
                             }
-                            if ui
-                                .button(RichText::new(t.folder_pick()).strong().color(text))
-                                .clicked()
-                            {
+                            if theme::main_action(ui, true, t.folder_pick()) {
                                 actions.push(Action::OfferFolder);
                             }
                         });
@@ -16200,22 +18952,6 @@ impl App {
                         held,
                         blocking: None,
                     } => held_sent_item_form(ui, &t, held, actions),
-                    Dialog::People { area } => {
-                        let manages = view.access.get(area) == Some(&AreaAccess::Manager);
-                        let people = view.people.get(area).map(Vec::as_slice).unwrap_or(&[]);
-                        let mine = view.mine.get(area).map(String::as_str);
-                        let names = &view.names;
-                        let shown = (&view.shown, &mut *pictures);
-                        people_form(
-                            ui,
-                            &t,
-                            area,
-                            (people, names, mine),
-                            shown,
-                            (manages, view.advanced),
-                            actions,
-                        );
-                    }
                     Dialog::RemovePerson { question, .. } => {
                         title(ui, question);
                         let text = ui.visuals().text_color();
@@ -16238,7 +18974,7 @@ impl App {
                         if *area_first {
                             let said = t.hidden_from_ai_area_first_desktop(names);
                             ui.label(RichText::new(said).color(text));
-                            if ui.button(RichText::new(t.close()).color(text)).clicked() {
+                            if design::row_button(ui, t.close()).clicked() {
                                 actions.push(Action::CloseDialog);
                             }
                         } else {
@@ -16262,7 +18998,11 @@ impl App {
                             },
                         );
                         let text = ui.visuals().text_color();
-                        ui.label(RichText::new(t.remove_media_detail()).color(text));
+                        let detail = match made {
+                            Made::File => t.remove_attachment_detail(),
+                            Made::Photo | Made::Recording => t.remove_media_detail(),
+                        };
+                        ui.label(RichText::new(detail).color(text));
                         ui.horizontal(|ui| {
                             cancel(ui, &t, actions);
                             if destructive(ui, t.remove()) {
@@ -16324,10 +19064,7 @@ impl App {
                                 focus,
                                 &mut asked,
                             );
-                            if ui
-                                .button(RichText::new(t.close()).color(ui.visuals().text_color()))
-                                .clicked()
-                            {
+                            if design::row_button(ui, t.close()).clicked() {
                                 actions.push(Action::CloseDialog);
                             }
                         }
@@ -16381,6 +19118,25 @@ impl App {
                         }
                         cancel(ui, &t, actions);
                     }
+                    Dialog::FillIn(question) => {
+                        title(ui, question);
+                        let text = ui.visuals().text_color();
+                        ui.label(RichText::new(t.desk_import_fill_in_detail()).color(text));
+                        ui.horizontal_wrapped(|ui| {
+                            if design::row_button(ui, t.cancel()).clicked() {
+                                actions.push(Action::FillIn(FillIn::Cancel));
+                            }
+                            if ui
+                                .button(RichText::new(t.desk_import_as_new()).color(text))
+                                .clicked()
+                            {
+                                actions.push(Action::FillIn(FillIn::New));
+                            }
+                            if theme::main_action(ui, true, t.desk_import_fill_in()) {
+                                actions.push(Action::FillIn(FillIn::Fill));
+                            }
+                        });
+                    }
                     Dialog::Import => {
                         title(ui, t.settings_import());
                         let text = ui.visuals().text_color();
@@ -16426,7 +19182,7 @@ impl App {
                         if importing.is_some() {
                             ui.label(RichText::new(t.import_goes_on_desktop()).color(text));
                         }
-                        if ui.button(RichText::new(t.close()).color(text)).clicked() {
+                        if design::row_button(ui, t.close()).clicked() {
                             actions.push(Action::CloseDialog);
                         }
                     }
@@ -16442,7 +19198,7 @@ impl App {
                                 ui.label(RichText::new(said).small().color(weak));
                             });
                         }
-                        if ui.button(RichText::new(t.close()).color(text)).clicked() {
+                        if design::row_button(ui, t.close()).clicked() {
                             actions.push(Action::CloseDialog);
                         }
                     }
@@ -16458,8 +19214,14 @@ impl App {
                             actions.push(Action::FileIntoPicked(picked));
                         }
                     }
-                    Dialog::AddToNote { picker, .. } => {
-                        title(ui, t.add_to_note());
+                    Dialog::AddToNote { picker, adding } => {
+                        // Notes merged go by Merge into… (obf-1014, C2);
+                        // an answer of Ask is added to a Note.
+                        let heading = match adding {
+                            Filing::Notes(_) => t.merge_into(),
+                            Filing::Answer(_) => t.add_to_note(),
+                        };
+                        title(ui, heading);
                         if let Some(asked) = picker.show(ui, (&t, tones)) {
                             actions.push(Action::AddToNotePicked(asked));
                         }
@@ -16467,10 +19229,7 @@ impl App {
                     Dialog::ProfileQr { link } => {
                         ui.set_width(500.0);
                         profile_view::qr_page(ui, &t, link);
-                        if ui
-                            .button(RichText::new(t.close()).color(ui.visuals().text_color()))
-                            .clicked()
-                        {
+                        if design::row_button(ui, t.close()).clicked() {
                             actions.push(Action::CloseDialog);
                         }
                     }
@@ -16479,6 +19238,18 @@ impl App {
                         Some(false) => actions.push(Action::KeepEditing(*from)),
                         None => {}
                     },
+                    // Asked once; Redo brings the changes back (obf-1051).
+                    Dialog::Revert => {
+                        title(ui, t.desk_note_revert_question());
+                        let text = ui.visuals().text_color();
+                        ui.label(RichText::new(t.desk_note_revert_detail()).color(text));
+                        ui.horizontal_wrapped(|ui| {
+                            cancel(ui, &t, actions);
+                            if theme::primary(ui, true, t.desk_note_revert()).clicked() {
+                                actions.push(Action::Revert);
+                            }
+                        });
+                    }
                     Dialog::RejectAi => {
                         title(ui, t.ai_reject_question());
                         let text = ui.visuals().text_color();
@@ -16487,6 +19258,22 @@ impl App {
                             cancel(ui, &t, actions);
                             if destructive(ui, t.ai_reject_all()) {
                                 actions.push(Action::Ai(AiAction::Reject));
+                            }
+                        });
+                    }
+                    // Asked once, as it cannot be undone (UI laws, #268).
+                    Dialog::EmptyTrash { notes, routines } => {
+                        title(
+                            ui,
+                            &t.desk_trash_empty_question(&trash_counts(&t, *notes, *routines)),
+                        );
+                        let text = ui.visuals().text_color();
+                        let detail = t.desk_trash_empty_detail((*notes + *routines) as i64);
+                        ui.label(RichText::new(detail).color(text));
+                        ui.horizontal_wrapped(|ui| {
+                            cancel(ui, &t, actions);
+                            if destructive(ui, t.desk_trash_delete_for_good()) {
+                                actions.push(Action::EmptyTrash);
                             }
                         });
                     }
@@ -16542,26 +19329,75 @@ impl App {
     /// the Checklists' rows after the all-day ones, a gap, and tomorrow's dimmed, then the five days after
     /// the same way, each under its weekday and date; each checkable on
     /// its own, a click on one opens its Routine. Its bar leads to All
-    /// Routines and Reminders, to a new Routine and, in Advanced, to a
-    /// new Session (#246).
+    /// Routines and Reminders, to a new Routine, in Advanced to a new
+    /// Session (#246), and holds Quiet today, End quiet day while today
+    /// is quiet (obf-1066).
     fn agenda_pane(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
         let t = self.t;
         let text = ui.visuals().text_color();
-        ui.horizontal(|ui| {
+        // One row as tall as Quiet today's framed button, all of it
+        // centred in it (obf-1066).
+        let sizes = BandSizes::of(ui);
+        let row = egui::vec2(ui.available_width(), sizes.row);
+        let centred = egui::Layout::left_to_right(egui::Align::Center);
+        let quiet = self.view.agenda.as_ref().map(|a| a.quiet);
+        let quiet_width = quiet.map_or(0.0, |_| {
+            let words = [t.quiet_today(), t.end_quiet_day()];
+            let widest = words
+                .iter()
+                .map(|w| band_button_width(ui, w, sizes))
+                .fold(0.0, f32::max);
+            widest + ui.spacing().item_spacing.x
+        });
+        // Quiet today, the phone's bar action, in the band's framed look;
+        // End quiet day in its place while today is quiet.
+        let quiet_button = |ui: &mut Ui, quiet: bool, actions: &mut Vec<Action>| {
+            let word = if quiet {
+                t.end_quiet_day()
+            } else {
+                t.quiet_today()
+            };
+            let width = quiet_width - ui.spacing().item_spacing.x;
+            let resp = ui
+                .allocate_ui_with_layout(
+                    egui::vec2(width, sizes.row),
+                    egui::Layout::right_to_left(egui::Align::Center),
+                    |ui| band_button(ui, (icons::NOTIFICATIONS_OFF, word, word), sizes, None),
+                )
+                .inner;
+            if !quiet {
+                spotlight::anchor(ui, "quiet-today", resp.rect);
+            }
+            if resp.clicked() {
+                actions.push(if quiet {
+                    Action::EndQuietDay
+                } else {
+                    Action::QuietToday
+                });
+            }
+        };
+        let mut below = None;
+        ui.allocate_ui_with_layout(row, centred, |ui| {
             ui.heading(RichText::new(t.agenda_title()).color(text));
             // As the phone's bar, without its Calendar (UI laws, "The
             // Agenda's bar").
-            // "+" captures, as the phone's Agenda's does (#146).
-            if add_button(ui, &t, &[NewKind::Note]).is_some() {
-                actions.push(Action::NewNote);
+            // "+" captures, as the phone's Agenda's does (#146): in the
+            // quick note or the Note dialog (obf-1141).
+            if let Some(kind) = add_button(ui, &t, &[NewKind::Note, NewKind::Editor], None) {
+                actions.push(Action::Add(kind));
             }
             // Room for the buttons at the end: 24 wide and 8 apart, and
-            // New Session only in Advanced (#197, #246); ⋮ while it has
-            // "Quiet today" to offer, once the Agenda is read (obf-1044).
+            // New Session only in Advanced (#197, #246); then Quiet today,
+            // once the Agenda is read (obf-1044, obf-1066), room for the
+            // wider of its two words so that its right edge keeps its
+            // place. Too narrow for it, as with Bigger text and icons in
+            // the smallest window, it goes to the line under the bar, at
+            // the right, and the bar stays in the window.
             let advanced = self.view.advanced;
-            let menu = self.view.agenda.as_ref().is_some_and(|a| !a.quiet);
-            let buttons = 2 + usize::from(advanced) + usize::from(menu);
-            let room = buttons as f32 * 32.0 - 4.0;
+            let buttons = 2 + usize::from(advanced);
+            let icons_room = buttons as f32 * 32.0 - 4.0;
+            let beside = ui.available_width() >= icons_room + quiet_width;
+            let room = icons_room + if beside { quiet_width } else { 0.0 };
             ui.add_space((ui.available_width() - room).max(0.0));
             let all = icon_button(ui, icons::ALL_ROUTINES, t.all_routines_title(), text);
             spotlight::anchor(ui, "all-routines", all.rect);
@@ -16580,30 +19416,46 @@ impl App {
             if advanced && icon_button(ui, icons::SESSION, t.new_session(), text).clicked() {
                 actions.push(Action::NewSession(None));
             }
-            // The Agenda's menu, the phone's ⋮ in its bar.
-            if menu {
-                let more = icon_button(
-                    ui,
-                    icons::MORE_VERT,
-                    &t.occurrence_menu(t.agenda_title()),
-                    text,
-                );
-                spotlight::anchor(ui, "agenda-menu", more.rect);
-                egui::Popup::menu(&more).show(|ui| {
-                    if ui
-                        .button(RichText::new(t.quiet_today()).color(text))
-                        .clicked()
-                    {
-                        actions.push(Action::QuietToday);
-                    }
-                });
+            match quiet {
+                Some(quiet) if beside => quiet_button(ui, quiet, actions),
+                _ => below = quiet,
             }
         });
+        if let Some(quiet) = below {
+            let right = egui::Layout::right_to_left(egui::Align::Center);
+            ui.allocate_ui_with_layout(row, right, |ui| quiet_button(ui, quiet, actions));
+        }
         ui.add_space(8.0);
         ui.spacing_mut().item_spacing.y = 16.0;
         let Some(agenda) = self.view.agenda.clone() else {
             return;
         };
+        // The Occurrence a click on its notification asked for, marked
+        // where it is listed and scrolled into view once (obf-1039).
+        let mark = self.notified.as_ref().and_then(|n| {
+            n.place
+                .map(|place| (n.routine.clone(), n.occurrence, place))
+        });
+        let scroll = std::cell::Cell::new(
+            self.notified
+                .as_mut()
+                .is_some_and(|n| std::mem::take(&mut n.scroll)),
+        );
+        let marks = |row: &Row| {
+            mark.as_ref()
+                .is_some_and(|(r, o, _)| row.row.routine.id == *r && row.row.occurrence == *o)
+        };
+        let row_at = |ui: &mut Ui, row: &Row, actions: &mut Vec<Action>| {
+            let marked = marks(row);
+            let rect = agenda_row(ui, &t, tones, (row, agenda.hides_checked, marked), actions);
+            if marked && scroll.take() {
+                ui.scroll_to_rect(rect, Some(egui::Align::Center));
+            }
+        };
+        let missed_mark = mark
+            .as_ref()
+            .filter(|(_, _, place)| *place == AgendaPlace::Missed)
+            .map(|(r, o, _)| (r.as_str(), *o));
         let output = list_scroll(ui, "agenda", |ui| {
             // Tighter than 0.3.1's 12 (#208).
             ui.spacing_mut().item_spacing.y = 6.0;
@@ -16613,7 +19465,12 @@ impl App {
                 quiet_day_line(ui, &t, tones, actions);
             }
             if !agenda.missed.is_empty() {
-                missed_card(ui, &t, tones, &agenda.missed, actions);
+                let shown = (&agenda.missed, missed_mark);
+                if let Some(rect) = missed_card(ui, &t, tones, shown, actions)
+                    && scroll.take()
+                {
+                    ui.scroll_to_rect(rect, Some(egui::Align::Center));
+                }
             }
             if agenda.unsorted > 0 {
                 let said = t.unsorted_banner(agenda.unsorted as i64);
@@ -16636,12 +19493,7 @@ impl App {
                     actions.push(Action::Select(Selection::AreaOffersWaiting));
                 }
             }
-            ui.label(
-                RichText::new(t.agenda_today())
-                    .strong()
-                    .size(16.0)
-                    .color(text),
-            );
+            ui.label(RichText::new(t.agenda_today()).strong().size(16.0));
             if agenda.today.is_empty() && agenda.shopping.is_empty() && agenda.checklists.is_empty()
             {
                 ui.label(RichText::new(t.nothing_today()).color(ui.visuals().weak_text_color()));
@@ -16655,7 +19507,7 @@ impl App {
                 .unwrap_or(agenda.today.len());
             let (all_day, timed) = agenda.today.split_at(timed);
             for row in all_day {
-                agenda_row(ui, &t, tones, (row, agenda.hides_checked), actions);
+                row_at(ui, row, actions);
             }
             for row in &agenda.shopping {
                 shopping_row(ui, tones, row, actions);
@@ -16664,7 +19516,7 @@ impl App {
                 checklist_row(ui, tones, row, actions);
             }
             for row in timed {
-                agenda_row(ui, &t, tones, (row, agenda.hides_checked), actions);
+                row_at(ui, row, actions);
             }
             // Under what is due, never above it (#101); gone once today's
             // Frog is eaten where this Device hides what is checked (#217).
@@ -16686,12 +19538,7 @@ impl App {
             ui.add_space(24.0);
             ui.scope(|ui| {
                 ui.multiply_opacity(TOMORROW_OPACITY);
-                ui.label(
-                    RichText::new(t.agenda_tomorrow())
-                        .strong()
-                        .size(16.0)
-                        .color(text),
-                );
+                ui.label(RichText::new(t.agenda_tomorrow()).strong().size(16.0));
                 // Only today's empty day tells how to capture.
                 if agenda.tomorrow.is_empty() {
                     ui.label(
@@ -16699,7 +19546,7 @@ impl App {
                     );
                 }
                 for row in &agenda.tomorrow {
-                    agenda_row(ui, &t, tones, (row, agenda.hides_checked), actions);
+                    row_at(ui, row, actions);
                 }
             });
             // The days after, each under its weekday and date; one
@@ -16708,12 +19555,7 @@ impl App {
                 ui.add_space(4.0);
                 ui.scope(|ui| {
                     ui.multiply_opacity(TOMORROW_OPACITY);
-                    ui.label(
-                        RichText::new(agenda_day_text(&t, *day))
-                            .strong()
-                            .size(16.0)
-                            .color(text),
-                    );
+                    ui.label(RichText::new(agenda_day_text(&t, *day)).strong().size(16.0));
                     if rows.is_empty() {
                         ui.label(
                             RichText::new(t.nothing_planned())
@@ -16721,7 +19563,7 @@ impl App {
                         );
                     }
                     for row in rows {
-                        agenda_row(ui, &t, tones, (row, agenda.hides_checked), actions);
+                        row_at(ui, row, actions);
                     }
                 });
             }
@@ -16767,7 +19609,7 @@ impl App {
         let profile_newer = self.view.profile_newer;
         let people_newer = &self.view.people_newer;
         let question = self.view.profile_question.is_some();
-        ui.heading(RichText::new(page_title(&t, page)).color(text));
+        design::dialog_title(ui, page_title(&t, page));
         ui.add_space(8.0);
         egui::ScrollArea::vertical()
             .id_salt(("profile", page_title(&t, page)))
@@ -16886,6 +19728,11 @@ impl App {
     /// whose sender the user blocked there shows nothing more and closes
     /// too (#90).
     fn close_dialog(&mut self) -> oldbrainfix_core::Result<()> {
+        // The Import's question left, by Esc, a click beside it or back,
+        // it imports nothing (obf-1078).
+        if matches!(self.dialog, Some(Dialog::FillIn(_))) {
+            self.import.answer(FillIn::Cancel);
+        }
         // The link not set: the field has the keyboard again.
         match &self.dialog {
             Some(Dialog::Link { amend: true, .. }) => self.amend_focus = true,
@@ -17096,6 +19943,7 @@ impl App {
         self.dialog = None;
         self.act(Action::Select(Selection::All))?;
         self.people = PersonFilter::person(&id);
+        self.made_hidden = None;
         Ok(())
     }
 
@@ -17362,6 +20210,10 @@ impl App {
         let alerts = settings.alerts_on().unwrap_or(true);
         let autostart = settings.autostart_on().unwrap_or(true);
         let bigger = settings.fat_fingers().unwrap_or(false);
+        let tips = settings.tips_on().unwrap_or(true);
+        // Where this computer records (obf-1053).
+        let records = self.recorder.is_some();
+        let pause = settings.recording_pause_seconds().ok().flatten();
         let renag = settings
             .renag_interval()
             .map(|d| d.num_minutes())
@@ -17395,33 +20247,22 @@ impl App {
             && ui.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::F));
         self.settings_find |= finds;
         let searched = self.settings_query.clone();
-        ui.horizontal(|ui| {
-            icons::show(ui, icons::SEARCH, 20.0, weak);
-            let field = ui.add(
-                TextEdit::singleline(&mut self.settings_query)
-                    .id(Id::new("settings search"))
-                    .hint_text(t.settings_search_hint())
-                    .text_color(text)
-                    .desired_width(ui.available_width() - 32.0),
-            );
+        // On its band, so the cards scroll under its line (obf-1088).
+        // The list band's field (obf-1127), across the band.
+        theme::search_band(ui, |ui| {
+            let sizes = BandSizes::of(ui);
+            let search = (Id::new("settings search"), t.settings_search_hint());
+            let width = ui.available_width();
+            let query = &mut self.settings_query;
+            let (field, cleared) = band_search(ui, &t, query, search, width, sizes);
             spotlight::anchor(ui, "settings-search", field.rect);
             name_field(ui, &field, t.settings_search_hint());
-            text_menu::show(ui, &t, &field, &self.settings_query);
-            if std::mem::take(&mut self.settings_find) {
+            if std::mem::take(&mut self.settings_find) || cleared {
                 field.request_focus();
-            }
-            if !self.settings_query.is_empty()
-                && icon_button(ui, icons::CLOSE, t.clear_search(), text).clicked()
-            {
-                self.settings_query.clear();
             }
         });
         let typed = self.settings_query.trim().to_string();
         let query = settings_search::query_of(&typed);
-        if query.is_empty() {
-            ui.label(RichText::new(t.settings_intro()).color(weak));
-        }
-        ui.add_space(8.0);
         let quiet_text = &mut self.quiet_text;
         let all_day_text = &mut self.all_day_text;
         let all_day_from = settings
@@ -17452,7 +20293,7 @@ impl App {
             .take()
             .and_then(|(s, frames)| (frames > 1).then_some((s, frames - 1)));
         let heading = |ui: &mut Ui, words: &str, slug: &str| {
-            let shown = ui.label(RichText::new(words).strong().color(text));
+            let shown = ui.label(RichText::new(words).strong());
             if section.as_deref() == Some(slug) {
                 shown.scroll_to_me_animation(
                     Some(egui::Align::TOP),
@@ -17474,6 +20315,10 @@ impl App {
         scroll.show(ui, |ui| {
             ui.spacing_mut().item_spacing.y = 16.0;
             ui.add_space(4.0);
+            // In the list, so nothing stands between it and the band.
+            if q.is_empty() {
+                ui.label(RichText::new(t.settings_intro()).color(weak));
+            }
             let shows = settings_search::rows(
                 q,
                 Some(t.settings_computer()),
@@ -17488,7 +20333,7 @@ impl App {
                         t.text_size_larger(),
                         t.text_size_largest(),
                     ],
-                    &[t.settings_show_tips()],
+                    &[t.tap_marks(), t.tap_marks_detail()],
                 ],
             );
             if shows.contains(&true) {
@@ -17553,9 +20398,50 @@ impl App {
                                 .color(weak),
                         );
                     }
-                    // The tips of every screen back on this computer
-                    // (obf-1043).
+                    // The green "!" of each button clicked (obf-1143).
                     if shows[4] {
+                        let mut on = self.tap_marks;
+                        if theme::checkbox(ui, &mut on, RichText::new(t.tap_marks()).color(text))
+                            .changed()
+                        {
+                            actions.push(Action::Setting(Setting::TapMarks(on)));
+                        }
+                        ui.label(RichText::new(t.tap_marks_detail()).small().color(weak));
+                    }
+                });
+            }
+            // Whether the screens show their tips (obf-1060), and the
+            // tips of every screen back on this computer (obf-1043).
+            let shows = settings_search::rows(
+                q,
+                Some(t.settings_tips()),
+                [
+                    &[t.settings_tips_switch(), t.settings_tips_switch_detail()],
+                    &[t.settings_show_tips()],
+                ],
+            );
+            if shows.contains(&true) {
+                found = true;
+                embossed(ui, tones, false, None, |ui| {
+                    heading(ui, t.settings_tips(), "tips");
+                    if shows[0] {
+                        let mut on = tips;
+                        let switch = theme::checkbox(
+                            ui,
+                            &mut on,
+                            RichText::new(t.settings_tips_switch()).color(text),
+                        );
+                        spotlight::anchor(ui, "settings-tips-switch", switch.rect);
+                        if switch.changed() {
+                            actions.push(Action::Setting(Setting::Tips(on)));
+                        }
+                        ui.label(
+                            RichText::new(t.settings_tips_switch_detail())
+                                .small()
+                                .color(weak),
+                        );
+                    }
+                    if shows[1] {
                         let again = ui.button(RichText::new(t.settings_show_tips()).color(text));
                         spotlight::anchor(ui, "settings-show-tips", again.rect);
                         if again.clicked() {
@@ -17626,6 +20512,36 @@ impl App {
                     quick_note_card(ui, &t, (&quick, &shows), actions);
                 });
             }
+            // A pause that ends a recording (obf-1053), where this
+            // computer records.
+            let [paused] = settings_search::rows(
+                q,
+                Some(t.settings_capture()),
+                [&[t.recording_pause(), t.recording_pause_detail()]],
+            );
+            if records && paused {
+                found = true;
+                embossed(ui, tones, false, None, |ui| {
+                    heading(ui, t.settings_capture(), "capture");
+                    ui.label(RichText::new(t.recording_pause()).color(text));
+                    let mut chosen = pause;
+                    let options = std::iter::once((None, t.recording_pause_off().to_string()))
+                        .chain(RECORDING_PAUSE_CHOICES.iter().map(|seconds| {
+                            (
+                                Some(*seconds),
+                                t.recording_pause_seconds(i64::from(*seconds)),
+                            )
+                        }));
+                    if chip_row(ui, &mut chosen, options) && chosen != pause {
+                        actions.push(Action::Setting(Setting::RecordingPause(chosen)));
+                    }
+                    ui.label(
+                        RichText::new(t.recording_pause_detail())
+                            .small()
+                            .color(weak),
+                    );
+                });
+            }
             if let Some(speech) = speech {
                 // The speech model is one setting: the model chosen.
                 let [model] = settings_search::rows(
@@ -17674,7 +20590,7 @@ impl App {
                         ui.horizontal(|ui| {
                             ui.label(RichText::new(t.all_day_from()).color(text));
                             let field = ui.add(
-                                TextEdit::singleline(all_day_text)
+                                crate::theme::field(ui, all_day_text)
                                     .id(Id::new("all day from"))
                                     .hint_text(t.time_hint())
                                     .text_color(text)
@@ -17857,7 +20773,7 @@ impl App {
             if own_grammars {
                 found = true;
                 embossed(ui, tones, false, None, |ui| {
-                    ui.label(RichText::new(t.grammars_title()).strong().color(text));
+                    ui.label(RichText::new(t.grammars_title()).strong());
                     ui.label(RichText::new(t.grammars_hint()).small().color(weak));
                     for grammar in &grammars.added {
                         let under = match Grammars::built_in().by_scope(Some(&grammar.scope)) {
@@ -17925,7 +20841,7 @@ impl App {
         let text = ui.visuals().text_color();
         let weak = ui.visuals().weak_text_color();
         embossed(ui, tones, false, None, |ui| {
-            ui.label(RichText::new(t.routines_heading()).strong().color(text));
+            ui.label(RichText::new(t.routines_heading()).strong());
             for (routine, note) in &self.view.trashed_routines {
                 ui.horizontal_wrapped(|ui| {
                     let what = row_title(&t, note.as_ref());
@@ -17953,7 +20869,7 @@ impl App {
         embossed(ui, tones, false, None, |ui| {
             ui.horizontal(|ui| {
                 frogs_view::frog_mark(ui, 16.0, text);
-                ui.label(RichText::new(t.frogs_title()).strong().color(text));
+                ui.label(RichText::new(t.frogs_title()).strong());
             });
             for (frog, note, manages) in &self.view.trashed_frogs {
                 ui.horizontal_wrapped(|ui| {
@@ -18003,7 +20919,7 @@ impl App {
                         let text = ui.visuals().text_color();
                         if count > 1 {
                             let many = self.t.notes_count(count as i64);
-                            ui.label(RichText::new(many).strong().color(text));
+                            ui.label(RichText::new(many).strong());
                         }
                         ui.label(RichText::new(placed.note.visible_text()).color(text));
                     });
@@ -18171,7 +21087,7 @@ fn area_drop(ui: &mut Ui, tones: Tones, blocks: &[AreaRows], actions: &mut Vec<A
     }
 }
 
-/// What the Area menu may do to the Area or Topic shown (#279), by its
+/// What the band's ⋮ may do to the Area or Topic shown (#279), by its
 /// id: whether it is an Area, whether this Device manages its Area and
 /// whether that is shared.
 struct PlaceMenu {
@@ -18181,17 +21097,18 @@ struct PlaceMenu {
     shared: bool,
 }
 
-/// What the Note menu may do to the Note shown (#145), by its id.
+/// An Area's colour and icon as picked in its dialog (obf-1014), kept
+/// with its name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct AreaLook {
+    colour: Option<String>,
+    icon: Option<String>,
+}
+
+/// What may be done to the Note shown (#145), by its id.
 struct NoteMenu {
     id: String,
     changes: bool,
-    schedules: bool,
-    frog: bool,
-    session: bool,
-    amends: bool,
-    checklist: bool,
-    shopping: bool,
-    tally: bool,
 }
 
 /// Important, Normal and Unimportant, as a menu's entries (#273), with
@@ -18219,7 +21136,7 @@ fn importance_entries(ui: &mut Ui, t: &L10n, keys: bool) -> Option<Importance> {
     picked
 }
 
-/// The entries of a menu of the menu bar: each label with its keys, if
+/// The entries of a menu of the menu bar or the band's ⋮: each label with its keys, if
 /// any, at its end, greyed unless enabled; a pick asks its action and
 /// closes the menu, also one by keyboard or screen reader.
 fn menu_entries<const N: usize>(
@@ -18245,10 +21162,10 @@ fn menu_entries<const N: usize>(
 /// drawn, so a screen reader hears the places as the sidebar and the
 /// heading name them, and a level above as the way `up` there, clicked
 /// when it says so. The place shown leads nowhere.
-fn crumb(ui: &mut Ui, name: &str, colour: Color32, up: Option<&str>) -> bool {
+fn crumb(ui: &mut Ui, name: &str, (size, colour): (f32, Color32), up: Option<&str>) -> bool {
     let galley = ui
         .painter()
-        .layout_no_wrap(name.to_string(), FontId::proportional(14.0), colour);
+        .layout_no_wrap(name.to_string(), FontId::proportional(size), colour);
     let sense = if up.is_some() {
         Sense::click()
     } else {
@@ -18313,16 +21230,58 @@ fn page_title(t: &L10n, page: Page) -> &'static str {
         Page::BackupNotes => t.backup_open_page_title(),
         Page::Sync => t.sync_title(),
         Page::Pair => t.menu_pair(),
+        Page::Running => t.running_title(),
+    }
+}
+
+/// What reading `kind` is, as the page Running names it (obf-1078).
+fn reading_what(t: &L10n, kind: enrich::Kind) -> &'static str {
+    match kind {
+        enrich::Kind::Transcripts => t.running_transcripts(),
+        enrich::Kind::PhotoTexts => t.running_photo_texts(),
+        enrich::Kind::AttachmentTexts => t.running_attachment_texts(),
     }
 }
 
 /// A square button that shows `icon`, called `label`.
 pub(crate) fn icon_button(ui: &mut Ui, icon: char, label: &str, colour: Color32) -> egui::Response {
-    let (rect, resp) = ui.allocate_exact_size(egui::vec2(24.0, 24.0), Sense::click());
+    sized_icon_button(ui, (icon, label, colour), (24.0, 20.0))
+}
+
+/// An [`icon_button`] `side` square, its icon `glyph` big in its middle.
+fn sized_icon_button(
+    ui: &mut Ui,
+    (icon, label, colour): (char, &str, Color32),
+    (side, glyph): (f32, f32),
+) -> egui::Response {
+    let (rect, resp) = ui.allocate_exact_size(egui::vec2(side, side), Sense::click());
     resp.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, label));
     theme::icon_button_back(ui, &resp, rect);
-    icons::paint(ui.painter(), rect.shrink(2.0), icon, colour);
+    let at = egui::Rect::from_center_size(rect.center(), egui::vec2(glyph, glyph));
+    icons::paint(ui.painter(), at, icon, colour);
     resp.on_hover_text(label)
+}
+
+/// An icon button of the Note's bar (obf-1051): `label` to a screen
+/// reader, `said` in its tooltip, greyed and not clickable while not
+/// `on`.
+fn step_button(
+    ui: &mut Ui,
+    (icon, label, said): (char, &str, &str),
+    on: bool,
+    colour: Color32,
+) -> egui::Response {
+    let sense = if on { Sense::click() } else { Sense::hover() };
+    let (rect, resp) = ui.allocate_exact_size(egui::vec2(24.0, 24.0), sense);
+    resp.widget_info(|| WidgetInfo::labeled(WidgetType::Button, on, label));
+    let colour = if on {
+        theme::icon_button_back(ui, &resp, rect);
+        colour
+    } else {
+        ui.visuals().weak_text_color()
+    };
+    icons::paint(ui.painter(), rect.shrink(2.0), icon, colour);
+    resp.on_hover_text(said)
 }
 
 /// Gives the text field `field` the name a screen reader says for it,
@@ -18349,7 +21308,7 @@ fn note_change(
             let says = |ui: &mut Ui, said: RichText| {
                 read_text::label(ui, egui::Label::new(said).wrap());
             };
-            says(ui, RichText::new(&row.title).strong().color(text));
+            says(ui, RichText::new(&row.title).strong());
             says(ui, RichText::new(&row.said).small().color(weak));
             if let Some(before) = &row.before {
                 says(
@@ -18380,8 +21339,7 @@ fn note_change(
 }
 
 fn title(ui: &mut Ui, title: &str) {
-    let text = ui.visuals().text_color();
-    ui.label(RichText::new(title).size(18.0).strong().color(text));
+    design::dialog_title(ui, title);
 }
 
 /// A dialog's text field, taking the keyboard when `focus` says so.
@@ -18394,7 +21352,7 @@ fn focused_field(
 ) -> egui::Response {
     let text = ui.visuals().text_color();
     let field = ui.add(
-        TextEdit::singleline(value)
+        crate::theme::field(ui, value)
             .id(Id::new(id))
             .hint_text(hint)
             .text_color(text)
@@ -18438,7 +21396,7 @@ pub(crate) fn failure_form(
             );
         });
     ui.horizontal(|ui| {
-        if ui.button(RichText::new(t.close()).color(text)).clicked() {
+        if design::row_button(ui, t.close()).clicked() {
             closed = true;
         }
         if ui.button(RichText::new(t.report()).color(text)).clicked() {
@@ -18456,7 +21414,25 @@ pub(crate) fn done_form(ui: &mut Ui, t: &L10n, heading: &str, details: &str) -> 
     title(ui, heading);
     let text = ui.visuals().text_color();
     ui.label(RichText::new(details).color(text));
-    ui.button(RichText::new(t.close()).color(text)).clicked()
+    design::row_button(ui, t.close()).clicked()
+}
+
+/// The first line of what an Import made, `summary`, in the Area shown
+/// as `shown`: the Notes that went into the new Area, or, when it filled
+/// in the earlier Import's Area `fill_in` (obf-1078), the Notes that went
+/// into it and how many were imported already. A fill-in refused, in a
+/// new Area, says what a new Import says.
+fn made_line(t: &L10n, summary: &ImportSummary, fill_in: Option<&str>, shown: &str) -> String {
+    let notes = summary.notes as i64;
+    if fill_in.is_none() || summary.area_id.as_deref() != fill_in {
+        return t.import_finished_notes(notes, shown);
+    }
+    let mut line = t.desk_import_filled_in(notes, shown);
+    if summary.already > 0 {
+        line.push('\n');
+        line.push_str(&t.desk_import_already(summary.already as i64));
+    }
+    line
 }
 
 /// What an Import made, `details` under "Import finished.", with Close
@@ -18466,7 +21442,7 @@ fn imported_form(ui: &mut Ui, t: &L10n, details: &str) -> (bool, bool) {
     let text = ui.visuals().text_color();
     ui.label(RichText::new(details).color(text));
     ui.horizontal(|ui| {
-        let close = ui.button(RichText::new(t.close()).color(text)).clicked();
+        let close = design::row_button(ui, t.close()).clicked();
         let open = ui
             .button(RichText::new(t.import_open_area()).color(text))
             .clicked();
@@ -18527,8 +21503,7 @@ fn problem_line(problem: oldbrainfix_whisper::Problem, name: &str) -> String {
 
 /// Cancel, which closes the dialog without a change.
 fn cancel(ui: &mut Ui, t: &L10n, actions: &mut Vec<Action>) {
-    let text = ui.visuals().text_color();
-    if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+    if design::row_button(ui, t.cancel()).clicked() {
         actions.push(Action::CloseDialog);
     }
 }
@@ -18878,7 +21853,7 @@ fn block_form(ui: &mut Ui, t: &L10n, name: &str, areas: &str, actions: &mut Vec<
     };
     ui.label(RichText::new(detail).color(text));
     ui.horizontal(|ui| {
-        if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+        if design::row_button(ui, t.cancel()).clicked() {
             actions.push(Action::CancelBlock);
         }
         if destructive(ui, verb) {
@@ -18893,7 +21868,7 @@ fn unblock_form(ui: &mut Ui, t: &L10n, name: &str, actions: &mut Vec<Action>) {
     title(ui, &t.person_unblock_question(name));
     ui.label(RichText::new(t.person_unblock_detail()).color(text));
     ui.horizontal(|ui| {
-        if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+        if design::row_button(ui, t.cancel()).clicked() {
             actions.push(Action::CancelBlock);
         }
         if ui
@@ -18903,6 +21878,20 @@ fn unblock_form(ui: &mut Ui, t: &L10n, name: &str, actions: &mut Vec<Action>) {
             actions.push(Action::Unblock);
         }
     });
+}
+
+/// "128 Notes and 4 Routines": what emptying the trash deletes
+/// (obf-1095), a count of none left out.
+fn trash_counts(t: &L10n, notes: usize, routines: usize) -> String {
+    let (notes, routines) = (notes as i64, routines as i64);
+    match (notes, routines) {
+        (_, 0) => t.desk_trash_notes(notes),
+        (0, _) => t.desk_trash_routines(routines),
+        _ => t.desk_trash_notes_and_routines(
+            &t.desk_trash_notes(notes),
+            &t.desk_trash_routines(routines),
+        ),
+    }
 }
 
 /// A confirm button for a destructive step: its verb on the error
@@ -18960,6 +21949,71 @@ fn link_form(
     });
 }
 
+/// The custom Heads-up `count` `unit`s make in minutes, `None` while they
+/// make none (obf-1087).
+fn custom_heads_up(count: &str, unit: HeadsUpUnit, all_day: bool) -> Option<i64> {
+    let count = count.parse::<i64>().ok()?;
+    heads_up_keys::minutes_of(count, unit, all_day)
+}
+
+/// The custom Heads-up's dialog (obf-1087): a number, the numbers its
+/// unit takes under it, the units as chips, minutes, hours, days and
+/// weeks, days and weeks only for an all-day schedule; Add, or Enter in
+/// the number, while they make a Heads-up.
+fn custom_heads_up_form(
+    ui: &mut Ui,
+    t: &L10n,
+    (count, focus): (&mut String, bool),
+    (unit, all_day): (&mut HeadsUpUnit, bool),
+    actions: &mut Vec<Action>,
+) {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    title(ui, t.heads_up_custom_title());
+    let label = ui.label(RichText::new(t.heads_up_custom_count()).color(text));
+    let field = ui
+        .add(
+            crate::theme::field(ui, count)
+                .id(Id::new("custom heads-up"))
+                .char_limit(5)
+                .text_color(text)
+                .desired_width(120.0),
+        )
+        .labelled_by(label.id);
+    // Digits only, as the phone's field takes.
+    count.retain(|c| c.is_ascii_digit());
+    if focus {
+        field.request_focus();
+    }
+    ui.label(
+        RichText::new(t.heads_up_custom_range(unit.most()))
+            .small()
+            .color(weak),
+    );
+    // The units' words agree with the number typed.
+    let typed = count.parse::<i64>().unwrap_or(0);
+    let units = heads_up_keys::units(all_day).iter().map(|u| {
+        let words = match u {
+            HeadsUpUnit::Minutes => t.unit_minutes(typed),
+            HeadsUpUnit::Hours => t.unit_hours(typed),
+            HeadsUpUnit::Days => t.unit_days(typed),
+            HeadsUpUnit::Weeks => t.unit_weeks(typed),
+        };
+        (*u, words)
+    });
+    chip_row(ui, unit, units);
+    let ready = custom_heads_up(count, *unit, all_day).is_some();
+    if ready && field.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
+        actions.push(Action::AddCustomHeadsUp);
+    }
+    ui.horizontal(|ui| {
+        cancel(ui, t, actions);
+        if theme::main_action(ui, ready, t.add()) {
+            actions.push(Action::AddCustomHeadsUp);
+        }
+    });
+}
+
 /// How an Area is shared: the role, and the button that shows the
 /// invite's code. Nobody types a name: the other person's Profile shows
 /// when their phone joins, to confirm (ADR 0017). Below, "Share with…"
@@ -18968,18 +22022,16 @@ fn link_form(
 fn share_form(
     ui: &mut Ui,
     t: &L10n,
-    area: &str,
     (role, afar, advanced): (&mut AreaRole, bool, bool),
     actions: &mut Vec<Action>,
 ) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
-    title(ui, &t.share_title(area));
     ui.label(RichText::new(t.share_host_intro()).color(weak));
     // Roles are chosen only in Advanced (#197); in Simple the person
     // joins as a Member.
     if advanced {
-        ui.label(RichText::new(t.role_heading()).strong().color(text));
+        ui.label(RichText::new(t.role_heading()).strong());
         for (choice, label, detail) in [
             (AreaRole::Member, t.role_member(), t.role_member_detail()),
             (AreaRole::Manager, t.role_manager(), t.role_manager_detail()),
@@ -18992,15 +22044,12 @@ fn share_form(
     }
     ui.horizontal(|ui| {
         cancel(ui, t, actions);
-        if ui
-            .button(RichText::new(t.share_show_code()).color(text))
-            .clicked()
-        {
+        if theme::main_action(ui, true, t.share_show_code()) {
             actions.push(Action::StartInvite);
         }
     });
     ui.separator();
-    ui.label(RichText::new(t.share_afar_heading()).strong().color(text));
+    ui.label(RichText::new(t.share_afar_heading()).strong());
     let intro = if afar {
         t.share_afar_intro()
     } else {
@@ -19087,10 +22136,7 @@ fn transport_form(
     }
     ui.horizontal(|ui| {
         cancel(ui, t, actions);
-        if ui
-            .button(RichText::new(t.invite_confirm_share()).strong().color(text))
-            .clicked()
-        {
+        if theme::main_action(ui, true, t.invite_confirm_share()) {
             actions.push(Action::ShareAfarNow);
         }
     });
@@ -19154,7 +22200,7 @@ fn area_offer_form(
             actions.push(Action::OpenPerson(held.sender.id.clone()));
         }
         ui.add_space(8.0);
-        ui.add(egui::Label::new(RichText::new(&line).strong().size(18.0).color(text)).wrap());
+        ui.add(egui::Label::new(RichText::new(&line).strong().size(18.0)).wrap());
     });
     let code = &held.code;
     let trust = if compared == Compared::Match {
@@ -19219,10 +22265,7 @@ fn area_offer_form(
             .color(weak),
     );
     ui.horizontal(|ui| {
-        if ui
-            .button(RichText::new(t.sent_item_accept()).strong().color(text))
-            .clicked()
-        {
+        if theme::main_action(ui, true, t.sent_item_accept()) {
             actions.push(Action::AcceptOffer);
         }
         if ui
@@ -19442,11 +22485,14 @@ fn sent_item_form(
         SentItemState::UpToDate | SentItemState::NothingToCancel => None,
     };
     ui.horizontal(|ui| {
-        if let Some(accept) = accept
-            && ui
-                .button(RichText::new(accept).strong().color(text))
-                .clicked()
-        {
+        // Accepting a cancel moves the Note to the trash: the error
+        // colour, and no Ctrl+Enter (Q665).
+        let accepted = match accept {
+            Some(label) if opened.state == SentItemState::Cancel => destructive(ui, label),
+            Some(label) => theme::main_action(ui, true, label),
+            None => false,
+        };
+        if accepted {
             actions.push(Action::AcceptSent);
         }
         let decline = if accept.is_some() {
@@ -19471,7 +22517,7 @@ fn sent_item_form(
         .max_height(360.0)
         .show(ui, |ui| {
             if let Some(changes) = &opened.changes {
-                ui.label(RichText::new(t.sent_item_changes()).strong().color(text));
+                ui.label(RichText::new(t.sent_item_changes()).strong());
                 let mut line = |said: String| {
                     ui.label(RichText::new(said).color(text));
                 };
@@ -19539,15 +22585,20 @@ fn sent_item_form(
                 false,
             );
             let of = Id::new("sent text");
-            if let Some(at) = text_marks_view::table_clicks(ui, t, of, &spots.tables) {
-                actions.push(Action::OpenTable(Opening {
-                    note: None,
-                    text: item.text.clone(),
-                    at,
-                    cell: None,
-                    tags: false,
-                    boxes: None,
-                }));
+            if let Some((at, act)) = text_marks_view::table_clicks(ui, t, of, &spots.tables, false)
+            {
+                actions.extend(table_action(
+                    act,
+                    Opening {
+                        note: None,
+                        text: item.text.clone(),
+                        at,
+                        cell: None,
+                        tags: false,
+                        boxes: None,
+                    },
+                    &unticked,
+                ));
             }
             text_marks_view::link_clicks(ui, of, &spots.links);
             if !full {
@@ -19559,7 +22610,7 @@ fn sent_item_form(
                 checklist_view::preview(ui, (t, tones), lines);
             }
             if !item.routines.is_empty() {
-                ui.label(RichText::new(t.routines_heading()).strong().color(text));
+                ui.label(RichText::new(t.routines_heading()).strong());
                 for r in &item.routines {
                     ui.label(RichText::new(schedule_text(t, &r.schedule)).color(text));
                 }
@@ -19575,15 +22626,21 @@ fn sent_item_form(
                     false,
                 );
                 let of = Id::new(("sent section", i));
-                if let Some(at) = text_marks_view::table_clicks(ui, t, of, &spots.tables) {
-                    actions.push(Action::OpenTable(Opening {
-                        note: None,
-                        text: section.text.clone(),
-                        at,
-                        cell: None,
-                        tags: false,
-                        boxes: None,
-                    }));
+                if let Some((at, act)) =
+                    text_marks_view::table_clicks(ui, t, of, &spots.tables, false)
+                {
+                    actions.extend(table_action(
+                        act,
+                        Opening {
+                            note: None,
+                            text: section.text.clone(),
+                            at,
+                            cell: None,
+                            tags: false,
+                            boxes: None,
+                        },
+                        &unticked,
+                    ));
                 }
                 text_marks_view::link_clicks(ui, of, &spots.links);
             }
@@ -19666,7 +22723,7 @@ fn held_sent_item_form(ui: &mut Ui, t: &L10n, held: &HeldSentItem, actions: &mut
         ui.add_sized([ui.available_width(), 32.0], egui::Button::new(label))
             .clicked()
     };
-    if wide(ui, RichText::new(t.sent_item_show()).strong().color(text)) {
+    if wide(ui, RichText::new(t.sent_item_show()).strong()) {
         actions.push(Action::ShowSent);
     }
     ui.horizontal(|ui| {
@@ -19691,8 +22748,9 @@ fn held_sent_item_form(ui: &mut Ui, t: &L10n, held: &HeldSentItem, actions: &mut
     }
 }
 
-/// The people of a Shared Area with their roles; a Manager changes them
-/// and takes them out here.
+/// The people of a Shared Area with their roles, on its Share with
+/// people… page (obf-1014); a Manager changes them and takes them out
+/// here.
 fn people_form(
     ui: &mut Ui,
     t: &L10n,
@@ -19711,7 +22769,7 @@ fn people_form(
 ) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
-    title(ui, t.people_title());
+    ui.label(RichText::new(t.people_title()).strong());
     ui.label(RichText::new(t.people_intro()).small().color(weak));
     for person in people {
         let own = Some(person.id.as_str()) == mine;
@@ -19765,62 +22823,83 @@ fn people_form(
             }
         });
     }
-    ui.horizontal(|ui| {
-        if ui.button(RichText::new(t.close()).color(text)).clicked() {
-            actions.push(Action::CloseDialog);
-        }
-    });
 }
 
-/// An Area's colour and icon, each kept as it is picked.
-fn look_form(ui: &mut Ui, t: &L10n, area: Option<&Area>, actions: &mut Vec<Action>) {
-    let Some(area) = area else {
-        return;
-    };
+/// An Area's name, colour and icon in one dialog (obf-1014): its name
+/// over the colours and icons, each marked as it is picked and kept with
+/// Save, or Enter in the name; Cancel keeps none of them.
+fn area_look_form(
+    ui: &mut Ui,
+    t: &L10n,
+    (name, focus): (&mut String, bool),
+    look: &mut AreaLook,
+    actions: &mut Vec<Action>,
+) {
     let text = ui.visuals().text_color();
-    title(ui, t.area_look());
-    ui.label(RichText::new(t.colour_heading()).strong().color(text));
+    title(ui, t.desk_area_look_title());
+    let field = focused_field(ui, t, (&mut *name, focus), "name", t.name_hint());
+    let ready = !name.trim().is_empty();
+    if ready && field.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
+        actions.push(Action::SaveName);
+    }
+    ui.add_space(8.0);
+    ui.label(RichText::new(t.colour_heading()).strong());
     ui.horizontal_wrapped(|ui| {
+        let none = look.colour.is_none();
         if ui
-            .button(RichText::new(t.no_colour()).color(text))
+            .add(egui::Button::selectable(
+                none,
+                RichText::new(t.no_colour()).color(text),
+            ))
             .clicked()
         {
-            actions.push(Action::Colour(area.id.clone(), None));
+            look.colour = None;
         }
         for hex in AREA_PALETTE {
-            let on = area.colour.as_deref() == Some(hex);
+            let on = look.colour.as_deref() == Some(hex);
             let colour = area_colour(Some(hex)).unwrap_or(text);
             if swatch(ui, hex, on, |painter, rect| {
                 painter.circle_filled(rect.center(), rect.width() / 2.0 - 3.0, colour);
             })
             .clicked()
             {
-                actions.push(Action::Colour(area.id.clone(), Some(hex.to_string())));
+                look.colour = Some(hex.to_string());
             }
         }
     });
-    ui.label(RichText::new(t.icon_heading()).strong().color(text));
+    ui.label(RichText::new(t.icon_heading()).strong());
     ui.horizontal_wrapped(|ui| {
-        if ui.button(RichText::new(t.no_icon()).color(text)).clicked() {
-            actions.push(Action::Icon(area.id.clone(), None));
+        let none = look.icon.is_none();
+        if ui
+            .add(egui::Button::selectable(
+                none,
+                RichText::new(t.no_icon()).color(text),
+            ))
+            .clicked()
+        {
+            look.icon = None;
         }
         for key in AREA_ICONS {
             let Some(glyph) = icons::area_icon(Some(key)) else {
                 continue;
             };
-            let on = area.icon.as_deref() == Some(key);
+            let on = look.icon.as_deref() == Some(key);
             if swatch(ui, key, on, |painter, rect| {
                 icons::paint(painter, rect.shrink(5.0), glyph, text);
             })
             .clicked()
             {
-                actions.push(Action::Icon(area.id.clone(), Some(key.to_string())));
+                look.icon = Some(key.to_string());
             }
         }
     });
-    if ui.button(RichText::new(t.close()).color(text)).clicked() {
-        actions.push(Action::CloseDialog);
-    }
+    ui.add_space(8.0);
+    ui.horizontal(|ui| {
+        cancel(ui, t, actions);
+        if theme::main_action(ui, ready, t.save()) {
+            actions.push(Action::SaveName);
+        }
+    });
 }
 
 /// A round choice called `label`, ringed while it is `on`.
@@ -19890,13 +22969,16 @@ fn merge_form(
 ) {
     let weak = ui.visuals().weak_text_color();
     title(ui, t.merge_into());
-    let field = focused_field(
-        ui,
-        t,
-        (&mut *query, focus),
-        "merge query",
-        t.search_all_hint(),
-    );
+    // On its band, so the Notes scroll under its line (obf-1088).
+    let field = theme::search_band(ui, |ui| {
+        focused_field(
+            ui,
+            t,
+            (&mut *query, focus),
+            "merge query",
+            t.search_all_hint(),
+        )
+    });
     if field.changed() {
         actions.push(Action::MergeQuery);
     }
@@ -19917,12 +22999,15 @@ fn merge_form(
         } else {
             t.nothing_found()
         };
+        ui.add_space(4.0);
         ui.label(RichText::new(empty).color(weak));
     }
     egui::ScrollArea::vertical()
         .id_salt("merge")
         .max_height(320.0)
         .show(ui, |ui| {
+            // Room under the band's line, inside, so the list is cut there.
+            ui.add_space(4.0);
             for (id, text) in shown {
                 if merge_row(ui, tones, text).clicked() {
                     actions.push(Action::Merge(id.clone()));
@@ -19971,16 +23056,12 @@ fn quick_capture_card(
 ) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
-    ui.label(
-        RichText::new(t.quick_capture_heading())
-            .strong()
-            .color(text),
-    );
+    ui.label(RichText::new(t.quick_capture_heading()).strong());
     let mut chord = None;
     ui.horizontal(|ui| {
         ui.label(RichText::new(t.hotkey_label()).color(text));
         let field = ui.add(
-            TextEdit::singleline(typed)
+            crate::theme::field(ui, typed)
                 .id(Id::new("hotkey"))
                 .hint_text(oldbrainfix_core::settings::DEFAULT_CAPTURE_HOTKEY)
                 .text_color(text)
@@ -20053,9 +23134,9 @@ fn quick_note_shows(query: &str, t: &L10n) -> [bool; 2] {
 }
 
 /// The Settings' card on what the quick note, its dialog in the window
-/// and the popup, shows besides its text and More (#142, #352): the
-/// Nudge buttons, on until switched off; of it the rows `shows` (#282).
-/// The switches for File into…, the Frog and Session, Add to a Shopping
+/// and the popup, shows besides its text and Open in the editor (#142,
+/// #352): the Nudge buttons, on until switched off; of it the rows
+/// `shows` (#282). The switches for File into…, the Frog and Session, Add to a Shopping
 /// List, the Importance and the format bar went with those controls
 /// into the Note dialog; what they stored stays, unused.
 fn quick_note_card(
@@ -20066,7 +23147,7 @@ fn quick_note_card(
 ) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
-    ui.label(RichText::new(t.settings_quick_note()).strong().color(text));
+    ui.label(RichText::new(t.settings_quick_note()).strong());
     if shows[0] {
         ui.label(
             RichText::new(t.settings_quick_note_detail_device())
@@ -20126,7 +23207,7 @@ fn quiet_hours(
         ] {
             ui.label(RichText::new(label).color(text));
             let field = ui.add(
-                TextEdit::singleline(value)
+                crate::theme::field(ui, value)
                     .id(Id::new(id))
                     .hint_text(t.time_hint())
                     .text_color(text)
@@ -20249,16 +23330,15 @@ pub(crate) fn radio_column<T: PartialEq + Copy>(
     changed
 }
 
-/// A short single choice (#226): a wrapping row of pills, the `current`
-/// one selected, as the Routine editor's weekday pills look. A screen
-/// reader hears a radio group of radio buttons; Tab and the arrows move
+/// A short single choice (#226): a wrapping row of choice chips
+/// ([`design::Chip`], obf-1081), the `current` one picked, as the
+/// Routine editor's weekday chips look. A screen reader hears a radio group of radio buttons; Tab and the arrows move
 /// between them, Space or Enter picks one. True when a click picked one.
 pub(crate) fn chip_row<T: PartialEq + Copy>(
     ui: &mut Ui,
     current: &mut T,
     options: impl IntoIterator<Item = (T, String)>,
 ) -> bool {
-    let tones = theme::tones(ui.visuals());
     ui.horizontal_wrapped(|ui| {
         ui.ctx().accesskit_node_builder(ui.unique_id(), |node| {
             node.set_role(egui::accesskit::Role::RadioGroup);
@@ -20266,7 +23346,7 @@ pub(crate) fn chip_row<T: PartialEq + Copy>(
         let mut changed = false;
         for (value, label) in options {
             let on = *current == value;
-            if pill_as(ui, tones, on, &label, WidgetType::RadioButton).clicked() {
+            if design::Chip::new(&label).on(on).radio().show(ui).clicked() {
                 *current = value;
                 changed = true;
             }
@@ -20274,55 +23354,6 @@ pub(crate) fn chip_row<T: PartialEq + Copy>(
         changed
     })
     .inner
-}
-
-/// A pill to pick one or several of a few choices: self-painted so its
-/// text reads in every state, with the accent while `on`.
-pub(crate) fn pill(ui: &mut Ui, tones: Tones, on: bool, label: &str) -> egui::Response {
-    pill_as(ui, tones, on, label, WidgetType::Button)
-}
-
-/// A [`pill`] a screen reader hears as `typ`, with the focus ring while
-/// it has the keyboard.
-fn pill_as(ui: &mut Ui, tones: Tones, on: bool, label: &str, typ: WidgetType) -> egui::Response {
-    let font = FontId::proportional(14.0);
-    let fg = ui.visuals().text_color();
-    let galley = ui.painter().layout_no_wrap(label.to_string(), font, fg);
-    let pad = egui::vec2(10.0, 5.0);
-    let (rect, resp) = ui.allocate_exact_size(galley.size() + pad * 2.0, Sense::click());
-    resp.widget_info(|| WidgetInfo::selected(typ, true, on, label));
-    if ui.is_rect_visible(rect) {
-        let fill = if on {
-            tones.accent.gamma_multiply(0.3)
-        } else if resp.hovered() {
-            tones.card.gamma_multiply(0.7)
-        } else {
-            Color32::TRANSPARENT
-        };
-        if fill.a() > 0 {
-            ui.painter().rect_filled(rect, 12.0, fill);
-        }
-        ui.painter().rect_stroke(
-            rect,
-            12.0,
-            egui::Stroke::new(
-                1.0,
-                if on {
-                    tones.accent
-                } else {
-                    ui.visuals().weak_text_color()
-                },
-            ),
-            egui::StrokeKind::Inside,
-        );
-        if resp.has_focus() {
-            let ring = ui.visuals().widgets.active.bg_stroke;
-            ui.painter()
-                .rect_stroke(rect.expand(2.0), 14.0, ring, egui::StrokeKind::Outside);
-        }
-        ui.painter().galley(rect.min + pad, galley, fg);
-    }
-    resp.on_hover_cursor(egui::CursorIcon::PointingHand)
 }
 
 /// The box that checks an Occurrence off, called `label`.
@@ -20685,12 +23716,16 @@ fn frogs_shown(
     Ok(out)
 }
 
-/// What an Occurrence of a Routine shows as: its Note's text, what the
-/// Note holds when it has no words, or that the Note is gone.
+/// What an Occurrence of a Routine shows as: its Note's text, else the
+/// first line of its Transcript or Photo Text ([`Note::shown_name`],
+/// obf-1049), what the Note holds when it has none of them, or that the
+/// Note is gone.
 pub(crate) fn row_title(t: &L10n, note: Option<&Note>) -> String {
-    match note {
-        Some(note) if !note.text.trim().is_empty() => note.visible_text().trim().to_string(),
-        Some(note) => l10n::wordless(t, note.wordless(), &note.wordless_name()),
+    match note.map(|n| (n, n.shown_name())) {
+        Some((note, name)) if name.trim().is_empty() => {
+            l10n::wordless(t, note.wordless(), &note.wordless_name())
+        }
+        Some((_, name)) => name.trim().to_string(),
         None => t.note_gone().to_string(),
     }
 }
@@ -20761,7 +23796,7 @@ fn agenda_entry(
         ui.add_space(4.0);
         // The row's words at the Device's text size (#326, obf-1019).
         let mut shown = RichText::new(words)
-            .size(theme::content(ui, 15.0))
+            .size(theme::content(ui, 16.0))
             .color(text);
         if struck {
             shown = shown.strikethrough().color(weak);
@@ -20812,14 +23847,16 @@ fn occurrence_opens(row: &AgendaRow) -> Action {
 /// every Line is checked, its box stays checked too (#121), a Line's
 /// words opening what the heading opens. Where
 /// `hides_checked` (#217), the checked Lines and the picks with an entry
-/// are left out.
+/// are left out. The one a click on its notification asked for is
+/// `marked` with an outline in the accent colour, and says so to a screen
+/// reader (obf-1039); where the card lies.
 fn agenda_row(
     ui: &mut Ui,
     t: &L10n,
     tones: Tones,
-    (row, hides_checked): (&Row, bool),
+    (row, hides_checked, marked): (&Row, bool, bool),
     actions: &mut Vec<Action>,
-) {
+) -> egui::Rect {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     let routine = &row.row.routine;
@@ -20837,7 +23874,7 @@ fn agenda_row(
         .and_then(|a| area_colour(a.colour.as_deref()));
     let title = row_title(t, row.row.note.as_ref());
     let time = occurrence_time(t, &occurrence);
-    agenda_card(ui, tones, colour, |ui| {
+    let card = agenda_card(ui, tones, colour, |ui| {
         // Done from the entries of every pick, or from every Line
         // checked, stays checked.
         let complete = matches!(&row.session, Some(SessionPart::Today(s)) if s.today.complete())
@@ -20863,9 +23900,9 @@ fn agenda_row(
             let body = ui.vertical(|ui| {
                 ui.set_max_width(width);
                 ui.spacing_mut().item_spacing.y = 2.0;
-                ui.label(RichText::new(&time).strong().color(text));
+                ui.label(RichText::new(&time).strong());
                 let mut line = RichText::new(&title)
-                    .size(theme::content(ui, 15.0))
+                    .size(theme::content(ui, 16.0))
                     .color(text);
                 if done || skipped {
                     line = line.strikethrough();
@@ -20888,19 +23925,26 @@ fn agenda_row(
                 .response
                 .interact(Sense::click())
                 .on_hover_cursor(egui::CursorIcon::PointingHand);
-            open.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, &title));
+            open.widget_info(|| WidgetInfo {
+                selected: marked.then_some(true),
+                ..WidgetInfo::labeled(WidgetType::Button, true, &title)
+            });
             if open.clicked() {
                 actions.push(occurrence_opens(&row.row));
             }
-            // The same menu from a right-click and from ⋮.
+            // The same menu from a right-click and from ⋮; Done there as
+            // the box checks it (obf-1039), not on a Session's, which its
+            // picks make Done.
             let history = !routine.is_reminder();
             let answers = row.answers;
+            let offers_done = answers.not_today && !done && !complete && row.session.is_none();
+            let menu = (history, offers_done, answers);
             let mut picked = None;
-            open.context_menu(|ui| picked = picked.or(occurrence_menu(ui, t, history, answers)));
+            open.context_menu(|ui| picked = picked.or(occurrence_menu(ui, t, menu)));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let more = icon_button(ui, icons::MORE_VERT, &t.occurrence_menu(&title), weak);
                 egui::Popup::menu(&more)
-                    .show(|ui| picked = picked.or(occurrence_menu(ui, t, history, answers)));
+                    .show(|ui| picked = picked.or(occurrence_menu(ui, t, menu)));
                 if let Some(icon) = row
                     .area
                     .as_ref()
@@ -20913,14 +23957,14 @@ fn agenda_row(
                 }
             });
             match picked {
+                Some(OccurrencePick::Done) => {
+                    actions.push(Action::Toggle(routine.id.clone(), occurrence));
+                }
                 Some(OccurrencePick::Schedule) => {
                     actions.push(Action::OpenRoutine(routine.id.clone()));
                 }
                 Some(OccurrencePick::History) => {
                     actions.push(Action::Select(Selection::History(routine.id.clone())));
-                }
-                Some(OccurrencePick::Share) => {
-                    actions.push(Action::ShareRoutine(routine.id.clone()));
                 }
                 Some(OccurrencePick::Answer(answer)) => {
                     actions.push(Action::Answer(routine.id.clone(), occurrence, answer));
@@ -20952,6 +23996,15 @@ fn agenda_row(
             }
         }
     });
+    if marked {
+        ui.painter().rect_stroke(
+            card.rect,
+            theme::CARD_RADIUS,
+            egui::Stroke::new(3.0, tones.accent),
+            egui::StrokeKind::Inside,
+        );
+    }
+    card.rect
 }
 
 /// Today's picks of a Session under its heading (#208), in the order
@@ -21029,7 +24082,7 @@ fn list_heading(
         let body = ui.vertical(|ui| {
             ui.set_max_width(width);
             let words = RichText::new(words)
-                .size(theme::content(ui, 15.0))
+                .size(theme::content(ui, 16.0))
                 .color(text);
             ui.add(egui::Label::new(words).truncate());
         });
@@ -21137,27 +24190,37 @@ fn answered_under(t: &L10n, row: &AgendaRow) -> Option<&'static str> {
 /// What was picked in an Occurrence's menu.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum OccurrencePick {
+    Done,
     Schedule,
     History,
-    Share,
     Answer(Answer),
 }
 
-/// An Occurrence's menu, from a right-click on it or its ⋮, as the
-/// phone's: Snooze and Not today as far as `answers` allows (#269), each
+/// An Occurrence's menu, from a right-click on it or its ⋮: Done where
+/// it is offered (`done`, obf-1039), as its box checks it, then as the
+/// phone's Snooze and Not today as far as `answers` allows (#269), each
 /// under its heading, then Edit schedule, which opens its Routine or
-/// Reminder editor (#270), History for a Routine (`history`), and Share,
-/// which saves its Routine as the whole series with its end, or its
-/// Reminder, as a calendar file. What was picked.
+/// Reminder editor (#270), and History for a Routine (`history`); no
+/// calendar file (obf-1014). What was picked.
 fn occurrence_menu(
     ui: &mut Ui,
     t: &L10n,
-    history: bool,
-    answers: Answers,
+    (history, done, answers): (bool, bool, Answers),
 ) -> Option<OccurrencePick> {
     let text = ui.visuals().text_color();
-    let mut picked = occurrence_answers::entries(ui, t, answers).map(OccurrencePick::Answer);
-    if answers.any() {
+    let mut picked = None;
+    if done
+        && ui
+            .button(RichText::new(t.mark_done()).color(text))
+            .clicked()
+    {
+        picked = Some(OccurrencePick::Done);
+    }
+    if done && answers.any() {
+        ui.separator();
+    }
+    picked = picked.or(occurrence_answers::entries(ui, t, answers).map(OccurrencePick::Answer));
+    if done || answers.any() {
         ui.separator();
     }
     if ui
@@ -21173,9 +24236,6 @@ fn occurrence_menu(
     {
         picked = Some(OccurrencePick::History);
     }
-    if ui.button(RichText::new(t.share()).color(text)).clicked() {
-        picked = Some(OccurrencePick::Share);
-    }
     // A pick closes the menu, also one by keyboard or screen reader,
     // which no pointer click closes.
     if picked.is_some() {
@@ -21189,26 +24249,25 @@ const MISSED_SHOWN: usize = 3;
 
 /// The Missed Summary: each Routine that Missed something since "Seen",
 /// how often, and its latest Missed Occurrences to check off late. It
-/// stays until "Seen".
+/// stays until "Seen". The Routine of the Occurrence a click on its
+/// notification asked for (`mark`, obf-1039) is outlined in the accent
+/// colour, its Occurrence's line in bold where it shows; where the
+/// outline lies.
 fn missed_card(
     ui: &mut Ui,
     t: &L10n,
     tones: Tones,
-    missed: &MissedSummary,
+    (missed, mark): (&MissedSummary, Option<(&str, Occurrence)>),
     actions: &mut Vec<Action>,
-) {
+) -> Option<egui::Rect> {
+    let mut marked_at = None;
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     let error = ui.visuals().error_fg_color;
     embossed(ui, tones, true, None, |ui| {
         ui.horizontal(|ui| {
             icons::show(ui, icons::HISTORY, 20.0, error);
-            ui.label(
-                RichText::new(t.missed_title())
-                    .strong()
-                    .size(16.0)
-                    .color(text),
-            );
+            ui.label(RichText::new(t.missed_title()).strong().size(16.0));
             ui.add_space((ui.available_width() - 64.0).max(0.0));
             if ui
                 .button(RichText::new(t.missed_seen()).color(text))
@@ -21218,40 +24277,61 @@ fn missed_card(
             }
         });
         for routine in &missed.routines {
-            let what = row_title(t, routine.note.as_ref());
-            let first = what.lines().next().unwrap_or_default();
-            ui.label(
-                RichText::new(format!(
-                    "{first} · {}",
-                    t.missed_times(routine.count() as i64)
-                ))
-                .color(text),
-            );
-            for m in routine.missed.iter().take(MISSED_SHOWN) {
-                ui.horizontal(|ui| {
-                    let when = format!(
-                        "{}  {}",
-                        day_text(t, m.occurrence.day),
-                        occurrence_time(t, &m.occurrence)
-                    );
-                    let label = format!("{}: {when} {first}", t.mark_done());
-                    let key = tick_saves::occurrence_key(&routine.routine.id, &m.occurrence);
-                    let done = tick_saves::done(ui.ctx(), &key, false);
-                    if check(ui, tones, done, &label).clicked() && !done {
-                        actions.push(Action::CheckMissed(
-                            routine.routine.id.clone(),
-                            m.occurrence,
-                        ));
-                    }
-                    ui.label(RichText::new(when).color(text));
-                });
-            }
-            if routine.count() > MISSED_SHOWN {
-                let more = t.missed_more((routine.count() - MISSED_SHOWN) as i64);
-                ui.label(RichText::new(more).small().color(weak));
+            let marked = mark.filter(|(id, _)| *id == routine.routine.id);
+            let block = ui.scope(|ui| {
+                let what = row_title(t, routine.note.as_ref());
+                let first = what.lines().next().unwrap_or_default();
+                ui.label(
+                    RichText::new(format!(
+                        "{first} · {}",
+                        t.missed_times(routine.count() as i64)
+                    ))
+                    .color(text),
+                );
+                for m in routine.missed.iter().take(MISSED_SHOWN) {
+                    ui.horizontal(|ui| {
+                        let when = format!(
+                            "{}  {}",
+                            day_text(t, m.occurrence.day),
+                            occurrence_time(t, &m.occurrence)
+                        );
+                        let label = format!("{}: {when} {first}", t.mark_done());
+                        let key = tick_saves::occurrence_key(&routine.routine.id, &m.occurrence);
+                        let done = tick_saves::done(ui.ctx(), &key, false);
+                        if check(ui, tones, done, &label).clicked() && !done {
+                            actions.push(Action::CheckMissed(
+                                routine.routine.id.clone(),
+                                m.occurrence,
+                            ));
+                        }
+                        let when = RichText::new(when);
+                        // Strong in the theme's strong tone (obf-1126).
+                        let when = if marked.is_some_and(|(_, o)| o == m.occurrence) {
+                            when.strong()
+                        } else {
+                            when.color(text)
+                        };
+                        ui.label(when);
+                    });
+                }
+                if routine.count() > MISSED_SHOWN {
+                    let more = t.missed_more((routine.count() - MISSED_SHOWN) as i64);
+                    ui.label(RichText::new(more).small().color(weak));
+                }
+            });
+            if marked.is_some() {
+                let rect = block.response.rect.expand(4.0);
+                ui.painter().rect_stroke(
+                    rect,
+                    8.0,
+                    egui::Stroke::new(3.0, tones.accent),
+                    egui::StrokeKind::Outside,
+                );
+                marked_at = Some(rect);
             }
         }
     });
+    marked_at
 }
 
 /// An Area's stored colour (`RRGGBB`), or `None` when it has none or it
@@ -21326,7 +24406,7 @@ fn context_line(ui: &mut Ui, icon: char, line: &str) {
     ui.horizontal_top(|ui| {
         ui.spacing_mut().item_spacing.x = 6.0;
         icons::show(ui, icon, 16.0, weak);
-        ui.add(egui::Label::new(RichText::new(line).size(13.0).color(text)).wrap());
+        ui.add(egui::Label::new(RichText::new(line).color(text)).wrap());
     });
 }
 
@@ -21465,7 +24545,7 @@ fn row(
     label: &str,
     droppable: bool,
 ) -> egui::Response {
-    let font = egui::FontId::proportional(15.0);
+    let font = egui::TextStyle::Body.resolve(ui.style());
     let height = 30.0;
     let width = ui.available_width();
     let (rect, resp) = ui.allocate_exact_size(egui::vec2(width, height), Sense::click());
@@ -21526,7 +24606,7 @@ pub(crate) fn merge_row(ui: &mut Ui, tones: Tones, label: &str) -> egui::Respons
         }
         let x = rect.left() + 8.0;
         let colours = (ui.visuals().text_color(), ui.visuals().hyperlink_color);
-        let font = FontId::proportional(15.0);
+        let font = egui::TextStyle::Body.resolve(ui.style());
         let mut job = text_marks_view::tag_job(label, (0, label.len()), font, colours);
         job.wrap.max_width = (rect.right() - x - 8.0).max(0.0);
         let text = ui.painter().layout_job(job);
@@ -21617,6 +24697,14 @@ struct BadgesShown<'a> {
     advanced: bool,
 }
 
+/// Where a step of the Note open goes (obf-1051).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Way {
+    Undo,
+    Redo,
+    Revert,
+}
+
 /// The kind of the Note open (#188), and the kinds this Device may make
 /// it from its kind badge, in the order offered: a plain Note a
 /// Checklist, a Shopping List, a Tally or a Session (#191), as it may make
@@ -21647,7 +24735,7 @@ impl KindShown {
                 // A Code text becomes no other kind (#213).
                 NoteKind::Plain if note.text_format == text_format::CODE => {}
                 NoteKind::Plain => {
-                    // As the Note menu offers them (#145).
+                    // As the card's menu offers them (#145).
                     let tally = may.amends && may.changes && !note.is_merged();
                     choices.extend(view.makes_checklist.then_some(NoteKind::Checklist));
                     choices.extend(view.makes_shopping.then_some(NoteKind::ShoppingList));
@@ -21673,6 +24761,13 @@ impl KindShown {
         }
         KindShown { kind, choices }
     }
+}
+
+/// Whether Redo's keys were pressed, Ctrl+Shift+Z or Ctrl+Y (Cmd on
+/// macOS), and takes them (obf-1051).
+fn redo_keys(i: &mut egui::InputState) -> bool {
+    (i.modifiers.shift && i.consume_key(Modifiers::COMMAND | Modifiers::SHIFT, Key::Z))
+        || i.consume_key(Modifiers::COMMAND, Key::Y)
 }
 
 /// What making the Note `id` of the kind `from` one of the kind `to`
@@ -21735,6 +24830,112 @@ fn kind_look(t: &L10n, kind: NoteKind) -> (char, &'static str) {
     }
 }
 
+/// Room between a group's heading and its buttons and between their
+/// rows, and between two buttons side by side (obf-1073).
+const GROUP_SPACING: egui::Vec2 = egui::vec2(8.0, 8.0);
+
+/// Room between two groups side by side (obf-1073).
+const GROUP_GAP: f32 = 32.0;
+
+/// How tall a group's buttons are at least, as one with its icon is, so
+/// a row of them lines up (obf-1073).
+const GROUP_BUTTON_HEIGHT: f32 = 26.0;
+
+/// What draws a group's compact buttons (obf-1073), adding what they ask.
+type GroupDraw<'a> = Box<dyn FnOnce(&mut Ui, &mut Vec<Action>) + 'a>;
+
+/// One of the Note dialog's groups of actions (obf-1073): its heading
+/// and what draws its compact buttons, its width kept by `key`.
+struct ActionGroup<'a> {
+    key: &'static str,
+    heading: &'a str,
+    draw: GroupDraw<'a>,
+}
+
+impl<'a> ActionGroup<'a> {
+    fn new(
+        key: &'static str,
+        heading: &'a str,
+        draw: impl FnOnce(&mut Ui, &mut Vec<Action>) + 'a,
+    ) -> ActionGroup<'a> {
+        ActionGroup {
+            key,
+            heading,
+            draw: Box::new(draw),
+        }
+    }
+}
+
+/// The groups of the Note `of` (obf-1073), side by side where they fit:
+/// each as wide as it was drawn last for that Note, which shows in the
+/// dialog or in its own window, one not drawn yet on a line of its own;
+/// a group wider than the dialog takes its line alone, its buttons
+/// wrapping.
+fn action_groups(ui: &mut Ui, of: &str, groups: Vec<ActionGroup<'_>>, actions: &mut Vec<Action>) {
+    let room = ui.available_width();
+    let mut rows: Vec<Vec<(Id, ActionGroup<'_>)>> = Vec::new();
+    let mut used = 0.0;
+    for group in groups {
+        let id = Id::new(("note group", of, group.key));
+        let wide = ui.data(|d| d.get_temp::<f32>(id)).unwrap_or(room);
+        match rows.last_mut() {
+            Some(row) if used + GROUP_GAP + wide <= room => {
+                row.push((id, group));
+                used += GROUP_GAP + wide;
+            }
+            _ => {
+                rows.push(vec![(id, group)]);
+                used = wide;
+            }
+        }
+    }
+    for row in rows {
+        ui.horizontal_top(|ui| {
+            ui.spacing_mut().item_spacing.x = GROUP_GAP;
+            for (id, group) in row {
+                let drawn = ui.vertical(|ui| {
+                    ui.spacing_mut().item_spacing = GROUP_SPACING;
+                    ui.spacing_mut().interact_size.y = GROUP_BUTTON_HEIGHT;
+                    group_heading(ui, group.heading);
+                    ui.horizontal_wrapped(|ui| (group.draw)(ui, actions));
+                });
+                // Laid out anew once its width changed.
+                let wide = drawn.response.rect.width();
+                let was = ui.data(|d| d.get_temp::<f32>(id));
+                if was.is_none_or(|was| (was - wide).abs() > 0.5) {
+                    ui.data_mut(|d| d.insert_temp(id, wide));
+                    ui.ctx().request_repaint();
+                }
+            }
+        });
+    }
+}
+
+/// A group's heading (obf-1073), small and strong, read as a heading.
+fn group_heading(ui: &mut Ui, heading: &str) {
+    let shown = ui.label(RichText::new(heading).strong());
+    ui.ctx().accesskit_node_builder(shown.id, |node| {
+        node.set_role(egui::accesskit::Role::Heading);
+    });
+}
+
+/// A compact button of a group (obf-1073): `icon`, where it has one,
+/// before its words.
+fn group_button(ui: &mut Ui, icon: Option<char>, label: &str) -> egui::Response {
+    let text = ui.visuals().text_color();
+    let words = RichText::new(label).color(text);
+    let Some(icon) = icon else {
+        return ui.button(words);
+    };
+    let at = Id::new(("group button icon", label));
+    let shown =
+        egui::Button::new((egui::Atom::custom(at, egui::Vec2::splat(18.0)), words)).atom_ui(ui);
+    if let Some(rect) = shown.rect(at) {
+        icons::paint(ui.painter(), rect, icon, text);
+    }
+    shown.response
+}
+
 /// The row of badges under the Note's text (#160), each the setting's
 /// icon and its value, an icon for a fixed set of values, short text
 /// otherwise (#192), in the phone's order: the kind, in words with ▾
@@ -21743,9 +24944,9 @@ fn kind_look(t: &L10n, kind: NoteKind) -> (char, &'static str) {
 /// opening its editor, and those a newer version saved, only shown; its
 /// Frog, open or eaten today or yesterday, offering Eat now and Remove
 /// the Frog (#259); a Session's rule and weekdays' counts (#191); Show on the
-/// Agenda; Show ticks; and "+" with Remind me… (#344), Frog while none is
-/// open and, on a plain Note, Session, for who may set them up. A setting that does not
-/// apply has no badge; one this Device may not change only shows.
+/// Agenda; Show ticks; and Hidden from AI. "+" ([`add_badge`]) stands in
+/// the Add group (obf-1073). A setting that does not apply has no badge;
+/// one this Device may not change only shows.
 fn note_badges(
     ui: &mut Ui,
     (t, tones): (&L10n, Tones),
@@ -21923,58 +25124,67 @@ fn note_badges(
                 actions.push(Action::Badge(Some(NoteBadge::HiddenFromAi)));
             }
         }
-        // In a Shared Area only a Manager sets them up (ADR 0013).
-        if !shown.may.schedules || trashed {
-            return;
+    });
+}
+
+/// The "+" badge (obf-1034), first in the Note dialog's Add group
+/// (obf-1073): its menu holds Remind me…, and in Advanced Frog and
+/// Session.
+fn add_badge(
+    ui: &mut Ui,
+    (t, tones): (&L10n, Tones),
+    shown: &BadgesShown,
+    actions: &mut Vec<Action>,
+) {
+    let note = &shown.placed.note;
+    let look = (t, tones);
+    let add = badge(
+        ui,
+        look,
+        (icons::ADD, None),
+        t.routine_or_reminder(),
+        None,
+        true,
+    );
+    // Its menu holds Remind me… (obf-1034).
+    spotlight::anchor(ui, "note-add-badge", add.rect);
+    let id = note.id.clone();
+    let text = ui.visuals().text_color();
+    egui::Popup::menu(&add).show(|ui| {
+        // One way in for a Routine or Reminder, starting as a
+        // Reminder (#344).
+        let mut entries = vec![(
+            icons::REMINDER,
+            t.remind_me(),
+            Action::NewRoutine {
+                note: Some(id.clone()),
+                reminder: true,
+            },
+        )];
+        // A Note has one open Frog at a time; Frogs and Sessions are
+        // made only in Advanced (#197).
+        let frog_open = shown.frog.is_some_and(|f| !f.frog.is_done());
+        if shown.advanced && !frog_open {
+            entries.push((icons::FROG, t.frog(), Action::SpawnFrog(id.clone())));
         }
-        let add = badge(
-            ui,
-            look,
-            (icons::ADD, None),
-            t.routine_or_reminder(),
-            None,
-            true,
-        );
-        // Its menu holds Remind me… (obf-1034).
-        spotlight::anchor(ui, "note-add-badge", add.rect);
-        let id = note.id.clone();
-        let text = ui.visuals().text_color();
-        egui::Popup::menu(&add).show(|ui| {
-            // One way in for a Routine or Reminder, starting as a
-            // Reminder (#344).
-            let mut entries = vec![(
-                icons::REMINDER,
-                t.remind_me(),
-                Action::NewRoutine {
-                    note: Some(id.clone()),
-                    reminder: true,
-                },
-            )];
-            // A Note has one open Frog at a time; Frogs and Sessions are
-            // made only in Advanced (#197).
-            let frog_open = shown.frog.is_some_and(|f| !f.frog.is_done());
-            if shown.advanced && !frog_open {
-                entries.push((icons::FROG, t.frog(), Action::SpawnFrog(id.clone())));
+        // Only a plain Note becomes a Session, and no Code text
+        // (#213); a Routine of a Session Note runs it already (#191).
+        if shown.advanced
+            && shown.kind.kind == NoteKind::Plain
+            && note.text_format != text_format::CODE
+        {
+            entries.push((
+                icons::SESSION,
+                t.spawn_session(),
+                Action::NewSession(Some(id.clone())),
+            ));
+        }
+        for (icon, label, action) in entries {
+            if menu_entry(ui, (icon, text), label).clicked() {
+                actions.push(action);
+                ui.close();
             }
-            // Only a plain Note becomes a Session, and no Code text
-            // (#213); a Routine of a Session Note runs it already (#191).
-            if shown.advanced
-                && shown.kind.kind == NoteKind::Plain
-                && note.text_format != text_format::CODE
-            {
-                entries.push((
-                    icons::SESSION,
-                    t.session(),
-                    Action::NewSession(Some(id.clone())),
-                ));
-            }
-            for (icon, label, action) in entries {
-                if menu_entry(ui, (icon, text), label).clicked() {
-                    actions.push(action);
-                    ui.close();
-                }
-            }
-        });
+        }
     });
 }
 
@@ -22010,7 +25220,7 @@ fn frog_badge(
             actions.push(Action::Frog(FrogAction::Toggle(frog.id.clone())));
             ui.close();
         }
-        if shown.manages && menu_entry(ui, (icons::TRASH, text), t.frog_remove()).clicked() {
+        if shown.manages && menu_entry(ui, (icons::TRASH, text), t.move_to_trash()).clicked() {
             actions.push(Action::Frog(FrogAction::Delete(frog.id.clone())));
             ui.close();
         }
@@ -22167,6 +25377,9 @@ struct CardMedia<'a> {
 #[derive(Debug, Clone, Copy)]
 struct CardLook<'a> {
     full: bool,
+    /// The places a search found in it, drawn inside it at its end
+    /// (obf-1047, obf-1114).
+    found: &'a [Finding],
     glance: &'a [String],
     switches: bool,
     /// Which of its folds this Device keeps open (#189).
@@ -22214,13 +25427,16 @@ struct CardLook<'a> {
 
 /// What a card's menu offers of the Note's Routines (#281): Remind me…
 /// (#344) with `schedules`, Frog with `frog` and Session… with
-/// `session`.
+/// `session`; and Add a part (obf-1014).
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct CardSpawns {
     note: String,
     schedules: bool,
     frog: bool,
     session: bool,
+    /// Whether Add a part opens the Note dialog with its Amend box
+    /// (obf-1014): where this Device may add a Section.
+    amends: bool,
     /// The switch Hidden from AI, ticked while the Note is marked itself;
     /// none while it may not be marked (#267).
     hidden: Option<bool>,
@@ -22277,8 +25493,9 @@ struct CardClicks {
     /// What a click on a box of the Note's text or a Section's asked,
     /// with that text's id (ADR 0035).
     tick: Option<(String, BoxAsk)>,
-    /// The table clicked, to show full screen (#128).
-    table: Option<Opening>,
+    /// The table clicked, to show full screen (#128), or copied from its
+    /// ⋮ (obf-1050).
+    table: Option<Action>,
     /// The tag clicked, as written (#126).
     tag: Option<String>,
     menu_opened: bool,
@@ -22287,6 +25504,8 @@ struct CardClicks {
     tally: Vec<TallyAction>,
     /// What was asked of the picks on a Session Note's full card (#191).
     session: Vec<SessionAction>,
+    /// The Note opened at a place a search found in it (obf-1114).
+    found: Option<Action>,
 }
 
 /// The room after the last row of every list (#158): its last card,
@@ -22451,29 +25670,160 @@ pub(crate) fn list_scroll<R>(
     output
 }
 
-/// "+" at the top of a list (#146, #161): with one kind it makes that at
-/// once, with more its menu offers them, Note first, each with its icon
-/// and words; the kind picked.
-fn add_button(ui: &mut Ui, t: &L10n, kinds: &[NewKind]) -> Option<NewKind> {
-    let text = ui.visuals().text_color();
-    if let [kind] = kinds {
-        let add = icon_button(ui, icons::ADD, t.menu_new_note(), text);
-        spotlight::anchor(ui, "add", add.rect);
-        return add.clicked().then_some(*kind);
+/// How narrow the search field of a list's band gets before the buttons
+/// beside it go to the line under it (obf-1064).
+const BAND_FIELD_MIN: f32 = 200.0;
+
+/// The size of the text typed into a list's search field (obf-1063): a
+/// card's text's ([`card_text`]), grown by the text size as it is.
+const BAND_FIELD_TEXT: f32 = 16.0;
+
+/// The measures of a list's header band (obf-1064), grown by the text
+/// size of this Device (#326): its second row's height, the arrows'
+/// side, the icons' size and the path's and title's words.
+#[derive(Clone, Copy, Debug)]
+struct BandSizes {
+    row: f32,
+    arrow: f32,
+    glyph: f32,
+    words: f32,
+    title: f32,
+}
+
+impl BandSizes {
+    fn of(ui: &Ui) -> Self {
+        let factor = theme::text_factor(ui.ctx());
+        Self {
+            row: 36.0 * factor,
+            arrow: 28.0 * factor,
+            glyph: 20.0 * factor,
+            words: 14.0 * factor,
+            title: theme::TITLE * factor,
+        }
     }
-    let add = icon_button(ui, icons::ADD, t.add_here(), text);
+}
+
+/// The band's search field (obf-1063, obf-1127) under `search`'s id
+/// with its hint, `width` wide: as tall as the band's row, the typed
+/// text at a card's text size, the magnifier inside it at the left and,
+/// while something is typed, ✕ inside it at the right. The field, and
+/// whether ✕ emptied it.
+fn band_search(
+    ui: &mut Ui,
+    t: &L10n,
+    query: &mut String,
+    (id, hint): (Id, &str),
+    width: f32,
+    sizes: BandSizes,
+) -> (egui::Response, bool) {
+    let text = ui.visuals().text_color();
+    // The margin makes the field as tall as the row (egui's single line
+    // takes no height of its own).
+    let font = FontId::proportional(theme::content(ui, BAND_FIELD_TEXT));
+    let line = ui.fonts_mut(|f| f.row_height(&font));
+    let inner = line.max(sizes.glyph);
+    let margin = egui::Margin::symmetric(
+        ((sizes.row - sizes.glyph) / 2.0).round() as i8,
+        ((sizes.row - inner) / 2.0).round() as i8,
+    );
+    let (glass, cross) = (id.with("glass"), id.with("cross"));
+    let icon = egui::Vec2::splat(sizes.glyph);
+    let output = TextEdit::singleline(query)
+        .id(id)
+        .font(font.clone())
+        .hint_text(RichText::new(hint).font(font))
+        .text_color(text)
+        .margin(margin)
+        .prefix(egui::Atom::custom(glass, icon))
+        // Its room kept while empty, so nothing moves as it fills.
+        .suffix(egui::Atom::custom(cross, icon))
+        .desired_width(width.max(0.0))
+        .show(ui);
+    let shown = &output.response;
+    let field = shown.response.clone();
+    if let Some(at) = shown.rect(glass) {
+        icons::paint(
+            ui.painter(),
+            at,
+            icons::SEARCH,
+            ui.visuals().weak_text_color(),
+        );
+    }
+    text_menu::show(ui, t, &field, query);
+    // ✕ over the field's right end, as tall as the field, while
+    // something is typed; under its own id, so the menus after the
+    // field keep theirs and stay open while the search changes.
+    let mut cleared = false;
+    if !query.is_empty()
+        && let Some(at) = shown.rect(cross)
+    {
+        let room = field.rect.right() - at.right();
+        let target = egui::Rect::from_min_max(
+            egui::pos2(at.left() - room, field.rect.top()),
+            field.rect.max,
+        )
+        .shrink(2.0);
+        let label = t.clear_search();
+        let clear = ui.interact(target, id.with("clear"), Sense::click());
+        clear.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, label));
+        theme::icon_button_back(ui, &clear, target);
+        icons::paint(ui.painter(), at, icons::CLOSE, text);
+        if clear.on_hover_text(label).clicked() {
+            query.clear();
+            cleared = true;
+        }
+    }
+    (field, cleared)
+}
+
+/// "+" at the top of a list (#146, #161): its menu offers `kinds`, Note
+/// first, each with its icon and words; on the Agenda and in Unsorted
+/// "Quick note" and "Editor" (obf-1141). The kind picked. In a list's band, of `band`'s sizes, it
+/// reads "+ New Note" in a button's frame (obf-1067); the Agenda's is
+/// the icon alone.
+fn add_button(
+    ui: &mut Ui,
+    t: &L10n,
+    kinds: &[NewKind],
+    band: Option<BandSizes>,
+) -> Option<NewKind> {
+    let text = ui.visuals().text_color();
+    let button = |ui: &mut Ui, label: &str| match band {
+        Some(sizes) => {
+            let resp = band_button(ui, (icons::ADD, t.menu_new_note(), label), sizes, None);
+            if label == t.menu_new_note() {
+                resp
+            } else {
+                resp.on_hover_text(label)
+            }
+        }
+        None => sized_icon_button(ui, (icons::ADD, label, text), (24.0, 20.0)),
+    };
+    // The Agenda's and Unsorted's "+" capture (obf-1141): "New Note",
+    // its menu "Quick note" and "Editor".
+    let captures = kinds.contains(&NewKind::Editor);
+    let add = button(
+        ui,
+        if captures {
+            t.menu_new_note()
+        } else {
+            t.add_here()
+        },
+    );
     spotlight::anchor(ui, "add", add.rect);
     let mut picked = None;
     egui::Popup::menu(&add).show(|ui| {
         for kind in kinds {
             let (icon, label) = match kind {
+                NewKind::Note if captures => (icons::NEW_NOTE, t.settings_quick_note()),
                 NewKind::Note => (icons::NEW_NOTE, t.add_fan_note()),
+                NewKind::Editor => (icons::EDIT, t.capture_fan_editor()),
                 NewKind::Checklist => (icons::CHECKLIST, t.checklist_heading()),
                 NewKind::Shopping => (icons::SHOPPING_CART, t.shopping_heading()),
                 NewKind::Tally => (icons::TALLY, t.tally_heading()),
                 NewKind::Session => (icons::SESSION, t.session()),
                 NewKind::Frog => (icons::FROG, t.frog()),
-                NewKind::Topic => (icons::NO_AREA_ICON, t.topic_choice()),
+                NewKind::Topic => (icons::NO_AREA_ICON, t.new_topic()),
             };
             if menu_entry(ui, (icon, text), label).clicked() {
                 picked = Some(*kind);
@@ -22485,26 +25835,84 @@ fn add_button(ui: &mut Ui, t: &L10n, kinds: &[NewKind]) -> Option<NewKind> {
 }
 
 /// The bar button of a Note list's compact/detailed switch (#114, #189):
-/// it says what clicking it does and shows as selected while the list is
+/// its icon and "View" in a button's frame (obf-1067), one height with
+/// the band's row (obf-1064); it says what clicking it does to a screen
+/// reader and in its tooltip and shows as selected while the list is
 /// `compact`; whether it was clicked.
-fn compact_button(ui: &mut Ui, tones: Tones, t: &L10n, compact: bool) -> bool {
+fn compact_button(ui: &mut Ui, tones: Tones, t: &L10n, compact: bool, sizes: BandSizes) -> bool {
     let (icon, label) = if compact {
         (icons::NOTES_COMPACT, t.show_notes_full())
     } else {
         (icons::NOTES_FULL, t.show_notes_compact())
     };
-    let (rect, resp) = ui.allocate_exact_size(egui::vec2(24.0, 24.0), Sense::click());
-    spotlight::anchor(ui, "compact", rect);
-    resp.widget_info(|| WidgetInfo::selected(WidgetType::Button, true, compact, label));
-    // The hover under the tint, so the selected look stays.
-    theme::icon_button_back(ui, &resp, rect);
-    if compact {
-        let fill = tones.accent.gamma_multiply(0.3);
-        ui.painter().rect_filled(rect, theme::BUTTON_RADIUS, fill);
-    }
-    let text = ui.visuals().text_color();
-    icons::paint(ui.painter(), rect.shrink(2.0), icon, text);
+    let selected = Some((compact, tones.accent));
+    let resp = band_button(ui, (icon, t.menu_view(), label), sizes, selected);
+    spotlight::anchor(ui, "compact", resp.rect);
     resp.on_hover_text(label).clicked()
+}
+
+/// How wide [`band_button`] draws `word` with its icon.
+fn band_button_width(ui: &Ui, word: &str, sizes: BandSizes) -> f32 {
+    let font = FontId::proportional(sizes.words);
+    let colour = ui.visuals().text_color();
+    let words = ui.painter().layout_no_wrap(word.to_string(), font, colour);
+    let pad = ui.spacing().button_padding.x;
+    pad + sizes.glyph + ui.spacing().icon_spacing + words.size().x + pad
+}
+
+/// A button of the band's second row (obf-1067): `icon` and `word` in
+/// the frame "Show Notes by…" has, as tall as the row, `label` to a
+/// screen reader; with `selected`, a switch, tinted with its accent
+/// while on.
+fn band_button(
+    ui: &mut Ui,
+    (icon, word, label): (char, &str, &str),
+    sizes: BandSizes,
+    selected: Option<(bool, Color32)>,
+) -> egui::Response {
+    let width = band_button_width(ui, word, sizes);
+    let (rect, resp) = ui.allocate_exact_size(egui::vec2(width, sizes.row), Sense::click());
+    // Greyed where the ui is, to a screen reader too.
+    let enabled = ui.is_enabled();
+    resp.widget_info(|| match selected {
+        Some((on, _)) => WidgetInfo::selected(WidgetType::Button, enabled, on, label),
+        None => WidgetInfo::labeled(WidgetType::Button, enabled, label),
+    });
+    if ui.is_rect_visible(rect) {
+        // The frame egui's button paints, for this state.
+        let look = *ui.style().visuals.widgets.state(resp.widget_state());
+        let frame = rect.expand(look.expansion);
+        ui.painter().rect(
+            frame,
+            look.corner_radius,
+            look.weak_bg_fill,
+            look.bg_stroke,
+            egui::StrokeKind::Inside,
+        );
+        if let Some((true, accent)) = selected {
+            let fill = accent.gamma_multiply(0.3);
+            ui.painter().rect_filled(frame, look.corner_radius, fill);
+        }
+        let text = ui.visuals().text_color();
+        let pad = ui.spacing().button_padding.x;
+        let glyph = egui::vec2(sizes.glyph, sizes.glyph);
+        let at = egui::Rect::from_min_size(
+            egui::pos2(rect.left() + pad, rect.center().y - sizes.glyph / 2.0),
+            glyph,
+        );
+        icons::paint(ui.painter(), at, icon, text);
+        let font = FontId::proportional(sizes.words);
+        let words = ui.painter().layout_no_wrap(word.to_string(), font, text);
+        let left = at.right() + ui.spacing().icon_spacing;
+        let top = rect.center().y - words.size().y / 2.0;
+        ui.painter().galley(egui::pos2(left, top), words, text);
+    }
+    if let Some(cursor) = ui.visuals().interact_cursor
+        && resp.hovered()
+    {
+        ui.ctx().set_cursor_icon(cursor);
+    }
+    resp
 }
 
 /// A text edited in the Note dialog: the Note's, or a Section's (#183)
@@ -22633,11 +26041,24 @@ fn edited_text(
         let marked = Id::new(("field", of));
         // A click on a table edits the cell clicked in its
         // grid (#257).
-        if let Some(at) = text_marks_view::table_clicks(ui, &t, marked, &spots.tables) {
-            let pointer = ui.input(|i| i.pointer.interact_pos());
-            let cell = spots.cell_at(at, pointer).unwrap_or((0, 0));
-            *editing = true;
-            table_grid::edit(ui, (id, of), edited, at, cell);
+        // Its ⋮ copies it, or deletes or moves it in the grids, a step
+        // of the Note's Undo there (obf-1050).
+        match text_marks_view::table_clicks(ui, &t, marked, &spots.tables, true) {
+            Some((at, TableAct::Open)) => {
+                let pointer = ui.input(|i| i.pointer.interact_pos());
+                let cell = spots.cell_at(at, pointer).unwrap_or((0, 0));
+                *editing = true;
+                table_grid::edit(ui, (id, of), edited, at, cell);
+            }
+            Some((at, TableAct::Copy)) => {
+                let copy = markdown::table::copy(edited, at, &boxes.states);
+                actions.extend(copy.map(Action::CopyTable));
+            }
+            Some((at, act)) => {
+                *editing = true;
+                table_grid::act(ui, (id, of), edited, at, act);
+            }
+            None => {}
         }
         // A tick is no edit: what is typed stays.
         if let Some(asked) = text_marks_view::box_clicks(ui, &t, marked, &spots.boxes, edit.ticks) {
@@ -22657,9 +26078,14 @@ fn edited_text(
         let weak = ui.visuals().weak_text_color();
         let code = ui.visuals().code_bg_color;
         let dark = ui.visuals().dark_mode;
-        let small = FontId::proportional(13.0);
+        let small = egui::TextStyle::Small.resolve(ui.style());
         let grammars = text_marks_view::grammars(ui.ctx());
         let grammar = grammars.by_scope(edit.language);
+        let typed_format = match (as_code, formatted) {
+            (true, _) => text_format::CODE,
+            (false, true) => text_format::MARKDOWN,
+            (false, false) => text_format::PLAIN,
+        };
         let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, width: f32| {
             let typed = typed.as_str();
             let font = FontId::proportional(typed_size);
@@ -22672,6 +26098,8 @@ fn edited_text(
                     let colours = text_marks_view::code_colours(ui.ctx(), grammar, typed);
                     text_marks_view::paint_code(&mut job, 0, &colours, dark);
                 }
+                // The places the find bar found (obf-1047).
+                find_marks::mark_typed(ui.ctx(), &mut job, (typed, text_format::CODE), dark);
                 return ui.fonts_mut(|f| f.layout_job(job));
             }
             let (job, lines) = if formatted {
@@ -22700,6 +26128,9 @@ fn edited_text(
             if let Some(grids) = &grids {
                 job = grids.hide(typed, job);
             }
+            // The places the find bar found (obf-1047); none in a table's
+            // source hidden under its grid.
+            find_marks::mark_typed(ui.ctx(), &mut job, (typed, typed_format), dark);
             job.wrap.max_width = width;
             let galley = ui.fonts_mut(|f| f.layout_job(job));
             if !formatted {
@@ -22811,6 +26242,8 @@ fn edited_text(
         if cut {
             ui.ctx().request_repaint();
         }
+        let place = (&*output.galley, output.galley_pos);
+        text_marks_view::reveal_typed(ui, place, (edited, typed_format));
         name_field(ui, &output.response.response, edit.name);
         // With Show ticks, who ticked each box, after it; a
         // click on a box ticks it, no edit of the text (ADR
@@ -22844,6 +26277,16 @@ fn edited_text(
         if let Some(asked) = grid.boxes.take() {
             actions.push(box_action(of.to_string(), asked));
         }
+        // A menu of a grid changed the text whole: a step of its own
+        // (obf-1051).
+        if let Some(before) = grid.whole.take() {
+            actions.push(Action::WholeStep {
+                section: edit.section.then(|| of.to_string()),
+                before,
+            });
+        }
+        // A table's ⋮ Copy (obf-1050).
+        actions.extend(grid.copy.take().map(Action::CopyTable));
         // A click on the bar keeps the field being edited,
         // and so does the keyboard going into a cell of its
         // grids or back.
@@ -22987,6 +26430,10 @@ struct KindedText<'a> {
     /// Whether the description's format bar shows: only in Advanced
     /// (#197).
     bar: bool,
+    /// Whether an empty description waits for "Add a description": a
+    /// Checklist's, a Shopping List's and a Tally's (obf-1071), not a
+    /// Session's.
+    asks: bool,
     boxes: &'a BoxLook,
     ticks: (bool, &'a dyn Fn(&str) -> bool),
 }
@@ -23006,9 +26453,11 @@ type KindedState<'a> = (
 /// The text of a Note of a kind as its name, a heading on one line, and
 /// its description under it (#188), small and weak, folded to its first
 /// line while it is not edited: a click unfolds it, into its field where
-/// this Device may change it, which an empty one always shows. Read only,
-/// both select to be copied (#183) and a click folds the description
-/// again.
+/// this Device may change it. An empty one there is "Add a description"
+/// on a Checklist, a Shopping List and a Tally (obf-1071), which opens
+/// its field until it is left empty, and its field on a Session. Read
+/// only, both select to be copied (#183) and a click folds the
+/// description again.
 fn kinded_text(
     ui: &mut Ui,
     (t, tones): (L10n, Tones),
@@ -23067,15 +26516,19 @@ fn kinded_text(
         }
         let of = Id::new(("text", &note.id));
         // Its tables open to read (#128).
-        if let Some(at) = text_marks_view::table_clicks(ui, &t, of, &spots.tables) {
-            actions.push(Action::OpenTable(Opening {
-                note: None,
-                text: note.text.clone(),
-                at,
-                cell: None,
-                tags: true,
-                boxes: Some(note.id.clone()),
-            }));
+        if let Some((at, act)) = text_marks_view::table_clicks(ui, &t, of, &spots.tables, false) {
+            actions.extend(table_action(
+                act,
+                Opening {
+                    note: None,
+                    text: note.text.clone(),
+                    at,
+                    cell: None,
+                    tags: true,
+                    boxes: Some(note.id.clone()),
+                },
+                shown.boxes,
+            ));
         }
         // A Member ticks the boxes of a Note not theirs.
         if let Some(asked) = text_marks_view::box_clicks(ui, &t, of, &spots.boxes, shown.ticks) {
@@ -23119,6 +26572,16 @@ fn kinded_text(
             (edited, editing, focus, select),
             actions,
         );
+    } else if edited.trim().is_empty() && shown.asks {
+        // Empty, only a way into its field (obf-1071), small and weak
+        // as the description is.
+        let asked = RichText::new(t.desk_add_description())
+            .size(theme::content(ui, DESCRIPTION_SIZE))
+            .color(weak);
+        if ui.add(egui::Button::new(asked).frame(false)).clicked() {
+            *editing = true;
+            *focus = true;
+        }
     } else if edited.trim().is_empty() {
         // Empty, its field with its hint; typed into, it is edited.
         let hint = RichText::new(t.note_description())
@@ -23193,6 +26656,11 @@ fn name_edit(
             }
         });
     }
+    let typed_format = if formatted {
+        text_format::MARKDOWN
+    } else {
+        text_format::PLAIN
+    };
     let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, width: f32| {
         let typed = typed.as_str();
         let font = FontId::proportional(theme::content(ui, NAME_SIZE));
@@ -23202,6 +26670,9 @@ fn name_edit(
             text_marks_view::tag_job(typed, (0, typed.len()), font, (text, accent))
         };
         let mut job = text_marks_view::field_job(job, boxes, &|_: &str| 0.0);
+        // The places the find bar found (obf-1047).
+        let dark = ui.visuals().dark_mode;
+        find_marks::mark_typed(ui.ctx(), &mut job, (typed, typed_format), dark);
         job.wrap.max_width = width;
         ui.fonts_mut(|f| f.layout_job(job))
     };
@@ -23224,6 +26695,8 @@ fn name_edit(
     if cut {
         ui.ctx().request_repaint();
     }
+    let place = (&*output.galley, output.galley_pos);
+    text_marks_view::reveal_typed(ui, place, (name, typed_format));
     text_marks_view::remember_text(ui, id, name);
     let field = &output.response.response;
     name_field(ui, field, t.note_name());
@@ -23270,6 +26743,19 @@ fn description_fold(ui: &mut Ui, t: &L10n, (rect, id): (egui::Rect, Id), open: b
         .clicked()
 }
 
+/// What was done to a table of a text only read (obf-1050), as an
+/// action: a click opens it as `opening` says, its ⋮ Copy puts it on the
+/// clipboard, each box as `look` shows it.
+fn table_action(act: TableAct, opening: Opening, look: &BoxLook) -> Option<Action> {
+    match act {
+        TableAct::Open => Some(Action::OpenTable(opening)),
+        TableAct::Copy => {
+            markdown::table::copy(&opening.text, opening.at, &look.states).map(Action::CopyTable)
+        }
+        TableAct::Up | TableAct::Down | TableAct::Delete => None,
+    }
+}
+
 /// What a click on a box of the text `entity` asked, as an action.
 fn box_action(entity: String, asked: BoxAsk) -> Action {
     match asked {
@@ -23283,9 +26769,91 @@ fn ticked_in(boxes: &[ShownBox]) -> impl Fn(&str) -> bool + '_ {
     move |id| boxes.iter().any(|b| b.id == id && b.last.is_some())
 }
 
-/// The size of a Note's text as the Note dialog and the reading view show
-/// it, before the Device's text size (#326).
-const READ_SIZE: f32 = 18.0;
+/// What a find bar over `note` and its `sections` finds in, as one key
+/// that changes with any text it finds in (obf-1047); in the reading
+/// view, `texts`, a key of its own.
+fn found_in(note: &Note, sections: &[Section], texts: bool) -> u64 {
+    let names = |files: &[oldbrainfix_core::Attachment]| -> Vec<String> {
+        files.iter().map(|f| f.name.clone()).collect()
+    };
+    let part = |text: &str, media: [&BTreeMap<String, String>; 3], files: Vec<String>| {
+        Id::new((text, media, files)).value()
+    };
+    let mut keys = vec![
+        u64::from(texts),
+        part(
+            &note.text,
+            [&note.transcripts, &note.photo_texts, &note.attachment_texts],
+            names(&note.attachments),
+        ),
+    ];
+    for s in sections {
+        let media = [&s.transcripts, &s.photo_texts, &s.attachment_texts];
+        keys.push(part(&s.text, media, names(&s.attachments)));
+    }
+    Id::new(keys).value()
+}
+
+/// Where `finding` lies as [`find_marks::Current`] names it: in the text
+/// of `note` or of one of its `sections` as it is drawn, a text's
+/// source, a Transcript, a Photo Text, an Attachment Text or a file's
+/// name; with `split`, the Note's own text as its name and description
+/// are drawn apart (#188).
+fn finding_text(
+    note: &Note,
+    sections: &[Section],
+    finding: &Finding,
+    split: bool,
+) -> Option<find_marks::Current> {
+    let at = |text: &str, start: usize| find_marks::Current {
+        text: find_marks::text_key(text),
+        start,
+    };
+    if split && finding.part == FindingPart::Text && finding.section.is_none() {
+        let whole = note.text.as_str();
+        let name = note_kinds::name(whole);
+        let description = note_kinds::description(whole);
+        let from = whole.len() - description.len();
+        // Where the description begins as the whole text shows.
+        let shown = find_marks::shown_of(whole.get(..from).unwrap_or_default())
+            .0
+            .len();
+        return Some(match finding.start.checked_sub(shown) {
+            Some(start) => at(description, start),
+            None => at(name, finding.start),
+        });
+    }
+    let section = match &finding.section {
+        Some(id) => Some(sections.iter().find(|s| &s.id == id)?),
+        None => None,
+    };
+    let (text, transcripts, photo_texts, attachment_texts) = match section {
+        Some(s) => (&s.text, &s.transcripts, &s.photo_texts, &s.attachment_texts),
+        None => (
+            &note.text,
+            &note.transcripts,
+            &note.photo_texts,
+            &note.attachment_texts,
+        ),
+    };
+    let files = match section {
+        Some(s) => s.attachments.iter(),
+        None => note.attachments.iter(),
+    };
+    let key = finding.key.as_str();
+    let said = match finding.part {
+        FindingPart::Text => text.as_str(),
+        FindingPart::Transcript => transcripts.get(key)?.as_str(),
+        FindingPart::PhotoText => photo_texts.get(key)?.as_str(),
+        FindingPart::AttachmentText => attachment_texts.get(key)?.as_str(),
+        FindingPart::FileName => files.into_iter().find(|f| f.hash == key)?.name.as_str(),
+    };
+    Some(at(said, finding.start))
+}
+
+/// The size of a Note's text as the reading view shows it, before the
+/// Device's text size (#326).
+pub(crate) const READ_SIZE: f32 = 18.0;
 
 /// What [`read_part`] draws, the text of a Note or Section: its id, its
 /// text, its format and the scope of the grammar a Code text is coloured
@@ -23296,16 +26864,20 @@ type ReadPart<'a> = (&'a str, &'a str, &'a str, Option<&'a str>);
 /// them, with which have been ticked.
 type PartBoxes<'a> = (&'a BoxLook, (bool, &'a dyn Fn(&str) -> bool));
 
+/// How far from the window's edges a table in the reading view stays.
+pub(crate) const READ_EDGE: f32 = 12.0;
+
 /// Draws the bytes `range` of a Note's or Section's text in the reading
 /// view (#322) at `size` points, as a text only read reads in the Note
 /// dialog: selectable to be copied, its boxes ticking where this Device
 /// may, its tags opening their search, its links their pages and its
-/// tables full screen to read; a Code text as code.
+/// tables full screen to read, each with all its rows and as wide as
+/// `wide`, the window's width, allows (obf-1048); a Code text as code.
 fn read_part(
     ui: &mut Ui,
     t: &L10n,
     (of, text, format, language): ReadPart<'_>,
-    (range, size): ((usize, usize), f32),
+    ((range, size), wide): (((usize, usize), f32), egui::Rangef),
     (boxes, ticks): PartBoxes<'_>,
     actions: &mut Vec<Action>,
 ) {
@@ -23318,19 +26890,28 @@ fn read_part(
             });
             return;
         }
+        let tables = TableRoom {
+            card: None,
+            wide: Some(wide),
+        };
         let spots = read_text::shown(ui, |ui| {
-            text_marks_view::formatted_label(ui, (text, format, boxes), range, look, false)
+            let text = (text, format, boxes);
+            text_marks_view::room_label(ui, text, None, range, look, false, tables)
         });
         let id = Id::new(("reading", of));
-        if let Some(at) = text_marks_view::table_clicks(ui, t, id, &spots.tables) {
-            actions.push(Action::OpenTable(Opening {
-                note: None,
-                text: text.to_string(),
-                at,
-                cell: None,
-                tags: true,
-                boxes: Some(of.to_string()),
-            }));
+        if let Some((at, act)) = text_marks_view::table_clicks(ui, t, id, &spots.tables, false) {
+            actions.extend(table_action(
+                act,
+                Opening {
+                    note: None,
+                    text: text.to_string(),
+                    at,
+                    cell: None,
+                    tags: true,
+                    boxes: Some(of.to_string()),
+                },
+                boxes,
+            ));
         }
         if let Some(asked) = text_marks_view::box_clicks(ui, t, id, &spots.boxes, ticks) {
             actions.push(box_action(of.to_string(), asked));
@@ -23434,7 +27015,12 @@ fn whole(
     (cache, store, transcribing): ShownMedia,
     (look, marks): (&BoxLook, &mut Spots),
 ) -> Vec<(String, egui::Rect)> {
-    card_text(ui, (part.text, part.format, look), part.language, marks);
+    card_text(
+        ui,
+        (part.id, part.text, part.format, look),
+        part.language,
+        marks,
+    );
     media_view::whole_media(
         ui,
         t,
@@ -23445,38 +27031,204 @@ fn whole(
     )
 }
 
-/// The whole text `text` of a Note or Section in `format` on a full
-/// card, its boxes as `look` says, where its boxes (ADR 0035), tags
+/// The whole text `text` of the Note or Section `id` in `format` on a
+/// full card, its boxes as `look` says, where its boxes (ADR 0035), tags
 /// (#126) and links (#127) lie added to `marks`; a Code text coloured by
-/// `language` (obf-1036).
+/// `language` (obf-1036); its tables folded to their first rows
+/// (obf-1048).
 fn card_text(
     ui: &mut Ui,
-    (text, format, look): (&str, &str, &BoxLook),
+    (id, text, format, look): (&str, &str, &str, &BoxLook),
     language: Option<&str>,
     marks: &mut Spots,
 ) {
     if !text.is_empty() {
         let colour = ui.visuals().text_color();
         let shown = (0, text.len());
-        marks.extend(text_marks_view::note_label(
+        marks.extend(text_marks_view::room_label(
             ui,
             (text, format, look),
             language,
             shown,
             (Some(16.0), colour),
             false,
+            card_tables(id),
         ));
     }
 }
 
-/// The text `text` of a Note of a kind in `format` on its full card
-/// (#188): its name as the card's title, its description under it,
-/// small, folded to its first line with words unless `unfolded`; where
-/// its boxes, tags and links lie added to `marks`, and where the
-/// description shows.
+/// Whether `note`, without words, goes by a Photo Text of a photo it
+/// still shows (obf-1049), which its compact card shows nowhere else; the
+/// Texts of its recordings and of its removed photos show on it already.
+/// The phone's `_namedByPhoto`.
+fn named_by_photo(note: &Note) -> bool {
+    let words = |text: Option<&String>| text.is_some_and(|t| !t.trim().is_empty());
+    let heard = |hashes: &[String]| hashes.iter().any(|h| words(note.transcripts.get(h)));
+    note.visible_text().trim().is_empty()
+        && !heard(&note.recordings)
+        && !heard(&note.removed_recordings)
+        && note.photos.iter().any(|h| words(note.photo_texts.get(h)))
+}
+
+/// How the tables of the Note or Section `id` show on its card
+/// (obf-1048): folded to their first rows, under the id its card takes
+/// their clicks with.
+fn card_tables(id: &str) -> TableRoom {
+    TableRoom {
+        card: Some(Id::new(("card", id))),
+        wide: None,
+    }
+}
+
+/// How many places a search found a card's Note by show under its card
+/// (obf-1047, C7b); "+n more" stands for the others.
+const CARD_FINDINGS: usize = 3;
+
+/// The places the search found in a card's Note (obf-1047, C7b), drawn
+/// inside its card at its end, indented 16, as links in the accent
+/// (obf-1114): the first [`CARD_FINDINGS`], each its context line with
+/// the words found on their tint, a Transcript's, Photo Text's,
+/// Attachment Text's or file name's after what it is, then "+n more" for
+/// the others, a text button. They take no clicks yet: the card, which
+/// takes the clicks over it, has them take theirs after its own with
+/// [`finding_clicks`].
+fn card_findings(ui: &mut Ui, t: &L10n, found: &[Finding]) -> FoundRows {
+    let mut drawn = FoundRows::default();
+    if found.is_empty() {
+        return drawn;
+    }
+    ui.horizontal(|ui| {
+        ui.add_space(16.0);
+        ui.vertical(|ui| {
+            ui.spacing_mut().item_spacing.y = 4.0;
+            for finding in found.iter().take(CARD_FINDINGS) {
+                let job = finding_job(ui, t, finding);
+                let said = t.desk_finding_open(&job.text);
+                let shown = ui.add(egui::Label::new(job).truncate());
+                drawn.rows.push((shown.rect, said));
+            }
+            if found.len() > CARD_FINDINGS {
+                let words = t.desk_find_more((found.len() - CARD_FINDINGS) as i64);
+                let button = design::text_button_under(ui, icons::SEARCH, &words);
+                drawn.more = Some((button, words));
+            }
+        });
+    });
+    drawn
+}
+
+/// The places found drawn inside a card by [`card_findings`]: each row's
+/// rect with what a screen reader says for it, and "+n more" with its
+/// words.
+#[derive(Default)]
+struct FoundRows {
+    rows: Vec<(egui::Rect, String)>,
+    more: Option<(design::UnderClick, String)>,
+}
+
+/// Takes the clicks on the places found in the Note `id`, `drawn` inside
+/// its card, registered after the card's own: a click on one opens the
+/// Note at it, on "+n more" at the first not shown. A row is underlined
+/// under the pointer, as a link.
+fn finding_clicks(ui: &mut Ui, id: &str, found: &[Finding], drawn: &FoundRows) -> Option<Action> {
+    let mut asked = None;
+    let open =
+        |finding: &Finding| Action::OpenFinding(id.to_string(), Some(Box::new(finding.clone())));
+    for (at, ((rect, said), finding)) in drawn.rows.iter().zip(found).enumerate() {
+        let click = ui.interact(*rect, Id::new(("finding", id, at)), Sense::click());
+        click.widget_info(|| WidgetInfo::labeled(WidgetType::Link, true, said));
+        if click.hovered() {
+            let accent = ui.visuals().hyperlink_color;
+            ui.painter().hline(
+                rect.x_range(),
+                rect.bottom(),
+                egui::Stroke::new(1.0, accent),
+            );
+        }
+        if click
+            .on_hover_cursor(egui::CursorIcon::PointingHand)
+            .clicked()
+        {
+            asked = Some(open(finding));
+        }
+    }
+    if let (Some((button, words)), Some(next)) = (&drawn.more, found.get(CARD_FINDINGS)) {
+        let click = ui.interact(button.rect, Id::new(("findings more", id)), Sense::click());
+        click.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, words));
+        button.answer(ui, &click);
+        if click
+            .on_hover_cursor(egui::CursorIcon::PointingHand)
+            .clicked()
+        {
+            asked = Some(open(next));
+        }
+    }
+    asked
+}
+
+/// A place found in its card (obf-1047): what it lies in, but for a
+/// text, then its context line in the accent, the words found on their
+/// tint.
+fn finding_job(ui: &Ui, t: &L10n, finding: &Finding) -> egui::text::LayoutJob {
+    // A link's colour (obf-1114).
+    let text = ui.visuals().hyperlink_color;
+    let weak = ui.visuals().weak_text_color();
+    let font = FontId::proportional(theme::content(ui, 14.0));
+    let plain = egui::TextFormat::simple(font.clone(), text);
+    let mut job = egui::text::LayoutJob::default();
+    let what = match finding.part {
+        FindingPart::Text => None,
+        FindingPart::Transcript => Some(t.transcript_label()),
+        FindingPart::PhotoText => Some(t.photo_text_label()),
+        FindingPart::FileName => Some(t.attachment()),
+        FindingPart::AttachmentText => Some(t.attachment_text_label()),
+    };
+    if let Some(what) = what {
+        let small = FontId::proportional(theme::content(ui, 12.0));
+        job.append(
+            &format!("{what}: "),
+            0.0,
+            egui::TextFormat::simple(small, weak),
+        );
+    }
+    let context = &finding.context;
+    let (a, b) = (finding.context_start, finding.context_end);
+    job.append(context.get(..a).unwrap_or_default(), 0.0, plain.clone());
+    let found = find_marks::marked(&plain, ui.visuals().dark_mode, false);
+    job.append(context.get(a..b).unwrap_or_default(), 0.0, found);
+    job.append(context.get(b..).unwrap_or_default(), 0.0, plain);
+    job
+}
+
+/// Unfolds on a card each table of `note` or of its `sections` the
+/// search `found` a place in under its first rows (obf-1047), so that
+/// the place shows on the card.
+fn show_found_rows(ctx: &egui::Context, note: &Note, sections: &[Section], found: &[Finding]) {
+    for finding in found {
+        let Some(cell) = finding.cell.filter(|c| c.row > text_marks_view::CARD_ROWS) else {
+            continue;
+        };
+        let (of, text) = match &finding.section {
+            None => (note.id.as_str(), note.text.as_str()),
+            Some(id) => match sections.iter().find(|s| &s.id == id) {
+                Some(s) => (s.id.as_str(), s.text.as_str()),
+                None => continue,
+            },
+        };
+        let (_, cuts) = find_marks::shown_of(text);
+        let at = find_marks::source_at(&cuts, cell.table_start);
+        text_marks_view::show_all_rows(ctx, Id::new(("card", of)), at);
+    }
+}
+
+/// The text `text` of the Note `id` of a kind in `format` on its full
+/// card (#188): its name as the card's title, its description under it,
+/// small, folded to its first line with words unless `unfolded`, its
+/// tables to their first rows (obf-1048); where its boxes, tags and
+/// links lie added to `marks`, and where the description shows.
 fn card_kinded_text(
     ui: &mut Ui,
-    (text, format, look): (&str, &str, &BoxLook),
+    (id, text, format, look): (&str, &str, &str, &BoxLook),
     (unfolded, untitled): (bool, Option<String>),
     marks: &mut Spots,
 ) -> Option<egui::Rect> {
@@ -23506,7 +27258,9 @@ fn card_kinded_text(
     };
     let small = (Some(13.0), weak);
     let drawn = folded_row(ui, unfolded, |ui| {
-        text_marks_view::formatted_label(ui, (text, format, look), range, small, !unfolded)
+        let text = (text, format, look);
+        let tables = card_tables(id);
+        text_marks_view::room_label(ui, text, None, range, small, !unfolded, tables)
     });
     marks.extend(drawn.inner);
     Some(drawn.response.rect)
@@ -23589,6 +27343,8 @@ fn note_card(
     let mut session_asked = Vec::new();
     // Where the boxes of today's Occurrences lie (#215).
     let mut today_rects = Vec::new();
+    // The places a search found in it, inside it (obf-1114).
+    let mut found_rows = FoundRows::default();
     let CardMedia {
         photos,
         pictures,
@@ -23602,10 +27358,9 @@ fn note_card(
         let text = ui.visuals().text_color();
         let weak = ui.visuals().weak_text_color();
         let card = embossed(ui, tones, important, colour, |ui| {
-            if important {
-                // Room for the marker on the right.
-                ui.set_max_width(ui.available_width() - 36.0);
-            }
+            // Room for the Important marker right of the buttons
+            // (obf-1139); the card's width is set, so its row keeps it.
+            let marker = if important { 36.0 } else { 0.0 };
             // The card's buttons stand in a column of their own on the
             // right, its first row (#330): in front of them a place for
             // the check mark of a card selected along, kept while it is
@@ -23617,7 +27372,7 @@ fn note_card(
                 .count();
             let buttons = count as f32 * 24.0 + (count - 1) as f32 * gap;
             ui.horizontal_top(|ui| {
-                let width = (ui.available_width() - buttons - gap).max(0.0);
+                let width = (ui.available_width() - buttons - gap - marker).max(0.0);
                 ui.vertical(|ui| {
                     ui.set_width(width);
                     // Another person's Note shows their picture (ADR
@@ -23652,7 +27407,7 @@ fn note_card(
                                 {
                                     icons::show(ui, icon, 16.0, colour.unwrap_or(weak));
                                 }
-                                ui.label(RichText::new(place).size(13.0).color(text));
+                                ui.label(RichText::new(place).color(text));
                             }
                         });
                     }
@@ -23662,7 +27417,7 @@ fn note_card(
                         ui.horizontal(|ui| {
                             icons::show(ui, pack_view::PACK_ICON, 16.0, weak);
                             let said = t.pack_from(profile_view::display_name(t, &from.name));
-                            ui.label(RichText::new(said).size(13.0).color(weak));
+                            ui.label(RichText::new(said).small().color(weak));
                         });
                     }
                     // Under where it is filed, over its text (#215).
@@ -23681,7 +27436,8 @@ fn note_card(
                             if lines.is_some() || look.tally || look.session {
                                 // Its name as its title, its description folded
                                 // under it (#188), its Lines right under them.
-                                let text = (part.text, part.format, look.boxes.look(part.id));
+                                let text =
+                                    (part.id, part.text, part.format, look.boxes.look(part.id));
                                 let untitled = l10n::untitled_list(t, note);
                                 description_rect =
                                     card_kinded_text(ui, text, (unfolded, untitled), &mut marks);
@@ -23700,10 +27456,15 @@ fn note_card(
                                     boxes = checklist_view::card_lines(ui, tones, &open);
                                     if !struck.is_empty() {
                                         let said = t.shopping_struck_count(struck.len() as i64);
-                                        let row = folded_row(ui, struck_open, |ui| {
-                                            ui.label(RichText::new(&said).size(13.0).color(weak));
-                                        });
-                                        struck_rect = Some((row.response.rect, said));
+                                        // A text button with its chevron
+                                        // (obf-1110), its click the card's.
+                                        let chevron = if struck_open {
+                                            icons::EXPAND_LESS
+                                        } else {
+                                            icons::EXPAND_MORE
+                                        };
+                                        let drawn = design::text_button_under(ui, chevron, &said);
+                                        struck_rect = Some((drawn, said));
                                         if struck_open {
                                             boxes.extend(checklist_view::card_lines(
                                                 ui, tones, &struck,
@@ -23850,7 +27611,13 @@ fn note_card(
                         return;
                     }
                     card_glance_lines(ui, look.glance);
-                    // Without words it shows what it holds instead.
+                    // Without words it shows what it holds instead, named by
+                    // the first line of a photo's text when it has one
+                    // (obf-1049).
+                    if named_by_photo(note) {
+                        let name = RichText::new(note.shown_name()).size(16.0).color(text);
+                        ui.add(egui::Label::new(name).truncate());
+                    }
                     if !note.photos.is_empty() {
                         media_view::thumbnails(ui, t, photos, store, &note.photos, 64.0, 3);
                     }
@@ -23924,6 +27691,8 @@ fn note_card(
                     },
                 );
             });
+            // Under it all, across the card (obf-1114).
+            found_rows = card_findings(ui, t, look.found);
         });
         let rect = card.rect;
         if important {
@@ -23967,8 +27736,12 @@ fn note_card(
         }
         None => ui.interact(rect, Id::new(("card", &note.id)), sense),
     };
-    let label = note.visible_text();
+    let label = note.shown_name();
     resp.widget_info(|| WidgetInfo::selected(WidgetType::Button, true, chosen, &label));
+    // A card is no button to mark (obf-1143).
+    if resp.clicked() {
+        design::no_tap_mark(ui.ctx());
+    }
     // The author's picture and Edit lie over the card: registered after
     // it, so they take the click.
     let author = author_rect
@@ -24020,9 +27793,10 @@ fn note_card(
         }
     }
     // A click on the struck Lines' fold shows or hides them (#189).
-    if let Some((rect, said)) = &struck_rect {
-        let fold = ui.interact(*rect, struck_id.with("fold"), Sense::click());
+    if let Some((drawn, said)) = &struck_rect {
+        let fold = ui.interact(drawn.rect, struck_id.with("fold"), Sense::click());
         fold.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, said));
+        drawn.answer(ui, &fold);
         if fold
             .on_hover_cursor(egui::CursorIcon::PointingHand)
             .clicked()
@@ -24061,144 +27835,177 @@ fn note_card(
     let has_boxes = !note.boxes.is_empty() || look.sections.iter().any(|s| !s.boxes.is_empty());
     let mut entries = |ui: &mut Ui| {
         let text = ui.visuals().text_color();
-        if ui.button(RichText::new(t.edit()).color(text)).clicked() {
+        let entry =
+            |ui: &mut Ui, label: &str| ui.button(RichText::new(label).color(text)).clicked();
+        // Edit, then the Note dialog's groups (obf-1014): This Note ▸,
+        // Add ▸, Share ▸ and Tidy ▸, each only with something in it.
+        if entry(ui, t.edit()) {
             picked = Some(Action::SelectNote(note.id.clone()));
         }
         // Beside the list (#287), for this card alone.
-        if !note.is_trashed()
-            && ui
-                .button(RichText::new(t.note_window_open()).color(text))
-                .clicked()
-        {
+        if !note.is_trashed() && entry(ui, t.note_window_open()) {
             picked = Some(Action::OpenWindow(note.id.clone()));
         }
-        // With the cards selected along, as the list makes it (#148).
-        if look.changes
-            && ui
-                .button(RichText::new(t.file_into()).color(text))
-                .clicked()
-        {
-            picked = Some(Action::AskFileInto(vec![note.id.clone()]));
+        // These with the cards selected along (#148, #273).
+        let one = || vec![note.id.clone()];
+        let pack_from = placed.pack_from.as_ref().filter(|_| look.changes);
+        let hidden = spawns.and_then(|s| s.hidden);
+        let kinds = menu.is_some_and(|m| m.make || m.make_shopping || m.to_plain);
+        let on_agenda =
+            menu.is_some_and(|m| m.on_agenda.is_some() || m.shopping_on_agenda.is_some());
+        let this_note = look.changes
+            || look.may
+            || kinds
+            || on_agenda
+            || pack_from.is_some()
+            || has_boxes
+            || hidden.is_some();
+        if this_note {
+            ui.menu_button(
+                RichText::new(t.editor_group_this_note()).color(text),
+                |ui| {
+                    if look.changes && entry(ui, t.file_into()) {
+                        picked = Some(Action::AskFileInto(one()));
+                    }
+                    if look.may {
+                        ui.menu_button(RichText::new(t.importance()).color(text), |ui| {
+                            if let Some(importance) = importance_entries(ui, t, false) {
+                                picked = Some(Action::ImportanceOf(one(), importance));
+                            }
+                        });
+                    }
+                    // Its kind as the Kind badge changes it, then how a list
+                    // shows on the Agenda (#186, #219).
+                    if let Some(menu) = menu.filter(|_| kinds) {
+                        ui.menu_button(RichText::new(t.badge_kind()).color(text), |ui| {
+                            if let Some(asked) = checklist_view::card_make(ui, t, menu) {
+                                picked = Some(Action::Checklist(asked));
+                            }
+                            if let Some(asked) = shopping_view::card_menu_entry(ui, t, menu) {
+                                picked = Some(Action::Shopping(asked));
+                            }
+                            if let Some(asked) = checklist_view::card_to_plain(ui, t, menu) {
+                                picked = Some(Action::Checklist(asked));
+                            }
+                        });
+                    }
+                    if let Some(asked) = menu.and_then(|m| shopping_view::card_on_agenda(ui, t, m))
+                    {
+                        picked = Some(Action::Shopping(asked));
+                    }
+                    if let Some(asked) = menu.and_then(|m| checklist_view::card_on_agenda(ui, t, m))
+                    {
+                        picked = Some(Action::Checklist(asked));
+                    }
+                    // Who they came from (#165).
+                    if let Some(from) = pack_from {
+                        let name = profile_view::display_name(t, &from.name);
+                        let label = t.remove_pack_from(name);
+                        if ui.button(RichText::new(label).color(text)).clicked() {
+                            picked = Some(Action::RemovePackFrom(note.id.clone()));
+                        }
+                    }
+                    // Who ticked each box last and when (ADR 0035), where it
+                    // has any.
+                    if has_boxes {
+                        let mut on = look.boxes.show;
+                        let label = RichText::new(t.box_show_ticks()).color(text);
+                        if theme::checkbox(ui, &mut on, label).clicked() {
+                            picked = Some(Action::ShowTicks {
+                                note: note.id.clone(),
+                                on,
+                            });
+                        }
+                    }
+                    // Read as the menu opens, in no Shared Area or to take it
+                    // off (#267).
+                    if let Some(on) = hidden
+                        && let Some(asked) = hidden_switch(ui, t, &note.id, on)
+                    {
+                        picked = Some(asked);
+                    }
+                },
+            );
         }
-        // Its Routines after File into…, as the phone's compact ⋮ has
-        // them (#281); for this card alone.
-        if let Some(spawns) = spawns {
-            let id = || Some(note.id.clone());
-            let mut entries = Vec::new();
-            if spawns.schedules {
-                // One way in for a Routine or Reminder, starting as a
-                // Reminder (#344).
-                entries.push((
-                    t.remind_me(),
-                    Action::NewRoutine {
+        // Its Routines as the "+" badge sets them up (#281), for this card
+        // alone; files of any kind and a part as the dialog adds them
+        // (obf-1014).
+        let spawned = spawns.map(|s| (s.schedules, s.frog, s.session, s.amends));
+        let (schedules, frog, session, amends) = spawned.unwrap_or_default();
+        if schedules || look.may || amends {
+            ui.menu_button(RichText::new(t.add()).color(text), |ui| {
+                let id = || Some(note.id.clone());
+                if schedules {
+                    // One way in for a Routine or Reminder, starting as a
+                    // Reminder (#344).
+                    let reminder = Action::NewRoutine {
                         note: id(),
                         reminder: true,
-                    },
-                ));
-            }
-            if spawns.frog {
-                entries.push((t.frog(), Action::SpawnFrog(note.id.clone())));
-            }
-            if spawns.session {
-                entries.push((t.spawn_session(), Action::NewSession(id())));
-            }
-            for (label, action) in entries {
-                if ui.button(RichText::new(label).color(text)).clicked() {
-                    picked = Some(action);
+                    };
+                    if entry(ui, t.remind_me()) {
+                        picked = Some(reminder);
+                    }
                 }
-            }
-        }
-        // These too with the cards selected along (#273).
-        let one = || vec![note.id.clone()];
-        if look.may {
-            // On an Unsorted Note's card Merge into… is Add to Note…
-            // (#308): the same Merge, picked as a capture picks its Note.
-            let (label, merge) = if note.is_unsorted() {
-                (t.add_to_note(), Action::AskAddToNote(one()))
-            } else {
-                (t.merge_into(), Action::AskMergeNotes(one()))
-            };
-            if ui.button(RichText::new(label).color(text)).clicked() {
-                picked = Some(merge);
-            }
-            ui.menu_button(RichText::new(t.importance()).color(text), |ui| {
-                if let Some(importance) = importance_entries(ui, t, false) {
-                    picked = Some(Action::ImportanceOf(one(), importance));
+                if frog && entry(ui, t.frog()) {
+                    picked = Some(Action::SpawnFrog(note.id.clone()));
+                }
+                if session && entry(ui, t.spawn_session()) {
+                    picked = Some(Action::NewSession(id()));
+                }
+                if look.may && entry(ui, t.attach_file()) {
+                    picked = Some(Action::AttachFilesTo(note.id.clone()));
+                }
+                // Opens the Note dialog with the Amend box open.
+                if amends && entry(ui, t.add_a_part()) {
+                    picked = Some(Action::AddPartTo(note.id.clone()));
                 }
             });
         }
-        // A Shopping List's ways onto the Agenda before "Back to a plain
-        // Note", as on the phone (#186).
-        if let Some(asked) = menu.and_then(|m| shopping_view::card_on_agenda(ui, t, m)) {
-            picked = Some(Action::Shopping(asked));
-        }
-        if let Some(asked) = menu.and_then(|m| checklist_view::card_menu_entries(ui, t, m)) {
-            picked = Some(Action::Checklist(asked));
-        }
-        if let Some(asked) = menu.and_then(|m| shopping_view::card_menu_entry(ui, t, m)) {
-            picked = Some(Action::Shopping(asked));
-        }
-        // To a person as a Sent Item, or to another app (#129).
-        if ui
-            .button(RichText::new(t.send_to_person()).color(text))
-            .clicked()
-        {
-            picked = Some(Action::StartSend(note.id.clone()));
-        }
-        if ui
-            .button(RichText::new(t.copy_as_text()).color(text))
-            .clicked()
-        {
-            picked = Some(Action::CopyAsText(note.id.clone()));
-        }
-        if ui
-            .button(RichText::new(t.save_as_markdown()).color(text))
-            .clicked()
-        {
-            picked = Some(Action::SaveAsMarkdown(note.id.clone()));
-        }
-        // Copies for another person (#165), and who they came from.
-        if ui
-            .button(RichText::new(t.export_as_pack()).color(text))
-            .clicked()
-        {
-            picked = Some(Action::ExportPack(note.id.clone()));
-        }
-        if let Some(from) = placed.pack_from.as_ref().filter(|_| look.changes) {
-            let name = profile_view::display_name(t, &from.name);
-            if ui
-                .button(RichText::new(t.remove_pack_from(name)).color(text))
-                .clicked()
-            {
-                picked = Some(Action::RemovePackFrom(note.id.clone()));
+        // To a person as a Sent Item, or to another app (#129), and copies
+        // for another person (#165).
+        ui.menu_button(RichText::new(t.share()).color(text), |ui| {
+            if entry(ui, t.send_to_person()) {
+                picked = Some(Action::StartSend(note.id.clone()));
             }
-        }
-        // Who ticked each box last and when (ADR 0035), where it has any.
-        if has_boxes {
-            let mut on = look.boxes.show;
-            let label = RichText::new(t.box_show_ticks()).color(text);
-            if theme::checkbox(ui, &mut on, label).clicked() {
-                picked = Some(Action::ShowTicks {
-                    note: note.id.clone(),
-                    on,
-                });
+            if entry(ui, t.copy_text()) {
+                picked = Some(Action::CopyAsText(note.id.clone()));
             }
-        }
-        // Read as the menu opens, in no Shared Area or to take it off
-        // (#267).
-        if let Some(on) = spawns.and_then(|s| s.hidden)
-            && let Some(asked) = hidden_switch(ui, t, &note.id, on)
-        {
-            picked = Some(asked);
-        }
-        if look.may {
-            ui.separator();
-            if ui
-                .button(RichText::new(t.move_to_trash()).color(text))
-                .clicked()
-            {
-                picked = Some(Action::TrashNotes(one()));
+            let markdown = Action::SaveAsMarkdown(note.id.clone());
+            if entry(ui, t.save_as_markdown()) {
+                picked = Some(markdown);
             }
+            if entry(ui, t.export_as_pack()) {
+                picked = Some(Action::ExportPack(note.id.clone()));
+            }
+        });
+        let unchecks = menu.is_some_and(|m| m.uncheck_all);
+        if look.may || unchecks {
+            ui.menu_button(RichText::new(t.editor_group_tidy()).color(text), |ui| {
+                // On an Unsorted Note's card the Merge is picked as a
+                // capture picks its Note (#308).
+                if look.may {
+                    let merge = if note.is_unsorted() {
+                        Action::AskAddToNote(one())
+                    } else {
+                        Action::AskMergeNotes(one())
+                    };
+                    if entry(ui, t.merge_into()) {
+                        picked = Some(merge);
+                    }
+                }
+                if let Some(asked) = menu.and_then(|m| checklist_view::card_uncheck_all(ui, t, m)) {
+                    picked = Some(Action::Checklist(asked));
+                }
+                if look.may {
+                    let error = ui.visuals().error_fg_color;
+                    if ui
+                        .button(RichText::new(t.move_to_trash()).color(error))
+                        .clicked()
+                    {
+                        picked = Some(Action::TrashNotes(one()));
+                    }
+                }
+            });
         }
         // A pick closes the menu, also one made with the keyboard or a
         // screen reader, which no pointer click closes.
@@ -24262,25 +28069,30 @@ fn note_card(
     // table opens full screen, to edit where its marks may change (#128);
     // taken first, its marks, tags and links keep their clicks.
     let of = Id::new(("card", &note.id));
-    let mut table = text_marks_view::table_clicks(ui, t, of, &marks.tables).map(|at| Opening {
-        note: look.changes.then(|| note.id.clone()),
-        text: note.text.clone(),
-        at,
-        cell: None,
-        tags: true,
-        boxes: Some(note.id.clone()),
-    });
+    let mut table =
+        text_marks_view::table_clicks(ui, t, of, &marks.tables, false).and_then(|(at, act)| {
+            let opening = Opening {
+                note: look.changes.then(|| note.id.clone()),
+                text: note.text.clone(),
+                at,
+                cell: None,
+                tags: true,
+                boxes: Some(note.id.clone()),
+            };
+            table_action(act, opening, look.boxes.look(&note.id))
+        });
     for (section, spots) in &section_marks {
         let of = Id::new(("card", &section.id));
-        if let Some(at) = text_marks_view::table_clicks(ui, t, of, &spots.tables) {
-            table = Some(Opening {
+        if let Some((at, act)) = text_marks_view::table_clicks(ui, t, of, &spots.tables, false) {
+            let opening = Opening {
                 note: None,
                 text: section.text.clone(),
                 at,
                 cell: None,
                 tags: true,
                 boxes: Some(section.id.clone()),
-            });
+            };
+            table = table_action(act, opening, look.boxes.look(&section.id)).or(table);
         }
     }
     // A box of its text, or of a Section's, ticks where this Device may
@@ -24309,6 +28121,7 @@ fn note_card(
     for row in &linked_rows {
         app_links::linked_row_clicks(ui, &note.id, row);
     }
+    let found = finding_clicks(ui, &note.id, look.found, &found_rows);
     CardClicks {
         card: resp.on_hover_cursor(egui::CursorIcon::PointingHand),
         author,
@@ -24326,6 +28139,7 @@ fn note_card(
         picked,
         tally: tally_asked,
         session: session_asked,
+        found,
     }
 }
 

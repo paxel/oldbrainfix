@@ -137,6 +137,11 @@ class AgendaGroup extends StatelessWidget {
   /// The entries, and what goes with them, under the heading.
   final List<Widget> entries;
 
+  /// Set on the one group a notification tap asked for (obf-1039): it
+  /// shows marked, on the find bar's tint in a ring of its colour, and
+  /// the key finds it to scroll it into view.
+  final GlobalKey? marked;
+
   const AgendaGroup({
     super.key,
     required this.area,
@@ -150,6 +155,7 @@ class AgendaGroup extends StatelessWidget {
     this.onMenu,
     this.menuKey,
     this.entries = const [],
+    this.marked,
   });
 
   /// The icon that leads a heading without a box, in a box's room.
@@ -227,37 +233,89 @@ class AgendaGroup extends StatelessWidget {
         ),
       ),
     );
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: sizes.gap),
-      child: Embossed(
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          // The row's ink shows on the card, not under it.
-          child: Material(
-            type: MaterialType.transparency,
-            child: Container(
-              decoration: colour == null
-                  ? null
-                  : BoxDecoration(
-                      border: Border(left: BorderSide(color: colour, width: 6)),
-                    ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  GestureDetector(
-                    onLongPressStart: onMenu == null
+    final card = Embossed(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        // The row's ink shows on the card, not under it.
+        child: Material(
+          type: MaterialType.transparency,
+          child: Container(
+            decoration: colour == null && marked == null
+                ? null
+                : BoxDecoration(
+                    // Marked, on the find bar's tint (obf-1039).
+                    color: marked == null
                         ? null
-                        : (details) => onMenu(details.globalPosition),
-                    child: InkWell(onTap: onTap, child: heading),
+                        : Theme.of(context).colorScheme.tertiaryContainer,
+                    border: colour == null
+                        ? null
+                        : Border(left: BorderSide(color: colour, width: 6)),
                   ),
-                  ...entries,
-                  if (entries.isNotEmpty) SizedBox(height: sizes.inside),
-                ],
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                GestureDetector(
+                  onLongPressStart: onMenu == null
+                      ? null
+                      : (details) => onMenu(details.globalPosition),
+                  child: InkWell(onTap: onTap, child: heading),
+                ),
+                ...entries,
+                if (entries.isNotEmpty) SizedBox(height: sizes.inside),
+              ],
             ),
           ),
         ),
       ),
+    );
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: sizes.gap),
+      child: switch (marked) {
+        final key? => KeyedSubtree(
+          key: key,
+          child: AgendaMark(radius: 16, tinted: false, child: card),
+        ),
+        null => card,
+      },
+    );
+  }
+}
+
+/// The mark of what a notification tap asked for on the Agenda
+/// (obf-1039): the find bar's tint under [child], unless it is not
+/// [tinted] as a card that tints itself, and a ring of its colour
+/// around it, with [radius] its corners'.
+class AgendaMark extends StatelessWidget {
+  final double radius;
+  final bool tinted;
+  final Widget child;
+
+  const AgendaMark({
+    super.key,
+    required this.radius,
+    this.tinted = true,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      key: const ValueKey('agenda-marked'),
+      position: DecorationPosition.foreground,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(color: scheme.tertiary, width: 3),
+      ),
+      child: tinted
+          ? DecoratedBox(
+              decoration: BoxDecoration(
+                color: scheme.tertiaryContainer,
+                borderRadius: BorderRadius.circular(radius),
+              ),
+              child: child,
+            )
+          : child,
     );
   }
 }

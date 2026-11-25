@@ -146,6 +146,14 @@ void main() {
       )
       .first;
 
+  /// The line under the band, on the page on top (obf-1129).
+  final line = find
+      .descendant(
+        of: find.byType(SearchHeaderLine),
+        matching: find.byType(ColoredBox),
+      )
+      .last;
+
   /// The contrast of two colours, 1 for the same, as WCAG reckons it.
   double contrast(Color a, Color b) {
     final (light, dark) = a.computeLuminance() > b.computeLuminance()
@@ -166,6 +174,15 @@ void main() {
       )
       .color;
 
+  /// The one line under the band runs across the whole list from [top].
+  void lineAt(WidgetTester tester, double top) {
+    final drawn = tester.getRect(line);
+    expect(drawn.height, greaterThan(0));
+    expect(drawn.top, top);
+    expect(drawn.left, tester.getRect(list).left);
+    expect(drawn.right, tester.getRect(list).right);
+  }
+
   /// The bar sits on an opaque band of the top bar's colour, top bar and
   /// band one header set off from the page's ground, with one line along
   /// the band's bottom that reads against it, and no line between bar and
@@ -180,18 +197,22 @@ void main() {
     expect(colour, barColour(tester));
     expect(colour, isNot(ground));
     expect(colour?.a, 1.0);
-    final border = decoration.border;
-    expect(border, isA<Border>());
-    if (border is! Border || colour == null) return;
-    expect(border.top, BorderSide.none);
-    expect(border.left, BorderSide.none);
-    expect(border.right, BorderSide.none);
-    expect(border.bottom.width, greaterThan(0));
-    expect(contrast(border.bottom.color, colour), greaterThan(1.2));
-    // The band holds the whole bar, the line at its bottom.
+    // No line of its own: the one line is the line under it.
+    expect(decoration.border, isNull);
+    if (colour == null) return;
+    expect(
+      contrast(tester.widget<ColoredBox>(line).color, colour),
+      greaterThan(1.2),
+    );
+    // The band holds the whole bar, the line right under it across the
+    // whole width, and with the line 8 under what the band holds, as when
+    // the band drew it itself.
     final shown = tester.getRect(band);
     expect(shown.top, lessThan(tester.getRect(field).top));
     expect(shown.bottom, greaterThan(tester.getRect(field).bottom));
+    lineAt(tester, shown.bottom);
+    final held = find.descendant(of: band, matching: find.byType(Column)).first;
+    expect(tester.getRect(line).bottom - tester.getRect(held).bottom, 8);
   }
 
   void systemBrightness(WidgetTester tester, Brightness brightness) {
@@ -225,6 +246,21 @@ void main() {
         // Down again a little: it snaps away.
         await slowScroll(tester, -40);
         barGone(tester);
+      });
+
+      testWidgets('with the bar scrolled away its line stays under the '
+          'page\'s bar, and comes back down with it', (tester) async {
+        await openPage(tester);
+        onBand(tester);
+
+        await slowScroll(tester, -400);
+        barGone(tester);
+        lineAt(tester, listTop(tester));
+        expect(line.hitTestable(), findsNothing);
+
+        await slowScroll(tester, 40);
+        barShown(tester);
+        onBand(tester);
       });
 
       testWidgets('the bar stays while its field has the focus, which '

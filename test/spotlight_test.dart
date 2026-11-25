@@ -139,6 +139,21 @@ void main() {
       }
     });
 
+    test('Show tips is on by default, kept off under tipsOff, and Show '
+        'tips again switches it on', () {
+      final tips = TipsSwitch.of(store);
+      expect(tips.value, isTrue);
+      expect(TipsSwitch.of(store), same(tips));
+      tips.set(false);
+      expect(tips.value, isFalse);
+      expect(store.localSetting(tipsOffKey), 'true');
+      markSpotlightsSeen(store, 'agenda', ['agenda-plus']);
+      resetSpotlights(store);
+      expect(tips.value, isTrue);
+      expect(store.localSetting(tipsOffKey), isNull);
+      expect(_seen(store, 'agenda'), isEmpty);
+    });
+
     test('marks add to those there', () {
       markSpotlightsSeen(store, 'agenda', ['agenda-plus']);
       markSpotlightsSeen(store, 'agenda', ['agenda-today', 'agenda-plus']);
@@ -344,6 +359,88 @@ void main() {
       });
     });
 
+    testWidgets('with Show tips off no tip shows and none is marked; on '
+        'again, they show', (tester) async {
+      TipsSwitch.of(store).set(false);
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+      expect(tip, findsNothing);
+      expect(_seen(store, 'agenda'), isEmpty);
+
+      // A new thing neither.
+      unsorted.value = true;
+      await tester.pumpAndSettle();
+      expect(tip, findsNothing);
+      expect(_seen(store, 'agenda'), isEmpty);
+
+      TipsSwitch.of(store).set(true);
+      await tester.pumpWidget(host(held: true));
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+      expect(find.text(en.spotAgendaPlus), findsOneWidget);
+    });
+
+    testWidgets('No more tips switches Show tips off at once; the rest '
+        'stays due', (tester) async {
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+      expect(find.text(en.spotNoMoreTips), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('spotOff')));
+      await tester.pumpAndSettle();
+      expect(tip, findsNothing);
+      expect(TipsSwitch.of(store).value, isFalse);
+      expect(store.localSetting(tipsOffKey), 'true');
+      expect(_seen(store, 'agenda'), {'agenda-plus'});
+
+      // The page coming back on top shows none.
+      final navigator = tester.state<NavigatorState>(find.byType(Navigator));
+      unawaitedPush(navigator);
+      await tester.pumpAndSettle();
+      navigator.pop();
+      await tester.pumpAndSettle();
+      expect(tip, findsNothing);
+    });
+
+    testWidgets('a German card with its three buttons stays inside a '
+        'narrow screen with large text', (tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      for (final (target, scale, text) in [
+        (const Rect.fromLTWH(260, 580, 56, 56), 1.3, de.spotSettingsTipsSwitch),
+        (const Rect.fromLTWH(260, 4, 56, 48), 1.3, de.spotSettingsTipsSwitch),
+        // Tall, with little room below: the card sits at its lowest, and
+        // its buttons, a row each, fit the room it keeps.
+        (const Rect.fromLTWH(16, 40, 288, 420), 1.0, de.spotNext),
+      ]) {
+        await tester.pumpWidget(
+          MaterialApp(
+            locale: const Locale('de'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context)
+                  .copyWith(textScaler: TextScaler.linear(scale)),
+              child: child ?? const SizedBox.shrink(),
+            ),
+            home: SpotlightTip(
+              key: ValueKey(target),
+              target: target,
+              text: text,
+              isLast: true,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        final card = tester.getRect(find.byKey(const ValueKey('spotCard')));
+        expect(card.top, greaterThanOrEqualTo(0), reason: '$target');
+        expect(card.bottom, lessThanOrEqualTo(640), reason: '$target');
+        expect(find.text(de.spotNoMoreTips), findsOneWidget);
+      }
+    });
+
     testWidgets('a tap outside the card ends the tour', (tester) async {
       await tester.pumpWidget(host());
       await tester.pumpAndSettle();
@@ -470,6 +567,74 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text(en.spotAgendaPlus), findsOneWidget);
       expect(store.localSetting(spotlightsStartedKey), '1');
+    });
+
+    testWidgets('the Settings switch follows No more tips on a tip over '
+        'them, and switches the tips on again', (tester) async {
+      store.starterSetOffered = true;
+      seedSpotlights(store, firstStartDue: false);
+      markAllSpotlightsSeen(store);
+      store.removeLocalSetting(spotlightKey('settings'));
+      markSpotlightsSeen(store, 'settings', [
+        for (final item in spotlightManifest['settings']!)
+          if (item.id != 'settings-tips-switch') item.id,
+      ]);
+      await start(tester);
+      await openDeviceSettings(tester);
+      expect(find.text(en.spotSettingsTipsSwitch), findsOneWidget);
+      final on = find.byKey(const ValueKey('tipsOn'));
+      expect(tester.widget<Switch>(on).value, isTrue);
+
+      await tester.tap(find.byKey(const ValueKey('spotOff')));
+      await tester.pumpAndSettle();
+      expect(find.byType(SpotlightTip), findsNothing);
+      expect(tester.widget<Switch>(on).value, isFalse);
+      expect(store.localSetting(tipsOffKey), 'true');
+
+      await tester.tap(on);
+      await tester.pumpAndSettle();
+      expect(tester.widget<Switch>(on).value, isTrue);
+      expect(store.localSetting(tipsOffKey), isNull);
+    });
+
+    testWidgets('Show tips off is kept on this Device: a new start shows '
+        'no tip and the switch off', (tester) async {
+      store.setLocalSetting(tipsOffKey, 'true');
+      await start(tester);
+      await tester.tap(find.byKey(const ValueKey('first-new')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Start'));
+      await tester.pumpAndSettle();
+      expect(find.byType(SpotlightTip), findsNothing);
+      expect(_seen(store, 'agenda'), isEmpty);
+      await openDeviceSettings(tester);
+      expect(find.byType(SpotlightTip), findsNothing);
+      expect(
+        tester.widget<Switch>(find.byKey(const ValueKey('tipsOn'))).value,
+        isFalse,
+      );
+    });
+
+    testWidgets('Show tips again with Show tips off switches it on', (
+      tester,
+    ) async {
+      store.starterSetOffered = true;
+      seedSpotlights(store, firstStartDue: false);
+      markAllSpotlightsSeen(store);
+      TipsSwitch.of(store).set(false);
+      await start(tester);
+      await openDeviceSettings(tester);
+      final row = find.byKey(const ValueKey('showTips'));
+      await tester.ensureVisible(row);
+      await tester.pumpAndSettle();
+      await tester.tap(row);
+      await tester.pumpAndSettle();
+      expect(find.text(en.settingsShowTipsDone), findsOneWidget);
+      expect(
+        tester.widget<Switch>(find.byKey(const ValueKey('tipsOn'))).value,
+        isTrue,
+      );
+      expect(store.localSetting(tipsOffKey), isNull);
     });
 
     testWidgets('Show tips again brings them back on this Device, without '

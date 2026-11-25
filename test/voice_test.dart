@@ -8,12 +8,14 @@ import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/capture_screen.dart';
 import 'package:oldbrainfix/src/note_card.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
+import 'package:oldbrainfix/src/recording_pause.dart';
 import 'package:oldbrainfix/src/voice_platform.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'fake_voice.dart';
 import 'reveal.dart';
 import 'open_capture.dart';
+import 'open_settings.dart';
 
 /// Stand-ins for two recordings: the app keeps any bytes as they are.
 final first = Uint8List.fromList([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 1]);
@@ -464,6 +466,209 @@ void main() {
       expect(stop, findsOneWidget);
       await tap(tester, stop);
       expect(notes.all().single.recordings, hasLength(1));
+    });
+  });
+
+  group('a pause (obf-1053)', () {
+    /// The microphone hears [loudness] for [time].
+    Future<void> hear(
+      WidgetTester tester,
+      double? loudness,
+      Duration time,
+    ) async {
+      voice.loudness = loudness;
+      await tester.pump(time);
+    }
+
+    const speech = 0.3;
+    const quiet = 0.005;
+
+    testWidgets('is ignored by default: a recording goes on, its level not '
+        'even asked', (tester) async {
+      await start(tester);
+      await openVoice(tester);
+      await hear(tester, speech, const Duration(seconds: 1));
+      await hear(tester, quiet, const Duration(seconds: 30));
+
+      expect(store.localSetting(recordingPauseKey), isNull);
+      expect(voice.recording, isTrue);
+      expect(voice.levelAsks, 0);
+      await tap(tester, stop);
+    });
+
+    testWidgets('of the set length after speaking ends the quick note\'s '
+        'recording and keeps it, as Stop does; speaking again counts anew', (
+      tester,
+    ) async {
+      setRecordingPause(store, 2);
+      await start(tester);
+      await openVoice(tester);
+      await hear(tester, speech, const Duration(seconds: 1));
+      await hear(tester, quiet, const Duration(milliseconds: 1500));
+      expect(voice.recording, isTrue);
+      await hear(tester, speech, const Duration(milliseconds: 400));
+      await hear(tester, quiet, const Duration(milliseconds: 1600));
+      expect(voice.recording, isTrue);
+
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.pumpAndSettle();
+      expect(voice.recording, isFalse);
+      expect(voice.stops, 1);
+      // Back on the quick note with the recording and room to type.
+      expect(stop, findsNothing);
+      expect(find.byType(CaptureScreen), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(CaptureScreen),
+          matching: find.byType(RecordingButton),
+        ),
+        findsOneWidget,
+      );
+      await saveCapture(tester);
+      expect(notes.all().single.recordings, [store.putAudio(first)]);
+    });
+
+    testWidgets('before anything was said, or while the level is not known, '
+        'ends nothing', (tester) async {
+      setRecordingPause(store, 2);
+      await start(tester);
+      await openVoice(tester);
+      await hear(tester, quiet, const Duration(seconds: 20));
+      expect(voice.recording, isTrue);
+      await hear(tester, speech, const Duration(seconds: 1));
+      await hear(tester, null, const Duration(seconds: 20));
+      expect(voice.recording, isTrue);
+      expect(voice.levelAsks, greaterThan(0));
+      await tap(tester, stop);
+      expect(voice.stops, 1);
+    });
+
+    testWidgets('ends the editor\'s recording, which goes into its Note, and '
+        'closes its page', (tester) async {
+      setRecordingPause(store, 3);
+      final note = notes.capture('call the plumber');
+      await start(tester);
+      await edit(tester, note);
+      await tap(tester, editorVoice);
+      await hear(tester, speech, const Duration(seconds: 1));
+      await hear(tester, quiet, const Duration(milliseconds: 2600));
+      expect(voice.recording, isTrue);
+      await hear(tester, quiet, const Duration(milliseconds: 600));
+      await tester.pumpAndSettle();
+
+      expect(voice.recording, isFalse);
+      expect(stop, findsNothing);
+      expect(find.byType(NoteEditorScreen), findsOneWidget);
+      expect(notes.byId(note.id)!.recordings, [store.putAudio(first)]);
+    });
+
+    testWidgets('ends the recording the iPhone goes on with locked, kept as '
+        'Stop keeps it (#350)', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      try {
+        setRecordingPause(store, 2);
+        await start(tester);
+        await openVoice(tester);
+        for (final state in [
+          AppLifecycleState.inactive,
+          AppLifecycleState.hidden,
+          AppLifecycleState.paused,
+        ]) {
+          tester.binding.handleAppLifecycleStateChanged(state);
+        }
+        await hear(tester, speech, const Duration(seconds: 1));
+        expect(voice.recording, isTrue);
+        await hear(tester, quiet, const Duration(milliseconds: 2200));
+        expect(voice.recording, isFalse);
+        expect(voice.stops, 1);
+
+        for (final state in [
+          AppLifecycleState.hidden,
+          AppLifecycleState.inactive,
+          AppLifecycleState.resumed,
+        ]) {
+          tester.binding.handleAppLifecycleStateChanged(state);
+        }
+        await tester.pumpAndSettle();
+        expect(stop, findsNothing);
+        expect(find.byType(CaptureScreen), findsOneWidget);
+        await saveCapture(tester);
+        expect(notes.all().single.recordings, [store.putAudio(first)]);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
+
+    testWidgets('Stop within a pause keeps the recording once', (tester) async {
+      setRecordingPause(store, 2);
+      await start(tester);
+      await openVoice(tester);
+      await hear(tester, speech, const Duration(seconds: 1));
+      await hear(tester, quiet, const Duration(seconds: 1));
+      await tap(tester, stop);
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+
+      expect(voice.stops, 1);
+      await saveCapture(tester);
+      expect(notes.all().single.recordings, hasLength(1));
+    });
+
+    testWidgets('is chosen in Settings ▸ Capture, Off at first, and kept on '
+        'this Device', (tester) async {
+      await start(tester);
+      await openDeviceSettings(tester);
+      final choice = find.byKey(const ValueKey('recordingPause'));
+      await tester.scrollUntilVisible(
+        choice,
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('End a recording after a pause'), findsOneWidget);
+      ChoiceChip chip(String label) => tester.widget<ChoiceChip>(
+        find.ancestor(
+          of: find.descendant(of: choice, matching: find.text(label)),
+          matching: find.byType(ChoiceChip),
+        ),
+      );
+      expect(
+        [
+          for (final o in ['Off', '2 s', '3 s', '5 s', '10 s'])
+            chip(o).selected,
+        ],
+        [true, false, false, false, false],
+      );
+
+      await tap(
+        tester,
+        find.descendant(of: choice, matching: find.text('5 s')),
+      );
+      expect(store.localSetting(recordingPauseKey), '5');
+      expect(recordingPause(store), const Duration(seconds: 5));
+      expect(chip('5 s').selected, isTrue);
+
+      await tap(
+        tester,
+        find.descendant(of: choice, matching: find.text('Off')),
+      );
+      expect(store.localSetting(recordingPauseKey), isNull);
+      expect(recordingPause(store), isNull);
+    });
+
+    testWidgets('is not offered where there is no microphone', (tester) async {
+      await tester.pumpWidget(OldBrainFixApp(store: store));
+      await tester.pumpAndSettle();
+      await openDeviceSettings(tester);
+      expect(find.byKey(const ValueKey('recordingPause')), findsNothing);
+    });
+
+    test('anything unknown kept is Off', () {
+      store.setLocalSetting(recordingPauseKey, '4');
+      expect(recordingPause(store), isNull);
+      store.setLocalSetting(recordingPauseKey, 'soon');
+      expect(recordingPause(store), isNull);
+      expect(() => setRecordingPause(store, 4), throwsArgumentError);
     });
   });
 

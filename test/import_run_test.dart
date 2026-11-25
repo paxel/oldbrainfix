@@ -25,6 +25,7 @@ Future<ImportSummary> _namesItsIsolate(
   Store store,
   FolderPlatform folders,
   ImportProgress progress,
+  Stopping stop,
 ) async {
   Notes(store).capture(Isolate.current.debugName ?? '');
   return const ImportSummary(areaId: null, notes: 0, notText: 0, tooLarge: 0);
@@ -40,10 +41,15 @@ class _GatedRunner implements JobRunner {
   _GatedRunner(this.folders);
 
   @override
-  Future<T> run<T>(Store store, LongWork<T> work, JobProgress progress) async {
+  Future<T> run<T>(
+    Store store,
+    LongWork<T> work,
+    JobProgress progress,
+    JobStop stop,
+  ) async {
     told = progress;
     await gate.future;
-    return work(store, folders, progress);
+    return work(store, folders, progress, () => File(stop.path).existsSync());
   }
 }
 
@@ -70,7 +76,7 @@ void main() {
 
     test('runs off the app\'s isolate', () async {
       final runner = IsolateJobRunner(path: path, folders: FakeImportFolders());
-      await runner.run(app, _namesItsIsolate, (_, _) {});
+      await runner.run(app, _namesItsIsolate, (_, _) {}, JobStop());
       final where = Notes(app).all().single.text;
       expect(where, isNot(Isolate.current.debugName));
     });
@@ -85,11 +91,54 @@ void main() {
         app,
         folderImport('content://tree/Notes', 'From Notes'),
         (written, of) => told.add((written, of)),
+        JobStop(),
       );
       expect(summary.notes, 2);
       expect(told, [(0, 2), (1, 2), (2, 2)]);
       expect(heard, 1);
       expect(Notes(app).inside(summary.areaId!), hasLength(2));
+    });
+
+    test('finds the earlier Import of a folder there and fills it in, the '
+        'files listed by the look not listed again (obf-1078)', () async {
+      const tree = 'content://tree/Notes';
+      final folders = FakeImportFolders()
+        ..put('Dentist.txt', march, utf8.encode('Tuesday 9:00'));
+      final runner = IsolateJobRunner(path: path, folders: folders);
+      final first = await runner.run(
+        app,
+        folderImport(tree, 'From Notes'),
+        (_, _) {},
+        JobStop(),
+      );
+      folders.put('Plan.md', march, utf8.encode('Ship it'));
+      final looked = await runner.run(
+        app,
+        folderLook(tree),
+        (_, _) {},
+        JobStop(),
+      );
+      expect(looked.listed.map((f) => f.path), ['Dentist.txt', 'Plan.md']);
+      final earlier = looked.earlier!;
+      expect(earlier.areaId, first.areaId);
+      expect(earlier.held, 1);
+
+      folders.fails = true;
+      final summary = await runner.run(
+        app,
+        folderImport(
+          tree,
+          'From Notes',
+          listed: looked.listed,
+          fillIn: earlier.areaId,
+        ),
+        (_, _) {},
+        JobStop(),
+      );
+      expect(summary.areaId, earlier.areaId);
+      expect(summary.notes, 1);
+      expect(summary.already, 1);
+      expect(Notes(app).inside(earlier.areaId), hasLength(2));
     });
   });
 
@@ -139,14 +188,8 @@ void main() {
     testWidgets('counts its Notes on a page of its own, leaves the app '
         'usable meanwhile, and opens the new Area at the end', (tester) async {
       await pumpApp(tester);
-      await openDeviceSettings(tester);
-      final row = find.byKey(const ValueKey('importFolder'));
-      await tester.scrollUntilVisible(
-        row,
-        200,
-        scrollable: find.byType(Scrollable).last,
-      );
-      await tester.tap(row);
+      await openImports(tester);
+      await tester.tap(find.byKey(const ValueKey('importFolder')));
       await frames(tester);
       expect(find.byType(ImportScreen), findsOneWidget);
       expect(find.text('Reading the folder…'), findsOneWidget);
@@ -205,14 +248,8 @@ void main() {
       folders.fails = true;
       await pumpApp(tester);
       runner.gate.complete();
-      await openDeviceSettings(tester);
-      final row = find.byKey(const ValueKey('importFolder'));
-      await tester.scrollUntilVisible(
-        row,
-        200,
-        scrollable: find.byType(Scrollable).last,
-      );
-      await tester.tap(row);
+      await openImports(tester);
+      await tester.tap(find.byKey(const ValueKey('importFolder')));
       await tester.pumpAndSettle();
       expect(
         find.text(

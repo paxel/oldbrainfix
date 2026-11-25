@@ -64,7 +64,8 @@ void main() {
   }
 
   group('removing a photo or recording', () {
-    test('the file goes, its text stays and search finds it', () {
+    test('the file goes, its text becomes a paragraph of the Note\'s text '
+        'and search finds it', () {
       final m = withTexts(ann);
       expect(notes.mayRemovePhoto(m.note, m.photo), isTrue);
       expect(notes.mayRemoveRecording(m.note, m.recording), isTrue);
@@ -73,10 +74,17 @@ void main() {
       final note = notes.byId(m.note)!;
       expect(note.photos, isEmpty);
       expect(note.recordings, isEmpty);
-      expect(note.removedPhotos, [m.photo]);
-      expect(note.removedRecordings, [m.recording]);
-      expect(note.photoTexts, {m.photo: 'Dr. Weber, Mon 9-12'});
-      expect(note.transcripts, {m.recording: 'Bring the old X-ray'});
+      expect(
+        note.text,
+        'Dentist\n\nDr. Weber, Mon 9-12\n\nBring the old X-ray',
+      );
+      // No Photo Text or Transcript is left of them (obf-1084).
+      expect(note.removedPhotos, isEmpty);
+      expect(note.removedRecordings, isEmpty);
+      expect(note.photoTexts, isEmpty);
+      expect(note.transcripts, isEmpty);
+      expect(ann.current(m.note, NoteKeys.ocr(m.photo)), isNull);
+      expect(ann.current(m.note, NoteKeys.transcript(m.recording)), isNull);
       expect(notes.photoBytes(m.photo), isNull);
       expect(notes.recordingBytes(m.recording), isNull);
       expect(ann.missingBlobs(), isEmpty, reason: 'not wanted back');
@@ -115,6 +123,76 @@ void main() {
       expect(notes.photoBytes(p1), isNotNull);
     });
 
+    test('into an empty text the words go as the text', () {
+      final note = notes.capture('', recordings: [voice(1)]);
+      final r = note.recordings.single;
+      notes.setTranscript(note.id, r, 'Call the bank');
+      notes.removeRecording(note.id, r);
+      final read = notes.byId(note.id)!;
+      expect(read.text, 'Call the bank');
+      expect(read.shownName, 'Call the bank');
+      expect(read.transcripts, isEmpty);
+    });
+
+    test('into a formatted text the words go escaped, reading as '
+        'themselves', () {
+      final m = withTexts(ann);
+      notes.setFormat(m.note, TextFormats.markdown);
+      notes.setPhotoText(m.note, m.photo, '2*3 = _six_');
+      notes.removePhoto(m.note, m.photo);
+      final note = notes.byId(m.note)!;
+      expect(note.textFormat, TextFormats.markdown);
+      expect(note.visibleText, 'Dentist\n\n2*3 = _six_');
+    });
+
+    test('the words are edited and deleted as typed text, and nothing '
+        'of them is left', () {
+      final m = withTexts(ann);
+      notes.removeRecording(m.note, m.recording);
+      expect(found(ann, 'x-ray'), [m.note]);
+      notes.edit(m.note, 'Dentist\n\nBring the new X-ray');
+      expect(notes.byId(m.note)!.text, 'Dentist\n\nBring the new X-ray');
+      notes.edit(m.note, 'Dentist');
+      final note = notes.byId(m.note)!;
+      expect(note.text, 'Dentist');
+      expect(note.transcripts, isEmpty);
+      expect(note.removedRecordings, isEmpty);
+      expect(found(ann, 'x-ray'), isEmpty);
+    });
+
+    test('a text in a format not known here refuses the removal and '
+        'writes nothing', () {
+      final m = withTexts(ann);
+      ann.append(m.note, NoteKeys.text, '{"format":"x-future","text":"T"}');
+      expect(notes.mayRemovePhoto(m.note, m.photo), isFalse);
+      expect(notes.mayRemoveRecording(m.note, m.recording), isFalse);
+      final mark = ann.currentSeq();
+      expect(() => notes.removePhoto(m.note, m.photo), throwsStateError);
+      expect(
+        () => notes.removeRecording(m.note, m.recording),
+        throwsStateError,
+      );
+      expect(ann.entriesAfter(mark), isEmpty);
+      // Its texts may still go on their own; the files stay.
+      expect(notes.mayRemoveTranscript(m.note, m.recording), isTrue);
+    });
+
+    test('a recording or photo removed before keeps its text beside the '
+        'Note as it did', () {
+      final m = withTexts(ann);
+      // As versions before obf-1084 wrote a removal.
+      ann.append(m.note, NoteKeys.photo(m.photo), null);
+      ann.append(m.note, NoteKeys.audio(m.recording), null);
+      final note = notes.byId(m.note)!;
+      expect(note.text, 'Dentist');
+      expect(note.removedPhotos, [m.photo]);
+      expect(note.removedRecordings, [m.recording]);
+      expect(note.photoTexts, {m.photo: 'Dr. Weber, Mon 9-12'});
+      expect(note.transcripts, {m.recording: 'Bring the old X-ray'});
+      expect(found(ann, 'weber'), [m.note]);
+      expect(notes.mayRemovePhotoText(m.note, m.photo), isFalse);
+    });
+
     test('the bytes stay while another Note shows the same photo', () {
       final m = withTexts(ann);
       final other = notes.capture('Same card', photos: [photo(1)]);
@@ -133,8 +211,10 @@ void main() {
       notes.removePhoto(m.note, m.photo);
       final section = notes.sections(target.id).single;
       expect(section.photos, isEmpty);
-      expect(section.removedPhotos, [m.photo]);
-      expect(section.photoTexts[m.photo], 'Dr. Weber, Mon 9-12');
+      expect(section.text, 'Dentist\n\nDr. Weber, Mon 9-12');
+      expect(section.removedPhotos, isEmpty);
+      expect(section.photoTexts, isEmpty);
+      expect(notes.byId(target.id)!.text, 'Health');
       expect(notes.photoBytes(m.photo), isNull);
       expect(found(ann, 'weber'), [target.id]);
     });
@@ -149,19 +229,41 @@ void main() {
       expect(desk.photo(m.photo), isNotNull);
       expect(desk.audio(m.recording), isNotNull);
       notes.removePhoto(m.note, m.photo);
+      syncAll(desk, ann);
       Notes(desk).removeRecording(m.note, m.recording);
       syncAll(desk, ann);
       for (final store in [ann, desk]) {
         final note = Notes(store).byId(m.note)!;
         expect(note.photos, isEmpty);
         expect(note.recordings, isEmpty);
-        expect(note.photoTexts[m.photo], 'Dr. Weber, Mon 9-12');
-        expect(note.transcripts[m.recording], 'Bring the old X-ray');
+        expect(
+          note.text,
+          'Dentist\n\nDr. Weber, Mon 9-12\n\nBring the old X-ray',
+        );
+        expect(note.photoTexts, isEmpty);
+        expect(note.transcripts, isEmpty);
         expect(store.photo(m.photo), isNull);
         expect(store.audio(m.recording), isNull);
         expect(store.missingBlobs(), isEmpty);
         expect(found(store, 'weber'), [m.note]);
       }
+    });
+
+    test('removals on two Devices at once are a Conflict of the text that '
+        'keeps both', () {
+      final desk = Store.inMemory(clock: clock)
+        ..applyProfileDefaults(name: 'Ann');
+      addTearDown(desk.close);
+      final m = withTexts(ann);
+      syncAll(desk, ann);
+      notes.removePhoto(m.note, m.photo);
+      Notes(desk).removeRecording(m.note, m.recording);
+      syncAll(desk, ann);
+      final conflict = ann.conflictOn(m.note, NoteKeys.text);
+      expect(
+        {for (final v in conflict!.versions) v.text.text},
+        {'Dentist\n\nDr. Weber, Mon 9-12', 'Dentist\n\nBring the old X-ray'},
+      );
     });
 
     test('a removed photo leaves the shared folder', () async {
@@ -182,7 +284,7 @@ void main() {
       await folderSync(desk, folder);
       expect(desk.photo(m.photo), isNull);
       expect(desk.audio(m.recording), isNotNull);
-      expect(Notes(desk).byId(m.note)!.removedPhotos, [m.photo]);
+      expect(Notes(desk).byId(m.note)!.text, 'Dentist\n\nDr. Weber, Mon 9-12');
     });
   });
 
@@ -209,7 +311,8 @@ void main() {
       syncAll(ben, ann);
       final note = Notes(ben).byId(m.note)!;
       expect(note.photos, isEmpty);
-      expect(note.removedPhotos, [m.photo]);
+      expect(note.text, 'Dentist\n\nDr. Weber, Mon 9-12');
+      expect(note.photoTexts, isEmpty);
       expect(ben.photo(m.photo), isNull);
       expect(ben.missingBlobs(), isEmpty);
       expect(found(ben, 'weber'), [m.note]);
@@ -220,13 +323,18 @@ void main() {
       syncAll(ben, ann);
       expect(Notes(ben).mayRemovePhoto(own.note, own.photo), isTrue);
       Notes(ben).removePhoto(own.note, own.photo);
+      syncAll(ben, ann);
       expect(notes.mayRemoveRecording(own.note, own.recording), isTrue);
       notes.removeRecording(own.note, own.recording);
       syncAll(ben, ann);
       for (final store in [ann, ben]) {
         final note = Notes(store).byId(own.note)!;
-        expect(note.removedPhotos, [own.photo]);
-        expect(note.removedRecordings, [own.recording]);
+        expect(
+          note.text,
+          'Dentist\n\nDr. Weber, Mon 9-12\n\nBring the old X-ray',
+        );
+        expect(note.photoTexts, isEmpty);
+        expect(note.transcripts, isEmpty);
         expect(store.photo(own.photo), isNull);
         expect(store.audio(own.recording), isNull);
       }
@@ -237,13 +345,24 @@ void main() {
       final m = withTexts(ann, place: area);
       syncAll(ben, ann);
       expect(Notes(ben).mayRemovePhoto(m.note, m.photo), isFalse);
+      final mark = ben.currentSeq();
       expect(() => Notes(ben).removePhoto(m.note, m.photo), throwsStateError);
+      expect(
+        () => Notes(ben).removeRecording(m.note, m.recording),
+        throwsStateError,
+      );
+      expect(ben.entriesAfter(mark), isEmpty, reason: 'nothing written');
       // As a modified app would write it.
+      ben.append(m.note, NoteKeys.text, StoredText.plain('Gone').encode());
+      ben.append(m.note, NoteKeys.ocr(m.photo), null);
       ben.append(m.note, NoteKeys.photo(m.photo), null);
       ben.dropRemovedBlobs();
       syncAll(ben, ann);
       for (final store in [ann, ben]) {
-        expect(Notes(store).byId(m.note)!.photos, [m.photo]);
+        final note = Notes(store).byId(m.note)!;
+        expect(note.photos, [m.photo]);
+        expect(note.text, 'Dentist');
+        expect(note.photoTexts, {m.photo: 'Dr. Weber, Mon 9-12'});
         expect(store.photo(m.photo), isNotNull);
       }
     });

@@ -70,6 +70,12 @@ fn shows(harness: &Harness<'_, App>, label: &str) -> bool {
     harness.query_all_by_label(label).next().is_some()
 }
 
+/// How many entries say Move to trash: the Note dialog's Tidy has one,
+/// the Frog badge's menu another (obf-1014, C10).
+fn trash_entries(harness: &Harness<'_, App>, t: &L10n) -> usize {
+    harness.query_all_by_label(t.move_to_trash()).count()
+}
+
 /// The jobs whose Frog row shows.
 fn shown(harness: &Harness<'_, App>) -> Vec<&'static str> {
     JOBS.into_iter()
@@ -289,11 +295,12 @@ fn a_right_click_deletes_a_frog_without_asking_and_the_trash_restores_it() -> Te
         .click_secondary();
     harness.run();
     // Picked as a screen reader or the keyboard does, which no pointer
-    // click closes: the menu closes all the same.
-    harness.get_by_label(t.delete()).click_accesskit();
+    // click closes: the menu closes all the same. Named Move to trash, as
+    // a Note's (obf-1014, C10).
+    harness.get_by_label(t.move_to_trash()).click_accesskit();
     harness.run();
     assert!(!shows(harness, t.delete_frog_question()));
-    assert_eq!(harness.query_all_by_label(t.delete()).count(), 0);
+    assert_eq!(harness.query_all_by_label(t.move_to_trash()).count(), 0);
     let frogs = Frogs::new(&store);
     assert_eq!(frogs.open()?.len(), 2);
     assert!(!shown(harness).contains(&JOBS[0]));
@@ -400,7 +407,7 @@ fn the_frog_badge_shows_open_eats_it_and_shows_it_eaten_for_two_days() -> TestRe
 
     harness.get_by_label(&frog_badge(&t, t.frog_open())).click();
     harness.run();
-    assert!(shows(harness, t.frog_remove()));
+    assert_eq!(trash_entries(harness, &t), 2);
     click(harness, t.frog_eat_now())?;
     assert!(
         Frogs::new(&store)
@@ -413,7 +420,7 @@ fn the_frog_badge_shows_open_eats_it_and_shows_it_eaten_for_two_days() -> TestRe
     harness.get_by_label(&today).click();
     harness.run();
     assert!(!shows(harness, t.frog_eat_now()), "eaten already");
-    assert!(shows(harness, t.frog_remove()));
+    assert_eq!(trash_entries(harness, &t), 2);
     harness.key_press(Key::Escape);
     harness.run();
 
@@ -441,7 +448,7 @@ fn remove_the_frog_asks_nothing_and_ctrl_z_brings_it_back() -> TestResult {
     let open = frog_badge(&t, t.frog_open());
     harness.get_by_label(&open).click();
     harness.run();
-    click(harness, t.frog_remove())?;
+    click(harness, t.move_to_trash())?;
     assert!(!shows(harness, t.delete_frog_question()));
     assert!(
         Frogs::new(&store)
@@ -457,7 +464,7 @@ fn remove_the_frog_asks_nothing_and_ctrl_z_brings_it_back() -> TestResult {
     );
     harness.get_by_label(&open).click();
     harness.run();
-    click(harness, t.frog_remove())?;
+    click(harness, t.move_to_trash())?;
     assert!(
         Frogs::new(&store)
             .by_id(&frog.id)?
@@ -529,7 +536,7 @@ fn a_member_eats_a_frog_but_may_not_remove_it() -> TestResult {
     harness.run();
     harness.get_by_label(&frog_badge(&t, t.frog_open())).click();
     harness.run();
-    assert!(!shows(harness, t.frog_remove()));
+    assert_eq!(trash_entries(harness, &t), 0);
     click(harness, t.frog_eat_now())?;
     assert!(
         Frogs::new(&ben)

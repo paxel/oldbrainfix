@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/agenda_screen.dart';
+import 'package:oldbrainfix/src/announcements.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/areas_screen.dart';
 import 'package:oldbrainfix/src/browser.dart';
@@ -11,8 +12,10 @@ import 'package:oldbrainfix/src/capture_screen.dart';
 import 'package:oldbrainfix/src/note_card.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/starter_set_screen.dart';
+import 'package:oldbrainfix/src/sync_line.dart';
 import 'package:oldbrainfix/src/speech_model_screen.dart';
 import 'package:oldbrainfix/src/speech_offer_screen.dart';
+import 'package:oldbrainfix/src/running.dart';
 import 'package:oldbrainfix/src/speech_platform.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -564,6 +567,207 @@ void main() {
     });
   });
 
+  group('the model a Backup carries (obf-1098)', () {
+    const downloaded = (name: 'base', source: SpeechModelSource.download);
+    const fromFile = (name: 'base', source: SpeechModelSource.file);
+
+    testWidgets('a download is noted as downloaded, a picked file as taken '
+        'from a file', (tester) async {
+      await start(tester);
+      expect(store.speechModelChoice, isNull);
+      await openModel(tester);
+      await choose(tester, small);
+      speech.bring(WhisperModel.small.sha256);
+      await tester.pumpAndSettle();
+      expect(store.speechModelChoice, (
+        name: 'small',
+        source: SpeechModelSource.download,
+      ));
+
+      await choose(tester, pick);
+      speech.bring(WhisperModel.base.sha256);
+      await tester.pumpAndSettle();
+      expect(store.speechModelChoice, fromFile);
+    });
+
+    testWidgets('a fetch that is not kept leaves the choice as it was', (
+      tester,
+    ) async {
+      speech.installed = WhisperModel.base.sha256;
+      await start(tester);
+      expect(store.speechModelChoice, downloaded);
+      await openModel(tester);
+      await choose(tester, small);
+      speech.bring(null);
+      await tester.pumpAndSettle();
+      await choose(tester, pick);
+      speech.bring(wrongHash);
+      await tester.pumpAndSettle();
+      expect(store.speechModelChoice, downloaded);
+    });
+
+    testWidgets('a model in place from before is noted as downloaded; a '
+        'noted file stays one', (tester) async {
+      speech.installed = WhisperModel.base.sha256;
+      await start(tester);
+      expect(store.speechModelChoice, downloaded);
+
+      // The next start: the app anew.
+      store.speechModelChoice = fromFile;
+      await tester.pumpWidget(const SizedBox());
+      await start(tester, platform: FakeSpeech(installed: speech.installed));
+      expect(store.speechModelChoice, fromFile);
+    });
+
+    testWidgets('a model that is dropped or gone is noted as none', (
+      tester,
+    ) async {
+      store.speechModelChoice = downloaded;
+      speech.installed = wrongHash;
+      await start(tester);
+      expect(speech.removes, 1);
+      expect(store.speechModelChoice, isNull);
+    });
+
+    group('offered on a later start', () {
+      late Announcements announcements;
+      setUp(() => announcements = Announcements());
+      tearDown(() => announcements.dispose());
+
+      Future<void> later(WidgetTester tester, String offer) async {
+        store.setLocalSetting('speechModelOffer', offer);
+        await tester.pumpWidget(
+          OldBrainFixApp(
+            store: store,
+            voice: voice,
+            speech: speech,
+            announcements: announcements,
+          ),
+        );
+        await tester.pumpAndSettle();
+      }
+
+      testWidgets('at the top, once; the tap downloads that model', (
+        tester,
+      ) async {
+        await later(tester, 'small:download');
+        expect(
+          announcements.visible,
+          'The speech model from the Backup is not on this phone yet. '
+          'Download',
+        );
+        expect(store.speechModelOffer, isNull);
+        await tester.tap(find.text(announcements.visible!));
+        await tester.pump();
+        await tester.pump();
+        expect(speech.downloads, [WhisperModel.small.url]);
+      });
+
+      testWidgets('one taken from a file: the tap picks the file again', (
+        tester,
+      ) async {
+        await later(tester, 'base:file');
+        expect(
+          announcements.visible,
+          'The speech model from the Backup is not on this phone yet. '
+          'Pick its file',
+        );
+        await tester.tap(find.text(announcements.visible!));
+        await tester.pump();
+        await tester.pump();
+        expect(speech.picks, 1);
+        expect(speech.downloads, isEmpty);
+      });
+
+      testWidgets('not said, and dropped, where that model is in use', (
+        tester,
+      ) async {
+        speech.installed = WhisperModel.small.sha256;
+        await later(tester, 'small:download');
+        expect(announcements.visible, isNull);
+        expect(store.speechModelOffer, isNull);
+      });
+
+      testWidgets('not said, and dropped, where Whisper does not run', (
+        tester,
+      ) async {
+        speech.runs = false;
+        await later(tester, 'small:download');
+        expect(announcements.visible, isNull);
+        expect(store.speechModelOffer, isNull);
+      });
+    });
+  });
+
+  group('Abort on the page Running (obf-1078)', () {
+    Future<void> openRunningPage(WidgetTester tester) async {
+      await tester.tap(find.byKey(const ValueKey('bar-more')));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.tap(find.byKey(const ValueKey('running')));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+    }
+
+    testWidgets('lets the recording under way end; the others wait, one '
+        'waited for is still transcribed', (tester) async {
+      final one = notes.capture('', recordings: [first]);
+      final two = notes.capture('', recordings: [second]);
+      speech
+        ..installed = WhisperModel.base.sha256
+        ..transcripts[1] = 'buy more sauce'
+        ..transcripts[2] = 'call the vet'
+        ..transcribeGate = Completer<void>();
+      await start(tester);
+      await openRunningPage(tester);
+      expect(find.text('Transcribing recordings'), findsOneWidget);
+      expect(find.text('0 of 2'), findsOneWidget);
+      await tap(tester, find.byKey(const ValueKey('running-abort')));
+      expect(find.text('Stopping…'), findsOneWidget);
+
+      speech.transcribeGate?.complete();
+      await tester.pumpAndSettle();
+      expect(speech.transcribed, [first]);
+      expect(notes.byId(one.id)?.transcripts.values, ['buy more sauce']);
+      expect(
+        find.text('Stopped: the others wait until Go on or the next start.'),
+        findsOneWidget,
+      );
+
+      // A capture waiting for its Transcript still gets it.
+      final transcriber = SpeechScope.of(
+        tester.element(find.byType(RunningScreen)),
+      )?.transcriber;
+      final hash = notes.byId(two.id)?.recordings.single ?? '';
+      final waited = transcriber?.transcribed(two.id, hash);
+      await tester.pumpAndSettle();
+      expect(await waited, isTrue);
+      expect(speech.transcribed, [first, second]);
+    });
+
+    testWidgets('cancels the speech model\'s download', (tester) async {
+      await start(tester);
+      await openModel(tester);
+      await choose(tester, base);
+      for (var i = 0; i < 3; i++) {
+        await tester.binding.handlePopRoute();
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 1));
+      }
+      await openRunningPage(tester);
+      expect(find.text('Downloading the speech model'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('running-abort')));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      expect(speech.cancels, 1);
+      expect(
+        find.text('Stopped. The Settings offer the speech model again.'),
+        findsOneWidget,
+      );
+      expect(find.text('Nothing runs in the background.'), findsOneWidget);
+    });
+  });
+
   group('Transcripts', () {
     testWidgets('nothing is transcribed without the model', (tester) async {
       notes.capture('', recordings: [first]);
@@ -640,7 +844,8 @@ void main() {
         ..transcribeGate = Completer<void>();
       await start(tester);
       await openCaptureBy(tester, 'voice');
-      await tap(tester, find.byKey(const ValueKey('stopRecording')));
+      // The quick note's line moves while it transcribes (obf-1082).
+      await press(tester, find.byKey(const ValueKey('stopRecording')));
       await saveCapture(tester);
 
       // Saved and back on the Agenda while Whisper still works.
@@ -659,6 +864,170 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Transcribing…'), findsNothing);
+    });
+
+    group('on the quick note (obf-1082)', () {
+      final stop = find.byKey(const ValueKey('stopRecording'));
+      final transcribing = find.byWidgetPredicate(
+        (w) => '${w.key}'.contains('capture-transcribing-'),
+      );
+      final fold = find.byWidgetPredicate(
+        (w) => '${w.key}'.contains('capture-transcript-'),
+      );
+      String typed(WidgetTester tester) =>
+          tester.widget<TextField>(find.byType(TextField)).controller!.text;
+
+      testWidgets('says it transcribes, then fills the empty text with the '
+          'Transcript, which stays folded under the recording', (tester) async {
+        speech
+          ..installed = WhisperModel.base.sha256
+          ..transcripts[1] = 'call the garage'
+          ..transcribeGate = Completer<void>();
+        await start(tester);
+        await openCaptureBy(tester, 'voice');
+        await press(tester, stop);
+
+        expect(
+          find.descendant(
+            of: transcribing,
+            matching: find.text('Transcribing…'),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: transcribing, matching: find.byType(SweepLine)),
+          findsOneWidget,
+        );
+        expect(typed(tester), '');
+
+        speech.transcribeGate?.complete();
+        await tester.pumpAndSettle();
+        expect(transcribing, findsNothing);
+        expect(typed(tester), 'call the garage');
+        expect(
+          find.descendant(of: fold, matching: find.text('Transcript')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: fold, matching: find.text('call the garage')),
+          findsNothing,
+        );
+        await tap(tester, find.text('Transcript'));
+        expect(
+          find.descendant(of: fold, matching: find.text('call the garage')),
+          findsOneWidget,
+        );
+
+        await saveCapture(tester);
+        final note = notes.all().single;
+        expect(note.text, 'call the garage');
+        expect(note.transcripts, {store.putAudio(first): 'call the garage'});
+      });
+
+      testWidgets('waits for a pause in typing, then adds the Transcript as '
+          'a new paragraph; Open in the editor saves both', (tester) async {
+        speech
+          ..installed = WhisperModel.base.sha256
+          ..transcripts[1] = 'call the garage'
+          ..transcribeGate = Completer<void>();
+        await start(tester);
+        await openCaptureBy(tester, 'voice');
+        await press(tester, stop);
+        await tester.enterText(find.byType(TextField), 'plumber');
+        speech.transcribeGate?.complete();
+        await tester.pump();
+        await tester.pump();
+
+        // Still typing: it waits.
+        expect(transcribing, findsNothing);
+        expect(typed(tester), 'plumber');
+        await tester.pump(const Duration(milliseconds: 500));
+        expect(typed(tester), 'plumber');
+        await tester.enterText(find.byType(TextField), 'plumber Monday');
+        await tester.pump(const Duration(milliseconds: 900));
+        expect(typed(tester), 'plumber Monday');
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(typed(tester), 'plumber Monday\n\ncall the garage');
+        // The cursor stays where the typing ended.
+        expect(
+          tester
+              .widget<TextField>(find.byType(TextField))
+              .controller!
+              .selection,
+          const TextSelection.collapsed(offset: 14),
+        );
+
+        await tap(tester, find.byKey(const ValueKey('captureToEditor')));
+        expect(find.byType(NoteEditorScreen), findsOneWidget);
+        final note = notes.all().single;
+        expect(note.text, 'plumber Monday\n\ncall the garage');
+        expect(note.transcripts, {store.putAudio(first): 'call the garage'});
+      });
+
+      testWidgets('a Transcript waiting for a pause in typing is saved with '
+          'the text by a Nudge button', (tester) async {
+        speech
+          ..installed = WhisperModel.base.sha256
+          ..transcripts[1] = 'call the garage'
+          ..transcribeGate = Completer<void>();
+        await start(tester);
+        await openCaptureBy(tester, 'voice');
+        await press(tester, stop);
+        // Ending in a space, as a phone keyboard leaves it.
+        await tester.enterText(find.byType(TextField), 'plumber ');
+        speech.transcribeGate?.complete();
+        await tester.pump();
+        expect(typed(tester), 'plumber ');
+        await tap(tester, find.byKey(const ValueKey('nudge10')));
+
+        expect(find.byType(CaptureScreen), findsNothing);
+        expect(notes.all().single.text, 'plumber \n\ncall the garage');
+      });
+
+      testWidgets('left before it is transcribed, the saved Note keeps the '
+          'text typed and gets the Transcript as the recording\'s', (
+        tester,
+      ) async {
+        speech
+          ..installed = WhisperModel.base.sha256
+          ..transcripts[1] = 'call the garage'
+          ..transcribeGate = Completer<void>();
+        await start(tester);
+        await openCaptureBy(tester, 'voice');
+        await press(tester, stop);
+        await tester.enterText(find.byType(TextField), 'plumber');
+        await saveCapture(tester);
+        expect(find.byType(CaptureScreen), findsNothing);
+        expect(notes.all().single.text, 'plumber');
+
+        speech.transcribeGate?.complete();
+        await tester.pumpAndSettle();
+        final note = notes.all().single;
+        expect(note.text, 'plumber');
+        expect(note.transcripts, {store.putAudio(first): 'call the garage'});
+      });
+
+      testWidgets('a recording that cannot be transcribed stops saying so and '
+          'adds nothing', (tester) async {
+        speech.installed = WhisperModel.base.sha256;
+        await start(tester);
+        await openCaptureBy(tester, 'voice');
+        await tap(tester, stop);
+        expect(transcribing, findsNothing);
+        expect(fold, findsNothing);
+        expect(find.byType(SweepLine), findsNothing);
+        expect(typed(tester), '');
+      });
+
+      testWidgets('without a speech model nothing says it transcribes', (
+        tester,
+      ) async {
+        await start(tester);
+        await openCaptureBy(tester, 'voice');
+        await tap(tester, stop);
+        expect(transcribing, findsNothing);
+        expect(find.byType(SweepLine), findsNothing);
+      });
     });
 
     testWidgets('a recording that cannot be transcribed is not tried again '
@@ -800,9 +1169,10 @@ void main() {
 
       final card = find.byType(NoteCard);
       expect(card, findsOneWidget);
+      // Its Transcript, and among the places found under it (obf-1047).
       expect(
         find.descendant(of: card, matching: find.text('buy more sauce')),
-        findsOneWidget,
+        findsNWidgets(2),
       );
     });
   });

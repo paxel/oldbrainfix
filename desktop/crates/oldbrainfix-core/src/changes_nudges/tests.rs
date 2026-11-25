@@ -213,6 +213,28 @@ fn sending_the_bundle_ends_it_and_it_keeps_everything_until_the_person_sends_bac
 }
 
 #[test]
+fn an_ai_task_waiting_holds_back_neither_the_nudge_nor_the_bundle_and_its_drafts_wait_for_none()
+-> TestResult {
+    let (mut a, ben, _) = world()?;
+    let area = a.shared("Household", &ben, Transport::Bundle)?;
+    let task = a.ann.open_ai_task()?;
+    a.ann.drafting(&task, || {
+        Notes::new(&a.ann).capture("Oat milk", Some(&area), None)
+    })?;
+    assert!(
+        a.ann.waiting_for_changes()?.is_empty(),
+        "a draft waits for none"
+    );
+    assert!(a.nudge()?.is_none());
+
+    capture(&a.ann, "Buy milk", &area)?;
+    assert_eq!(a.nudge()?.ok_or("a Changes Nudge")?.at, at(9, 30));
+    a.send(&ben)?;
+    assert!(a.nudge()?.is_none());
+    Ok(())
+}
+
+#[test]
 fn a_share_sheet_left_without_an_app_leaves_it_waiting() -> TestResult {
     let (mut a, ben, _) = world()?;
     let area = a.shared("Household", &ben, Transport::Bundle)?;

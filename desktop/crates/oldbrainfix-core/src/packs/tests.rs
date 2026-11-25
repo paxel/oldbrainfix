@@ -737,6 +737,40 @@ fn add_my_profile_signs_the_pack_and_a_changed_one_is_no_pack() -> TestResult {
     Ok(())
 }
 
+/// obf-1142: the card a Pack carries holds the picture, longer than a
+/// link's; the Pack opens for its maker and its receiver.
+#[test]
+fn add_my_profile_with_a_picture_opens_for_its_maker_and_its_receiver() -> TestResult {
+    let ann = device(1, "Ann")?;
+    let ben = device(2, "Ben")?;
+    let image = image::RgbImage::from_fn(600, 600, |x, y| {
+        image::Rgb([
+            ((x * 7 + y * 13) % 256) as u8,
+            ((x * y) % 256) as u8,
+            ((x ^ y) % 256) as u8,
+        ])
+    });
+    let mut png = std::io::Cursor::new(Vec::new());
+    image::DynamicImage::ImageRgb8(image).write_to(&mut png, image::ImageFormat::Png)?;
+    let picture = crate::profile::square_picture(png.get_ref()).ok_or("a picture")?;
+    OwnProfile::new(&ann).set_picture(Some(picture))?;
+    let card = ann.profile_card_text()?.ok_or("a card")?;
+    assert!(card.len() > crate::cards::MAX_CHARS);
+    let h = health(&ann)?;
+    let pack = ann.pack_of(&h.plain, &HashSet::new())?;
+    let signed = ann.write_pack(&pack, &pack.all_keys(), true)?;
+    assert_eq!(opened(&ann, &signed)?.from, None);
+    let from = opened(&ben, &signed)?.from.ok_or("who it is from")?;
+    assert_eq!(from.name, "Ann");
+    assert!(from.picture.is_some());
+    let changed = String::from_utf8(signed)?.replacen("Drink water", "Drink wine", 1);
+    assert_eq!(
+        refused(&ben, changed.as_bytes())?,
+        Some(PackError::NotAPack)
+    );
+    Ok(())
+}
+
 #[test]
 fn a_blocked_senders_pack_is_refused_and_a_later_format_needs_an_update() -> TestResult {
     let ann = device(1, "Ann")?;

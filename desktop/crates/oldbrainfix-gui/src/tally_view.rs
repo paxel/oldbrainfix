@@ -19,7 +19,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use chrono::{DateTime, Duration, Utc};
-use egui::{Id, RichText, Sense, TextEdit, Ui, WidgetInfo, WidgetType};
+use egui::{Id, RichText, Sense, Ui, WidgetInfo, WidgetType};
 use oldbrainfix_core::tally_units::{self, KnownUnit};
 use oldbrainfix_core::{
     Day, Error, Occurrence, PersonFilter, Profile, Sessions, Store, Tallies, Tally, TallyBucket,
@@ -28,6 +28,7 @@ use oldbrainfix_core::{
 
 use crate::app::{chip_row, embossed, icon_button, when};
 use crate::capture_choices::TallyFieldChoice;
+use crate::design;
 use crate::icons;
 use crate::l10n::L10n;
 use crate::leave_saves::Leaving;
@@ -362,7 +363,8 @@ fn values_lines(t: &L10n, tally: &Tally, entry: &TallyEntry, system: UnitSystem)
     lines
 }
 
-/// The setup of a Tally in the Note dialog (#190): the Tally's own
+/// The setup of a Tally in the Note dialog (#190), in the card of its
+/// name (obf-1071): the Tally's own
 /// settings as badges (#264), the length of a bar and whether it counts
 /// in sets; then a row per field, its name and its settings as badges as
 /// on the New Tally page (#161), how several sets or entries in a bar
@@ -379,12 +381,12 @@ pub fn setup(
     shown: &TallyShown,
     actions: &mut Vec<TallyAction>,
 ) {
-    let text = ui.visuals().text_color();
     let tally = &shown.tally;
     let system = shown.system;
     let decimal = decimal_sign(t);
-    embossed(ui, tones, false, None, |ui| {
-        ui.label(RichText::new(t.tally_fields()).strong().color(text));
+    // In the card of its name, which heads it (obf-1071).
+    ui.scope(|ui| {
+        ui.label(RichText::new(t.tally_fields()).strong());
         badge_row(ui, |ui| {
             let bar = Text(period_label(t, tally.bar));
             let look = (t, tones);
@@ -421,7 +423,7 @@ pub fn setup(
         ui.add_space(8.0);
         for field in &tally.fields {
             let changes = shown.changeable.contains(&field.id);
-            let name = RichText::new(&field.name).strong().color(text);
+            let name = RichText::new(&field.name).strong();
             if !changes {
                 ui.label(name);
             } else if ui.add(egui::Button::new(name).frame(false)).clicked() {
@@ -474,14 +476,8 @@ pub fn setup(
             });
             ui.add_space(8.0);
         }
-        if shown.defines {
-            let add = ui.horizontal(|ui| {
-                icons::show(ui, icons::ADD, 20.0, text);
-                ui.button(RichText::new(t.tally_add_field()).color(text))
-            });
-            if add.inner.clicked() {
-                actions.push(TallyAction::OpenField(None));
-            }
+        if shown.defines && design::text_button(ui, icons::ADD, t.tally_add_field()).clicked() {
+            actions.push(TallyAction::OpenField(None));
         }
     });
 }
@@ -501,18 +497,12 @@ pub fn card(ui: &mut Ui, t: &L10n, shown: &TallyShown, actions: &mut Vec<TallyAc
     let system = shown.system;
     let heading = |ui: &mut Ui, words: &str| {
         ui.add_space(4.0);
-        ui.label(RichText::new(words).strong().color(text));
+        ui.label(RichText::new(words).strong());
     };
     ui.vertical(|ui| {
         ui.spacing_mut().item_spacing.y = 6.0;
-        if shown.adds {
-            let add = ui.horizontal(|ui| {
-                icons::show(ui, icons::ADD, 20.0, text);
-                ui.button(RichText::new(t.add_tally_entry()).color(text))
-            });
-            if add.inner.clicked() {
-                actions.push(TallyAction::AddEntry);
-            }
+        if shown.adds && design::text_button(ui, icons::ADD, t.add_tally_entry()).clicked() {
+            actions.push(TallyAction::AddEntry);
         }
         if shown.shared {
             heading(ui, t.tally_show_entries());
@@ -650,7 +640,9 @@ fn entry_row(
         )
         .on_hover_cursor(egui::CursorIcon::PointingHand);
     open.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, &label));
+    // A row, no button to mark (obf-1143).
     if open.clicked() {
+        crate::design::no_tap_mark(ui.ctx());
         actions.push(TallyAction::EditEntry(entry.id.clone()));
     }
     open.context_menu(|ui| {
@@ -826,14 +818,13 @@ impl TallyForm {
 /// The heading of a page and its bar: Save, Cancel and, with `delete`,
 /// Delete, last.
 fn page_bar(ui: &mut Ui, t: &L10n, heading: &str, delete: bool) -> Option<FormIntent> {
-    let text = ui.visuals().text_color();
     let mut intent = None;
-    ui.label(RichText::new(heading).size(18.0).strong().color(text));
+    crate::design::dialog_title(ui, heading);
     ui.horizontal_wrapped(|ui| {
         if theme::main_action(ui, true, t.save()) {
             intent = Some(FormIntent::Save);
         }
-        if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+        if design::row_button(ui, t.cancel()).clicked() {
             intent = Some(FormIntent::Close);
         }
         if delete && theme::destructive(ui, true, t.delete()).clicked() {
@@ -1121,10 +1112,10 @@ impl FieldForm {
                 ui.add_space(4.0);
                 intent = page_bar(ui, t, heading, false);
                 embossed(ui, tones, false, None, |ui| {
-                    let label = ui.label(RichText::new(t.tally_field_name()).strong().color(text));
+                    let label = ui.label(RichText::new(t.tally_field_name()).strong());
                     let field = ui
                         .add(
-                            TextEdit::singleline(&mut self.name)
+                            crate::theme::field(ui, &mut self.name)
                                 .id(Id::new(NAME_FIELD))
                                 .hint_text(t.tally_field_name_hint())
                                 .text_color(text)
@@ -1142,7 +1133,7 @@ impl FieldForm {
                 let new = self.field.is_none();
                 if new || self.check {
                     embossed(ui, tones, false, None, |ui| {
-                        ui.label(RichText::new(t.tally_field_kind()).strong().color(text));
+                        ui.label(RichText::new(t.tally_field_kind()).strong());
                         if new {
                             let options = [
                                 (false, t.tally_field_kind_number().to_string()),
@@ -1161,13 +1152,13 @@ impl FieldForm {
                 if !self.check {
                     embossed(ui, tones, false, None, |ui| {
                         ui.spacing_mut().item_spacing.y = 6.0;
-                        let label = ui.label(RichText::new(t.tally_unit()).strong().color(text));
+                        let label = ui.label(RichText::new(t.tally_unit()).strong());
                         if fixed.is_some() {
                             ui.label(RichText::new(t.tally_unit_fixed()).small().color(weak));
                         }
                         let field = ui
                             .add(
-                                TextEdit::singleline(&mut self.unit_text)
+                                crate::theme::field(ui, &mut self.unit_text)
                                     .id(Id::new(UNIT_FIELD))
                                     .hint_text(t.tally_unit_hint())
                                     .text_color(text)
@@ -1216,7 +1207,7 @@ impl FieldForm {
                 }
                 if !self.counts_sets {
                     embossed(ui, tones, false, None, |ui| {
-                        let label = ui.label(RichText::new(t.tally_target()).strong().color(text));
+                        let label = ui.label(RichText::new(t.tally_target()).strong());
                         ui.horizontal(|ui| {
                             let unit = if self.check {
                                 String::new()
@@ -1225,7 +1216,7 @@ impl FieldForm {
                             };
                             let field = ui
                                 .add(
-                                    TextEdit::singleline(&mut self.target)
+                                    crate::theme::field(ui, &mut self.target)
                                         .id(Id::new(TARGET_FIELD))
                                         .text_color(text)
                                         .desired_width(120.0),
@@ -1245,7 +1236,7 @@ impl FieldForm {
                 }
                 if !self.counts_sets && !self.check {
                     embossed(ui, tones, false, None, |ui| {
-                        ui.label(RichText::new(t.tally_rule()).strong().color(text));
+                        ui.label(RichText::new(t.tally_rule()).strong());
                         let options = [
                             (TallyRule::Sum, t.tally_rule_sum().to_string()),
                             (TallyRule::Max, t.tally_rule_max().to_string()),
@@ -1667,7 +1658,7 @@ impl EntryForm {
                     if in_sets {
                         ui.horizontal(|ui| {
                             let words = t.tally_set(i as i64 + 1);
-                            ui.label(RichText::new(words).strong().color(text));
+                            ui.label(RichText::new(words).strong());
                             if i > 0 {
                                 let remove = t.tally_remove_set(i as i64 + 1);
                                 if icon_button(ui, icons::REMOVE, &remove, text).clicked() {
@@ -1679,7 +1670,7 @@ impl EntryForm {
                     for (field, typed) in self.fields.iter().zip(set.iter_mut()) {
                         let key = value_key(i, &field.id);
                         embossed(ui, tones, false, None, |ui| {
-                            let label = ui.label(RichText::new(&field.name).strong().color(text));
+                            let label = ui.label(RichText::new(&field.name).strong());
                             ui.horizontal(|ui| {
                                 let id = if i == 0 {
                                     Id::new(("tally value", &field.id))
@@ -1688,7 +1679,7 @@ impl EntryForm {
                                 };
                                 let edit = ui
                                     .add(
-                                        TextEdit::singleline(typed)
+                                        crate::theme::field(ui, typed)
                                             .id(id)
                                             .text_color(text)
                                             .desired_width(120.0),
@@ -1732,27 +1723,23 @@ impl EntryForm {
                 if let Some(i) = removed {
                     self.sets.remove(i);
                 }
-                if self.counts_in_sets && !self.fields.is_empty() {
-                    let add = ui.horizontal(|ui| {
-                        icons::show(ui, icons::ADD, 20.0, text);
-                        ui.button(RichText::new(t.tally_add_set()).color(text))
-                    });
-                    if add.inner.clicked() {
-                        self.add_set();
-                    }
+                if self.counts_in_sets
+                    && !self.fields.is_empty()
+                    && design::text_button(ui, icons::ADD, t.tally_add_set()).clicked()
+                {
+                    self.add_set();
                 }
                 if self.pick.is_none() {
                     embossed(ui, tones, false, None, |ui| {
-                        let label =
-                            ui.label(RichText::new(t.tally_entry_date()).strong().color(text));
+                        let label = ui.label(RichText::new(t.tally_entry_date()).strong());
                         self.day_editor(ui, t, (label.id, focus.as_deref() == Some(DAY_FIELD)));
                     });
                 }
                 embossed(ui, tones, false, None, |ui| {
-                    let label = ui.label(RichText::new(t.tally_entry_line()).strong().color(text));
+                    let label = ui.label(RichText::new(t.tally_entry_line()).strong());
                     let field = ui
                         .add(
-                            TextEdit::singleline(&mut self.line)
+                            crate::theme::field(ui, &mut self.line)
                                 .id(Id::new(LINE_FIELD))
                                 .text_color(text)
                                 .desired_width(f32::INFINITY),
@@ -1779,7 +1766,7 @@ impl EntryForm {
                 self.day = self.day.add_days(-1);
                 moved = true;
             }
-            ui.label(RichText::new(day_text(t, self.day)).strong().color(text));
+            ui.label(RichText::new(day_text(t, self.day)).strong());
             if icon_button(ui, icons::NEXT, t.day_after(), text).clicked() {
                 self.day = self.day.add_days(1);
                 moved = true;
@@ -1789,7 +1776,7 @@ impl EntryForm {
             }
             let field = ui
                 .add(
-                    TextEdit::singleline(&mut self.day_text)
+                    crate::theme::field(ui, &mut self.day_text)
                         .id(Id::new(DAY_FIELD))
                         .hint_text(t.date_hint())
                         .text_color(text)

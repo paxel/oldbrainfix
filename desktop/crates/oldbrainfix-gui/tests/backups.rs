@@ -1,18 +1,28 @@
 //! Backups driven headless: set up in the Settings with a passphrase
 //! typed twice, the Recovery Sheet saved, the folder chosen with a first
 //! Backup at once; and the first start's view restoring one into the
-//! empty log with the passphrase or the recovery key, or starting new.
+//! empty log with the passphrase or the recovery key, or starting new;
+//! the settings it brings shown at once, and its speech model offered at
+//! the top (obf-1098).
 
 use egui::accesskit::Role;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::time::{Duration, Instant};
 
 use oldbrainfix_core::backup::{self, EXTENSION, Kdf, system_random};
-use oldbrainfix_core::{DeviceSettings, Notes, Places, SigningKey, Store};
+use oldbrainfix_core::{
+    DeviceSettings, Notes, Places, SigningKey, SpeechModelChoice, SpeechModelSource, Store,
+    TextSize, ThemeChoice,
+};
 use oldbrainfix_gui::media::Player;
+use oldbrainfix_gui::speech::{Download, SpeechModel, Status};
 use oldbrainfix_gui::{App, Page, Selection};
+use oldbrainfix_whisper::model::{ModelDir, WhisperModel, copy_hashing};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -208,7 +218,16 @@ impl Player for Speakers {
 fn old_backup(
     dir: &std::path::Path,
 ) -> Result<(std::path::PathBuf, String), Box<dyn std::error::Error>> {
+    backup_of(dir, |_| Ok(()))
+}
+
+/// As [`old_backup`], with the old Device's settings set by `set`.
+fn backup_of(
+    dir: &std::path::Path,
+    set: impl Fn(&DeviceSettings) -> oldbrainfix_core::Result<()>,
+) -> Result<(std::path::PathBuf, String), Box<dyn std::error::Error>> {
     let old = store(7)?;
+    set(&DeviceSettings::new(&old))?;
     let profile = oldbrainfix_core::profile::OwnProfile::new(&old);
     profile.apply_defaults("Desk", None)?;
     profile.rename("Ada")?;
@@ -380,5 +399,217 @@ fn the_first_start_restores_with_the_recovery_key_or_starts_new() -> TestResult 
     harness.state_mut().offer_restore();
     assert!(!harness.state().welcoming());
     assert!(Notes::new(harness.state().store()).all()?.is_empty());
+    Ok(())
+}
+
+fn eventually(done: impl Fn() -> bool) -> bool {
+    let until = Instant::now() + Duration::from_secs(10);
+    while !done() {
+        if Instant::now() > until {
+            return false;
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    true
+}
+
+/// The SHA-256 of `bytes`, as the model directory reads it.
+fn sha(bytes: &[u8]) -> String {
+    let hash = copy_hashing(bytes, std::io::sink(), &AtomicBool::new(false), |_| {});
+    hash.ok().flatten().unwrap_or_default()
+}
+
+/// The speech model of this computer in `dir`, the bytes "base" and
+/// "small" standing in for the models, with `base` in use already when
+/// true; and how often it downloaded.
+fn speech_in(
+    dir: &std::path::Path,
+    base: bool,
+) -> Result<(SpeechModel, Arc<AtomicUsize>), Box<dyn std::error::Error>> {
+    let whisper = dir.join("whisper");
+    let models = ModelDir::pinned_to(&whisper, &sha(b"base"), &sha(b"small"));
+    if base {
+        std::fs::create_dir_all(&whisper)?;
+        std::fs::write(whisper.join(WhisperModel::Base.file()), b"base")?;
+    }
+    let calls = Arc::new(AtomicUsize::new(0));
+    let counted = calls.clone();
+    let mirror: Download = Arc::new(move |dir, model, stop, _| {
+        counted.fetch_add(1, Ordering::SeqCst);
+        let bytes: &[u8] = match model {
+            WhisperModel::Base => b"base",
+            WhisperModel::Small => b"small",
+        };
+        dir.take_in(bytes, None, Some(model), stop, |_, _| {})
+    });
+    let speech = SpeechModel::with_download(models, mirror, Arc::new(|| {}));
+    let settled = |s: Status| matches!(s, Status::Missing | Status::Ready);
+    if !eventually(|| settled(speech.status())) {
+        return Err("the speech model was not checked".into());
+    }
+    Ok((speech, calls))
+}
+
+/// Restores `path` with the passphrase, `speech` the speech model of
+/// this computer, and clicks "Backup restored." away.
+fn restore_with(
+    path: std::path::PathBuf,
+    speech: &SpeechModel,
+) -> Result<Harness<'static, App>, Box<dyn std::error::Error>> {
+    let mut harness = first_start(path)?;
+    harness
+        .state_mut()
+        .set_enrichers(None, None, Some(speech.clone()));
+    click(&mut harness, "Restore from a Backup");
+    type_into(&mut harness, "Passphrase", "correct horse");
+    click(&mut harness, "Restore");
+    assert!(!harness.state().welcoming());
+    assert_eq!(harness.state().notice(), Some("Backup restored."));
+    click(&mut harness, "Backup restored.");
+    harness
+        .get_all_by_label("Close")
+        .last()
+        .ok_or("Close")?
+        .click_accesskit();
+    harness.step();
+    harness.step();
+    Ok(harness)
+}
+
+const OFFER: &str = "The speech model used before is not on this computer yet.";
+const OFFER_FILE: &str =
+    "The speech model used before came from a file of your own and is not on this computer yet.";
+
+#[test]
+fn a_restored_backup_shows_its_settings_at_once_and_offers_its_speech_model() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let (path, _) = backup_of(dir.path(), |settings| {
+        settings.set_theme(ThemeChoice::Dark)?;
+        settings.set_text_size(TextSize::Largest)?;
+        settings.set_tips_on(false)?;
+        settings.set_speech_model(Some(&SpeechModelChoice {
+            name: "small".into(),
+            source: SpeechModelSource::Download,
+        }))
+    })?;
+    let (speech, calls) = speech_in(dir.path(), false)?;
+    let mut harness = first_start(path)?;
+    harness.state_mut().set_spotlights(true)?;
+    harness
+        .state_mut()
+        .set_enrichers(None, None, Some(speech.clone()));
+    assert_eq!(harness.state().theme(), ThemeChoice::System);
+    click(&mut harness, "Restore from a Backup");
+    type_into(&mut harness, "Passphrase", "correct horse");
+    click(&mut harness, "Restore");
+    // The window shows what came at once, no new start needed.
+    assert_eq!(harness.state().theme(), ThemeChoice::Dark);
+    assert_eq!(harness.state().text_size(), TextSize::Largest);
+    assert_eq!(harness.state().spotlight_showing(), None, "no tips");
+    // "Backup restored." comes first, the offer after it.
+    assert_eq!(harness.state().notice(), Some("Backup restored."));
+    assert!(!shows(&harness, OFFER));
+    click(&mut harness, "Backup restored.");
+    harness
+        .get_all_by_label("Close")
+        .last()
+        .ok_or("Close")?
+        .click_accesskit();
+    harness.step();
+    harness.step();
+    assert!(shows(&harness, OFFER));
+    assert_eq!(calls.load(Ordering::SeqCst), 0, "nothing on its own");
+    click(&mut harness, "Download");
+    assert!(eventually(
+        || speech.status() == Status::Ready && speech.current() == Some(WhisperModel::Small)
+    ));
+    harness.run_steps(4);
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    // In use now: the offer goes, and the choice is kept as downloaded.
+    assert!(!shows(&harness, OFFER));
+    let settings = DeviceSettings::new(harness.state().store());
+    assert_eq!(settings.speech_model_offer()?, None);
+    assert_eq!(
+        settings.speech_model()?,
+        Some(SpeechModelChoice {
+            name: "small".into(),
+            source: SpeechModelSource::Download,
+        })
+    );
+    Ok(())
+}
+
+#[test]
+fn a_speech_model_taken_from_a_file_is_offered_as_its_file_again() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let (path, _) = backup_of(dir.path(), |settings| {
+        settings.set_speech_model(Some(&SpeechModelChoice {
+            name: "base".into(),
+            source: SpeechModelSource::File,
+        }))
+    })?;
+    let (speech, calls) = speech_in(dir.path(), false)?;
+    let file = dir.path().join("mine.bin");
+    std::fs::write(&file, b"base")?;
+    let mut harness = restore_with(path, &speech)?;
+    assert!(shows(&harness, OFFER_FILE));
+    // The dialog left without a file keeps the offer.
+    harness.state_mut().set_model_picker(Box::new(|_| None));
+    click(&mut harness, "Use a file of my own");
+    assert!(shows(&harness, OFFER_FILE));
+    let picked = file.clone();
+    harness.state_mut().set_model_picker(Box::new(move |title| {
+        assert_eq!(title, "Use a file of my own");
+        Some(picked.clone())
+    }));
+    click(&mut harness, "Use a file of my own");
+    assert!(eventually(
+        || speech.status() == Status::Ready && speech.current() == Some(WhisperModel::Base)
+    ));
+    harness.run_steps(4);
+    assert!(!shows(&harness, OFFER_FILE));
+    assert_eq!(calls.load(Ordering::SeqCst), 0, "nothing downloaded");
+    let settings = DeviceSettings::new(harness.state().store());
+    assert_eq!(settings.speech_model_offer()?, None);
+    assert_eq!(
+        settings.speech_model()?,
+        Some(SpeechModelChoice {
+            name: "base".into(),
+            source: SpeechModelSource::File,
+        })
+    );
+    Ok(())
+}
+
+#[test]
+fn not_now_turns_the_offer_down_and_a_model_in_use_needs_none() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let (path, _) = backup_of(dir.path(), |settings| {
+        settings.set_speech_model(Some(&SpeechModelChoice {
+            name: "base".into(),
+            source: SpeechModelSource::Download,
+        }))
+    })?;
+    let (speech, calls) = speech_in(&dir.path().join("empty"), false)?;
+    let mut harness = restore_with(path.clone(), &speech)?;
+    assert!(shows(&harness, OFFER));
+    click(&mut harness, "Not now");
+    assert!(!shows(&harness, OFFER));
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    let settings = DeviceSettings::new(harness.state().store());
+    assert_eq!(settings.speech_model_offer()?, None);
+    assert_eq!(settings.speech_model()?, None);
+
+    // The model the Backup names in use here already: nothing offered.
+    let (speech, _) = speech_in(&dir.path().join("kept"), true)?;
+    let harness = restore_with(path, &speech)?;
+    assert_eq!(speech.current(), Some(WhisperModel::Base));
+    assert!(!shows(&harness, OFFER));
+    let settings = DeviceSettings::new(harness.state().store());
+    assert_eq!(settings.speech_model_offer()?, None);
+    assert_eq!(
+        settings.speech_model()?.map(|c| c.name),
+        Some("base".into())
+    );
     Ok(())
 }

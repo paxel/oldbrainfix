@@ -3,11 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/l10n/app_localizations_de.dart';
 import 'package:oldbrainfix/l10n/app_localizations_en.dart';
 import 'package:oldbrainfix/src/app.dart';
+import 'package:oldbrainfix/src/areas_screen.dart';
 import 'package:oldbrainfix/src/look.dart';
 import 'package:oldbrainfix/src/settings_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'fake_alarms.dart';
+import 'fake_import.dart';
 import 'open_settings.dart';
 
 /// The search field on top of Settings (#282): it filters to the
@@ -108,13 +110,15 @@ void main() {
     expect(shown(en.settingsLook), findsOneWidget);
     expect(keyed('theme'), findsOneWidget);
     expect(keyed('fatFingers'), findsNothing);
-    // No card is left without its rows.
+    // The one card left is the theme's, holding only its row (obf-1085).
+    final cards = find.descendant(
+      of: find.byType(SettingsScreen),
+      matching: find.byType(Embossed),
+    );
+    expect(cards, findsOneWidget);
     expect(
-      find.descendant(
-        of: find.byType(SettingsScreen),
-        matching: find.byType(Embossed),
-      ),
-      findsNothing,
+      find.descendant(of: cards, matching: find.byKey(const ValueKey('theme'))),
+      findsOneWidget,
     );
 
     // "Default on this phone" by "ignored alarm rings again".
@@ -133,6 +137,19 @@ void main() {
     expect(keyed('quietHours'), findsOneWidget);
     expect(shown(en.nudgeSettingsExplain), findsOneWidget);
     expect(shown(en.settingsAlarms), findsNothing);
+  });
+
+  testWidgets('Simple and Advanced sit under Complexity, found by it', (
+    tester,
+  ) async {
+    await start(tester);
+    // obf-1086: the section was "What Old Brain Fix offers".
+    await search(tester, 'complexity');
+
+    expect(shown('Complexity'), findsOneWidget);
+    expect(keyed('features'), findsOneWidget);
+    expect(shown(en.settingsNudges), findsNothing);
+    expect(AppLocalizationsDe().features, 'Komplexität');
   });
 
   testWidgets('a row this Device does not show finds nothing, and says so', (
@@ -239,5 +256,51 @@ void main() {
       tester.widget<Text>(nothing).data,
       'Keine Einstellung passt zu „Wecker klingelt“.',
     );
+  });
+
+  testWidgets('a search for the Imports shows a line that leads to the Areas '
+      'list, whose ⋮ holds them (obf-1096)', (tester) async {
+    await tester.pumpWidget(
+      OldBrainFixApp(
+        store: store,
+        alarms: FakeAlarms(),
+        folders: FakeImportFolders(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await openDeviceSettings(tester);
+    final line = keyed('settingsImportMoved');
+    // No section of its own, and the line only while searching.
+    expect(shown(en.settingsImport), findsNothing);
+    expect(keyed('importFolder'), findsNothing);
+    expect(line, findsNothing);
+
+    for (final query in ['import', 'Google Keep']) {
+      await search(tester, query);
+      expect(line, findsOneWidget);
+      expect(shown("Import… is in the Areas list's ⋮"), findsOneWidget);
+      expect(nothing, findsNothing);
+    }
+    for (final query in ['dark', 'areas list']) {
+      await search(tester, query);
+      expect(line, findsNothing);
+    }
+
+    await search(tester, 'import');
+    await tester.tap(line);
+    await tester.pumpAndSettle();
+    expect(find.byType(AreasScreen), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('areas-more')).last);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('areas-import')), findsOneWidget);
+  });
+
+  testWidgets('says nothing of the Imports where none can be made', (
+    tester,
+  ) async {
+    await start(tester);
+    await search(tester, 'import');
+    expect(keyed('settingsImportMoved'), findsNothing);
+    expect(nothing, findsOneWidget);
   });
 }

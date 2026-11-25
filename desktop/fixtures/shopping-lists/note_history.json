@@ -1039,7 +1039,67 @@
       "id": "note:00000000000000000000000000000034",
       "history": [
         {
-          "at": "2026-01-31T11:38:50.000Z",
+          "at": "2026-01-31T11:39:48.000Z",
+          "entity": "note:00000000000000000000000000000040",
+          "kind": "mergedIn",
+          "before": null,
+          "after": "Rice and oats",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-31T11:39:41.000Z",
+          "entity": "line:00000000000000000000000000000041",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "Rice and oats",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-31T11:39:26.000Z",
+          "entity": "line:0000000000000000000000000000003f",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "jam",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-31T11:39:18.000Z",
+          "entity": "line:0000000000000000000000000000003e",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "Tea",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-31T11:39:14.000Z",
+          "entity": "note:0000000000000000000000000000003c",
+          "kind": "mergedIn",
+          "before": null,
+          "after": "Honey\n\nTea and jam",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-31T11:39:07.000Z",
+          "entity": "line:0000000000000000000000000000003d",
+          "kind": "lineAdded",
+          "before": null,
+          "after": "Honey",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-31T11:38:51.000Z",
           "entity": "line:0000000000000000000000000000003b",
           "kind": "lineAdded",
           "before": null,
@@ -1049,7 +1109,7 @@
           "mayUse": false
         },
         {
-          "at": "2026-01-31T11:38:41.000Z",
+          "at": "2026-01-31T11:38:42.000Z",
           "entity": "line:0000000000000000000000000000003a",
           "kind": "lineAdded",
           "before": null,
@@ -1174,6 +1234,56 @@
           "kind": "captured",
           "before": null,
           "after": "",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:0000000000000000000000000000003c",
+      "history": [
+        {
+          "at": "2026-01-31T11:38:59.000Z",
+          "entity": "note:0000000000000000000000000000003c",
+          "kind": "recordingAdded",
+          "before": null,
+          "after": null,
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-31T11:38:59.000Z",
+          "entity": "note:0000000000000000000000000000003c",
+          "kind": "captured",
+          "before": null,
+          "after": "Honey\n\nTea and jam",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000040",
+      "history": [
+        {
+          "at": "2026-01-31T11:39:34.000Z",
+          "entity": "note:00000000000000000000000000000040",
+          "kind": "recordingAdded",
+          "before": null,
+          "after": null,
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-31T11:39:34.000Z",
+          "entity": "note:00000000000000000000000000000040",
+          "kind": "captured",
+          "before": null,
+          "after": "Rice and oats",
           "format": "plain",
           "by": null,
           "mayUse": false

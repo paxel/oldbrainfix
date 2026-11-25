@@ -44,16 +44,16 @@
   formats and a formatted text shows formatted.
 </p>
 <p>
-  On the phone, the format bar sits on the keyboard while the Note editor or Add to Note has it
-  open; the quick note has none, and its <strong>More</strong> opens the Note editor. Its buttons,
+  On the phone, the format bar sits on the keyboard while the Note editor or Add a part has it
+  open; the quick note has none, and its <strong>Open in the editor</strong> opens the Note editor. Its buttons,
   in this order:
 </p>
 <ul>
-  <li>☐: <strong>Put in ☐</strong> at the cursor (in the Note editor and in a table's cell; not in Add to Note; see "Tick a box in the text").</li>
-  <li><strong>Bold</strong>, <strong>Italic</strong> and <strong>Strike through</strong>.</li>
+  <li>☐: <strong>Put in ☐</strong> at the cursor (in the Note editor and in a table's cell; not in Add a part; see "Tick a box in the text").</li>
+  <li><strong>Bold</strong>, <strong>Italic</strong>, <strong>Strike through</strong> and <strong>Code</strong>.</li>
   <li><strong>H1</strong> and <strong>H2</strong>: <strong>Large heading</strong> and <strong>Small heading</strong>.</li>
   <li><strong>Bulleted list</strong>, <strong>Numbered list</strong> and <strong>Quote</strong>.</li>
-  <li><strong>Link</strong>, <strong>Link to…</strong>, <strong>Code</strong> and <strong>Code block</strong>.</li>
+  <li><strong>Link</strong>, <strong>Link to…</strong> and <strong>Code block</strong>.</li>
   <li><strong>Indent list item</strong> and <strong>Move list item out</strong>.</li>
   <li><strong>Table</strong>.</li>
 </ul>
@@ -61,10 +61,12 @@
   The buttons that find no room go into ⋮ at the end of the bar, <strong>More formats</strong>,
   which opens at the finger. Bold, italic, strike-through and code work on the selection, or on the
   word at the cursor when nothing is selected; the line formats work on every line the selection
-  touches. A button shows highlighted while the cursor is in its format. A second tap takes the
-  format off again, except for <strong>Link</strong>, which asks for the address again, and
-  <strong>Table</strong>, which goes into the table; <strong>Indent list item</strong> and
-  <strong>Move list item out</strong> each move the item one way.
+  touches. On the phone, <strong>Code</strong> also makes a code block: of the lines a selection
+  over more than one line touches, or an empty one at an empty line, the cursor in it; in a block it
+  takes the block's fences off. A button shows highlighted while the cursor is in its format. A
+  second tap takes the format off again, except for <strong>Link</strong>, which asks for the
+  address again, and <strong>Table</strong>, which goes into the table; <strong>Indent list
+  item</strong> and <strong>Move list item out</strong> each move the item one way.
 </p>
 <p>
   With <strong>Type in two rows</strong> on, the default in Settings under "Typing", the top row
@@ -152,7 +154,7 @@
   <li>A right-click on words selected in a formatted text offers the format bar's <strong>Bold</strong>, <strong>Italic</strong>, <strong>Code</strong>, <strong>Link</strong> and <strong>Code block</strong> for them, below Cut, Copy, Paste and Select all.</li>
   <li>A formatted text shows as it reads; a click on it edits its Markdown, the marks dimmed. Leaving the field or Ctrl+Enter saves it.</li>
   <li>A Markdown task such as <code>- [ ] milk</code> typed in the quick note or Add to Note becomes a box when the text is saved; in the Note dialog it does as the space after <code>]</code> is typed.</li>
-  <li>Add to Note has the format bar too, without ☐, which only the Note's text puts in; a table in it is edited in the field as in the Note editor, and nothing is kept before <strong>Add to Note</strong>.</li>
+  <li>Add to Note, which <strong>Add a part</strong> in the Note dialog opens, has the format bar too, without ☐, which only the Note's text puts in; a table in it is edited in the field as in the Note editor, and nothing is kept before <strong>Add to Note</strong>.</li>
   <li><strong>Link</strong> opens a dialog with the same field; Enter or <strong>Set link</strong> takes it. A click on a link opens it in the browser or the mail program; the mouse over it shows its address. A web address written into a text opens on a click too.</li>
   <li><strong>Link to…</strong>, beside <strong>Link</strong>, opens the same picker with its search; a click on a target puts the link in. A click on an app link opens its place in the window, the Settings at their section, a guide page in the browser.</li>
 </ul>
@@ -227,9 +229,12 @@
   <li>A tap or click on a cell edits it in place. Tab and Shift+Tab go to the next and the previous cell row by row, ↵ to the cell below, and the arrow keys at a cell's edge to the cell beside it. Past the first or the last cell the cursor goes into the text before or after the table, and the arrow keys (on the phone also ◀ and ▶) go from the text into it.</li>
   <li>While a cell is edited, the format bar holds ☐, bold, italic, strike-through, link and code for its words. A cell holds one line.</li>
   <li><strong>+</strong> under the last row and beside the last column adds a row or a column.</li>
-  <li>A tap or click on a row's number opens <strong>Insert a row above</strong>, <strong>Insert a row below</strong>, <strong>Move up</strong>, <strong>Move down</strong> and <strong>Delete row</strong>; a column's letter opens <strong>Insert a column to the left</strong>, <strong>Insert a column to the right</strong>, <strong>Move left</strong>, <strong>Move right</strong>, <strong>Delete column</strong>, <strong>Align left</strong>, <strong>Centre</strong> and <strong>Align right</strong>, and for column A the switch <strong>First column as headings</strong>.</li>
+  <li>A tap or click on a row's number opens <strong>Insert a row above</strong>, <strong>Insert a row below</strong>, <strong>Move up</strong>, <strong>Move down</strong> and <strong>Delete row</strong>; a column's letter opens <strong>Insert</strong> ▸ (<strong>Insert a column to the left</strong>, <strong>Insert a column to the right</strong>), <strong>Move</strong> ▸ (<strong>Move left</strong>, <strong>Move right</strong>), <strong>Align</strong> ▸ (<strong>Align left</strong>, <strong>Centre</strong>, <strong>Align right</strong>), <strong>Sort rows</strong> ▸, <strong>Delete column</strong>, and for column A the switch <strong>First column as headings</strong>.</li>
   <li>Deleting a row or column that holds words asks once, "Delete this row?" or "Delete this column?": "The words in its cells are deleted from the Note." Deleting the last row or column deletes the table, and asks "Delete the table?".</li>
   <li><strong>Show as lines</strong> shows the table's Markdown lines to edit them as text; <strong>Show as table</strong>, the cursor leaving the lines or leaving the field shows the table again.</li>
+  <li>On the phone, ⋮ at the table's top right corner holds <strong>Copy</strong>, <strong>Move up</strong>, <strong>Move down</strong> and <strong>Delete table</strong>. Moving takes the whole table past the block of text above or below it: a paragraph, a list, a quote, a heading, a code block or another table. Deleting a table that holds words asks "Delete the table?" first. <strong>Undo</strong> takes each of them back.</li>
+  <li><strong>Sort rows</strong> ▸ under a column's letter offers <strong>Sort rows by this column</strong> and <strong>Sort rows by this column, descending</strong>, which put the rows under the header in that order in the Note's text. A column of numbers, also with a unit or a currency sign such as "12,50 €", sorts by number, one of dates by date, any other alphabetically, case and umlauts not counted; empty cells go last. <strong>Undo</strong> takes it back; rows already in that order change nothing.</li>
+  <li>On the desktop, ⋮ at the table's top right corner in the Note dialog and a Note's own window holds the same <strong>Copy</strong>, <strong>Move up</strong>, <strong>Move down</strong> and <strong>Delete table</strong>, also while the text is only shown there. <strong>Undo</strong> in the dialog's bar takes each of them back.</li>
 </ul>
 <p>
   For the text around it, a table is one block: what is typed right before it goes on a line of
@@ -246,15 +251,51 @@
   becomes a row of it.
 </p>
 <p>
-  On a card, and where you may only read the Note, a table is drawn as a grid made smaller to fit
-  the width, its header row in bold; a tap or click on it opens it full screen, to edit from the
-  card or only to read. Full screen, the header row stays on screen while the rows scroll, and so
+  On a card, and where you may only read the Note, a table is drawn as a grid at the size of the
+  text, its header row in bold, a long cell wrapping onto more lines. A table wider than its room
+  moves sideways inside it, the first column staying while it holds headings; on the phone with a
+  drag on its cells or by <strong>Move the table sideways</strong> above it, on the desktop with
+  the bar under it or Shift and the mouse wheel. Its header row stays in view while its rows
+  scroll. A card shows the first
+  10 rows under the header; <strong>Show all 200</strong> under them shows the rest in place. A tap
+  or click on a table opens it full screen, to edit from the card or only to read. Full screen, the header row stays on screen while the rows scroll, and so
   does the first column while it holds headings; on the phone a table wider than the screen moves
   sideways with a one-finger drag on its cells or by <strong>Move the table sideways</strong>. On
   the desktop Alt+Left, the mouse's back button, Esc or the arrow at the top leave it.
   <strong>Copy</strong> at the top puts the table on the clipboard: an app that takes formatted
   text, such as a mail or a document, pastes it as a table, any other as its Markdown lines, which
-  paste into a Note as the same table. Each box goes as it shows, ticked or not.
+  paste into a Note as the same table. Each box goes as it shows, ticked or not. On the phone,
+  ⋮ at the top right corner of a table, on a card, in a text being read and full screen, offers
+  the same <strong>Copy</strong>; a tap on ⋮ opens neither the table nor the Note. A tap or
+  click on a cell of the header row, on a card, in a text being read, on the desktop also in the
+  reading view and the Markdown viewer, and full screen where the table is only read, sorts the rows shown by its column in the same way: ascending, then descending, then
+  as written again, an arrow in that cell showing which. It opens neither the table nor the
+  Note, the Note's text stays as written, and the order is forgotten on leaving; a card then shows
+  the first 10 rows in that order. Full screen where the table is edited, a tap or click on a cell of the header
+  row edits it, and the column's letter offers under <strong>Show sorted</strong> ▸ <strong>Show sorted ascending</strong>,
+  <strong>Show sorted descending</strong> and <strong>Show as written</strong> instead; putting in, moving or deleting a row or column there
+  shows the rows as written again. On the desktop
+  ⋮ beside a table's top right corner offers <strong>Copy</strong> on a card, in a Section, in the
+  reading view, in the Markdown viewer and full screen; a click on ⋮ opens neither the table nor
+  the Note.
+</p>
+<p>
+  On the phone a long press on a cell selects it, in a Section's text being read, in the Note
+  editor's table and full screen, but not on a card. Dragging on without lifting the finger selects
+  every cell from there to the one under the finger. <strong>Copy</strong> above the cells puts
+  them on the clipboard as a table of their own, the first row as its header row, also a single
+  cell; for one cell <strong>Find in Note</strong> finds its words in the Note. A tap ends the selection.
+  A selection that starts in the text before a table runs through its cells and copies as text.
+</p>
+<p>
+  On the desktop a drag that starts on a cell selects every cell from there to the one under the
+  pointer, in a text being read, in the reading view, in the Markdown viewer, in the Note editor's
+  table and full screen, but not on a card; Shift+click selects from the cell selected first to the
+  one clicked. Ctrl+C (Cmd+C on macOS) or <strong>Copy</strong> in the right-click menu puts the
+  cells on the clipboard as a table of their own, in the same way; for one cell
+  <strong>Find in Note</strong> there finds its words in the Note. A click on the table or Esc ends the
+  selection and does nothing else; a click beside it ends it too. A drag that starts in the text
+  before a table selects its words as text.
 </p>
 </box-more>
 </guide-box>
@@ -291,10 +332,10 @@
   <li>☐ in the format bar puts ☐ in at the cursor, also in the middle of a word.</li>
   <li>In a formatted text, a list item written as a Markdown task, such as <code>- [ ] milk</code> or <code>1. [x] bread</code>, becomes a box: <code>[ ]</code> becomes ☐ and <code>[x]</code> or <code>[X]</code> becomes ✅. This happens as the space after <code>]</code> is typed, when such a list is pasted, and when a Markdown file is imported. In code, a code block, a Code text or a plain text it stays as written.</li>
   <li>Each box carries an id that is never seen. The cursor steps over a box as one character; deleting the box's character deletes the box.</li>
-  <li><strong>Show ticks</strong>, in the ⋮ of the Note's card and as a badge in the Note editor while the Note or a Section holds a box, shows after each ticked box, small and grey, who ticked it last and when, such as "Ann, Tue 14:02", or "You" for your own ticks; an older tick shows its date. It is kept for that Note on that Device.</li>
+  <li><strong>Show ticks</strong>, under This Note in the ⋮ of the Note's card and as a badge in the Note editor while the Note or a Section holds a box, shows after each ticked box, small and grey, who ticked it last and when, such as "Ann, Tue 14:02", or "You" for your own ticks; an older tick shows its date. It is kept for that Note on that Device.</li>
   <li>Once a box has been ticked, its menu also has <strong>History</strong>: every change, the oldest first, with its state, who made it and when.</li>
   <li>In a Shared Area everyone with a role there ticks every box of every Note and Section. Adding, moving and deleting boxes is an edit of the text, which stays with the Note's author and the Managers. A Note in the Trash is not ticked; where you may not tick, the menu of a box ticked before holds only History.</li>
-  <li>Copies, shares, Markdown files and Sent Items show each box in its state now. Copy as text, Share and Save as Markdown write a list item of a formatted text that starts with a box as a Markdown task, so other Markdown apps show a checkbox: ☐ as <code>- [ ]</code>, ✅ as <code>- [x]</code>, and ❌ as <code>- [x]</code> with the rest of the item struck through. The formatted copy beside it shows the boxes as they are.</li>
+  <li>Copies, shares, Markdown files and Sent Items show each box in its state now. Copy text, Share and Save as Markdown write a list item of a formatted text that starts with a box as a Markdown task, so other Markdown apps show a checkbox: ☐ as <code>- [ ]</code>, ✅ as <code>- [x]</code>, and ❌ as <code>- [x]</code> with the rest of the item struck through. The formatted copy beside it shows the boxes as they are.</li>
 </ul>
 <p>
   On the desktop a click on a box opens its menu under it, also in the field being edited: ☐
@@ -344,12 +385,13 @@
 <p>See every #tag of your Notes by its levels, such as #life/health below #life.</p>
 <box-tab device="phone" alt="The tag tree: #garden and #life, with health and back unfolded below #life, each with its count of Notes">
 <li>Tap <strong>Search and browse</strong>.</li>
-<li>Tap <strong>Tags</strong> below the Areas.</li>
+<li>Tap <strong>All tags…</strong> at the end of the tags under the search.</li>
 <li>Tap the arrow beside a tag for the tags below it.</li>
 <li>Tap a tag to search for it.</li>
 </box-tab>
 <box-tab device="desktop" alt="The tag tree in the desktop window: #garden and #life, with health and back unfolded below #life, each with its count of Notes">
-<li>Click <strong>Tags</strong> below the Areas in the sidebar.</li>
+<li>Click <strong>All Notes</strong> in the sidebar.</li>
+<li>Click <strong>All tags…</strong> at the end of the tags under the search.</li>
 <li>Click the arrow beside a tag for the tags below it.</li>
 <li>Click a tag to search for it.</li>
 </box-tab>
@@ -362,16 +404,23 @@
   in several ways ("#Life", "#life") shows as most of its Notes write it.
 </p>
 <p>
-  Typing "#" into the search of the Areas list shows the tags that start with what is typed as
-  buttons under the field, at most twelve; a tap fills one in, so a tag is found without knowing
-  its exact spelling. While a locked Area is closed, the tags of its Notes are left out of
-  <strong>Tags</strong> and of these buttons, as its Notes are left out of every list.
+  While the search of the Areas list is empty, one row under it shows the most used tags as
+  buttons, at most twelve, those on the most Notes first, and ends in <strong>All tags…</strong>.
+  A tap on a tag searches for it. A row wider than the screen moves sideways under the finger.
 </p>
 <p>
-  On the desktop, <strong>Tags</strong> below the Areas in the sidebar shows the tag tree in the
-  list, and a click on a tag shows All Notes searching for it. Typing "#" into the search of a list,
-  but the Trash's, shows the tags that start with what is typed as buttons under the field, at most
-  twelve; a click fills one in. The desktop has no Area Locks, so it leaves no tag out.
+  Typing "#" into the search of the Areas list shows the tags that start with what is typed as
+  buttons under the field, at most twelve; a tap fills one in, so a tag is found without knowing
+  its exact spelling. While a locked Area is closed, the tags of its Notes are left out of the
+  row of tags, the tag tree and these buttons, as its Notes are left out of every list.
+</p>
+<p>
+  On the desktop the row of the most used tags, as chips, sits under the search of All Notes, while it is
+  empty; a click on a tag searches for it there, and <strong>All tags…</strong> shows the tag tree in
+  the list. A row wider than the window leaves out the least used tags. A click on a tag in the tree
+  shows All Notes searching for it. Typing "#" into the search of a list, but the Trash's, shows the
+  tags that start with what is typed as chips under the field, at most twelve; a click fills one
+  in. The desktop has no Area Locks, so it leaves no tag out.
 </p>
 </box-more>
 </guide-box>
@@ -396,7 +445,8 @@
   Whisper writes it on the Device, in English or German, whichever the recording sounds more like,
   in the background and one recording at a time once the Note is saved; recordings captured before
   the speech model was there follow. While it runs, "Transcribing…" shows under the recording; a
-  recording without speech shows "No words heard.". The recording is always kept.
+  recording without speech shows "No words heard.". On the phone's quick note the Transcript also
+  goes into the text once it is done (see <a href="capture-and-sort.html">Capture and sort</a>). The recording is always kept.
 </p>
 <p>
   Whisper is led in with your Area and Topic names; for German speech also with the English words
@@ -447,7 +497,7 @@
 </box-tab>
 <box-tab device="desktop" alt="The Note dialog of a bakery's receipt with its photo and the Photo Text under it, line by line">
 <li>Press Ctrl+N, or click <strong>File ▸ New Note</strong>.</li>
-<li>Press Ctrl+V, or click <strong>File ▸ Attach a file…</strong>, for the photo.</li>
+<li>Press Ctrl+V, or drag the photo onto the window.</li>
 <li>Click <strong>10 min</strong>, <strong>30 min</strong> or <strong>1 h</strong>.</li>
 <li>Double-click the Note's card.</li>
 <li>Read the Photo Text under the photo.</li>
@@ -465,7 +515,8 @@
   In a card's detailed view, Transcripts and Photo Texts show dimmed under the word "Transcript" or
   "Photo Text". The compact view of a Note without words shows the first three lines of its
   Transcripts, and of the Photo Texts of photos that were removed; a photo still there shows as a
-  small picture.
+  small picture. While none of its Transcripts has words, the first line of a photo's Photo Text
+  shows above the pictures as the Note's name.
 </p>
 <p>
   On the desktop Photo Texts work the same, while the app runs; the Note dialog shows each one under
@@ -494,8 +545,8 @@
   Any file can be attached: a PDF, a Word document, a spreadsheet, a <code>.zip</code>. It is kept
   as it is, with its name, type and size, on all your Devices and with everyone you share the Note's
   Area with. Besides <strong>File</strong> in Capture and in the fan of <strong>+</strong>, a file
-  comes in by sharing it from another app to Old Brain Fix, and by <strong>Attach a file</strong>
-  in the Note editor's bar. A file larger than 256 MB is not attached, and the app says so at the
+  comes in by sharing it from another app to Old Brain Fix, and by <strong>Attach a file…</strong>
+  under Add at the end of the Note editor. A file larger than 256 MB is not attached, and the app says so at the
   top. A Note made from one file alone shows the file as its card and goes by its name, also in
   alarms. A tap on a PDF shows it in the app; a tap on any other file opens it with the app of the
   phone that opens that kind. A file that has not synced to the phone yet, or that no app opens, is
@@ -526,12 +577,12 @@
   text</strong> take its text in, <strong>Remove generated text</strong> removes the text (the
   announcement at the top brings it back), <strong>Read the text again</strong> reads it anew, and
   <strong>Remove Attachment, keep text</strong> asks once and removes the file from all your Devices
-  while its text stays. The card's ⋮ offers the last too.
+  while its text stays. The card's ⋮ offers the last too, under Tidy.
 </p>
 <p>
   On the desktop, a file dropped onto the window waits in the quick note and is saved with what is
-  typed as one Note; dropped onto the Note dialog, it goes onto that Note. <strong>File</strong> ▸
-  <strong>Attach a file…</strong>, and <strong>Attach a file…</strong> in the Note dialog pick files in the system's dialog. A click on a file
+  typed as one Note; dropped onto the Note dialog, it goes onto that Note. <strong>Attach a
+  file…</strong> under Add in the Note dialog and in a card's ⋮ ▸ Add picks files in the system's dialog. A click on a file
   opens a copy of it with the program the computer has for its kind; one that has not synced to the
   computer yet, or that no program opens, is said at the top. A file that could run a program, such
   as an <code>.exe</code>, a script or a shortcut, asks "Open it anyway?" first, naming who added it
@@ -612,20 +663,23 @@
 </p>
 <ul>
   <li><strong>Replace Note text</strong> makes it the text; <strong>Append to Note text</strong> adds it on a line of its own after the text. Under a Section's Transcript or Photo Text they change that Section's text. The text is then edited as usual. Into a formatted text it goes as plain text, written so that it reads as itself. Both show while the generated text has words and the text may be changed.</li>
-  <li><strong>Remove generated text</strong> asks nothing. On the phone the announcement at the top, "Transcript removed" or "Photo Text removed", brings the text back with a tap; on the desktop Ctrl+Z or Edit ▸ Undo does. Then the search no longer finds the text, on all your Devices, and the recording or photo stays, so the text can be made from it again. The text of a recording or photo that was removed cannot be removed; it is all that is left of it.</li>
+  <li><strong>Remove generated text</strong> asks nothing. On the phone the announcement at the top, "Transcript removed" or "Photo Text removed", brings the text back with a tap; on the desktop Ctrl+Z or Edit ▸ Undo does. Then the search no longer finds the text, on all your Devices, and the recording or photo stays, so the text can be made from it again. The text of a recording or photo removed with an earlier version stays under it and cannot be removed; it is all that is left of it.</li>
   <li><strong>Transcribe again</strong> and <strong>Read the text again</strong> make the text anew from the file, in place of the one before or of a removed one. They show while the file is on this Device and the speech model or RustO runs there. When nothing comes of it, an announcement at the top says so and its tap tells why; the file stays.</li>
 </ul>
 <p>
   <strong>Remove recording, keep text</strong> and <strong>Remove photo, keep text</strong>, in the
-  editor and in the card's ⋮, do the opposite for a recording or photo that has a text: they ask
-  once ("Remove this recording and keep its Transcript?" or "Remove this photo and keep its Photo
-  Text?"), then the file goes from all your Devices and from everyone you share the Note's Area
-  with, and the text stays on the Note. The card's ⋮ offers them for the Note's own files, the editor
+  editor and under Tidy in the card's ⋮, do the opposite for a recording or photo that has a text: they ask
+  once ("Remove this recording and keep its words in the text?" or "Remove this photo and keep its
+  words in the text?"), then the file goes from all your Devices and from everyone you share the Note's Area
+  with. Its text goes into the Note's text as a paragraph of its own, after a blank line, or
+  becomes the text when the Note has none; it is then edited or deleted like typed text, and no
+  Transcript or Photo Text is left. The card's ⋮ offers them for the Note's own files, the editor
   also for its Sections'. In a Shared Area a Member does all of this only on their own Notes.
 </p>
 <p>
   On the desktop all these buttons are in the Note dialog, under each photo and recording; the
-  card's ⋮ has none of them.
+  card's ⋮ has none of them. There Ctrl+Z or Edit ▸ Undo takes a removed file's words out of the
+  text again, unless the text was empty; the file stays gone.
 </p>
 </box-more>
 </guide-box>
@@ -636,10 +690,12 @@
 <box-tab device="phone" alt="The search of all Notes for boiler: a voice Note found by its Transcript and the boiler's service by its text">
 <li>Tap <strong>Search and browse</strong>.</li>
 <li>Type a word into <strong>Search all Notes</strong>.</li>
+<li>Tap a place found under a card.</li>
 </box-tab>
 <box-tab device="desktop" alt="All Notes searched for boiler: a voice Note found by its Transcript and the boiler's service by its text">
 <li>Press Ctrl+F.</li>
 <li>Type a word.</li>
+<li>Click a place found at the end of a card.</li>
 </box-tab>
 <box-more>
 <p>
@@ -655,11 +711,44 @@
   Text is no longer found.
 </p>
 <p>
+  On the phone each card of a search lists the first three places found in its Note, over its
+  text in the detailed view and under it in the compact one, each with its line and the word on a
+  tint, then "+2 more". A tap on a place opens the Note
+  there, a tap on the card at its first place; a table holding a place shows all its rows. The
+  opened Note shows every place on a tint, and under its top bar the find bar: "3 of 12", ↑ and ↓
+  to the place before and after, the words editable there, and ✕ to close it; leaving the Note
+  closes it too. It finds in the text being edited as in one only read. The magnifier in the
+  Note's top bar opens the find bar without a search. Case, accents and umlauts do not matter:
+  "muller" finds "Müller", "strasse" finds "Straße"; a typo finds nothing.
+</p>
+<p>
+  Words selected in a Note with a long press show a small toolbar just above them:
+  <strong>Copy</strong>, <strong>Paste</strong> where the text may be changed and something was
+  copied, and <strong>Find in Note</strong>, which opens the find bar with those words. A long press on
+  an empty spot of the text shows only Paste. <strong>Search all Notes</strong> in the find bar,
+  between ↓ and ✕, searches every Note for its words; back returns to the Note.
+</p>
+<p>
   On the desktop the search field sits above the list of Notes: "Search all Notes" on All Notes,
   "Search Unsorted" on Unsorted, "Search this Area" on an Area, "Search this Topic" on a Topic and
   "Search the Trash" in the Trash, which also finds its Routines, Reminders and Frogs by their
-  Note; the Agenda has none. Ctrl+F, or <strong>Edit ▸ Find</strong>, puts the cursor into it, into
+  Note; the Agenda has none. Ctrl+F, or <strong>Edit ▸ Search</strong>, puts the cursor into it, into
   All Notes' where the list shown has none. Down in the field goes to the first card found.
+</p>
+<p>
+  At the end of each card of a search the desktop lists the first three places found in its Note,
+  each a link with its line and the word on a tint, then "+2 more", which opens the Note at the
+  fourth. A click on a
+  place opens the Note there; opening the card, by a double-click, Edit or Enter, opens it at its
+  first place. A table holding a place below its first rows shows all of them on the card. The Note
+  dialog shows every place on a tint, the current one stronger, and above the Note the find bar:
+  "3 of 12", the arrows to the place before and after, Enter and Shift+Enter in its field too, the
+  words editable there, <strong>Search all Notes</strong>, which searches All Notes for the words
+  in the main window, closing the Note dialog, and ✕ to close it; Esc closes it before the Note, and leaving the Note
+  closes it too. With a Note open in the Note dialog or in a window of its own, its reading view
+  included, Ctrl+F or <strong>Edit ▸ Find in Note</strong> opens the find bar without a search, or puts the
+  cursor back into it; a right-click on words selected in the Note, then <strong>Find in Note</strong>,
+  opens it with those words.
 </p>
 </box-more>
 </guide-box>

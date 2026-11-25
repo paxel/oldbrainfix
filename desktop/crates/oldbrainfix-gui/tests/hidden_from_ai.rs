@@ -1,5 +1,5 @@
 //! Hidden from AI on the desktop (#267, ADR 0049): a card's menu, an
-//! Area's right-click and the Area menu mark a Note or Area, offered in
+//! Area's right-click and the ⋮ of its band mark a Note or Area, offered in
 //! no Shared Area; a shield on the card and the sidebar's row shows what
 //! is hidden, the Note dialog's badge "Off, hidden by its Area"; and
 //! filing, sending, sharing or packing something hidden asks to show it
@@ -72,6 +72,12 @@ fn card_menu(harness: &mut Harness<'_, App>) {
     harness.run();
 }
 
+/// Opens the submenu `label` of the menu open (obf-1014).
+fn sub(harness: &mut Harness<'_, App>, label: &str) {
+    harness.get_by_label(&format!("{label} ⏵")).click();
+    harness.run();
+}
+
 /// Opens the right-click menu of the sidebar's row `name`.
 fn row_menu(harness: &mut Harness<'_, App>, name: &str) {
     harness
@@ -118,12 +124,14 @@ fn a_cards_menu_marks_the_note_and_a_shield_shows_it() -> TestResult {
     let mut harness = harness(store);
     assert_eq!(shields(&harness), 0);
     card_menu(&mut harness);
+    sub(&mut harness, "This Note");
     switch(&harness).ok_or("the switch")?.click_accesskit();
     harness.run();
     assert!(harness.state().store().is_marked_hidden_from_ai(&milk)?);
     assert_eq!(shields(&harness), 1);
     // Ticked as the menu opens again; its click takes the mark off.
     card_menu(&mut harness);
+    sub(&mut harness, "This Note");
     let on = switch(&harness).ok_or("the switch")?;
     assert_eq!(
         on.accesskit_node().toggled(),
@@ -154,13 +162,13 @@ fn an_areas_mark_hides_its_notes_and_is_not_offered_in_a_shared_area() -> TestRe
     harness.state_mut().select_note(&milk);
     harness.run();
     assert!(shows(&harness, "Hidden from AI: Off, hidden by its Area"));
-    // The Area menu offers the same switch for the Area shown.
+    // The ⋮ of the Area's band offers the same switch (obf-1065).
     harness.state_mut().close_note();
     harness.state_mut().select(Selection::Place(house.clone()));
     harness.run();
-    harness.get_by_label("Area").click();
+    harness.get_by_label("More for this Area").click();
     harness.run();
-    let on = switch(&harness).ok_or("the Area menu's switch")?;
+    let on = switch(&harness).ok_or("the ⋮'s switch")?;
     assert_eq!(
         on.accesskit_node().toggled(),
         Some(egui::accesskit::Toggled::True)
@@ -228,6 +236,7 @@ fn sending_sharing_and_packing_ask_before_anything_else() -> TestResult {
     let mut harness = harness(store);
     // Send asks before whom.
     card_menu(&mut harness);
+    sub(&mut harness, "Share");
     harness.get_by_label("Send to a person").click_accesskit();
     harness.run();
     assert!(shows(&harness, BODY));
@@ -235,6 +244,7 @@ fn sending_sharing_and_packing_ask_before_anything_else() -> TestResult {
     harness.run();
     // Export as Pack… asks before the tree.
     card_menu(&mut harness);
+    sub(&mut harness, "Share");
     harness.get_by_label("Export as Pack…").click_accesskit();
     harness.run();
     assert!(shows(&harness, BODY));
@@ -249,7 +259,7 @@ fn sending_sharing_and_packing_ask_before_anything_else() -> TestResult {
     harness.state_mut().select(Selection::Place(house.clone()));
     harness.run();
     row_menu(&mut harness, "Household");
-    harness.get_by_label("Share…").click_accesskit();
+    harness.get_by_label("Share with people…").click_accesskit();
     harness.run();
     assert!(shows(&harness, BODY));
     Ok(())

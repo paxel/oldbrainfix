@@ -224,11 +224,8 @@ fn the_history_selects_to_be_copied() -> TestResult {
     let note = notes.capture("Dentist on Tuesday", None, None)?.id;
     notes.edit(&note, "Dentist on Wednesday")?;
     let mut harness = opened(&store, Selection::All, &note);
-    harness
-        .get_all_by_label("Note")
-        .next()
-        .ok_or("the Note menu")?
-        .click();
+    // History in the Note dialog's ⋮ (obf-1065).
+    harness.get_by_label("More for this Note").click();
     harness.run();
     harness
         .get_all_by_label("History")

@@ -13,7 +13,9 @@ import 'package:oldbrainfix/src/setting_badges.dart';
 import 'package:oldbrainfix/src/share_area_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'add_a_part.dart';
 import 'announced.dart';
+import 'editor_actions.dart';
 import 'fake_photos.dart';
 import 'reveal.dart';
 
@@ -140,7 +142,7 @@ void main() {
     await rowMenu(tester, 'Household');
     expect(find.text('People'), findsOneWidget);
     expect(find.text('Rename'), findsNothing);
-    expect(find.text('Share…'), findsNothing);
+    expect(find.text('Share with people…'), findsNothing);
     expect(find.text('Delete'), findsNothing);
     await tester.tap(find.text('People'));
     await tester.pumpAndSettle();
@@ -163,12 +165,23 @@ void main() {
     expect(find.byTooltip('File into…'), findsNothing);
     await tester.longPress(find.text('Buy milk'));
     await tester.pumpAndSettle();
-    expect(find.byTooltip('Move to trash'), findsNothing);
-    expect(find.byTooltip('Merge into…'), findsNothing);
     expect(find.byTooltip('File into…'), findsNothing);
-    // Only a Manager sets up Routines: no "+" among the badges, and the
-    // settings of the Note are shown, not changed.
+    // No Tidy at the end of the editor (obf-1073), and only a Manager
+    // sets up Routines: no "+" under Add, and the settings of the Note
+    // are shown, not changed.
+    await revealInEditor(
+      tester,
+      find.byKey(const ValueKey('editor-group-share')),
+    );
+    expect(find.byKey(const ValueKey('editor-group-tidy')), findsNothing);
+    expect(find.byKey(const ValueKey('editor-trash')), findsNothing);
+    expect(find.byKey(const ValueKey('editor-merge')), findsNothing);
     expect(find.byKey(const ValueKey('badge-add')), findsNothing);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('badge-importance')),
+      -100,
+      scrollable: find.byType(Scrollable).first,
+    );
     for (final badge in ['badge-importance', 'badge-place']) {
       expect(
         tester.widget<SettingBadge>(find.byKey(ValueKey(badge))).onTap,
@@ -178,8 +191,9 @@ void main() {
     }
     final field = tester.widget<TextField>(find.byType(TextField).first);
     expect(field.readOnly, isTrue);
-    await reveal(tester, find.text('Add to Note'));
-    expect(find.text('Add to Note'), findsOneWidget);
+    // Amend stays: "Add a part" under Add (obf-1072, obf-1073).
+    await revealInEditor(tester, addAPartAction);
+    expect(addAPartAction, findsOneWidget);
   });
 
   testWidgets('a Member checks off a Frog of the Area on the Agenda but '
@@ -237,7 +251,13 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Share…'), findsOneWidget);
+    expect(find.text('Share'), findsOneWidget);
+    // Removals sit under Tidy (obf-1014), where it is offered at all.
+    final tidy = find.byKey(const ValueKey('note-group-tidy'));
+    if (tidy.evaluate().isNotEmpty) {
+      await tester.tap(tidy);
+      await tester.pumpAndSettle();
+    }
     expect(find.byKey(ValueKey('note-remove-$hash')), findsNothing);
     await tester.tapAt(Offset.zero);
     await tester.pumpAndSettle();
@@ -263,7 +283,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('browse')));
     await tester.pumpAndSettle();
     await rowMenu(tester, 'Household');
-    for (final item in ['Rename', 'Share…', 'People', 'Delete']) {
+    for (final item in ['Rename', 'Share with people…', 'People', 'Delete']) {
       expect(find.text(item), findsOneWidget);
     }
   });

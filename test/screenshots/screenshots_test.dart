@@ -1308,9 +1308,10 @@ void _storeScreenshots({required bool iphone}) {
           await openTextCapture(tester);
           await tester.enterText(find.byType(TextField), texts.captureText);
           await tester.pumpAndSettle();
-          // The quick note: the text, three Nudge buttons and More (#352).
+          // The quick note: the text, three Nudge buttons and Open in the
+          // editor (#352, obf-1080).
           expect(find.byType(NudgeButtons), findsOneWidget);
-          expect(find.text(t.more), findsOneWidget);
+          expect(find.text(t.captureOpenInEditor), findsOneWidget);
         });
 
         frame('3-diary.png', (tester) async {
@@ -1502,8 +1503,8 @@ void main() {
             expect(find.byKey(const ValueKey('restore-offer')), findsOneWidget);
           });
 
-          /// The phone's Settings searched for its Import rows (#282), a
-          /// folder pickable.
+          /// The phone's Import rows, opened by Import… in the Areas
+          /// list's ⋮ (obf-1096), a folder pickable.
           Future<void> importRows(WidgetTester tester) async {
             final dir = Directory('build/guide-import')
               ..createSync(recursive: true);
@@ -1515,20 +1516,9 @@ void main() {
               _guideDpr,
               folders: DirFolders(dir.path),
             );
-            await _tap(tester, find.byTooltip(t.profileTitle));
-            final settings = find.byKey(const ValueKey('deviceSettings'));
-            await tester.ensureVisible(settings);
-            await _tap(tester, settings);
-            await tester.enterText(
-              find.descendant(
-                of: find.byKey(const ValueKey('settingsSearch')),
-                matching: find.byType(TextField),
-              ),
-              t.settingsImport,
-            );
-            // The rows found, without the cursor blinking in the field.
-            FocusManager.instance.primaryFocus?.unfocus();
-            await tester.pumpAndSettle();
+            await _tap(tester, find.byTooltip(t.browseTooltip));
+            await _tap(tester, find.byKey(const ValueKey('areas-more')));
+            await _tap(tester, find.byKey(const ValueKey('areas-import')));
             expect(find.byKey(const ValueKey('importKeep')), findsOneWidget);
           }
 
@@ -1621,7 +1611,13 @@ void main() {
 
           boxFrame('capture-and-sort', 'history', (tester) async {
             await boilerEditor(tester);
-            await _tap(tester, find.byKey(const ValueKey('note-history')));
+            // On the bar after Undo, Redo and Find (obf-1051), in ⋮ where
+            // the bar is full.
+            final history = find.byKey(const ValueKey('note-history'));
+            if (history.evaluate().isEmpty) {
+              await _tap(tester, find.byKey(const ValueKey('bar-more')));
+            }
+            await _tap(tester, history);
             expect(find.byType(NoteHistoryScreen), findsOneWidget);
           });
 
@@ -1676,18 +1672,34 @@ void main() {
             await reveal(tester, find.byKey(const ValueKey('escalationAfter')));
           });
 
+          // The boiler's notification tapped: the Agenda with its row
+          // marked (obf-1039).
           boxFrame('routines-and-agenda', 'check-off', (tester) async {
-            final t = await start(
-              tester,
-              _Seeded(texts, dueReminder: true)..store.themeChoice = choice,
+            final seeded = _Seeded(texts, dueReminder: true)
+              ..store.themeChoice = choice;
+            final reminder = Routines(seeded.store).all().firstWhere(
+              (r) =>
+                  r.schedule.start == Day(2026, 10, 27) &&
+                  r.schedule.times.contains(ClockTime(9, 30)),
             );
-            await _tap(tester, find.byTooltip(t.browseTooltip));
-            await _tap(tester, find.text(t.starterHousehold));
-            await tester.longPress(find.text(texts.boiler));
-            await tester.pumpAndSettle();
-            expect(find.byKey(const ValueKey('open-done')), findsOneWidget);
+            final alarms = FakeAlarms()
+              ..tapOccurrence((
+                routineId: reminder.id,
+                occurrenceKey: '2026-10-27T09:30',
+              ));
+            await _start(
+              tester,
+              boundary,
+              language,
+              seeded.store,
+              _guideDpr,
+              alarms: alarms,
+            );
             expect(
-              find.byKey(const ValueKey('open-done-trash')),
+              find.descendant(
+                of: find.byKey(ValueKey('row-${reminder.id}@2026-10-27T09:30')),
+                matching: find.byKey(const ValueKey('agenda-marked')),
+              ),
               findsOneWidget,
             );
           });
@@ -2083,7 +2095,13 @@ void main() {
               _guideDpr,
             );
             await _tap(tester, find.byTooltip(t.browseTooltip));
-            await _tap(tester, find.byKey(const ValueKey('tags-row')));
+            // "All tags…" ends the row of tags (obf-1074).
+            await tester.drag(
+              find.byKey(const ValueKey('tag-chips')),
+              const Offset(-2000, 0),
+            );
+            await tester.pumpAndSettle();
+            await _tap(tester, find.byKey(const ValueKey('tag-chips-all')));
             expect(find.byType(TagTreeScreen), findsOneWidget);
             await _tap(tester, find.byKey(ValueKey('tree-open-#$life')));
             await _tap(
@@ -2279,11 +2297,14 @@ void main() {
             if (open) await _tap(tester, finder);
           }
 
-          /// Sync, opened from the Profile page, scrolled to [finder].
+          /// Sync, opened from the Profile page, scrolled to [finder], then
+          /// on to [top] standing at the top of the page under its bar, so
+          /// no row is cut by the bar (obf-1136).
           Future<void> openSync(
             WidgetTester tester,
             AppLocalizations t, [
             Finder? finder,
+            Finder? top,
           ]) async {
             await onProfile(tester, t, find.byKey(const ValueKey('sync')));
             expect(find.byType(SyncScreen), findsOneWidget);
@@ -2294,6 +2315,26 @@ void main() {
               scrollable: notesList.last,
             );
             await tester.pumpAndSettle();
+            if (top == null) return;
+            // Above what was looked for, [top] may not be built yet.
+            await tester.scrollUntilVisible(
+              top,
+              -100,
+              scrollable: notesList.last,
+            );
+            await Scrollable.ensureVisible(tester.element(top));
+            await tester.pumpAndSettle();
+            // At the list's end it may stand lower, by at most the room
+            // above a section.
+            final under =
+                tester.getTopLeft(top).dy -
+                tester.getTopLeft(notesList.last).dy;
+            expect(
+              under,
+              inInclusiveRange(0, 16),
+              reason: 'the row starts at the top, not under the bar',
+            );
+            expect(finder.hitTestable(), findsOneWidget);
           }
 
           /// The share page of [slug]'s Area, opened from its ⋮.
@@ -2330,8 +2371,8 @@ void main() {
                 matching: find.byKey(const ValueKey('note-menu')),
               ),
             );
-            // Send and Share to an app are under Share… (#281).
-            await _tap(tester, find.byKey(const ValueKey('note-share-menu')));
+            // Send and Share to an app are under Share (#281, obf-1014).
+            await _tap(tester, find.byKey(const ValueKey('note-group-share')));
             return t;
           }
 
@@ -2458,6 +2499,7 @@ void main() {
               tester,
               t,
               find.byKey(const ValueKey('pick-folder')),
+              find.byKey(const ValueKey('conflicts')),
             );
           });
 
@@ -2467,6 +2509,7 @@ void main() {
               tester,
               t,
               find.byKey(const ValueKey('import-bundle')),
+              find.byKey(const ValueKey('conflicts')),
             );
           });
 
@@ -2652,6 +2695,14 @@ void main() {
                       install: 'F-Droid',
                     ),
                     crash: () => null,
+                    // One tap, the same in every frame (obf-1039).
+                    taps: () => (
+                      text:
+                          '2026-10-27T08:30:04.000Z occurrence '
+                          'routine=routine:boiler occurrence=2026-10-27T09:30 '
+                          'from=background -> agenda today, marked',
+                      count: 1,
+                    ),
                     mail: (_) async {},
                   ),
                 ),
@@ -2846,14 +2897,14 @@ void main() {
               // Shown while Ask is switched on (#333).
               ..askOn = true;
             final t = await sharingApp(tester, seeded);
+            // The computer's name and its switch above the field, under
+            // the heading of the Paired Devices.
             await openSync(
               tester,
               t,
               find.byKey(const ValueKey('address-device:guide-desk')),
+              find.text(t.pairedDevicesTitle),
             );
-            // The computer's name and its switch above the field.
-            await tester.drag(notesList.last, const Offset(0, 260));
-            await tester.pumpAndSettle();
             expect(find.byKey(const ValueKey('hand-address')), findsOne);
           });
 
@@ -2876,6 +2927,7 @@ void main() {
               tester,
               t,
               find.byKey(const ValueKey('pick-folder')),
+              find.byKey(const ValueKey('conflicts')),
             );
           }
 

@@ -19,10 +19,10 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration as StdDuration, Instant};
 
 use egui::Key;
-use egui::accesskit::Role;
+use egui::accesskit::{Role, Toggled};
 use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
-use oldbrainfix_core::{Notes, SigningKey, Store, WireEntry, parse_time};
+use egui_kittest::kittest::{NodeT, Queryable};
+use oldbrainfix_core::{DeviceSettings, Notes, SigningKey, Store, WireEntry, parse_time};
 use oldbrainfix_gui::enrich::{Engine, Enricher, Kind};
 use oldbrainfix_gui::media::{self, Clipboard, Player, Recorder};
 use oldbrainfix_gui::speech::{Download, SpeechModel, Status};
@@ -72,6 +72,10 @@ struct Devices {
     speeds: Vec<f64>,
     /// The clipboard's photo, if any.
     clipboard: Option<Vec<u8>>,
+    /// The level the microphone tells while it records (obf-1053).
+    level: Option<f32>,
+    /// How often the level was asked.
+    asked: u32,
 }
 
 type Shared = Rc<RefCell<Devices>>;
@@ -102,6 +106,12 @@ impl Recorder for FakeMic {
 
     fn elapsed(&self) -> StdDuration {
         StdDuration::from_secs(75)
+    }
+
+    fn level(&mut self) -> Option<f32> {
+        let mut d = self.0.borrow_mut();
+        d.asked += 1;
+        d.level.filter(|_| d.recording)
     }
 }
 
@@ -190,6 +200,14 @@ fn shows<S>(harness: &Harness<'_, S>, label: &str) -> bool {
     harness.query_all_by_label(label).next().is_some()
 }
 
+/// The text a field of the editor holds, which has `words` in it.
+fn field_with<S>(harness: &Harness<'_, S>, words: &str) -> Option<String> {
+    let typed = |role| matches!(role, Role::TextInput | Role::MultilineTextInput);
+    harness
+        .query_all_by(|n| typed(n.role()) && n.value().is_some_and(|v| v.contains(words)))
+        .find_map(|n| n.value())
+}
+
 /// Where `label` shows last: in the Note dialog, over the card in the
 /// list that shows it too (#114, #146).
 fn rightmost<S>(harness: &Harness<'_, S>, label: &str) -> egui::Rect {
@@ -225,7 +243,7 @@ fn the_quick_note_offers_no_record_voice_and_no_paste() -> TestResult {
     let mut harness = window(store, &devices);
     quick(&mut harness);
     // They are the Note dialog's (#352).
-    assert!(!shows(&harness, "Record voice"));
+    assert!(!shows(&harness, "Voice"));
     assert!(
         harness
             .query_by_role_and_label(Role::Button, "Paste")
@@ -241,7 +259,7 @@ fn recording_in_the_note_dialog_starts_at_once_and_the_big_stop_button_adds_it()
     devices.borrow_mut().mic = true;
     let mut harness = window(store.clone(), &devices);
     let garage = open_garage(&mut harness);
-    harness.get_by_label("Record voice").click();
+    harness.get_by_label("Voice").click();
     harness.run();
     assert!(harness.state().recording());
     assert!(shows(&harness, "Recording… 1:15"));
@@ -276,7 +294,7 @@ fn leaving_the_note_dialog_while_recording_keeps_the_recording_on_its_note() -> 
     devices.borrow_mut().mic = true;
     let mut harness = window(store.clone(), &devices);
     let garage = open_garage(&mut harness);
-    harness.get_by_label("Record voice").click();
+    harness.get_by_label("Voice").click();
     harness.run();
     harness.key_press(Key::Escape);
     harness.run();
@@ -302,7 +320,7 @@ fn closing_the_window_while_recording_keeps_the_recording() -> TestResult {
     devices.borrow_mut().mic = true;
     let mut harness = window(store.clone(), &devices);
     let garage = open_garage(&mut harness);
-    harness.get_by_label("Record voice").click();
+    harness.get_by_label("Voice").click();
     harness.run();
     harness.state_mut().flush();
     let notes = Notes::new(&store).all()?;
@@ -318,7 +336,7 @@ fn without_a_microphone_the_top_says_so_and_nothing_is_kept() -> TestResult {
     let devices: Shared = Rc::default();
     let mut harness = window(store.clone(), &devices);
     let garage = open_garage(&mut harness);
-    harness.get_by_label("Record voice").click();
+    harness.get_by_label("Voice").click();
     harness.run();
     assert_eq!(devices.borrow().starts, 1);
     assert_eq!(
@@ -384,7 +402,8 @@ fn the_editor_shows_photos_recordings_and_their_transcripts() -> TestResult {
     let store = media_store()?;
     let devices: Shared = Rc::default();
     let mut harness = window(store, &devices);
-    // Shed: two Photos, an empty Transcript; Groceries: a Transcript.
+    // Shed: two Photos, an empty Transcript; Groceries: its removed
+    // recording's words in its text (obf-1084).
     harness
         .state_mut()
         .select_note("note:00000000000000000000000000000003");
@@ -394,7 +413,10 @@ fn the_editor_shows_photos_recordings_and_their_transcripts() -> TestResult {
         .state_mut()
         .select_note("note:00000000000000000000000000000002");
     harness.run();
-    assert!(harness.query_all_by_label("Milk, eggs and bread").count() >= 2);
+    assert_eq!(
+        field_with(&harness, "Milk, eggs and bread").as_deref(),
+        Some("Groceries\n\nMilk, eggs and bread")
+    );
     // Dentist: a photo from another Device whose bytes are not here, and
     // the merged Notes' photo and recording in its Sections.
     harness
@@ -430,13 +452,13 @@ fn search_finds_transcripts_photo_texts_and_sections() -> TestResult {
     );
     harness.get_by_label("Clear search").click();
     harness.run();
-    assert_eq!(harness.state().shown_notes().len(), 6);
+    assert_eq!(harness.state().shown_notes().len(), 10);
     // Another level starts with a search of its own.
     harness.state_mut().set_query("receipt");
     harness.state_mut().select(Selection::Unsorted);
     harness.state_mut().select(Selection::All);
     harness.run();
-    assert_eq!(harness.state().shown_notes().len(), 6);
+    assert_eq!(harness.state().shown_notes().len(), 10);
     Ok(())
 }
 
@@ -661,6 +683,84 @@ fn choosing_a_model_downloads_it_and_keeps_only_that_one() -> TestResult {
     Ok(())
 }
 
+/// The choice of speech model this Device keeps, as text.
+fn kept(store: &Store) -> Result<Option<String>, Box<dyn std::error::Error>> {
+    Ok(DeviceSettings::new(store)
+        .speech_model()?
+        .map(|c| format!("{}:{:?}", c.name, c.source)))
+}
+
+#[test]
+fn the_speech_model_in_use_is_kept_as_the_choice_with_how_it_came() -> TestResult {
+    let store = media_store()?;
+    let tmp = tempfile::tempdir()?;
+    let whisper = tmp.path().join("whisper");
+    let pinned = || ModelDir::pinned_to(&whisper, &sha(b"base"), &sha(b"small"));
+    let mirror: Download = Arc::new(|dir, model, stop, _| {
+        let bytes: &[u8] = match model {
+            WhisperModel::Base => b"base",
+            WhisperModel::Small => b"small",
+        };
+        dir.take_in(bytes, None, Some(model), stop, |_, _| {})
+    });
+    let start = |store: &Arc<Store>| {
+        let speech = SpeechModel::with_download(pinned(), mirror.clone(), Arc::new(|| {}));
+        assert!(eventually(|| matches!(
+            speech.status(),
+            Status::Missing | Status::Ready
+        )));
+        let mut app = App::new(store.clone(), "en");
+        app.set_enrichers(None, None, Some(speech.clone()));
+        let mut harness = settings(app);
+        harness.run();
+        (harness, speech)
+    };
+    // No model, none kept.
+    let (mut harness, speech) = start(&store);
+    assert_eq!(kept(&store)?, None);
+    harness.state_mut().open(Page::Settings);
+    harness.run();
+    harness.get_by_label("Small, 488 MB").click_accesskit();
+    harness.run_steps(4);
+    assert!(eventually(
+        || speech.status() == Status::Ready && speech.current() == Some(WhisperModel::Small)
+    ));
+    harness.run_steps(4);
+    assert_eq!(kept(&store)?.as_deref(), Some("small:Download"));
+    // Taken from a file, it says so.
+    let file = tmp.path().join("mine.bin");
+    std::fs::write(&file, b"base")?;
+    let picked = file.clone();
+    harness
+        .state_mut()
+        .set_model_picker(Box::new(move |_| Some(picked.clone())));
+    harness
+        .get_by_label("Use a file of my own")
+        .click_accesskit();
+    harness.run_steps(4);
+    assert!(eventually(
+        || speech.status() == Status::Ready && speech.current() == Some(WhisperModel::Base)
+    ));
+    harness.run_steps(4);
+    assert_eq!(kept(&store)?.as_deref(), Some("base:File"));
+    drop(harness);
+    // The next start finds it and keeps how it came.
+    let (harness, _) = start(&store);
+    assert_eq!(kept(&store)?.as_deref(), Some("base:File"));
+    drop(harness);
+    // A model there from before anything was kept counts as downloaded.
+    DeviceSettings::new(&store).set_speech_model(None)?;
+    let (harness, _) = start(&store);
+    assert_eq!(kept(&store)?.as_deref(), Some("base:Download"));
+    drop(harness);
+    // Gone from the folder, none is kept.
+    std::fs::remove_dir_all(&whisper)?;
+    let (_harness, speech) = start(&store);
+    assert_eq!(speech.status(), Status::Missing);
+    assert_eq!(kept(&store)?, None);
+    Ok(())
+}
+
 #[test]
 fn the_merge_dialog_finds_notes_by_their_transcripts_too() -> TestResult {
     let store = media_store()?;
@@ -703,29 +803,76 @@ fn only_a_photo_or_recording_with_a_text_offers_its_removal() -> TestResult {
     );
     assert!(!shows(&harness, "Remove recording, keep text"));
     // Groceries: a photo without a Photo Text, its recording removed and
-    // the Transcript on the card and in the editor.
+    // its words in the text (obf-1084).
     harness
         .state_mut()
         .select_note("note:00000000000000000000000000000002");
     harness.run();
     assert!(!shows(&harness, "Remove photo, keep text"));
-    assert!(harness.query_all_by_label("Milk, eggs and bread").count() >= 2);
-    // A Note whose only photo was removed shows its Photo Text alone.
+    assert!(!shows(&harness, "Remove recording, keep text"));
+    assert!(field_with(&harness, "Milk, eggs and bread").is_some());
+    // A Note whose only photo was removed has its words as its text.
     harness
         .state_mut()
         .select_note("note:00000000000000000000000000000001");
     harness.run();
-    assert!(harness.query_all_by_label("RECEIPT\nTotal 12,50").count() >= 2);
-    // Dentist: the removed photo of a merged Note, in its Section.
+    assert_eq!(
+        field_with(&harness, "RECEIPT").as_deref(),
+        Some("RECEIPT\nTotal 12,50")
+    );
+    // Dentist: the removed photo of a merged Note, its words in its
+    // Section's text.
     harness.state_mut().select_note(DENTIST);
     harness.run();
-    assert!(shows(&harness, "Dr. Müller, Tuesday 9:00"));
+    assert_eq!(
+        field_with(&harness, "Dr. Müller").as_deref(),
+        Some("Dr. Müller, Tuesday 9:00")
+    );
     assert!(!shows(&harness, "Remove recording, keep text"));
     Ok(())
 }
 
+/// The sizes `words` are drawn at, wherever they are drawn.
+fn sizes_of(harness: &Harness<'_, App>, words: &str) -> Vec<f32> {
+    fn flat(shape: &egui::Shape, words: &str, into: &mut Vec<f32>) {
+        match shape {
+            egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| flat(s, words, into)),
+            egui::Shape::Text(text) if text.galley.text() == words => into.extend(
+                text.galley
+                    .job
+                    .sections
+                    .iter()
+                    .map(|s| s.format.font_id.size),
+            ),
+            _ => {}
+        }
+    }
+    let mut sizes = Vec::new();
+    for clipped in &harness.output().shapes {
+        flat(&clipped.shape, words, &mut sizes);
+    }
+    sizes
+}
+
 #[test]
-fn removing_a_photo_asks_once_and_keeps_its_photo_text() -> TestResult {
+fn a_photo_text_reads_at_content_size() -> TestResult {
+    let store = media_store()?;
+    let devices: Shared = Rc::default();
+    let mut harness = window(store, &devices);
+    harness.state_mut().select_note(SHED);
+    harness.run();
+    // Under its photo in the Note dialog (obf-1123).
+    let sizes = sizes_of(&harness, "Spare key under the pot");
+    assert!(!sizes.is_empty(), "not drawn");
+    assert!(
+        sizes.iter().all(|s| (s - 16.0).abs() < 0.01),
+        "drawn at {sizes:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn removing_a_photo_asks_once_and_puts_its_words_into_the_text() -> TestResult {
     let store = media_store()?;
     let devices: Shared = Rc::default();
     let mut harness = window(store.clone(), &devices);
@@ -743,44 +890,56 @@ fn removing_a_photo_asks_once_and_keeps_its_photo_text() -> TestResult {
     harness.run();
     assert!(shows(
         &harness,
-        "Remove this photo and keep its Photo Text?"
+        "Remove this photo and keep its words in the text?"
     ));
     harness.get_by_label("Cancel").click();
     harness.run();
     assert!(!shows(
         &harness,
-        "Remove this photo and keep its Photo Text?"
+        "Remove this photo and keep its words in the text?"
     ));
     let shed = Notes::new(&store).by_id(SHED)?.ok_or("Shed")?;
     assert_eq!(shed.photos.len(), 3);
     assert!(shed.removed_photos.is_empty());
-    // Remove takes it; the Photo Text stays where it was.
+    // Remove takes it; its words go into the text, which the editor's
+    // field shows at once (obf-1084).
     harness.get_by_label("Remove photo, keep text").click();
     harness.run();
+    assert!(shows(
+        &harness,
+        "The file goes from all your Devices and from everyone you share the Note's Area with. Its words go into the text, to be edited or deleted like typed text."
+    ));
     harness.get_by_label("Remove").click();
     harness.run();
     assert!(!shows(
         &harness,
-        "Remove this photo and keep its Photo Text?"
+        "Remove this photo and keep its words in the text?"
     ));
     assert_eq!(harness.state().error(), None);
     let shed = Notes::new(&store).by_id(SHED)?.ok_or("Shed")?;
     assert_eq!(shed.photos.len(), 2);
-    assert_eq!(shed.removed_photos, vec![photo.to_string()]);
+    assert!(!shed.photos.contains(&photo.to_string()));
     assert!(store.photo(photo).is_none(), "its bytes go");
-    // On the card and in the editor.
-    assert_eq!(harness.query_all_by_label(spare).count(), 2);
+    assert!(
+        !shed.photo_texts.contains_key(photo),
+        "no Photo Text is left"
+    );
+    let words = "Shed\n\nSpare key under the pot";
+    assert_eq!(shed.text, words);
+    assert_eq!(field_with(&harness, spare).as_deref(), Some(words));
     assert!(!shows(&harness, "Remove photo, keep text"));
-    // Search still finds it, under the Note dialog.
+    // Leaving writes no old text back; search still finds it.
     harness.state_mut().close_note();
     harness.run();
+    let shed = Notes::new(&store).by_id(SHED)?.ok_or("Shed")?;
+    assert_eq!(shed.text, words);
     type_into(&mut harness, "Search all Notes", "spare key");
     assert_eq!(harness.state().shown_notes(), vec![SHED]);
     Ok(())
 }
 
 #[test]
-fn removing_a_recording_of_a_merged_note_keeps_its_transcript() -> TestResult {
+fn removing_a_recording_of_a_merged_note_puts_its_words_into_its_section() -> TestResult {
     let store = media_store()?;
     let merged = "note:00000000000000000000000000000006";
     let recording = "f30aa31ce85ada5e75454198abfd7a73294f261d712e5ec3dbe7a8846606879d";
@@ -798,7 +957,7 @@ fn removing_a_recording_of_a_merged_note_keeps_its_transcript() -> TestResult {
     harness.run();
     assert!(shows(
         &harness,
-        "Remove this recording and keep its Transcript?"
+        "Remove this recording and keep its words in the text?"
     ));
     harness.get_by_label("Cancel").click();
     harness.run();
@@ -810,9 +969,63 @@ fn removing_a_recording_of_a_merged_note_keeps_its_transcript() -> TestResult {
     harness.run();
     let note = Notes::new(&store).by_id(merged)?.ok_or("merged")?;
     assert!(note.recordings.is_empty());
-    assert_eq!(note.removed_recordings, vec![recording.to_string()]);
-    assert!(shows(&harness, "Bring the X-ray"));
+    assert!(note.transcripts.is_empty(), "no Transcript is left");
+    assert_eq!(note.text, "Bring the X-ray");
+    // The Section's field shows it, and leaving writes no old text back.
+    assert_eq!(
+        field_with(&harness, "X-ray").as_deref(),
+        Some("Bring the X-ray")
+    );
     assert!(!shows(&harness, "Remove recording, keep text"));
+    // Its text was empty: as on the phone, Ctrl+Z empties no text, and
+    // the field keeps showing what is stored.
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Z);
+    harness.run();
+    let note = Notes::new(&store).by_id(merged)?.ok_or("merged")?;
+    assert_eq!(note.text, "Bring the X-ray");
+    assert_eq!(
+        field_with(&harness, "X-ray").as_deref(),
+        Some("Bring the X-ray")
+    );
+    assert_eq!(harness.state().error(), None);
+    harness.state_mut().close_note();
+    harness.run();
+    let note = Notes::new(&store).by_id(merged)?.ok_or("merged")?;
+    assert_eq!(note.text, "Bring the X-ray");
+    Ok(())
+}
+
+#[test]
+fn ctrl_z_takes_a_removed_recordings_words_out_of_the_text_again() -> TestResult {
+    let store = empty_store()?;
+    let notes = Notes::new(&store);
+    let note = notes.capture("Bike", None, None)?;
+    let hash = notes.add_recording(&note.id, &heard())?;
+    notes.set_transcript(&note.id, &hash, "Lock code 1234")?;
+    let devices: Shared = Rc::default();
+    let mut harness = window(store.clone(), &devices);
+    harness.state_mut().select_note(&note.id);
+    harness.run();
+    harness.get_by_label("Remove recording, keep text").click();
+    harness.run();
+    harness.get_by_label("Remove").click();
+    harness.run();
+    let text = |store: &Store| -> Result<String, Box<dyn std::error::Error>> {
+        Ok(Notes::new(store).by_id(&note.id)?.ok_or("Bike")?.text)
+    };
+    assert_eq!(text(&store)?, "Bike\n\nLock code 1234");
+    assert_eq!(
+        field_with(&harness, "Bike").as_deref(),
+        Some("Bike\n\nLock code 1234")
+    );
+    // One step: the text as it was; the recording stays gone.
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Z);
+    harness.run();
+    assert_eq!(text(&store)?, "Bike");
+    assert_eq!(field_with(&harness, "Bike").as_deref(), Some("Bike"));
+    let bike = Notes::new(&store).by_id(&note.id)?.ok_or("Bike")?;
+    assert!(bike.recordings.is_empty());
+    assert!(bike.transcripts.is_empty());
     Ok(())
 }
 
@@ -830,7 +1043,7 @@ fn disk_store(dir: &std::path::Path) -> Result<Arc<Store>, Box<dyn std::error::E
 fn record_note(harness: &mut Harness<'_, App>, devices: &Shared) {
     devices.borrow_mut().mic = true;
     open_garage(harness);
-    harness.get_by_label("Record voice").click();
+    harness.get_by_label("Voice").click();
     harness.run();
     harness.get_by_label("Stop").click();
     harness.run();
@@ -919,7 +1132,7 @@ fn the_playback_speed_is_written_the_german_way_in_german() -> TestResult {
     devices.borrow_mut().mic = true;
     // Recorded in the Note dialog, as the quick note has no recorder (#352).
     open_garage(&mut harness);
-    harness.get_by_label("Sprache aufnehmen").click();
+    harness.get_by_label("Sprache").click();
     harness.run();
     harness.get_by_label("Beenden").click();
     harness.run();
@@ -1215,5 +1428,225 @@ fn transcribing_again_without_a_text_is_announced_at_the_top() -> TestResult {
         section.transcripts.values().next().map(String::as_str),
         Some("Lock code 1234")
     );
+    Ok(())
+}
+
+/// Speaking, as the fake microphone hears it (obf-1053).
+const LOUD: Option<f32> = Some(0.4);
+
+/// A quiet room: under 0.02 of full scale (obf-1053).
+const QUIET: Option<f32> = Some(0.005);
+
+/// The window over a Note "Garage" open in the Note dialog, recording
+/// into it with "End a recording after a pause" at `pause` (obf-1053);
+/// its id. Each step of the window is a quarter second.
+fn recording_garage(
+    store: &Arc<Store>,
+    devices: &Shared,
+    pause: Option<u32>,
+) -> Result<(Harness<'static, App>, String), Box<dyn std::error::Error>> {
+    DeviceSettings::new(store).set_recording_pause_seconds(pause)?;
+    devices.borrow_mut().mic = true;
+    let mut harness = window(store.clone(), devices);
+    let garage = open_garage(&mut harness);
+    harness.get_by_label("Voice").click();
+    // With a pause set, the window looks five times a second.
+    harness.run_steps(1);
+    assert!(harness.state().recording());
+    Ok((harness, garage))
+}
+
+/// How many recordings the Note `id` has.
+fn recordings(store: &Store, id: &str) -> Result<usize, Box<dyn std::error::Error>> {
+    Ok(Notes::new(store)
+        .by_id(id)?
+        .ok_or("the Note")?
+        .recordings
+        .len())
+}
+
+#[test]
+fn with_a_pause_set_a_recording_ends_once_it_was_quiet_that_long_and_is_kept() -> TestResult {
+    let store = empty_store()?;
+    let devices: Shared = Rc::default();
+    let (mut harness, garage) = recording_garage(&store, &devices, Some(2))?;
+    devices.borrow_mut().level = LOUD;
+    harness.run_steps(4);
+    devices.borrow_mut().level = QUIET;
+    // 2 s are eight steps from the first quiet one on.
+    harness.run_steps(8);
+    assert!(harness.state().recording(), "not yet 2 s");
+    harness.run_steps(2);
+    assert!(!harness.state().recording());
+    // Kept as Stop keeps it: on the Note, which stays open.
+    assert_eq!(recordings(&store, &garage)?, 1);
+    assert_eq!(harness.state().selected_note(), Some(garage.as_str()));
+    assert!(shows(&harness, "Voice"));
+    assert_eq!(harness.state().notice(), None);
+    Ok(())
+}
+
+#[test]
+fn off_as_by_default_a_pause_is_ignored() -> TestResult {
+    let store = empty_store()?;
+    let devices: Shared = Rc::default();
+    let (mut harness, garage) = recording_garage(&store, &devices, None)?;
+    devices.borrow_mut().level = LOUD;
+    harness.run_steps(2);
+    devices.borrow_mut().level = QUIET;
+    harness.run_steps(60);
+    assert!(harness.state().recording());
+    assert_eq!(devices.borrow().asked, 0, "the level is not even asked");
+    harness.get_by_label("Stop").click();
+    harness.run();
+    assert_eq!(recordings(&store, &garage)?, 1);
+    Ok(())
+}
+
+#[test]
+fn a_recording_nothing_was_said_into_goes_on_however_quiet() -> TestResult {
+    let store = empty_store()?;
+    let devices: Shared = Rc::default();
+    devices.borrow_mut().level = QUIET;
+    let (mut harness, _) = recording_garage(&store, &devices, Some(2))?;
+    harness.run_steps(60);
+    assert!(harness.state().recording());
+    assert!(devices.borrow().asked > 40, "asked every step");
+    Ok(())
+}
+
+#[test]
+fn speech_or_a_level_that_cannot_be_told_counts_the_pause_anew() -> TestResult {
+    let store = empty_store()?;
+    let devices: Shared = Rc::default();
+    devices.borrow_mut().level = LOUD;
+    let (mut harness, garage) = recording_garage(&store, &devices, Some(2))?;
+    harness.run_steps(2);
+    for breaks in [LOUD, None] {
+        devices.borrow_mut().level = QUIET;
+        harness.run_steps(6);
+        devices.borrow_mut().level = breaks;
+        harness.run_steps(1);
+    }
+    devices.borrow_mut().level = QUIET;
+    harness.run_steps(8);
+    assert!(harness.state().recording(), "1.75 s since the last break");
+    harness.run_steps(2);
+    assert!(!harness.state().recording());
+    assert_eq!(recordings(&store, &garage)?, 1);
+    Ok(())
+}
+
+#[test]
+fn the_pause_is_read_as_each_recording_starts() -> TestResult {
+    let store = empty_store()?;
+    let devices: Shared = Rc::default();
+    devices.borrow_mut().level = LOUD;
+    let (mut harness, garage) = recording_garage(&store, &devices, None)?;
+    DeviceSettings::new(&store).set_recording_pause_seconds(Some(2))?;
+    harness.run_steps(2);
+    devices.borrow_mut().level = QUIET;
+    harness.run_steps(20);
+    assert!(harness.state().recording(), "it started with Off");
+    harness.get_by_label("Stop").click();
+    harness.run();
+    devices.borrow_mut().level = LOUD;
+    harness.get_by_label("Voice").click();
+    harness.run_steps(3);
+    devices.borrow_mut().level = QUIET;
+    harness.run_steps(12);
+    assert!(!harness.state().recording(), "the next one ends on 2 s");
+    assert_eq!(devices.borrow().starts, 2);
+    // The fake hears the same both times, kept once.
+    assert_eq!(recordings(&store, &garage)?, 1);
+    Ok(())
+}
+
+/// The pill `label` of the choice "End a recording after a pause".
+fn pause_pill<'a>(harness: &'a Harness<'_, App>, label: &'a str) -> egui_kittest::Node<'a> {
+    let title = harness.get_by_label("End a recording after a pause").rect();
+    harness
+        .query_all_by(|n| n.role() == Role::RadioButton && n.label().as_deref() == Some(label))
+        .filter(|n| n.rect().min.y > title.min.y)
+        .min_by(|a, b| a.rect().min.y.total_cmp(&b.rect().min.y))
+        .unwrap_or_else(|| panic!("no {label:?}"))
+}
+
+#[test]
+fn settings_capture_sets_the_pause_on_this_computer_only() -> TestResult {
+    let store = empty_store()?;
+    let devices: Shared = Rc::default();
+    let mut app = App::new(store.clone(), "en");
+    app.set_recorder(Box::new(FakeMic(devices.clone())));
+    app.open(Page::Settings);
+    let mut harness = settings(app);
+    harness.run();
+    assert!(shows(&harness, "Capture"));
+    assert!(shows(
+        &harness,
+        "Ends a voice recording on its own once you have said nothing this long, and keeps it as Stop does. Off: pauses are ignored."
+    ));
+    assert!(pause_pill(&harness, "Off").accesskit_node().toggled() == Some(Toggled::True));
+    pause_pill(&harness, "3 s").click();
+    harness.run();
+    let settings = DeviceSettings::new(&store);
+    assert_eq!(settings.recording_pause_seconds()?, Some(3));
+    assert_eq!(
+        store.local_setting("recordingPauseSeconds")?.as_deref(),
+        Some("3")
+    );
+    assert!(store.all_entries()?.is_empty(), "never synced");
+    pause_pill(&harness, "Off").click();
+    harness.run();
+    assert_eq!(settings.recording_pause_seconds()?, None);
+    assert_eq!(store.local_setting("recordingPauseSeconds")?, None);
+    // Found by its detail line, under the card's heading.
+    type_into(&mut harness, "Search Settings", "pauses ignored");
+    assert!(shows(&harness, "End a recording after a pause"));
+    assert!(shows(&harness, "Capture"));
+    assert!(!shows(&harness, "This computer"));
+    Ok(())
+}
+
+#[test]
+fn without_a_microphone_the_settings_offer_no_pause() -> TestResult {
+    let store = empty_store()?;
+    let mut app = App::new(store, "en");
+    app.open(Page::Settings);
+    let mut harness = settings(app);
+    harness.run();
+    assert!(!shows(&harness, "End a recording after a pause"));
+    Ok(())
+}
+
+#[test]
+fn a_pause_ending_the_recording_keeps_what_is_being_typed_and_the_cursor() -> TestResult {
+    let store = empty_store()?;
+    let devices: Shared = Rc::default();
+    devices.borrow_mut().level = LOUD;
+    let (mut harness, garage) = recording_garage(&store, &devices, Some(2))?;
+    harness
+        .get_by(|n| {
+            matches!(n.role(), Role::TextInput | Role::MultilineTextInput)
+                && n.value().as_deref() == Some("Garage")
+        })
+        .click();
+    harness.run_steps(1);
+    harness.get_by(|n| n.is_focused()).type_text(" in the loft");
+    harness.run_steps(1);
+    devices.borrow_mut().level = QUIET;
+    harness.run_steps(12);
+    assert!(!harness.state().recording());
+    let focused = harness.get_by(|n| n.is_focused());
+    let typed = focused.value().unwrap_or_default();
+    assert!(typed.contains("in the loft"), "{typed:?}");
+    // Typing on, then leaving, keeps both.
+    focused.type_text(" too");
+    harness.run();
+    harness.key_press(Key::Escape);
+    harness.run();
+    let note = Notes::new(&store).by_id(&garage)?.ok_or("Garage")?;
+    assert!(note.text.contains("in the loft too"), "{:?}", note.text);
+    assert_eq!(note.recordings.len(), 1);
     Ok(())
 }

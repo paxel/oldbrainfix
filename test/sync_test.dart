@@ -7,12 +7,14 @@ import 'package:oldbrainfix/src/announcements.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/app_lock.dart';
 import 'package:oldbrainfix/src/conflicts_screen.dart';
+import 'package:oldbrainfix/src/look.dart';
 import 'package:oldbrainfix/src/pairing_platform.dart';
 import 'package:oldbrainfix/src/photo_platform.dart';
 import 'package:oldbrainfix/src/starter_set_screen.dart';
 import 'package:oldbrainfix/src/sync_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'accent_row.dart';
 import 'announced.dart';
 import 'fake_alarms.dart';
 import 'fake_photos.dart';
@@ -158,6 +160,17 @@ void main() {
 
     await tester.ensureVisible(find.text('Forget'));
     await tester.pumpAndSettle();
+    // A text button with its icon (obf-1104).
+    expect(
+      find.descendant(
+        of: find.ancestor(
+          of: find.text('Forget'),
+          matching: find.byWidgetPredicate((w) => w is TextButton),
+        ),
+        matching: find.byIcon(Icons.link_off),
+      ),
+      findsOneWidget,
+    );
     await tester.tap(find.text('Forget'));
     await tester.pumpAndSettle();
     expect(phone.pairedDevices(), isEmpty);
@@ -385,6 +398,33 @@ void main() {
     expect(find.textContaining('On this Device, '), findsOneWidget);
     // Meanwhile the newer one shows.
     expect(Notes(phone).byId(note.id)?.text, 'Edited at the desk');
+    // An embossed card, its versions radio rows, none picked yet
+    // (obf-1119).
+    final card = find.descendant(
+      of: find.byType(ConflictsScreen),
+      matching: find.byType(Embossed),
+    );
+    expect(card, findsOneWidget);
+    final rows = find.descendant(
+      of: card,
+      matching: find.byType(RadioListTile<ConflictVersion?>),
+    );
+    expect(rows, findsNWidgets(2));
+    // Its heading is a card's, 16 medium (obf-1124).
+    final heading = tester.widget<Text>(find.text('Note text')).style;
+    expect(heading?.fontSize, 16);
+    expect(heading?.fontWeight, FontWeight.w500);
+    expect(
+      find.descendant(of: card, matching: find.byType(OutlinedButton)),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: rows.first,
+        matching: find.text('Edited at the desk'),
+      ),
+      findsOneWidget,
+    );
 
     await tester.tap(find.text('From the phone'));
     await tester.pumpAndSettle();
@@ -430,6 +470,11 @@ void main() {
     NamedPlaces(phone).setRadius(home.id, 250);
     NamedPlaces(desk).setRadius(home.id, 50);
     await syncNow(tester);
+    expectAccentRow(
+      tester,
+      find.byKey(const ValueKey('conflicts')),
+      'Conflicts',
+    );
     await tester.tap(find.byKey(const ValueKey('conflicts')));
     await tester.pumpAndSettle();
     expect(find.text('Routine schedule'), findsOneWidget);

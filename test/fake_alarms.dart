@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:oldbrainfix/src/agenda_widget.dart';
 import 'package:oldbrainfix/src/alarm_platform.dart';
+import 'package:oldbrainfix/src/notification_taps.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 /// An [AlarmPlatform] that records what was armed and answers as told.
@@ -142,6 +143,7 @@ class FakeAlarms implements AlarmPlatform {
   /// The Nudge's notification is tapped while the app runs.
   void tapNudge() {
     _nudgeTapped = true;
+    _arrived('nudge');
     _actions.add(null);
   }
 
@@ -157,6 +159,7 @@ class FakeAlarms implements AlarmPlatform {
   /// The Changes Nudge's notification is tapped while the app runs.
   void tapChanges() {
     _changesTapped = true;
+    _arrived('changes');
     _actions.add(null);
   }
 
@@ -172,6 +175,7 @@ class FakeAlarms implements AlarmPlatform {
   /// The Catch-up Notification is tapped while the app runs (obf-1039).
   void tapCatchUp() {
     _catchUpTapped = true;
+    _arrived('catchUp');
     _actions.add(null);
   }
 
@@ -221,10 +225,32 @@ class FakeAlarms implements AlarmPlatform {
 
   OpenedOccurrence? _occurrenceTapped;
 
-  /// An Occurrence's notification is tapped while the app runs (#270).
-  void tapOccurrence(OpenedOccurrence opened) {
+  /// An Occurrence's notification, or its Heads-up's ([kind] "headsUp"),
+  /// is tapped while the app runs (#270), as the platform tells it came
+  /// [from] (obf-1039).
+  void tapOccurrence(
+    OpenedOccurrence opened, {
+    String kind = 'occurrence',
+    TapFrom from = TapFrom.running,
+  }) {
     _occurrenceTapped = opened;
+    _arrived(kind, from: from);
     _actions.add(null);
+  }
+
+  TapArrival? _tapArrived;
+
+  /// When the taps in the trace are told to have come (obf-1039).
+  var tappedAt = DateTime.utc(2026, 10, 24, 9);
+
+  void _arrived(String kind, {TapFrom from = TapFrom.running}) =>
+      _tapArrived = (kind: kind, from: from, at: tappedAt);
+
+  @override
+  Future<TapArrival?> tapArrived() async {
+    final arrived = _tapArrived;
+    _tapArrived = null;
+    return arrived;
   }
 
   @override

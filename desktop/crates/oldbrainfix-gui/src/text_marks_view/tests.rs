@@ -105,3 +105,21 @@ fn a_cut_through_an_id_leaves_none_of_it() {
     let flag = "\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}";
     assert_eq!(without_stray_ids(flag), None);
 }
+
+#[test]
+fn a_tables_columns_keep_their_words_width_while_it_fits() {
+    // obf-1048: no column is cut while the whole table fits.
+    assert_eq!(column_widths(&[100.0, 200.0], 400.0, 150.0), [100.0, 200.0]);
+}
+
+#[test]
+fn a_table_too_wide_cuts_its_long_columns_and_shares_the_room_left() {
+    // The long ones cut to the cap, the room left shared among them,
+    // none past its words.
+    let widths = column_widths(&[100.0, 900.0, 260.0], 600.0, 200.0);
+    assert_eq!(widths, [100.0, 250.0, 250.0]);
+    let widths = column_widths(&[100.0, 900.0, 220.0], 600.0, 200.0);
+    assert_eq!(widths, [100.0, 280.0, 220.0]);
+    // Still too wide at the cap: each cut to it, the table moving sideways.
+    assert_eq!(column_widths(&[500.0, 500.0], 300.0, 200.0), [200.0, 200.0]);
+}

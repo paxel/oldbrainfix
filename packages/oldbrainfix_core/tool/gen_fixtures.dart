@@ -193,9 +193,13 @@ final _scenarios = <Scenario>[
         'date, dated now; an empty one; a hidden file, a photo, one with a '
         'zero byte and one too large, skipped; a folder of nothing usable, '
         'which makes no Area; a file of the folder again, into a third '
-        'Area.',
+        'Area; four files of a folder picked, each keeping its path, the '
+        'Area what was picked (obf-1078), and the earlier Import found by '
+        'that and its paths only; of them one moved and one trashed, then '
+        'filled in with them, one changed, one by a backslash path, and '
+        'three new; and a fill-in of another folder, into a new Area.',
     build: (store) {
-      Places(store).addArea('From Notes');
+      final own = Places(store).addArea('From Notes').id;
       final imports = Imports(store);
       final folder = _importFolder();
       _imported = [
@@ -203,6 +207,64 @@ final _scenarios = <Scenario>[
         imports.folder('From Notes', [folder[8], folder[9]]),
         imports.folder('From Notes', [folder[1]]),
       ];
+      final picked = imports.folder('From Notes', [
+        folder[0],
+        folder[1],
+        folder[2],
+        folder[5],
+      ], from: _importFrom);
+      _imported.add(picked);
+      final area = picked.areaId ?? '';
+      final paths = [for (final f in folder) f.name];
+      _earlier = [
+        imports.earlier(ImportSourceKind.folder, _importFrom, paths),
+        imports.earlier(ImportSourceKind.folder, _importOther, paths),
+        imports.earlier(ImportSourceKind.keep, _importFrom, paths),
+      ];
+      final notes = Notes(store);
+      String withPath(String path) => notes
+          .inside(area)
+          .firstWhere((n) => store.current(n.id, ImportKeys.source) == path)
+          .id;
+      notes.file(withPath('dentist.txt'), own);
+      notes.trash(withPath('Müller.txt'));
+      final shopping = folder[0];
+      final ideas = folder[5];
+      _imported.add(
+        imports.folder(
+          'From Notes',
+          [
+            ImportFile(
+              shopping.name,
+              shopping.modified,
+              Uint8List.fromList(utf8.encode('# Shopping\nchanged')),
+            ),
+            folder[1],
+            folder[2],
+            folder[3],
+            folder[4],
+            ImportFile(
+              ideas.name.replaceAll('/', r'\'),
+              ideas.modified,
+              ideas.bytes,
+            ),
+            folder[6],
+          ],
+          from: _importFrom,
+          fillIn: area,
+        ),
+      );
+      _earlier.add(
+        imports.earlier(ImportSourceKind.folder, _importFrom, paths),
+      );
+      _imported.add(
+        imports.folder(
+          'From Notes',
+          [folder[3]],
+          from: _importOther,
+          fillIn: area,
+        ),
+      );
     },
   ),
   (
@@ -234,9 +296,16 @@ final _scenarios = <Scenario>[
         'the Agenda; an archived '
         'note without a time of making; a note in the trash, one that is '
         'no JSON, its .html twin, Labels.txt and a note of another product '
-        'outside the Keep folder.',
+        'outside the Keep folder; each Note keeps its path, the Area the zip '
+        'picked (obf-1078).',
     build: (store) {
-      _imported = [Imports(store).keep('From Google Keep', _keepTakeout())];
+      _imported = [
+        Imports(store).keep(
+          'From Google Keep',
+          _keepTakeout(),
+          from: 'content://downloads/takeout.zip',
+        ),
+      ];
     },
   ),
   (
@@ -1059,13 +1128,18 @@ final _scenarios = <Scenario>[
         'with an untranscribed recording merged into another; a trashed '
         'Note whose media waits for nothing; a photo from another Device '
         'whose bytes are not here; a photo that may be removed; a photo '
-        'removed and its Photo Text kept, '
+        'removed and its Photo Text kept as the Note\'s text, '
         'its bytes kept for the other Note showing it; a merged Note\'s '
         'photo and a recording removed, their bytes gone, their texts '
-        'kept; Notes without words titled as a photo or as a voice '
+        'kept as a paragraph of the text, none left beside it '
+        '(obf-1084); Notes without words titled as a photo or as a voice '
         'recording, one with an empty Transcript; a Note merged into that '
         'one whose Photo Text was removed and whose Transcript was removed '
-        'and transcribed again.',
+        'and transcribed again; Notes without text of their own named by '
+        'their first Transcript with words before a Photo Text, by the '
+        'order their recordings were added, and by a Transcript whose '
+        'recording was removed as versions before obf-1084 removed it '
+        '(obf-1049).',
     build: (store) {
       final notes = Notes(store);
       final receipt = notes.capture('', photos: [_photo(1)]);
@@ -1131,6 +1205,35 @@ final _scenarios = <Scenario>[
       notes.removePhotoText(bike.id, frame);
       notes.removeTranscript(bike.id, lock);
       notes.setTranscript(bike.id, lock, 'Lock code 1234');
+      final plumber = notes.capture(
+        '',
+        photos: [_photo(9)],
+        recordings: [_recording(8), _recording(9)],
+      );
+      notes.setPhotoText(plumber.id, plumber.photos.single, 'SALE');
+      notes.setTranscript(plumber.id, plumber.recordings.first, '');
+      notes.setTranscript(
+        plumber.id,
+        plumber.recordings.last,
+        '\n  Call the plumber  \r\nabout the leak\n',
+      );
+      final ordered = notes.capture(
+        '',
+        recordings: [_recording(10), _recording(11)],
+      );
+      final swapped = notes.capture(
+        '',
+        recordings: [_recording(11), _recording(10)],
+      );
+      for (final note in [ordered, swapped]) {
+        notes.setTranscript(note.id, ordered.recordings.first, 'Ten');
+        notes.setTranscript(note.id, ordered.recordings.last, 'Eleven');
+      }
+      final ferns = notes.capture('', recordings: [_recording(12)]);
+      notes.setTranscript(ferns.id, ferns.recordings.single, 'Water the ferns');
+      // As versions before obf-1084 removed it: the Transcript stays.
+      store.append(ferns.id, NoteKeys.audio(ferns.recordings.single), null);
+      store.dropRemovedBlobs();
     },
   ),
   (
@@ -1766,7 +1869,9 @@ final _scenarios = <Scenario>[
         'back a week on, and after the open ones, a move before itself and '
         'one to where it is writing nothing (#283); then a voice capture with '
         'a typed line said into a list, still owing the items of its '
-        'Transcript, and one transcribed since (#311).',
+        'Transcript, and one transcribed since (#311); one whose text holds '
+        'its Transcript, that line no Line but the items said, and one whose '
+        'text held it as a Line before it came, adding no item (obf-1082).',
     build: (store) {
       final notes = Notes(store);
       final lists = ShoppingLists(store);
@@ -1958,6 +2063,22 @@ final _scenarios = <Scenario>[
         'Butter, flour und 1,5 Liter Milch.',
       );
       lists.addOwedLines(said.id, wall);
+      // Said into the quick note (obf-1082): its text holds the Transcript,
+      // whose line is no Line, the items said split instead; and a typed
+      // line made a Line before the same words came as its Transcript.
+      final heard = notes.capture(
+        'Honey\n\nTea and jam',
+        recordings: [_recording(33)],
+      );
+      notes.setTranscript(heard.id, heard.recordings.single, 'Tea and jam');
+      lists.addVoiceCapture(market, heard.id, wall);
+      final typed = notes.capture(
+        'Rice and oats',
+        recordings: [_recording(34)],
+      );
+      lists.addVoiceCapture(market, typed.id, wall);
+      notes.setTranscript(typed.id, typed.recordings.single, 'Rice and oats');
+      lists.addOwedLines(typed.id, wall);
     },
   ),
   (
@@ -4027,6 +4148,8 @@ const _queries = [
   'dentist',
   'x-ray',
   'müller',
+  // Folded (obf-1047): without the umlaut, in upper case.
+  'MULLER',
   'called',
   'loop',
   ' e ',
@@ -4147,6 +4270,13 @@ Map<String, Object?> _note(Note note) => {
   ),
   if (note.attachments.isNotEmpty) 'aloneFile': note.aloneFile?.hash,
   if (note.wordless == Wordless.file) 'wordlessName': note.wordlessName,
+  // The name a Note without text of its own is shown by (obf-1049): only
+  // when it is not its text.
+  if (note.calendarText.isNotEmpty &&
+      note.calendarText != note.visibleText) ...{
+    'shownName': note.shownName,
+    'calendarText': note.calendarText,
+  },
 };
 
 /// The attached files of a Note or Section, only when it has any, so a
@@ -4335,7 +4465,80 @@ Map<String, Object?> _expected(Store store) {
       for (final id in placeIds)
         id: [for (final n in Search(store).notes('e', within: id)) n.id],
     },
+    'findings': {
+      for (final query in _findingQueries)
+        query: {
+          for (final n in Search(store).notes(query))
+            n.id: _findingsOf(n, notes.sections(n.id), query),
+        },
+    },
     'conflicts': _conflicts(store.conflicts()),
+  };
+}
+
+/// The queries whose places in each Note found are read (obf-1047).
+const _findingQueries = [
+  'MULLER',
+  'dentist',
+  'receipt',
+  'called',
+  'loop',
+  'lease',
+  'rent due',
+];
+
+/// The places of [query] in [note] and its [sections] (obf-1047), each
+/// with the text it lies in, offsets counted in code points.
+List<Map<String, Object?>> _findingsOf(
+  Note note,
+  List<Section> sections,
+  String query,
+) {
+  int points(String text, int at) => text.substring(0, at).runes.length;
+  return [
+    for (final f in Findings.ofNote(note, query, sections: sections))
+      if (_findingText(note, sections, f) case final text)
+        {
+          'cell': switch (f.cell) {
+            null => null,
+            final cell => {
+              'column': cell.column,
+              'row': cell.row,
+              'table': cell.table,
+              'tableStart': points(text, cell.tableStart),
+            },
+          },
+          'context': f.context,
+          'contextEnd': points(f.context, f.contextEnd),
+          'contextStart': points(f.context, f.contextStart),
+          'end': points(text, f.end),
+          'key': f.key,
+          'line': f.line,
+          'part': f.part.name,
+          'section': f.section,
+          'start': points(text, f.start),
+        },
+  ];
+}
+
+/// The text [finding] lies in.
+String _findingText(Note note, List<Section> sections, Finding finding) {
+  final section = sections.where((s) => s.id == finding.section).firstOrNull;
+  final key = finding.key;
+  return switch (finding.part) {
+    FindingPart.text => section?.shownText ?? note.shownText,
+    FindingPart.transcript =>
+      (section?.transcripts ?? note.transcripts)[key] ?? '',
+    FindingPart.photoText =>
+      (section?.photoTexts ?? note.photoTexts)[key] ?? '',
+    FindingPart.attachmentText =>
+      (section?.attachmentTexts ?? note.attachmentTexts)[key] ?? '',
+    FindingPart.fileName =>
+      (section?.attachments ?? note.attachments)
+              .where((a) => a.hash == key)
+              .firstOrNull
+              ?.name ??
+          '',
   };
 }
 
@@ -4353,6 +4556,7 @@ Map<String, Object?> _attachmentsOf(Store store, Pack pack) {
         'rent due',
         'LEASE.PDF',
         'grüße',
+        'GRUSSE',
         'keys: 2',
         'boxes.csv',
         'plan.ods',
@@ -5487,6 +5691,14 @@ Map<String, Object?> _ics() {
 /// What the Imports of the `import` scenario came to.
 var _imported = <ImportSummary>[];
 
+/// What the `import` scenario found of earlier Imports (obf-1078).
+var _earlier = <EarlierImport?>[];
+
+/// Where the app picked the folder the `import` scenario fills in, and
+/// another one.
+const _importFrom = 'content://tree/primary%3ANotes';
+const _importOther = 'content://tree/primary%3AOther';
+
 /// What the `features` scenario read after each of its steps.
 final _featureReads = <Map<String, Object>>[];
 
@@ -5525,7 +5737,17 @@ const _helpBundle = {
   '0.4.1': {'en': 'Fixed\n• A thing.', 'de': 'Behoben\n• Eine Sache.'},
 };
 
+Map<String, Object?>? _earlierJson(EarlierImport? e) => e == null
+    ? null
+    : {
+        'areaId': e.areaId,
+        'areaName': e.areaName,
+        'at': e.at.toUtc().toIso8601String(),
+        'held': e.held,
+      };
+
 Map<String, Object?> _summary(ImportSummary s) => {
+  'already': s.already,
   'areaId': s.areaId,
   'checklists': s.checklists,
   'missing': s.missing,
@@ -6332,6 +6554,22 @@ Future<void> _bundle(Directory root) async {
   }
 }
 
+/// The Device settings of Ada's Device in the backup fixture besides the
+/// playback speed: carried for both apps, for one alone, the speech model,
+/// one with a value not offered and one bound to the Device.
+const _backupDeviceSettings = [
+  ('theme', 'dark'),
+  ('quietHours', '21:30-07:00'),
+  ('renagMinutes', '15'),
+  ('recordingPauseSeconds', '5'),
+  ('tipsOff', 'true'),
+  ('twoRowEditorOff', 'true'),
+  ('alertsOff', 'true'),
+  ('speechModel', 'small:file'),
+  ('textSize', 'huge'),
+  ('alarmSound', 'content://media/internal/audio/media/42'),
+];
+
 /// The new Device's fixed key seed in the backup fixture: bytes 65 to 96.
 final _restoredSeed = Uint8List.fromList(List<int>.generate(32, (i) => 65 + i));
 
@@ -6381,8 +6619,13 @@ Future<void> _backupFixture(Directory root) async {
     ada
       ..applyProfileDefaults(name: 'Desk')
       ..renameOwnProfile('Ada');
-    // The one Device setting a Backup carries.
+    // The Device settings a Backup carries (obf-1098), the phone's and the
+    // desktop's alone among them, one not offered and one bound to the
+    // Device, which stay behind.
     ada.playbackSpeed = 1.5;
+    for (final (key, value) in _backupDeviceSettings) {
+      ada.setLocalSetting(key, value);
+    }
     const passphrase = 'Grüße an die Katze';
     final code = await setUpBackups(ada, passphrase);
     final moment = ada.momentRows().single;
@@ -6395,6 +6638,7 @@ Future<void> _backupFixture(Directory root) async {
           ..._keySettings(ada),
           for (final (key, value) in ada.localSettingsWithPrefix('backup:')) [key, value],
           ['playbackSpeed', '${ada.playbackSpeed}'],
+          for (final (key, value) in _backupDeviceSettings) [key, value],
         ],
       })}\n',
     );
@@ -6408,6 +6652,7 @@ Future<void> _backupFixture(Directory root) async {
     secretBytes = _counted(5000);
     final file = '${out.path}/backup.$backupExtension';
     final counts = await writeBackup(ada, file);
+    final carried = carriedSettings(ada);
 
     final header = readBackupHeader(file);
     if (header == null) throw StateError('the backup fixture has no header');
@@ -6448,6 +6693,12 @@ Future<void> _backupFixture(Directory root) async {
           for (final (key, value) in restored.localSettingsWithPrefix(''))
             if (key != 'device' && key != 'signseed') [key, value],
         ],
+        'carried': carried,
+        'taken': {
+          for (final app in SettingsApp.values) app.name: [
+              for (final (key, value) in takenSettings(carried, app)) [key, value],
+            ],
+        },
         'read': expected,
       })}\n',
     );
@@ -9913,6 +10164,171 @@ Map<String, Object?> _textTags() {
   };
 }
 
+/// Folding and the places of a query (obf-1047): what every character
+/// that does not fold to itself folds to, by its code point, and some
+/// words; then for texts in each format and queries the places found,
+/// counted in code points, so that the cores' UTF-16 and UTF-8 offsets
+/// compare.
+Map<String, Object?> _findings() {
+  const words = [
+    'Müller',
+    'MÜLLER',
+    'Müller',
+    'Straße',
+    'STRASSE',
+    'ẞ',
+    'Ærø Œuvre',
+    'İzmir',
+    'ΟΔΟΣ Ελλάδα',
+    'Łódź Đorđe',
+    'ﬃ K',
+    'Ǆemal',
+    '🧠 日記 𝔸',
+    'é̂',
+    '́',
+  ];
+  final long = [for (var i = 0; i < 40; i++) 'word$i'].join(' ');
+  final word = 'x' * 100;
+  final cases = [
+    (
+      'Call Herr Müller\nthen muller again, MULLER',
+      TextFormats.plain,
+      ' muller ',
+    ),
+    ('Straße strasse STRASSE', TextFormats.plain, 'strasse'),
+    ('Straße', TextFormats.plain, 's'),
+    ('Müller und Müller', TextFormats.plain, 'mu'),
+    ('🧠 Grüße 𝔸 grusse\r\nGRÜSSE\rgrüsse', TextFormats.plain, 'grusse'),
+    ('', TextFormats.plain, 'a'),
+    ('abc', TextFormats.plain, '   '),
+    ('é', TextFormats.plain, '́'),
+    (long, TextFormats.plain, 'word20'),
+    (long, TextFormats.plain, 'word1'),
+    ('  $long  ', TextFormats.plain, 'word39'),
+    ('a $word b', TextFormats.plain, 'x' * 90),
+    ('#Müll und #mull', TextFormats.plain, '#mull'),
+    ('fn main() {\n  let straße = 1;\n}', TextFormats.code, 'strasse'),
+    ('**Müller**', 'later', 'muller'),
+    (
+      '# Title\n**Mül**ler and \\*star\\* and `co de`',
+      TextFormats.markdown,
+      'muller',
+    ),
+    (
+      '# Title\n**Mül**ler and \\*star\\* and `co de`',
+      TextFormats.markdown,
+      '*star*',
+    ),
+    (
+      '# Title\n**Mül**ler and \\*star\\* and `co de`',
+      TextFormats.markdown,
+      'co de',
+    ),
+    (
+      '# Title\n**Mül**ler and \\*star\\* and `co de`',
+      TextFormats.markdown,
+      '#',
+    ),
+    (
+      '- Müller\n> Müller\n## Müller\n1. Müller\n  - *Mü*_ller_',
+      TextFormats.markdown,
+      'muller',
+    ),
+    (
+      '[Müller](https://example.org/muller) and `` `Müller` ``',
+      TextFormats.markdown,
+      'muller',
+    ),
+    ('```\nMüller\n```\nMüller', TextFormats.markdown, 'muller'),
+    ('☐ Müller ✅ done', TextFormats.markdown, '☐ m'),
+    (
+      'Before\n\n| a | b |\n| --- | --- |\n| x | y |\n\n'
+          '| Name | City |\n| --- | --- |\n| Ann | Köln |\n| Bo | Graz `\\|` |',
+      TextFormats.markdown,
+      'koln',
+    ),
+    (
+      'Before\n\n| a | b |\n| --- | --- |\n| x | y |\n\n'
+          '| Name | City |\n| --- | --- |\n| Ann | Köln |\n| Bo | Graz `\\|` |',
+      TextFormats.markdown,
+      'ann kö',
+    ),
+    (
+      'Before\n\n| a | b |\n| --- | --- |\n| x | y |\n\n'
+          '| Name | City |\n| --- | --- |\n| Ann | Köln |\n| Bo | Graz `\\|` |',
+      TextFormats.markdown,
+      'graz |',
+    ),
+    (
+      'Before\n\n| a | b |\n| --- | --- |\n| x | y |\n\n'
+          '| Name | City |\n| --- | --- |\n| Ann | Köln |\n| Bo | Graz `\\|` |',
+      TextFormats.markdown,
+      '---',
+    ),
+    (
+      'Before\n\n| a | b |\n| --- | --- |\n| x | y |\n\n'
+          '| Name | City |\n| --- | --- |\n| Ann | Köln |\n| Bo | Graz `\\|` |',
+      TextFormats.markdown,
+      'a',
+    ),
+    (
+      '${MarkdownTables.headingColumnLine}\n| a | b |\n|---|---|\n'
+          '| Müller | x |',
+      TextFormats.markdown,
+      'muller',
+    ),
+    (
+      '| a |  | c |\n|---|---|---|\n| x |  | Müller |',
+      TextFormats.markdown,
+      'x muller',
+    ),
+    ('| a\\|b |\n|---|\n| c |', TextFormats.markdown, 'a|b'),
+    ('Straße\r\n**STRASSE**\rstraße', TextFormats.markdown, 'strasse'),
+  ];
+  int points(String text, int at) => text.substring(0, at).runes.length;
+  return {
+    'folding': {
+      for (var c = 0; c <= 0x10FFFF; c++)
+        if ((c < 0xD800 || c >= 0xE000) &&
+            Findings.fold(String.fromCharCode(c)) != String.fromCharCode(c))
+          c.toRadixString(16).toUpperCase().padLeft(4, '0'): Findings.fold(
+            String.fromCharCode(c),
+          ),
+    },
+    'words': [
+      for (final w in words) {'folded': Findings.fold(w), 'text': w},
+    ],
+    'cases': [
+      for (final (text, format, query) in cases)
+        {
+          'findings': [
+            for (final f in Findings.inText(text, format, query))
+              {
+                'cell': switch (f.cell) {
+                  null => null,
+                  final cell => {
+                    'column': cell.column,
+                    'row': cell.row,
+                    'table': cell.table,
+                    'tableStart': points(text, cell.tableStart),
+                  },
+                },
+                'context': f.context,
+                'contextEnd': points(f.context, f.contextEnd),
+                'contextStart': points(f.context, f.contextStart),
+                'end': points(text, f.end),
+                'line': f.line,
+                'start': points(text, f.start),
+              },
+          ],
+          'format': format,
+          'query': query,
+          'text': text,
+        },
+    ],
+  };
+}
+
 /// The tag tree (#267): the Areas made, the Notes captured, each with its
 /// format, the Area it is filed into by its index, its Amends, the one it
 /// is merged into and whether it is trashed, then the tree read from them
@@ -10126,6 +10542,75 @@ Map<String, Object?> _backlinks() {
   } finally {
     store.close();
   }
+}
+
+/// The Heads-ups the Routine editor offers (obf-1087): its list per
+/// schedule, the units a custom one is given in and the most of each,
+/// and the minutes a number of a unit makes or none, at the edges; then
+/// offsets as stored, read and written back.
+Map<String, Object?> _headsUps() {
+  const counts = [
+    -1,
+    0,
+    1,
+    2,
+    4,
+    5,
+    24,
+    30,
+    31,
+    45,
+    720,
+    721,
+    1440,
+    43200,
+    43201,
+    0x7fffffffffffffff,
+  ];
+  return {
+    'maxMinutes': HeadsUpKeys.maxMinutes,
+    'choices': {
+      for (final allDay in [false, true])
+        allDay ? 'allDay' : 'timed': HeadsUpKeys.choices(allDay: allDay),
+    },
+    'units': {
+      for (final allDay in [false, true])
+        allDay ? 'allDay' : 'timed': [
+          for (final unit in HeadsUpKeys.units(allDay: allDay)) unit.name,
+        ],
+    },
+    'most': {for (final unit in HeadsUpUnit.values) unit.name: unit.most},
+    'minutesOf': [
+      for (final allDay in [false, true])
+        for (final unit in HeadsUpUnit.values)
+          for (final count in counts)
+            {
+              'allDay': allDay,
+              'count': count,
+              'minutes': HeadsUpKeys.minutesOf(count, unit, allDay: allDay),
+              'unit': unit.name,
+            },
+    ],
+    'read': [
+      for (final value in [
+        null,
+        '',
+        '20',
+        '1440,20,20',
+        '45,90,14400,43200',
+        '43201,0,020,+5, 5,abc,-3,0x10,,99999',
+      ])
+        {'minutes': HeadsUpKeys.read(value), 'value': value},
+    ],
+    'write': [
+      for (final minutes in [
+        <int>[],
+        [0, -5, 43201],
+        [90, 45, 45, 43200, 1],
+      ])
+        {'minutes': minutes, 'value': HeadsUpKeys.write(minutes)},
+    ],
+  };
 }
 
 /// Schedules as sentences (ADR 0044), on a held day: each schedule of
@@ -11277,6 +11762,112 @@ Map<String, Object?> _markdown() {
       'index': 0,
     }, (at) => MarkdownTables.deleteColumn(text, at, 0));
   }
+  // Sorting a table's rows by a column (obf-1052).
+  String sortColumn(List<String> cells) =>
+      ['| h |', '|---|', for (final c in cells) '| $c |'].join('\n');
+  final sortIds = [for (var i = 9; i > 0; i--) 'box$i'].iterator;
+  final sortTexts = [
+    '| Item | Price | Weight | Date | Note |\n|---|--:|---|---|---|\n'
+        '| Milk | 1,29 € | 1 kg | 24.11.2026 | |\n'
+        '| Äpfel | 12,50 € | 500 g | 2026-01-05 | b |\n'
+        '| eggs | € 3 | 3,5 kg | 3/1/2026 | A |\n'
+        '| Bread |  | 0,75 kg | | ☐ x |\n'
+        '| zebra | 0,99 € | 2 | 29.2.2024 | 🧠 |\n'
+        '| milk | 1,29 € | 1 kg | 24.11.2026 |',
+    for (final cells in [
+      ['1.234', '12,5', '999'],
+      ['1,234', '1.5', '999'],
+      ['1.234.567', '2,345', '3'],
+      ['1,234', '567', '2,000'],
+      ['0.500', '2', '0,5'],
+      ['0.500', '2'],
+      ["1'234.5", '1\u00a0234.25 €', '999', '1\u202f000'],
+      ['1’000,5', '2'],
+      ["1'234.5", '1’000,5'],
+      ['1,5', '2.5'],
+      ['1.2,3', '4'],
+      ['1,23,456', '4'],
+      ['1.234 567', '4'],
+      ['3 x 4', '5'],
+      ['ca. 5', '6'],
+      ['10:30', '9:15'],
+      ['٣', '4'],
+      ['12.', '3,-', '7kg', '1st', '5'],
+      ['€', '5'],
+      ['−7 %', '-€5', '€-6', '+4', '€ +2', r'\$1'],
+      ['- 3', '4'],
+      ['12345678901234567890123', '12345678901234567890122.9', '-0', '0.0'],
+      ['-0.000001', '007', '7.000', '-7', '-7.5'],
+      ['24.11.2026', '2026-01-05', '3/1/2026', '29.2.2024', '01.01.2000'],
+      ['31.02.2026', '1.1.2026'],
+      ['29.2.2026', '1.1.2026'],
+      ['29.2.1900', '1.1.2026'],
+      ['29.2.2000', '31.12.1999', '30.4.2026'],
+      ['31.4.2026', '1.1.2026'],
+      ['24.11.26', '1.1.2026'],
+      ['24/11/2026', '1/1/2026'],
+      ['2026.11.24', '1.1.2026'],
+      ['2026-11-24.', '1.1.2026'],
+      ['2026', '2025'],
+      ['Zebra', 'äpfel', 'Müller', 'muller', 'Apfel', 'eclair', 'Straße'],
+      ['strasse', 'Œuvre', 'oeuvre', 'ǅ', 'İ', 'i'],
+      ['🧠', 'ａ', 'Ａ', '\ue000'],
+      ['**b**', '*a*', '`c`', '[d](u)', '~~e~~'],
+      ['', ''],
+      ['', 'x', '', '1'],
+      [for (var i = 0; i < 40; i++) '${i % 3} kg'],
+      [for (var i = 0; i < 40; i++) i.isEven ? 'Ä' : 'a'],
+    ])
+      sortColumn(cells),
+    TextBoxes.convert(
+      sortColumn(['☐ b', '☐\ufe0f a', '✅ c', '☐ c']),
+      format: TextFormats.markdown,
+      newId: () => (sortIds..moveNext()).current,
+    ),
+    '${MarkdownTables.headingColumnLine}\r\nItem|  Price\r\n:--- | ---:\r\n'
+        '  bread | 2,50 € | beyond\r\n| milk |1 €|\r\neggs | 12 €\r\n\r\nafter',
+    '| a | b |\n|---|---|\n| x | 2 |\n| y |\n|  | 1 |\n| z | 3 |',
+    '| only |\n|---|',
+  ];
+  final sorts = [
+    for (final text in sortTexts)
+      if (MarkdownTables.all(text) case [final table, ...])
+        {
+          'columns': [
+            for (var c = 0; c <= table.columns; c++)
+              {
+                'ascending': MarkdownTables.sortedRows(table, c),
+                'column': c,
+                'descending': MarkdownTables.sortedRows(
+                  table,
+                  c,
+                  descending: true,
+                ),
+                'kind': MarkdownTables.sortKind(table, c).name,
+              },
+          ],
+          'text': text,
+        },
+  ];
+  for (final text in [sortTexts.first, ...sortTexts.reversed.take(4)]) {
+    final table = MarkdownTables.all(text).first;
+    final at = cp(text, table.rows.first.start) + 1;
+    for (var c = 0; c <= table.columns; c++) {
+      for (final descending in [false, true]) {
+        tableEdit(
+          'sortRows',
+          text,
+          at,
+          {'column': c, 'descending': descending},
+          (at) => MarkdownTables.sortRows(text, at, c, descending: descending),
+        );
+      }
+    }
+  }
+  tableEdit('sortRows', 'plain', 3, {
+    'column': 0,
+    'descending': false,
+  }, (at) => MarkdownTables.sortRows('plain', at, 0));
   for (final (text, at) in [
     ('', 0),
     ('abc def', 5),
@@ -11382,6 +11973,7 @@ Map<String, Object?> _markdown() {
         },
     ],
     'edits': edits,
+    'sorts': sorts,
     'mayOpen': {
       for (final url in [
         'https://x.org',
@@ -12111,7 +12703,10 @@ Future<void> main(List<String> args) async {
     'values before and after, the format of its text, the name of who '
     'made it and whether this Device may use its text again.\n'
     '- `import/import.json`: what each Import of the `import` log came to '
-    '(ADR 0036): the Area made, the Notes made and the files skipped.\n'
+    '(ADR 0036): the Area made, the Notes made, the files skipped and '
+    'those an earlier Import made already (obf-1078); `earlier.json` the '
+    'earlier Import found for a folder picked and its paths, by its Area, '
+    'date and the paths it holds, or none.\n'
     '- `import-formats/`: the documents the Import of its log took, as '
     'they lie in a folder (`inputs/`), and for each, in the order handed '
     'over, its name, when it was last changed and, for AsciiDoc, Org, '
@@ -12221,6 +12816,11 @@ Future<void> main(List<String> args) async {
     'German and read back, texts read as typed with the parts not '
     'understood, and the words suggested at a cursor, offsets counted in '
     'code points.\n'
+    '- `heads_ups.json`: the Heads-ups the Routine editor offers '
+    '(obf-1087): its list for a timed and an all-day schedule, the units '
+    'a custom one is given in for each and the most of every unit, and '
+    'the minutes a number of a unit makes, or none, at the edges; then '
+    'offsets as stored, read and written back.\n'
     '- `markdown.json`: formatted text: for each text its lines with their '
     'kind, level, number and parts, as read, what it reads as without its '
     'marks, whether it uses a format, the text escaped, as HTML, its '
@@ -12238,9 +12838,15 @@ Future<void> main(List<String> args) async {
     'put on and taken off at a cursor, on a word, a selection and lines, '
     'links put on, changed and taken off, every line format on and off, '
     'items in and out, a table\'s cell set, its rows and columns put in, '
-    'moved and deleted, its first column marked, a new table put in, the '
+    'moved and deleted, its first column marked, its rows sorted by each '
+    'column both ways (obf-1052), a new table put in, the '
     'task list items of the lines a selection touches made boxes, with '
-    'the text and the selection they gave; which link destinations '
+    'the text and the selection they gave; for tables the order each '
+    'column sorts the rows under the header row in, ascending and '
+    'descending, and whether it compares them as numbers, dates or text: '
+    'units, currency signs, decimal marks and groups, dates in the '
+    'calendar and not, folded letters, marks, boxes, empty cells and '
+    'equal keys; which link destinations '
     'may be opened; and which pasted texts look like code (#213): a '
     'shebang, lines of code punctuation or indented, and lists, prose, '
     'Markdown and short texts that do not. Offsets are counted in '
@@ -12255,6 +12861,14 @@ Future<void> main(List<String> args) async {
     'too long lines); which fence names and pasted first lines name '
     'which grammar; and which grammars and regular expressions are '
     'refused. Offsets are counted in code points.\n'
+    '- `findings.json`: the folding search and the find bar match by '
+    '(obf-1047): what every character that does not fold to itself folds '
+    'to, by its code point, and words in several scripts, decomposed '
+    'accents among them; then for texts in each format and queries the '
+    'places found, each with its line, its table cell and its context: '
+    'a letter folded to two, accents dropped, line breaks of every kind, '
+    'a long line cut, marks inside a place, escapes, code, links, lists, '
+    'code blocks and tables. Offsets are counted in code points.\n'
     '- `folder/`: two Devices that met once, so the joiner holds the '
     'host\'s keys; the host wrote more since, a new Area among it, and '
     'synced through the shared folder: both logs with their blobs and the '
@@ -12327,15 +12941,18 @@ Future<void> main(List<String> args) async {
     '- `backup/`: Ada\'s Device with Areas, a Shared Area, a photo, a '
     'recording longer than a chunk, a Routine checked off, a Moment and '
     'another Device\'s key: her log with its blobs (`device.jsonl`), the '
-    'keys, her Profile, the backup key she holds and the playback speed '
-    'she chose (`settings.json`), '
+    'keys, her Profile, the backup key she holds, the playback speed '
+    'she chose and her other Device settings, the phone\'s and the '
+    'desktop\'s alone, a speech model, one not offered and one bound to '
+    'the Device among them (`settings.json`), '
     'her Moments '
     '(`moments.json`), the Backup she wrote with the standard Argon2id '
     'cost (`backup.$backupExtension`, random bytes counted from 5001 on, '
     'at a held clock), and a new Device restoring it with the passphrase '
     'a day later: its log (`restored.jsonl`), the settings it keeps, her '
     'Profile with the new Device\'s key bound to it by the old one\'s '
-    'and her playback speed among them, and what it reads '
+    'and her playback speed among them, the settings record she wrote '
+    'and what the phone and the desktop take of it, and what it reads '
     '(`expected.json`).\n'
     '- `backup-notes/`: taking Notes back from a Backup (#285): Ada\'s '
     'Device with her Work before her Health, a Routine and a Reminder, a '
@@ -12498,9 +13115,14 @@ Future<void> main(List<String> args) async {
     File('${root.path}/highlight.json'),
     '${_json.convert(_highlight())}\n',
   );
+  _write(File('${root.path}/findings.json'), '${_json.convert(_findings())}\n');
   _write(
     File('${root.path}/schedule_sentences.json'),
     '${_json.convert(_scheduleSentences())}\n',
+  );
+  _write(
+    File('${root.path}/heads_ups.json'),
+    '${_json.convert(_headsUps())}\n',
   );
   _sync(root);
   _conflictsFixture(root);
@@ -12622,6 +13244,12 @@ Future<void> main(List<String> args) async {
         _write(
           File('${out.path}/${scenario.name}.json'),
           '${_json.convert({'imports': _imported.map(_summary).toList()})}\n',
+        );
+      }
+      if (scenario.name == 'import') {
+        _write(
+          File('${out.path}/earlier.json'),
+          '${_json.convert({'earlier': _earlier.map(_earlierJson).toList()})}\n',
         );
       }
       if (scenario.name == 'features') {

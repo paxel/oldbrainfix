@@ -44,6 +44,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get text => 'Text';
 
   @override
+  String get captureFanEditor => 'Editor';
+
+  @override
   String get captureFanClose => 'Schließen';
 
   @override
@@ -82,6 +85,12 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get newArea => 'Neuer Bereich';
+
+  @override
+  String get rearrangeAreas => 'Neu anordnen';
+
+  @override
+  String get rearrangeDone => 'Fertig';
 
   @override
   String get newTopic => 'Neues Thema';
@@ -287,6 +296,31 @@ class AppLocalizationsDe extends AppLocalizations {
   String get nothingFound => 'Keine Notiz passt.';
 
   @override
+  String findingsMore(int count) {
+    return '+$count weitere';
+  }
+
+  @override
+  String get findInNote => 'In der Notiz suchen';
+
+  @override
+  String findCount(int at, int count) {
+    return '$at von $count';
+  }
+
+  @override
+  String get findNone => 'Nicht in dieser Notiz';
+
+  @override
+  String get findPrevious => 'Vorherige Stelle';
+
+  @override
+  String get findNext => 'Nächste Stelle';
+
+  @override
+  String get findClose => 'Suchleiste schließen';
+
+  @override
   String get noNotesHere =>
       'Hier gibt es noch keine Notizen. Tippe auf +, um eine hinzuzufügen.';
 
@@ -315,7 +349,16 @@ class AppLocalizationsDe extends AppLocalizations {
   String get amendHint => 'Was gibt es Neues?';
 
   @override
+  String get addAPart => 'Teil hinzufügen';
+
+  @override
   String get add => 'Hinzufügen';
+
+  @override
+  String get editorGroupThisNote => 'Diese Notiz';
+
+  @override
+  String get editorGroupTidy => 'Aufräumen';
 
   @override
   String get moveToTrash => 'In den Papierkorb';
@@ -325,6 +368,67 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get trashEmpty => 'Der Papierkorb ist leer.';
+
+  @override
+  String get trashEmptyNow => 'Papierkorb jetzt leeren';
+
+  @override
+  String trashEmptyNotes(int notes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      notes,
+      locale: localeName,
+      other:
+          '$notes Notizen endgültig löschen? Sie lassen sich nicht zurückholen.',
+      one: '1 Notiz endgültig löschen? Sie lässt sich nicht zurückholen.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String trashEmptyRoutines(int routines) {
+    String _temp0 = intl.Intl.pluralLogic(
+      routines,
+      locale: localeName,
+      other:
+          '$routines Routinen endgültig löschen? Sie lassen sich nicht zurückholen.',
+      one: '1 Routine endgültig löschen? Sie lässt sich nicht zurückholen.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String trashEmptyBoth(int notes, int routines) {
+    String _temp0 = intl.Intl.pluralLogic(
+      notes,
+      locale: localeName,
+      other: '$notes Notizen',
+      one: '1 Notiz',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      routines,
+      locale: localeName,
+      other: '$routines Routinen',
+      one: '1 Routine',
+    );
+    return '$_temp0 und $_temp1 endgültig löschen? Sie lassen sich nicht zurückholen.';
+  }
+
+  @override
+  String get deleteForGood => 'Endgültig löschen';
+
+  @override
+  String get trashEmptyFailed => 'Der Papierkorb konnte nicht geleert werden.';
+
+  @override
+  String get trashEmptyFailedTitle => 'Papierkorb nicht geleert';
+
+  @override
+  String get trashEmptyFailedCause =>
+      'Die Notizen im Papierkorb ließen sich nicht endgültig löschen.';
+
+  @override
+  String get trashEmptyFailedFix =>
+      'Was nicht gelöscht wurde, bleibt im Papierkorb. Versuche es noch einmal.';
 
   @override
   String get restore => 'Wiederherstellen';
@@ -635,6 +739,28 @@ class AppLocalizationsDe extends AppLocalizations {
   String get more => 'Mehr';
 
   @override
+  String unitMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Minuten',
+      one: 'Minute',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String unitHours(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Stunden',
+      one: 'Stunde',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String unitDays(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -885,6 +1011,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get occurrenceFromDayBefore => 'Vom Vortag';
 
   @override
+  String get notificationAlreadyDone => 'Schon erledigt';
+
+  @override
+  String get notificationSkipped => 'Ausgelassen';
+
+  @override
   String get alarmsBanner =>
       'Alarme kommen vielleicht zu spät oder gar nicht: Eine Erlaubnis fehlt. Tippe hier, um das zu beheben.';
 
@@ -1027,6 +1159,20 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get removeHeadsUp => 'Vorwarnung entfernen';
+
+  @override
+  String get headsUpCustom => 'Eigene…';
+
+  @override
+  String get headsUpCustomTitle => 'Eigene Vorwarnung';
+
+  @override
+  String get headsUpCustomCount => 'Wie lange vorher';
+
+  @override
+  String headsUpCustomRange(int most) {
+    return 'Von 1 bis $most.';
+  }
 
   @override
   String headsUpMinutesBefore(int minutes) {
@@ -1298,9 +1444,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get moreCaptureContext => 'Mehr zur Erfassung';
 
   @override
-  String get recordVoice => 'Sprache aufnehmen';
-
-  @override
   String get recording => 'Aufnahme läuft …';
 
   @override
@@ -1439,6 +1582,27 @@ class AppLocalizationsDe extends AppLocalizations {
   String speechOfferMobileData(int megabytes) {
     return 'Du bist mit mobilen Daten online. Der Download verbraucht davon $megabytes MB.';
   }
+
+  @override
+  String speechOfferRestored(String model) {
+    return 'Die Sicherung nennt das zuvor verwendete Sprachmodell: $model. Lade es einmal herunter. Es lädt im Hintergrund, während du weitermachst, und die Einstellungen bieten es jederzeit später an.';
+  }
+
+  @override
+  String speechOfferRestoredFile(String model) {
+    return 'Die Sicherung nennt das zuvor verwendete Sprachmodell: $model. Es kam aus einer eigenen Datei: Wähle diese Datei noch einmal. Die Einstellungen bieten es jederzeit später an.';
+  }
+
+  @override
+  String get speechOfferPickAgain => 'Datei noch einmal wählen';
+
+  @override
+  String get speechRestoredDownload =>
+      'Das Sprachmodell aus der Sicherung ist noch nicht auf diesem Telefon. Herunterladen';
+
+  @override
+  String get speechRestoredPick =>
+      'Das Sprachmodell aus der Sicherung ist noch nicht auf diesem Telefon. Datei wählen';
 
   @override
   String get transcribing => 'Wird transkribiert …';
@@ -1740,6 +1904,13 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get fatFingersDetail =>
       'Schrift, Symbole und Knöpfe erscheinen 1,3-mal so groß, zusätzlich zur Schriftgröße des Systems, auch im Widget der Agenda.';
+
+  @override
+  String get tapMarks => 'Tippen auf Knöpfe zeigen';
+
+  @override
+  String get tapMarksDetail =>
+      'Ein grünes „!“ erscheint kurz über dem Finger, wenn ein Knopf ein Tippen annimmt.';
 
   @override
   String get textSize => 'Textgröße';
@@ -2396,7 +2567,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get bundleNoApp => 'Keine App hier kann das Bündel annehmen.';
 
   @override
-  String get shareArea => 'Teilen …';
+  String get shareArea => 'Mit Menschen teilen …';
 
   @override
   String get areaShared => 'Geteilt';
@@ -2717,7 +2888,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get backupsIntro =>
-      'Eine Sicherung ist eine verschlüsselte Datei mit all deinen Bereichen, Notizen, Fotos, Sprachaufnahmen, Routinen und ihrem Verlauf. Nur deine Passphrase oder der Wiederherstellungsschlüssel auf dem Wiederherstellungsblatt öffnet sie. Die Einstellungen dieses Geräts bleiben draußen, außer der Wiedergabegeschwindigkeit. All deine Geräte teilen sich eine Passphrase und einen Wiederherstellungsschlüssel, und jedes schreibt eigene Sicherungen.';
+      'Eine Sicherung ist eine verschlüsselte Datei mit all deinen Bereichen, Notizen, Fotos, Sprachaufnahmen, Routinen und ihrem Verlauf. Nur deine Passphrase oder der Wiederherstellungsschlüssel auf dem Wiederherstellungsblatt öffnet sie. Sie enthält auch die Einstellungen dieses Geräts und welches Sprachmodell es verwendet, nicht das Modell selbst. Draußen bleiben die App-Sperre, die Bereichssperren, der Alarmton, die gekoppelten Geräte, der gemeinsame Ordner und der Ordner für Sicherungen: Stell sie nach einer Wiederherstellung neu ein. All deine Geräte teilen sich eine Passphrase und einen Wiederherstellungsschlüssel, und jedes schreibt eigene Sicherungen.';
 
   @override
   String get backupPassphrase => 'Passphrase';
@@ -2886,7 +3057,7 @@ class AppLocalizationsDe extends AppLocalizations {
       other: '$count Änderungen',
       one: '1 Änderung',
     );
-    return 'Wiederhergestellt: $_temp0. Stell Alarme und Sperren neu ein, wähl den Ordner für Sicherungen noch einmal und kopple deine anderen Geräte noch einmal.';
+    return 'Wiederhergestellt: $_temp0. Stell die App-Sperre, die Bereichssperren und den Alarmton neu ein, wähl den Ordner für Sicherungen noch einmal und kopple deine anderen Geräte noch einmal.';
   }
 
   @override
@@ -3085,6 +3256,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get personFilterShowing => 'Nur Notizen von';
 
   @override
+  String get madeHiddenByFilter => 'Angelegt, vom Filter ausgeblendet';
+
+  @override
+  String get showHidden => 'Zeigen';
+
+  @override
   String get personTheirNotes => 'Notizen dieser Person';
 
   @override
@@ -3126,7 +3303,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get addToCalendar => 'In den Kalender';
 
   @override
-  String get deleteNoteQuestion => 'Diese Notiz löschen?';
+  String get deleteNoteQuestion => 'Diese Notiz in den Papierkorb verschieben?';
 
   @override
   String get deleteNoteDetail => 'Sie bleibt 30 Tage im Papierkorb.';
@@ -3136,15 +3313,16 @@ class AppLocalizationsDe extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Diese Notiz und ihre $count Routinen und Erinnerungen löschen?',
-      one: 'Diese Notiz und ihre 1 Routine löschen?',
+      other:
+          'Diese Notiz und ihre $count Routinen und Erinnerungen in den Papierkorb verschieben?',
+      one: 'Diese Notiz und ihre 1 Routine in den Papierkorb verschieben?',
     );
     return '$_temp0';
   }
 
   @override
   String get deleteNoteReminderQuestion =>
-      'Diese Notiz und ihre 1 Erinnerung löschen?';
+      'Diese Notiz und ihre 1 Erinnerung in den Papierkorb verschieben?';
 
   @override
   String get removeRecordingKeepText => 'Aufnahme entfernen, Text behalten';
@@ -3154,14 +3332,18 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get removeRecordingQuestion =>
-      'Diese Aufnahme entfernen und ihr Transkript behalten?';
+      'Diese Aufnahme entfernen und ihre Worte im Text behalten?';
 
   @override
   String get removePhotoQuestion =>
-      'Dieses Foto entfernen und seinen Text behalten?';
+      'Dieses Foto entfernen und seine Worte im Text behalten?';
 
   @override
   String get removeMediaDetail =>
+      'Die Datei verschwindet von all deinen Geräten und bei allen, mit denen du den Bereich der Notiz teilst. Ihre Worte kommen in den Text und werden wie getippter Text bearbeitet oder gelöscht.';
+
+  @override
+  String get removeAttachmentDetail =>
       'Die Datei verschwindet von all deinen Geräten und bei allen, mit denen du den Bereich der Notiz teilst. Der Text bleibt in der Notiz.';
 
   @override
@@ -3681,7 +3863,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get deleteFrogQuestion =>
-      'Diesen Frosch löschen? Er bleibt im Papierkorb. Seine Notiz bleibt.';
+      'Diesen Frosch in den Papierkorb verschieben? Seine Notiz bleibt.';
 
   @override
   String get frogOpen => 'Offen';
@@ -4788,9 +4970,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get shareToApp => 'Mit einer App teilen';
 
   @override
-  String get shareNote => 'Teilen …';
-
-  @override
   String get noteNotShared => 'Die Notiz wurde nicht geteilt.';
 
   @override
@@ -5139,10 +5318,27 @@ class AppLocalizationsDe extends AppLocalizations {
   String get tableCopy => 'Kopieren';
 
   @override
+  String get tableMore => 'Mehr zur Tabelle';
+
+  @override
+  String get tableUp => 'Nach oben';
+
+  @override
+  String get tableDown => 'Nach unten';
+
+  @override
+  String get tableDelete => 'Tabelle löschen';
+
+  @override
   String get tableOpen => 'Tabelle öffnen';
 
   @override
   String get tableSideways => 'Tabelle seitlich verschieben';
+
+  @override
+  String tableShowAll(int count) {
+    return 'Alle $count zeigen';
+  }
 
   @override
   String tableRow(int number) {
@@ -5227,6 +5423,49 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get tableSort => 'Nach dieser Spalte sortieren';
+
+  @override
+  String get tableSortedUp => 'Aufsteigend sortiert';
+
+  @override
+  String get tableSortedDown => 'Absteigend sortiert';
+
+  @override
+  String get tableShowSortedUp => 'Aufsteigend sortiert zeigen';
+
+  @override
+  String get tableShowSortedDown => 'Absteigend sortiert zeigen';
+
+  @override
+  String get tableShowAsWritten => 'Wie geschrieben zeigen';
+
+  @override
+  String get tableSortRows => 'Zeilen nach dieser Spalte sortieren';
+
+  @override
+  String get tableSortRowsDown =>
+      'Zeilen nach dieser Spalte absteigend sortieren';
+
+  @override
+  String get tableInsertMenu => 'Einfügen';
+
+  @override
+  String get tableMoveMenu => 'Verschieben';
+
+  @override
+  String get tableAlignMenu => 'Ausrichten';
+
+  @override
+  String get tableSortRowsMenu => 'Zeilen sortieren';
+
+  @override
+  String get tableShowSortedMenu => 'Sortiert zeigen';
+
+  @override
+  String get menuMore => 'Mehr …';
+
+  @override
   String get pairCodeNeedsUpdate =>
       'Dieser Code stammt von einem neueren Old Brain Fix. Aktualisiere Old Brain Fix auf diesem Gerät und versuch es dann noch einmal.';
 
@@ -5261,7 +5500,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsQuickNoteDetail =>
-      'Die Schnellnotiz zeigt den Text, die drei Stupser-Knöpfe und „Mehr“, das den vollen Editor öffnet. Foto, Sprache, Galerie, Einfügen, Datei und alles, was die Notiz einsortiert, gibt es im vollen Editor.';
+      'Die Schnellnotiz zeigt den Text, die drei Stupser-Knöpfe und „Im Editor öffnen“, das den vollen Editor öffnet. Foto, Sprache, Galerie, Einfügen, Datei und alles, was die Notiz einsortiert, gibt es im vollen Editor.';
 
   @override
   String get quickNoteFormatBar => 'Formatleiste';
@@ -5277,13 +5516,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get quickNoteSchedule => 'Frosch, Einheit oder Strichliste';
 
   @override
-  String get copyPhoto => 'Kopieren';
+  String get copyPhoto => 'Foto kopieren';
 
   @override
-  String get savePhoto => 'Speichern';
-
-  @override
-  String get sharePhoto => 'Teilen';
+  String get savePhoto => 'Foto speichern';
 
   @override
   String get photoSaveFailed => 'Das Foto wurde nicht gespeichert.';
@@ -5340,6 +5576,13 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsImport => 'Import';
+
+  @override
+  String get areasImport => 'Importieren …';
+
+  @override
+  String get settingsImportMoved =>
+      'Importieren … steht im ⋮ der Bereichsliste';
 
   @override
   String get importFolder => 'Ordner importieren';
@@ -5523,6 +5766,44 @@ class AppLocalizationsDe extends AppLocalizations {
       'Du kannst diese Seite verlassen. Der Import läuft neben der App weiter, und oben auf dem Bildschirm steht, wenn er fertig ist.';
 
   @override
+  String importFillInAsk(String date, String area) {
+    return 'Den Import vom $date in $area ergänzen? Dort kommt nur hinzu, was dieser Import nicht mitgebracht hat.';
+  }
+
+  @override
+  String get importFillIn => 'Ergänzen';
+
+  @override
+  String get importAsNew => 'Neu importieren';
+
+  @override
+  String importFilledIn(int count, String area) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Notizen kamen in den Bereich $area.',
+      one: '1 Notiz kam in den Bereich $area.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String importAlready(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count wurden schon früher importiert und bleiben weg.',
+      one: '1 wurde schon früher importiert und bleibt weg.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String importNothingNew(int count) {
+    return 'Nichts Neues: $count schon importiert';
+  }
+
+  @override
   String settingBadgeLabel(String setting, String value) {
     return '$setting: $value';
   }
@@ -5538,6 +5819,12 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get noteName => 'Name';
+
+  @override
+  String get addALine => 'Zeile hinzufügen';
+
+  @override
+  String get addADescription => 'Beschreibung hinzufügen';
 
   @override
   String get noteDescription => 'Beschreibung';
@@ -5685,7 +5972,7 @@ class AppLocalizationsDe extends AppLocalizations {
       'Der alte Text ist zurück. Der Verlauf behält jede Version.';
 
   @override
-  String get features => 'Was Old Brain Fix anbietet';
+  String get features => 'Komplexität';
 
   @override
   String get featuresDetail =>
@@ -5721,11 +6008,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get helpQuickStart3 =>
-      'Schreib unter + eine Aufgabe, tippe „Mehr“, dann + und Erinnere mich …; stell die Zeit ein und speichere.';
+      'Schreib unter + eine Aufgabe, tippe „Im Editor öffnen“, dann + und Erinnere mich …; stell die Zeit ein und speichere.';
 
   @override
   String get helpQuickStart4 =>
-      'Schreib unter + eine Gewohnheit, tippe „Mehr“, dann + und Erinnere mich …; wähl Alle …, wann, und Speichern.';
+      'Schreib unter + eine Gewohnheit, tippe „Im Editor öffnen“, dann + und Erinnere mich …; wähl Alle …, wann, und Speichern.';
 
   @override
   String get helpQuickStart5 =>
@@ -5757,7 +6044,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get helpQuickStartDesktop3 =>
-      'Erinnerung: in der Schnellnotiz schreiben, Mehr klicken, dann + und Erinnere mich …; die Zeit einstellen und Speichern klicken.';
+      'Erinnerung: in der Schnellnotiz schreiben, „Im Editor öffnen“ klicken, dann + und Erinnere mich …; die Zeit einstellen und Speichern klicken.';
 
   @override
   String get helpQuickStartDesktop4 =>
@@ -6088,6 +6375,23 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get feedbackTaps => 'Die zuletzt angetippten Benachrichtigungen';
+
+  @override
+  String get feedbackTapsNone => 'Bisher keine.';
+
+  @override
+  String feedbackTapsKept(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Benachrichtigungen, ohne den Text der Notizen',
+      one: '1 Benachrichtigung, ohne den Text der Notizen',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get feedbackNotes => 'Notizen als Paket';
 
   @override
@@ -6310,6 +6614,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get tagFold => '#Wörter darunter ausblenden';
 
   @override
+  String get allTags => 'Alle #Wörter …';
+
+  @override
   String get hiddenFromAi => 'Vor KI verborgen';
 
   @override
@@ -6330,7 +6637,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get file => 'Datei';
 
   @override
-  String get attachFile => 'Datei anhängen';
+  String get attachFile => 'Datei anhängen …';
 
   @override
   String get attachmentTextLabel => 'Anhangtext';
@@ -6821,10 +7128,23 @@ class AppLocalizationsDe extends AppLocalizations {
   String get spotDone => 'Verstanden';
 
   @override
+  String get spotNoMoreTips => 'Keine Tipps mehr';
+
+  @override
   String get settingsShowTips => 'Tipps wieder zeigen';
 
   @override
   String get settingsShowTipsDone => 'Jede Seite zeigt ihre Tipps wieder.';
+
+  @override
+  String get settingsTips => 'Tipps';
+
+  @override
+  String get settingsTipsSwitch => 'Tipps zeigen';
+
+  @override
+  String get settingsTipsSwitchDetail =>
+      'Jede Seite erklärt ihre Schaltflächen einmal.';
 
   @override
   String get spotAgendaPlus =>
@@ -6856,7 +7176,10 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get spotCaptureMore =>
-      '„Mehr“ speichert die Notiz und öffnet sie im vollen Editor.';
+      '„Im Editor öffnen“ speichert die Notiz und öffnet sie im vollen Editor.';
+
+  @override
+  String get captureOpenInEditor => 'Im Editor öffnen';
 
   @override
   String get spotEditorKind =>
@@ -6877,6 +7200,10 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get spotEditorLinkedFrom =>
       '„Verlinkt von“ nennt die Notizen, deren Links zu dieser führen.';
+
+  @override
+  String get spotEditorAddPart =>
+      'Teil hinzufügen setzt Neues unter die Notiz, mit eigener Zeit.';
 
   @override
   String get spotAreaSearch => 'Die Suche findet die hier abgelegten Notizen.';
@@ -6924,4 +7251,147 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get spotSettingsGrammar =>
       '„Grammatik hinzufügen …“ färbt Code in einer weiteren Sprache ein, auf all deinen Geräten.';
+
+  @override
+  String get spotSettingsTipsSwitch =>
+      'Ausgeschaltet zeigt keine Seite einen Tipp; „Keine Tipps mehr“ tut dasselbe.';
+
+  @override
+  String get editorUndo => 'Rückgängig';
+
+  @override
+  String get editorRedo => 'Wiederholen';
+
+  @override
+  String get revertAllChanges => 'Alle Änderungen zurücknehmen';
+
+  @override
+  String get revertAllQuestion => 'Alle Änderungen zurücknehmen?';
+
+  @override
+  String get revertAllBody =>
+      'Die Notiz wird wieder so, wie sie beim Öffnen war. „Wiederholen“ holt die Änderungen einzeln zurück.';
+
+  @override
+  String get revertAllConfirm => 'Zurücknehmen';
+
+  @override
+  String get recordingPause => 'Aufnahme nach einer Pause beenden';
+
+  @override
+  String get recordingPauseDetail =>
+      'Beendet eine Sprachaufnahme von selbst, wenn du so lange nichts gesagt hast, und behält sie wie „Beenden“. Aus: Pausen zählen nicht.';
+
+  @override
+  String get recordingPauseOff => 'Aus';
+
+  @override
+  String recordingPauseSeconds(int seconds) {
+    return '$seconds Sek.';
+  }
+
+  @override
+  String get jobsTitle => 'Im Hintergrund';
+
+  @override
+  String get jobsNone => 'Im Hintergrund läuft nichts.';
+
+  @override
+  String jobsSince(String time) {
+    return 'Seit $time';
+  }
+
+  @override
+  String get jobsAbort => 'Abbrechen';
+
+  @override
+  String get jobsStopping => 'Wird angehalten …';
+
+  @override
+  String get jobsStopped => 'Angehalten';
+
+  @override
+  String get jobsGoOn => 'Weiter';
+
+  @override
+  String get jobsSync => 'Synchronisierung mit einem Gerät';
+
+  @override
+  String get jobsSyncAbort =>
+      'Die laufende Synchronisierung endet zuerst. Danach synchronisiert dieses Gerät nicht mehr von selbst, bis du „Jetzt synchronisieren“ oder „Weiter“ tippst oder die App neu startet.';
+
+  @override
+  String get jobsSyncPaused =>
+      'Pausiert: Dieses Gerät synchronisiert nicht mehr von selbst, bis du „Jetzt synchronisieren“ oder „Weiter“ tippst oder die App neu startet.';
+
+  @override
+  String jobsImport(String name) {
+    return 'Import von $name';
+  }
+
+  @override
+  String get jobsImportAbort => 'Die bisher importierten Notizen bleiben.';
+
+  @override
+  String jobsImportStopped(int done, int count) {
+    return 'Angehalten: $done von $count importiert';
+  }
+
+  @override
+  String get jobsImportEnded => 'Import angehalten.';
+
+  @override
+  String get jobsTranscripts => 'Aufnahmen werden transkribiert';
+
+  @override
+  String get jobsPhotoTexts => 'Text in Fotos wird gelesen';
+
+  @override
+  String get jobsAttachmentTexts => 'Angehängte Dateien werden gelesen';
+
+  @override
+  String jobsRead(int done, int count) {
+    return '$done von $count';
+  }
+
+  @override
+  String get jobsReadAbort =>
+      'Was gerade gelesen wird, endet zuerst. Die übrigen warten bis „Weiter“ oder zum nächsten Start.';
+
+  @override
+  String get jobsReadStopped =>
+      'Angehalten: Die übrigen warten bis „Weiter“ oder zum nächsten Start.';
+
+  @override
+  String get jobsModelDownload => 'Das Sprachmodell wird heruntergeladen';
+
+  @override
+  String get jobsModelCopy => 'Das Sprachmodell wird kopiert';
+
+  @override
+  String get jobsModelStopped =>
+      'Angehalten. Die Einstellungen bieten das Sprachmodell wieder an.';
+
+  @override
+  String jobsAreaDeletion(String name) {
+    return 'Der Bereich $name wird gelöscht';
+  }
+
+  @override
+  String get jobsAreaAbort =>
+      'Die bisher verschobenen Notizen bleiben, wo sie hingingen. Der Bereich bleibt mit den übrigen.';
+
+  @override
+  String jobsAreaStopped(int moved, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Angehalten: $moved von $count Notizen verschoben',
+      one: 'Angehalten: $moved von 1 Notiz verschoben',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get jobsTrashEmptying => 'Der Papierkorb wird geleert';
 }
