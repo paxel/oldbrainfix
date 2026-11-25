@@ -7,6 +7,7 @@ import 'package:oldbrainfix/src/announcements.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/app_lock.dart';
 import 'package:oldbrainfix/src/conflicts_screen.dart';
+import 'package:oldbrainfix/src/look.dart';
 import 'package:oldbrainfix/src/pairing_platform.dart';
 import 'package:oldbrainfix/src/photo_platform.dart';
 import 'package:oldbrainfix/src/starter_set_screen.dart';
@@ -397,6 +398,29 @@ void main() {
     expect(find.textContaining('On this Device, '), findsOneWidget);
     // Meanwhile the newer one shows.
     expect(Notes(phone).byId(note.id)?.text, 'Edited at the desk');
+    // An embossed card, its versions radio rows, none picked yet
+    // (obf-1119).
+    final card = find.descendant(
+      of: find.byType(ConflictsScreen),
+      matching: find.byType(Embossed),
+    );
+    expect(card, findsOneWidget);
+    final rows = find.descendant(
+      of: card,
+      matching: find.byType(RadioListTile<ConflictVersion?>),
+    );
+    expect(rows, findsNWidgets(2));
+    expect(
+      find.descendant(of: card, matching: find.byType(OutlinedButton)),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: rows.first,
+        matching: find.text('Edited at the desk'),
+      ),
+      findsOneWidget,
+    );
 
     await tester.tap(find.text('From the phone'));
     await tester.pumpAndSettle();

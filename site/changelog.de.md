@@ -53,6 +53,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 ### Behoben
 
+- Auf dem Handy ist ein Konflikt eine Karte wie die anderen, auch im dunklen Modus, und jede Fassung eine Zeile zum Wählen. ([obf-1119](https://github.com/paxel/oldbrainfix/issues/435))
 - Auf dem Handy sehen Neue Strichliste, Notizen dieser Person, Änderungen schicken und Konflikte nicht mehr wie bloßer Text aus, sondern antippbar. ([obf-1108](https://github.com/paxel/oldbrainfix/issues/424))
 - Auf dem Handy und dem Desktop schneidet keine Suchleiste mehr ab, was darunter scrollt; jede steht auf einem Streifen mit einer Linie darunter. ([obf-1088](https://github.com/paxel/oldbrainfix/issues/401))
 - Auf dem Desktop bleibt Neue Notiz bei einem Filter; in beiden Apps meldet sich eine vom Filter ausgeblendete Notiz mit „Zeigen“. ([obf-1070](https://github.com/paxel/oldbrainfix/issues/383))

@@ -54,6 +54,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 
 ### Fixed
 
+- On the phone, a Conflict is a card like the others, also in dark mode, and each version is a row to pick. ([obf-1119](https://github.com/paxel/oldbrainfix/issues/435))
 - On the phone, New Tally, Their Notes, Send changes and Conflicts no longer look like plain text but like something to tap. ([obf-1108](https://github.com/paxel/oldbrainfix/issues/424))
 - On the phone and the desktop, no search bar cuts off what scrolls under it; each sits on a band with a line under it. ([obf-1088](https://github.com/paxel/oldbrainfix/issues/401))
 - On the desktop, New Note stays when a filter is on; on both apps a Note the filter hides is announced with Show. ([obf-1070](https://github.com/paxel/oldbrainfix/issues/383))
