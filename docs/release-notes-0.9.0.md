@@ -112,7 +112,6 @@ Old Brain Fix is a note and reminder app for Android. A desktop app for Linux, W
 • Your Profile unites all of your Devices. Your name, a unique code and an optional picture show on the Notes you share with others.
 • A Note can be sent to another person as a file, together with its Routines and Reminders. The receiver can accept or decline it.
 • Notes, Topics or whole Areas can be handed to others as a Pack of copies, which they keep as their own.
-• Notes, Reminders and Routines go to other apps, and come from them, as AXT files, an open format for small apps.
 
 <b>Privacy and security</b>
 • No account, no server, no analytics, no advertising.
@@ -333,7 +332,7 @@ Old Brain Fix ist eine Notiz- und Erinnerungs-App für das iPhone. Eine Desktop-
 Old Brain Fix ist eine Notiz- und Erinnerungs-App für iPhone und iPad. Eine Desktop-App für Linux, Windows und macOS nutzt dieselben Daten. Es gibt kein Konto und keinen Server; alle Daten liegen auf den eigenen Geräten.
 ```
 
-<!-- edit block=play_full_en status=accepted -->
+<!-- edit block=play_full_en status=pending -->
 Changelog 0.9.0, Added: "Export as AXT file… hands Notes, a selection, a Topic or an Area to other apps that speak AXT."
 ```
 • Notes, Topics or whole Areas can be handed to others as a Pack of copies, which they keep as their own.
