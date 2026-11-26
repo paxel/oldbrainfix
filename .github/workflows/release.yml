@@ -37,9 +37,11 @@
 #                    refused when signed with the debug key; the bundle
 #                    goes to Google Play's internal track with What's new
 #                    from docs/release-notes-<version>.md
-#   build-linux    — Rust desktop: tar.gz, .deb and AppImage per arch, built
-#                    on Ubuntu 22.04 and refused when the binary needs a
-#                    newer glibc than its 2.35
+#   build-linux    — Rust desktop: tar.gz, .deb, .rpm and AppImage per
+#                    arch, built on Ubuntu 22.04 and refused when the
+#                    binary needs a newer glibc than its 2.35; the .deb
+#                    installed on the runner and the .rpm on Fedora, their
+#                    files listed and the binary's libraries found
 #   screenshots    — desktop screenshots, drawn by kittest from demo data,
 #                    attached to the Release
 #   appstore-screenshots — the App Store's iPhone frames (1320 × 2868, en-US
@@ -630,9 +632,9 @@ jobs:
     strategy:
       matrix:
         include:
-          # The tarball, the .deb and the AppImage use the system's glibc,
-          # so they run on the runner's glibc and newer only: Ubuntu 22.04
-          # has 2.35 (ubuntu-latest is Ubuntu 26.04 with 2.43, #332). The
+          # The tarball, the .deb, the .rpm and the AppImage use the
+          # system's glibc, so they run on the runner's glibc and newer
+          # only: Ubuntu 22.04 has 2.35 (ubuntu-latest is Ubuntu 26.04 with 2.43, #332). The
           # 2.35 is also in the check below, packaging/linux/pack.sh's
           # Depends and the install page.
           - runner: ubuntu-22.04
@@ -660,10 +662,29 @@ jobs:
         run: cargo build --release --locked --bin oldbrainfix
       - name: The binary needs glibc 2.35 at most
         run: python3 tool/glibc_ceiling.py desktop/target/release/oldbrainfix 2.35
-      - name: Pack tar.gz, .deb and AppImage
+      - name: Pack tar.gz, .deb, .rpm and AppImage
         run: |
           v="${RELEASE_TAG#v}"
           desktop/packaging/linux/pack.sh "$v" "${{ matrix.arch }}" desktop/target/release/oldbrainfix dist
+      # Before they are uploaded (obf-1152): each package installs, lists
+      # its files and leaves no library the binary links missing; the
+      # .deb on this runner, the .rpm on Fedora.
+      - name: The .deb and the .rpm install
+        env:
+          # The digest of fedora:43 on 2026-11-26, both arches.
+          FEDORA_IMAGE: docker.io/library/fedora@sha256:f01112b9a1f1d0504ad962d9adfa401425033f8ab067e0a821904ebdde5b8ca5
+        run: |
+          v="${RELEASE_TAG#v}"
+          name="oldbrainfix-$v-linux-${{ matrix.arch }}"
+          sudo apt-get install -y --no-install-recommends "./dist/$name.deb"
+          dpkg -L oldbrainfix
+          if ldd /usr/bin/oldbrainfix | grep 'not found'; then exit 1; fi
+          docker run --rm -v "$PWD/dist:/dist:ro" "$FEDORA_IMAGE" sh -c "
+            set -e
+            rpm -qlp /dist/$name.rpm
+            dnf install -y /dist/$name.rpm
+            rpm -V oldbrainfix
+            if ldd /usr/bin/oldbrainfix | grep 'not found'; then exit 1; fi"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: linux-${{ matrix.arch }}
