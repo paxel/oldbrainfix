@@ -88,7 +88,9 @@ class ShareInboxTests: XCTestCase {
   func testTheExportedTypesAreTheOnesTheAppDeclares() throws {
     let declared = Bundle.main.object(forInfoDictionaryKey: "UTExportedTypeDeclarations") as? [[String: Any]] ?? []
     let ids = declared.compactMap { $0["UTTypeIdentifier"] as? String }
-    XCTAssertEqual(Set(ids), Set(ShareTypes.documents.map(\.uti)))
+    // AXT files are another format's, imported rather than exported (obf-1146).
+    let own = ShareTypes.documents.filter { $0.uti != "io.github.paxel.axt" }
+    XCTAssertEqual(Set(ids), Set(own.map(\.uti)))
     for type in declared {
       let tags = type["UTTypeTagSpecification"] as? [String: Any]
       let id = type["UTTypeIdentifier"] as? String
