@@ -491,8 +491,6 @@
   "deskMarkdownAlone": "Nur diese Datei",
   "deskMarkdownUnreadable": "Diese Datei lässt sich nicht lesen.",
   "deskMarkdownNotFound": "Nicht in diesem Ordner gefunden",
-  "deskMarkdownOpenFolder": "Ordner öffnen, um den Links zu folgen",
-  "deskMarkdownFolderTitle": "Ordner wählen, in dem die Links liegen",
   "deskMarkdownFindHint": "In dieser Datei suchen",
   "deskMarkdownFindNone": "Nicht in dieser Datei",
   "deskMarkdownPictureMissing": "Bild nicht gefunden: {name}",

@@ -1,8 +1,7 @@
 //! The system's own program for a file, started without a shell (#267):
-//! `ShellExecuteW` on Windows, `open` on macOS and `xdg-open` on Linux
-//! (the OpenURI portal inside the Flatpak), the path handed over as one
-//! argument, never as words a shell reads. A photo, an Attachment and a
-//! file link's file open through it.
+//! `ShellExecuteW` on Windows, `open` on macOS and `xdg-open` on Linux,
+//! the path handed over as one argument, never as words a shell reads.
+//! A photo, an Attachment and a file link's file open through it.
 
 // `ShellExecuteW` is FFI (#229): unsafe code is allowed in this module
 // only, for that one call on Windows.

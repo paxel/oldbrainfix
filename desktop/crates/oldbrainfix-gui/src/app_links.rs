@@ -288,7 +288,7 @@ pub fn file_in(folder: &Path, path: &str) -> Option<PathBuf> {
 
 /// The name of the app the system opens `file` with, "" when it does not
 /// tell: on Linux the desktop file `xdg-mime` names for the file's type,
-/// read for its `Name`; elsewhere, and inside the Flatpak, none.
+/// read for its `Name`; elsewhere none.
 pub fn file_app(file: &Path) -> String {
     if !cfg!(target_os = "linux") {
         return String::new();

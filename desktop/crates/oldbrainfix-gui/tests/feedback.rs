@@ -34,7 +34,7 @@ fn facts() -> FeedbackFacts {
     FeedbackFacts {
         version: "0.4.0".into(),
         system: "Debian GNU/Linux 13 (trixie), x86_64".into(),
-        install: "Flatpak".into(),
+        install: ".deb".into(),
     }
 }
 
@@ -166,7 +166,7 @@ fn the_ticks_build_the_preview_and_mail_and_save_send_exactly_it() -> TestResult
         .get_by_role_and_label(Role::CheckBox, "OS and device")
         .click();
     harness.run();
-    let body = "It counts wrong.\n\nVersion: 0.4.0\nInstalled from: Flatpak";
+    let body = "It counts wrong.\n\nVersion: 0.4.0\nInstalled from: .deb";
     assert!(shows(&harness, body));
     assert!(seen(&urls).is_empty(), "nothing leaves without a click");
 
@@ -356,7 +356,7 @@ fn the_notification_clicks_go_along_ticked_once_there_are_any() -> TestResult {
     type_text(&mut harness, "It rang.");
     let line = "2026-11-24 09:00:00Z routine:a@2026-11-24T09:00 click, window: Agenda today";
     let body = format!(
-        "It rang.\n\nVersion: 0.4.0\nSystem: Debian GNU/Linux 13 (trixie), x86_64\nInstalled from: Flatpak\n\nNotification clicks:\n{line}"
+        "It rang.\n\nVersion: 0.4.0\nSystem: Debian GNU/Linux 13 (trixie), x86_64\nInstalled from: .deb\n\nNotification clicks:\n{line}"
     );
     assert!(shows(&harness, &body));
     harness

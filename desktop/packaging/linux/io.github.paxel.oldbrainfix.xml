@@ -6,7 +6,7 @@
      Avro file. The launcher's MimeType offers Old Brain Fix for it under
      "Open with", never as its default program. The app writes this file
      into the user's mime packages on every start, as it does the
-     launcher; a Flatpak and a .deb ship it. -->
+     launcher; the .deb ships it. -->
 <mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
   <mime-type type="application/vnd.axt">
     <comment>AXT file</comment>

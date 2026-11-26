@@ -1,7 +1,7 @@
 //! The system's light or dark setting where the window system does not
 //! report it (#147): on Linux, X11 and Wayland tell egui nothing, so the
-//! desktop portal's colour scheme is read on start, inside the Flatpak
-//! too, and followed as it changes. On Windows and macOS the window
+//! desktop portal's colour scheme is read on start and followed as it
+//! changes. On Windows and macOS the window
 //! system reports it, and this adds nothing.
 
 use std::sync::{Arc, Mutex};

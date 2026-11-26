@@ -2,7 +2,7 @@
 //! window over a small demo store, drawn by egui_kittest through wgpu and
 //! written as PNG files to `$SCREENSHOTS_DIR` (else
 //! `target/screenshots`). The release workflow renders them and
-//! attaches them to the GitHub Release, which the metainfo points at.
+//! attaches them to the GitHub Release.
 //! Ignored: they need a GPU or a software Vulkan such as lavapipe.
 //!
 //! ```sh
@@ -56,7 +56,7 @@ use parking_lot::Mutex;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-/// The file names the metainfo lists, in its order.
+/// The screenshots' file names, in their order.
 pub const FILES: [&str; 3] = [
     "screenshot-agenda.png",
     "screenshot-notes.png",
@@ -2152,7 +2152,7 @@ fn privacy_frames(
             harness.state_mut().set_feedback_facts(FeedbackFacts {
                 version: "0.4.0".into(),
                 system: "Debian GNU/Linux 13 (trixie), x86_64".into(),
-                install: "Flatpak".into(),
+                install: ".deb".into(),
             });
             harness.state_mut().open(Page::Settings);
             harness.run();

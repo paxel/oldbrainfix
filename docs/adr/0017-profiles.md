@@ -93,7 +93,7 @@ The settings gear in the Agenda's corner is replaced by the own Profile's pictur
 - Answered on both Devices before they meet again, and differently, "Which one is you?" ends with the lower id on both.
 - A change of name or picture alone makes no bundle: a bundle is written only when there are entries to send, and carries the Profile with them.
 - A restored Device is not the Device that made the Profile, so the Profile no longer follows any Device's defaults after a restore.
-- The account picture is read where the system keeps it on Linux (AccountsService's icon or `~/.face`); inside the Flatpak, on Windows and on macOS the initials show until the user picks a picture. The name comes from the user database there too (passwd's full name, Windows' display name).
+- The account picture is read where the system keeps it on Linux (AccountsService's icon or `~/.face`); inside the Flatpak, on Windows and on macOS the initials show until the user picks a picture. The name comes from the user database there too (passwd's full name, Windows' display name). Amended by obf-1151: there is no Flatpak any more, so on Linux the picture is always read where the system keeps it.
 - A name cut at 40 code points may lose the end of a long emoji sequence, never the characters before it.
 - A Profile is bound to the keys it came with when it is first seen, from whoever passed it on: a copied id with another first key that arrives first keeps the real one out on that Device. The short code, compared in person, tells them apart.
 - "Verified" is a local setting of the Device where the codes were compared; the user's other Devices do not learn it.

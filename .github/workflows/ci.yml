@@ -218,86 +218,23 @@ jobs:
         working-directory: desktop
         run: cargo clippy -p oldbrainfix-gui --all-targets --locked -- -D warnings
 
-  # The Flatpak (#45): the files Flathub gets are current and pass its
-  # linters, and the manifest builds from source for both arches.
-  flatpak-files:
-    name: ${{ github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork && 'Flatpak files (cargo sources, metainfo, lint) (runs on push)' || 'Flatpak files (cargo sources, metainfo, lint)' }}
+  # The release tools' tests and the changelog's shape.
+  tools:
+    name: ${{ github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork && 'Tools (unit tests, changelog) (runs on push)' || 'Tools (unit tests, changelog)' }}
     if: github.event_name == 'push' || github.event.pull_request.head.repo.fork
     runs-on: ubuntu-latest
-    env:
-      # flatpak-builder-lint and appstreamcli, as Flathub runs them; the
-      # image digest of the `latest` tag on 2026-10-23.
-      LINT_IMAGE: ghcr.io/flathub-infra/flatpak-builder-lint@sha256:6057d350c1f67cfd72b87891ea779a9de2567ff70e33b480d20eebcffef08fa0
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
-      # The generator runs in a virtualenv of this Python.
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
-      - name: cargo-sources.json is current with desktop/Cargo.lock
-        run: |
-          desktop/packaging/flatpak/cargo-sources.sh
-          git diff --exit-code -- desktop/packaging/flatpak/cargo-sources.json
-      - name: Metainfo, What's-new, alarm sound, OSV gate, coverage floor, whisper pin, App Store listing, iPhone icon, tested tree, Sonar gate, glibc ceiling and changelog check tools — unit tests
+      - name: What's-new, store release, alarm sound, OSV gate, coverage floor, whisper pin, App Store listing, iPhone icon, tested tree, Sonar gate, glibc ceiling and changelog check tools — unit tests
         working-directory: tool
-        run: python3 -m unittest test_whats_new test_store_release test_metainfo test_alarm_sound test_osv_gate test_coverage_floor test_whisper_pin test_appstore_listing test_ios_icon test_tested_tree test_sonar_gate test_glibc_ceiling test_changelog_check
+        run: python3 -m unittest test_whats_new test_store_release test_alarm_sound test_osv_gate test_coverage_floor test_whisper_pin test_appstore_listing test_ios_icon test_tested_tree test_sonar_gate test_glibc_ceiling test_changelog_check
       - name: The changelog's current section is one short sentence per entry
         run: python3 tool/changelog_check.py CHANGELOG.md site/changelog.de.md
-      - name: Render the files as Flathub gets them
-        run: |
-          ver=$(grep -m1 '^version:' pubspec.yaml | sed -E 's/version: *//; s/\+.*//')
-          desktop/packaging/flatpak/render.sh flathub "$ver" "$(git log -1 --format=%cs)" "v$ver" "$GITHUB_SHA"
-          cp desktop/packaging/linux/io.github.paxel.oldbrainfix.desktop flathub/
-      # The screenshots and the site exist once the release does, so the
-      # metainfo is validated without the network here; the release
-      # workflow lints it with the network before the Flathub update.
-      - name: appstreamcli, desktop-file-validate and flatpak-builder-lint
-        run: |
-          docker run --rm -v "$PWD/flathub:/work" -w /work --entrypoint sh "$LINT_IMAGE" -c '
-            set -e
-            appstreamcli validate --no-net --explain io.github.paxel.oldbrainfix.metainfo.xml
-            desktop-file-validate io.github.paxel.oldbrainfix.desktop
-            flatpak-builder-lint manifest io.github.paxel.oldbrainfix.yml'
-
-  flatpak:
-    name: ${{ github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork && 'Flatpak from source (runs on push)' || format('Flatpak from source ({0})', matrix.arch) }}
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.fork
-    needs: flatpak-files
-    strategy:
-      matrix:
-        include:
-          - runner: ubuntu-latest
-            arch: x86_64
-          - runner: ubuntu-24.04-arm
-            arch: arm64
-    runs-on: ${{ matrix.runner }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          submodules: recursive
-      - name: flatpak and flatpak-builder
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder
-      - name: Build the bundle from the manifest, network off during the build
-        run: |
-          # flatpak-builder sandboxes through bwrap, which Ubuntu's
-          # AppArmor default refuses user namespaces to.
-          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-          ver=$(grep -m1 '^version:' pubspec.yaml | sed -E 's/version: *//; s/\+.*//')
-          RELEASE_DATE=$(git log -1 --format=%cs) \
-            desktop/packaging/flatpak/pack.sh "$ver" "${{ matrix.arch }}" dist flatpak-repo
-      - name: flatpak-builder-lint on the built repository
-        if: matrix.arch == 'x86_64'
-        run: |
-          # Only the screenshots are excepted: they are the Release's
-          # assets, so they exist from the release on.
-          docker run --rm -v "$PWD/flatpak-repo:/repo" \
-            -v "$PWD/desktop/packaging/flatpak/ci-lint-exceptions.json:/exceptions.json:ro" \
-            ghcr.io/flathub-infra/flatpak-builder-lint@sha256:6057d350c1f67cfd72b87891ea779a9de2567ff70e33b480d20eebcffef08fa0 \
-            --exceptions --user-exceptions /exceptions.json repo /repo
 
   apk:
     name: ${{ github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork && 'Debug APK (runs on push)' || 'Debug APK' }}

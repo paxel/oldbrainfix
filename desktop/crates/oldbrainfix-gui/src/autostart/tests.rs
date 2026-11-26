@@ -35,21 +35,6 @@ fn the_launch_agent_and_the_run_key_start_it_too() {
     assert_eq!(delete, ["delete", RUN_KEY, "/v", "Old Brain Fix", "/f"]);
 }
 
-#[test]
-fn the_portal_starts_the_sandboxed_program_into_the_tray_and_writes_no_file() -> Result<(), String>
-{
-    let dir = tempfile::tempdir().map_err(|e| e.to_string())?;
-    let start = Autostart {
-        exe: PathBuf::from("/app/bin/oldbrainfix"),
-        file: dir.path().join("x.desktop"),
-        through_portal: true,
-    };
-    assert_eq!(start.portal_command(), ["oldbrainfix", "--tray"]);
-    assert!(!start.is_set());
-    assert!(!start.file.exists());
-    Ok(())
-}
-
 #[cfg(not(any(windows, target_os = "macos")))]
 #[test]
 fn it_is_set_up_and_taken_away_again() -> Result<(), String> {
@@ -57,7 +42,6 @@ fn it_is_set_up_and_taken_away_again() -> Result<(), String> {
     let start = Autostart {
         exe: PathBuf::from("/usr/bin/oldbrainfix"),
         file: dir.path().join("autostart").join("x.desktop"),
-        through_portal: false,
     };
     assert!(!start.is_set());
     start.set(true)?;

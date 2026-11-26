@@ -2335,14 +2335,9 @@ There are three kinds, and an action takes the first that fits.
   asks first "Also import the N files it links to?"; imported together,
   their links become App links to each other's Notes, their pictures
   photos. While an Import runs, the bar says so in its place. What the
-  Import made is announced at the top of the main window. Inside the
-  Flatpak, where only the file opened is shared, a line under the bar,
-  "Open the folder to follow its links", asks once through the folder
-  portal for the folder its links are in, for a file with links or
-  pictures only; the viewer then reads only inside that folder, finding
-  the file's copy there by its name and bytes (a folder without it is
-  asked for again), Import as Note imports that copy, and the app keeps
-  the folder while it runs, for other files whose copy it holds (Q13).
+  Import made is announced at the top of the main window. The viewer
+  asks for no folder; its links are found where the file lies
+  (obf-1151).
 - **Unsorted says how many Notes it holds in the sidebar** ("Unsorted
   7", #279), as the one list that asks to be emptied; no other place
   shows a count, and an empty Unsorted shows none. **An Area with Topics

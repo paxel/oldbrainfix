@@ -4,6 +4,6 @@ Sources the apps build from that Old Brain Fix does not write. Each is a git sub
 
 | Submodule     | Upstream                                | Pinned   | Licence                                               | Built by                                                                                                                                                           |
 |---------------|-----------------------------------------|----------|-------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `whisper.cpp` | https://github.com/ggml-org/whisper.cpp | `v1.9.5` | MIT, in [licenses/common.txt](../licenses/common.txt) | the phone (`android/app/src/main/cpp/CMakeLists.txt`), the desktop (`desktop/crates/oldbrainfix-whisper/build.rs`), the Flatpak, the iPhone (`tool/ios-native.sh`) |
+| `whisper.cpp` | https://github.com/ggml-org/whisper.cpp | `v1.9.5` | MIT, in [licenses/common.txt](../licenses/common.txt) | the phone (`android/app/src/main/cpp/CMakeLists.txt`), the desktop (`desktop/crates/oldbrainfix-whisper/build.rs`), the iPhone (`tool/ios-native.sh`) |
 
 Only whisper.cpp's CPU parts are compiled: `include/`, `src/` and `ggml/` with its CPU backend. The lockfiles of its examples and bindings are never built and are left out of the OSV scan.

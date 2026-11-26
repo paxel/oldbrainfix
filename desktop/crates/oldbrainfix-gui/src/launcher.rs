@@ -8,8 +8,7 @@
 //! named after the window's app id. The app closes that gap on every
 //! start: it writes or refreshes the icon and the launcher in the user's
 //! XDG data dirs, what `packaging/linux/install-icon.sh` does for a
-//! checkout and the formula does once at install. A Flatpak exports its
-//! own entry and skips this.
+//! checkout and the formula does once at install.
 //!
 //! Rules: only an entry carrying the `X-Oldbrainfix-Managed` marker is
 //! ever overwritten, a hand-written or distro-installed one is left
@@ -32,12 +31,9 @@ const MARKER: &str = "X-Oldbrainfix-Managed=true";
 const MIME_XML: &str = include_str!("../../../packaging/linux/io.github.paxel.oldbrainfix.xml");
 
 /// Registers icon and launcher for the running binary; call from a
-/// thread of its own. Best effort: errors, a home-less environment and a
-/// Flatpak are ignored.
+/// thread of its own. Best effort: errors and a home-less environment
+/// are ignored.
 pub fn register() {
-    if std::env::var_os("FLATPAK_ID").is_some() {
-        return;
-    }
     let Some(data_home) = data_home() else {
         return;
     };

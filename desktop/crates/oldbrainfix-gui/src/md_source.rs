@@ -6,13 +6,6 @@
 //! shows, decoded. Nothing outside that folder is read: hidden folders
 //! and links to files or folders are not followed, and every path found
 //! is checked to lie inside it.
-//!
-//! Inside the Flatpak only the file opened is shared with the app, in a
-//! folder of the document portal's of its own (Q13): its links find
-//! nothing until a folder is granted through the folder portal. The
-//! links are then found in that folder, or in the nearest one in it
-//! holding `.obsidian` above the file's copy there, which is found by
-//! its name and its bytes; nothing outside the folder granted is read.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -59,53 +52,6 @@ pub fn link_root(file: &Path) -> PathBuf {
         at = folder.parent();
     }
     own
-}
-
-/// Whether the app runs inside the Flatpak, where only the files and
-/// folders granted through the portals are shared with it.
-pub fn in_flatpak() -> bool {
-    std::env::var_os("FLATPAK_ID").is_some_and(|id| !id.is_empty())
-        || Path::new("/.flatpak-info").exists()
-}
-
-/// Where the links of the file `file` are found in the folder `granted`
-/// (Q13): the folder they are found in, the nearest in `granted` holding
-/// `.obsidian` above the file's copy there, else `granted` itself; and
-/// the copy's path in that folder, while one with its name and bytes
-/// lies in `granted`.
-pub fn granted_root(granted: &Path, file: &Path) -> (PathBuf, Option<String>) {
-    let granted = granted
-        .canonicalize()
-        .unwrap_or_else(|_| granted.to_path_buf());
-    let Some(copy) = copy_in(&granted, file) else {
-        return (granted, None);
-    };
-    let mut root = granted.clone();
-    let mut at = copy.parent();
-    while let Some(folder) = at.filter(|f| f.starts_with(&granted)) {
-        if folder.join(".obsidian").is_dir() {
-            root = folder.to_path_buf();
-            break;
-        }
-        at = folder.parent();
-    }
-    let place = path_in(&root, &copy);
-    (root, place)
-}
-
-/// The file in `folder` or its folders with the name and the bytes of
-/// `file`, the shallowest first; none where none has.
-fn copy_in(folder: &Path, file: &Path) -> Option<PathBuf> {
-    let name = file.file_name()?.to_string_lossy().into_owned();
-    let bytes = std::fs::read(file).ok()?;
-    index(folder)
-        .iter()
-        .filter(|p| p.rsplit('/').next() == Some(name.as_str()))
-        .filter_map(|p| inside(folder, p))
-        .find(|p| {
-            stamp(p).is_some_and(|(_, size)| size == bytes.len() as u64)
-                && std::fs::read(p).is_ok_and(|b| b == bytes)
-        })
 }
 
 /// The files of `root` and of its folders, at most [`MAX_FILES`] and
@@ -211,20 +157,6 @@ pub struct Read {
     /// The other Markdown files of the folder it links to, each once, in
     /// the order it first does.
     pub linked: Vec<PathBuf>,
-    /// Whether `root` is a folder granted through the folder portal
-    /// (Q13).
-    pub granted: bool,
-    /// The file's copy in `root`, where it is read elsewhere: what
-    /// Import as Note imports, as its links are found from there.
-    pub copy: Option<PathBuf>,
-}
-
-impl Read {
-    /// The file Import as Note imports: its copy in the folder its links
-    /// are found in, where it is read elsewhere, else itself.
-    pub fn to_import(&self) -> PathBuf {
-        self.copy.clone().unwrap_or_else(|| self.file.clone())
-    }
 }
 
 /// Reads the Markdown file at `file` for the viewer, with what it links
@@ -233,14 +165,6 @@ impl Read {
 /// it opened first while it follows links, so a link back from a file
 /// in a folder further in still finds its file.
 pub fn read_file(file: &Path, root: Option<&Path>) -> Read {
-    read_placed(file, root, None)
-}
-
-/// [`read_file`], the file's links found from `place`, its path in
-/// `root`, where it lies elsewhere: a file opened inside the Flatpak,
-/// read where the document portal shares it, its links found in a folder
-/// granted from its copy there ([`granted_root`]).
-pub fn read_placed(file: &Path, root: Option<&Path>, place: Option<&str>) -> Read {
     let root = root.map_or_else(|| link_root(file), Path::to_path_buf);
     let file = file.canonicalize().unwrap_or_else(|_| file.to_path_buf());
     let name = file
@@ -264,23 +188,12 @@ pub fn read_placed(file: &Path, root: Option<&Path>, place: Option<&str>) -> Rea
         notes: Arc::default(),
         pictures: Arc::default(),
         linked: Vec::new(),
-        granted: false,
-        copy: None,
     };
     let Ok(doc) = doc else {
         return read;
     };
     let paths = index(&root);
-    let own = path_in(&root, &file);
-    // Read where it was opened, outside the folder: its copy there, which
-    // is no other file it links to.
-    let copy = match own {
-        Some(_) => None,
-        None => place.and_then(|p| inside(&root, p)),
-    };
-    let from = own
-        .or_else(|| place.map(str::to_string))
-        .unwrap_or_default();
+    let from = path_in(&root, &file).unwrap_or_default();
     let mut notes = HashMap::new();
     let mut linked = Vec::new();
     for name in note_names(&doc) {
@@ -295,7 +208,6 @@ pub fn read_placed(file: &Path, root: Option<&Path>, place: Option<&str>) -> Rea
             .and_then(|p| inside(&root, p));
         if let Some(found) = &found
             && *found != file
-            && copy.as_ref() != Some(found)
             && !linked.contains(found)
         {
             linked.push(found.clone());
@@ -318,7 +230,6 @@ pub fn read_placed(file: &Path, root: Option<&Path>, place: Option<&str>) -> Rea
     read.notes = Arc::new(notes);
     read.pictures = Arc::new(pictures);
     read.linked = linked;
-    read.copy = copy;
     read
 }
 
@@ -420,58 +331,25 @@ pub fn doc_pictures(doc: &Doc) -> Vec<Picture> {
 /// with [`Watch::arrived`], `wake` waking the window. It ends with the
 /// viewer.
 pub struct Watch {
-    wanted: Sender<Wanted>,
+    /// Another file to show.
+    wanted: Sender<PathBuf>,
     arrives: Receiver<Read>,
 }
-
-/// What the viewer asks of its [`Watch`].
-enum Wanted {
-    /// Another file to show.
-    Show(PathBuf),
-    /// A folder granted to find the links of the file opened in (Q13).
-    Folder(PathBuf),
-}
-
-/// The folder the links are found in, the file opened's path in it, and
-/// whether it was granted.
-type Root = (PathBuf, Option<String>, bool);
 
 impl Watch {
     /// Starts reading `file`.
     pub fn start(file: PathBuf, wake: Arc<dyn Fn() + Send + Sync>) -> Watch {
-        Watch::start_granted(file, Vec::new(), wake)
-    }
-
-    /// Starts reading `file`, opened inside the Flatpak: its links are
-    /// found in the first of the folders `granted` before that holds a
-    /// copy of it (Q13).
-    pub fn start_granted(
-        file: PathBuf,
-        granted: Vec<PathBuf>,
-        wake: Arc<dyn Fn() + Send + Sync>,
-    ) -> Watch {
-        let (wanted, asked) = std::sync::mpsc::channel::<Wanted>();
+        let (wanted, asked) = std::sync::mpsc::channel::<PathBuf>();
         let (sent, arrives) = std::sync::mpsc::channel();
         std::thread::spawn(move || {
-            let opened = file.clone();
             let mut file = file;
             let mut seen = None;
-            let mut root: Option<Root> = granted.iter().find_map(|folder| {
-                let (root, place) = granted_root(folder, &opened);
-                place.map(|place| (root, Some(place), true))
-            });
+            let mut root: Option<PathBuf> = None;
             loop {
                 let now = (file.clone(), stamp(&file));
                 if seen.as_ref() != Some(&now) {
-                    let (at, place, granted) = match &root {
-                        Some((at, place, granted)) => {
-                            (Some(at.as_path()), place.as_deref(), *granted)
-                        }
-                        None => (None, None, false),
-                    };
-                    let mut read = read_placed(&file, at, place);
-                    read.granted = granted;
-                    root.get_or_insert_with(|| (read.root.clone(), None, false));
+                    let read = read_file(&file, root.as_deref());
+                    root.get_or_insert_with(|| read.root.clone());
                     if sent.send(read).is_err() {
                         return;
                     }
@@ -479,15 +357,7 @@ impl Watch {
                     seen = Some(now);
                 }
                 match asked.recv_timeout(POLL) {
-                    Ok(Wanted::Show(next)) => file = next,
-                    Ok(Wanted::Folder(folder)) => {
-                        // A folder without the file's copy is not where
-                        // its links are: it is asked for again.
-                        if let (at, Some(place)) = granted_root(&folder, &opened) {
-                            root = Some((at, Some(place), true));
-                        }
-                        seen = None;
-                    }
+                    Ok(next) => file = next,
                     Err(RecvTimeoutError::Timeout) => {}
                     Err(RecvTimeoutError::Disconnected) => return,
                 }
@@ -498,13 +368,7 @@ impl Watch {
 
     /// Shows `file` in place of the one shown.
     pub fn show(&self, file: PathBuf) {
-        drop(self.wanted.send(Wanted::Show(file)));
-    }
-
-    /// Finds the links in `folder`, granted through the folder portal,
-    /// and reads the file shown again (Q13).
-    pub fn grant(&self, folder: PathBuf) {
-        drop(self.wanted.send(Wanted::Folder(folder)));
+        drop(self.wanted.send(file));
     }
 
     /// The last reading arrived since asked last.

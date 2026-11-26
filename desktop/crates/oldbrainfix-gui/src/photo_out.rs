@@ -1,8 +1,7 @@
 //! A photo of a Note handed to another program from the desktop (#149):
 //! a copy of it written for "Open in another program", and the system's
 //! own opener started on it without a shell ([`crate::system_open`]),
-//! `xdg-open` on Linux (the OpenURI portal inside the Flatpak), `open`
-//! on macOS and `ShellExecuteW` on Windows.
+//! `xdg-open` on Linux, `open` on macOS and `ShellExecuteW` on Windows.
 
 use std::io;
 use std::path::{Path, PathBuf};

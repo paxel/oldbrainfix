@@ -57,7 +57,7 @@ fn the_tray_icon_is_the_round_anthracite_app_icon() {
 
 #[test]
 fn the_packaged_icons_are_the_same_round_icon() {
-    // Launcher, .deb, AppImage, Flatpak, macOS and Windows ship these.
+    // Launcher, .deb, AppImage, macOS and Windows ship these.
     for (size, png) in [
         (
             256,

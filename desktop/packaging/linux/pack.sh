@@ -1,7 +1,6 @@
 #!/usr/bin/env sh
 # Packs the Linux release from a built binary: the tarball the Homebrew
-# formula installs, a .deb, and an AppImage. The Flatpak is packed by
-# packaging/flatpak/pack.sh.
+# formula installs, a .deb, and an AppImage.
 #
 #   packaging/linux/pack.sh <version> <arch> <binary> <dist dir>
 #

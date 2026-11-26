@@ -13,6 +13,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - An AXT file from another app opens in Old Brain Fix, and its ticked records become Notes in the place picked. ([obf-1146](https://github.com/paxel/oldbrainfix/issues/462))
 - A later AXT file from the same app updates or removes the Notes it made, unless you changed them since. ([obf-1147](https://github.com/paxel/oldbrainfix/issues/463))
 
+### Removed
+
+- The Flatpak is no longer offered; Linux users take the tarball, the .deb, the AppImage or Homebrew. ([obf-1151](https://github.com/paxel/oldbrainfix/issues/469))
+
 ---
 
 Historical changes have been moved to [OLDER_CHANGES.md](OLDER_CHANGES.md).
