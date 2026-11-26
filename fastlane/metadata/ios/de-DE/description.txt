@@ -27,7 +27,7 @@ Abgleich und Teilen
 • Deine Geräte gleichen sich direkt im lokalen Netz ab, solange die App offen ist (TLS, gekoppelt per QR-Code oder eingetippten Code), über einen geteilten Ordner in iCloud Drive oder Möbius Sync (Ende-zu-Ende-verschlüsselt) oder über eine verschlüsselte Datei, die eine beliebige App verschickt.
 • Ein einzelner Bereich lässt sich mit einer anderen Person teilen, andere nicht.
 • Eine Notiz kann samt Routinen und Erinnerungen als Datei an eine andere Person geschickt werden, die sie annimmt oder ablehnt.
-• Notizen, Themen oder ganze Bereiche lassen sich als Paket mit Kopien an andere weitergeben, die sie als ihre eigenen behalten.
+• Notizen, Themen oder ganze Bereiche gehen als Paket mit Kopien an Menschen und als AXT-Dateien an andere Apps.
 
 Datenschutz und Sicherheit
 • Kein Konto, kein Server, keine Analyse, keine Werbung.

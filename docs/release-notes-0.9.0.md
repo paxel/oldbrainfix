@@ -111,7 +111,7 @@ Old Brain Fix is a note and reminder app for Android. A desktop app for Linux, W
 • A single Area can be shared with another person. Other Areas are not shared.
 • Your Profile unites all of your Devices. Your name, a unique code and an optional picture show on the Notes you share with others.
 • A Note can be sent to another person as a file, together with its Routines and Reminders. The receiver can accept or decline it.
-• Notes, Topics or whole Areas can be handed to others as a Pack of copies, which they keep as their own.
+• Notes, Topics or whole Areas go to people as a Pack of copies, and to other apps as AXT files.
 
 <b>Privacy and security</b>
 • No account, no server, no analytics, no advertising.
@@ -156,7 +156,7 @@ Old Brain Fix ist eine Notiz- und Erinnerungs-App für Android. Eine Desktop-App
 • Telefon und Desktop gleichen sich direkt im lokalen Netz ab (TLS, gekoppelt per QR-Code oder eingetippten Code), über einen geteilten Ordner wie Syncthing oder Nextcloud (Ende-zu-Ende-verschlüsselt) oder über eine verschlüsselte Datei, die eine beliebige App verschickt.
 • Ein einzelner Bereich lässt sich mit einer anderen Person teilen, andere nicht.
 • Dein Profil vereint alle deine Geräte. Name, eindeutiger Code und optionales Bild stehen an den Notizen, die du mit anderen teilst.
-• Eine Notiz kann samt Routinen und Erinnerungen als Datei an eine andere Person geschickt werden, die sie annimmt oder ablehnt.
+• Eine Notiz geht samt Routinen und Erinnerungen an eine Person, die sie annimmt oder ablehnt, oder als AXT-Datei an andere Apps.
 
 <b>Datenschutz und Sicherheit</b>
 • Kein Konto, kein Server, keine Analyse, keine Werbung.
@@ -289,7 +289,7 @@ Abgleich und Teilen
 • Deine Geräte gleichen sich direkt im lokalen Netz ab, solange die App offen ist (TLS, gekoppelt per QR-Code oder eingetippten Code), über einen geteilten Ordner in iCloud Drive oder Möbius Sync (Ende-zu-Ende-verschlüsselt) oder über eine verschlüsselte Datei, die eine beliebige App verschickt.
 • Ein einzelner Bereich lässt sich mit einer anderen Person teilen, andere nicht.
 • Eine Notiz kann samt Routinen und Erinnerungen als Datei an eine andere Person geschickt werden, die sie annimmt oder ablehnt.
-• Notizen, Themen oder ganze Bereiche lassen sich als Paket mit Kopien an andere weitergeben, die sie als ihre eigenen behalten.
+• Notizen, Themen oder ganze Bereiche gehen als Paket mit Kopien an Menschen und als AXT-Dateien an andere Apps.
 
 Datenschutz und Sicherheit
 • Kein Konto, kein Server, keine Analyse, keine Werbung.
@@ -332,24 +332,31 @@ Old Brain Fix ist eine Notiz- und Erinnerungs-App für das iPhone. Eine Desktop-
 Old Brain Fix ist eine Notiz- und Erinnerungs-App für iPhone und iPad. Eine Desktop-App für Linux, Windows und macOS nutzt dieselben Daten. Es gibt kein Konto und keinen Server; alle Daten liegen auf den eigenen Geräten.
 ```
 
-<!-- edit block=play_full_en status=pending -->
-Changelog 0.9.0, Added: "Export as AXT file… hands Notes, a selection, a Topic or an Area to other apps that speak AXT."
+<!-- edit block=play_full_en status=accepted -->
+Changelog 0.9.0, Added: "Export as AXT file… hands Notes, a selection, a Topic or an Area to other apps that speak AXT." (the description is full, so the AXT file joins an existing bullet)
 ```
 • Notes, Topics or whole Areas can be handed to others as a Pack of copies, which they keep as their own.
 ```
 ```
-• Notes, Topics or whole Areas can be handed to others as a Pack of copies, which they keep as their own.
-• Notes, Reminders and Routines go to other apps, and come from them, as AXT files, an open format for small apps.
+• Notes, Topics or whole Areas go to people as a Pack of copies, and to other apps as AXT files.
 ```
 
-<!-- edit block=play_full_de status=pending -->
-Changelog 0.9.0, Added: "Export as AXT file… hands Notes, a selection, a Topic or an Area to other apps that speak AXT."
+<!-- edit block=play_full_de status=accepted -->
+Changelog 0.9.0, Added: "Export as AXT file… hands Notes, a selection, a Topic or an Area to other apps that speak AXT." (the description is full, so the AXT file joins an existing bullet)
 ```
 • Eine Notiz kann samt Routinen und Erinnerungen als Datei an eine andere Person geschickt werden, die sie annimmt oder ablehnt.
 ```
 ```
-• Eine Notiz kann samt Routinen und Erinnerungen als Datei an eine andere Person geschickt werden, die sie annimmt oder ablehnt.
-• Notizen, Erinnerungen und Routinen gehen als AXT-Dateien, einem offenen Format für kleine Apps, an andere Apps und kommen von ihnen.
+• Eine Notiz geht samt Routinen und Erinnerungen an eine Person, die sie annimmt oder ablehnt, oder als AXT-Datei an andere Apps.
+```
+
+<!-- edit block=appstore_desc_de status=accepted -->
+Changelog 0.9.0, Added: "Export as AXT file… hands Notes, a selection, a Topic or an Area to other apps that speak AXT." (the description is full, so the AXT file joins an existing bullet)
+```
+• Notizen, Themen oder ganze Bereiche lassen sich als Paket mit Kopien an andere weitergeben, die sie als ihre eigenen behalten.
+```
+```
+• Notizen, Themen oder ganze Bereiche gehen als Paket mit Kopien an Menschen und als AXT-Dateien an andere Apps.
 ```
 
 <!-- edit block=appstore_desc_en status=accepted -->
@@ -360,16 +367,6 @@ Changelog 0.9.0, Added: "Export as AXT file… hands Notes, a selection, a Topic
 ```
 • Notes, Topics or whole Areas can be handed to others as a Pack of copies, which they keep as their own.
 • Notes, Reminders and Routines go to other apps, and come from them, as AXT files, an open format for small apps.
-```
-
-<!-- edit block=appstore_desc_de status=pending -->
-Changelog 0.9.0, Added: "Export as AXT file… hands Notes, a selection, a Topic or an Area to other apps that speak AXT."
-```
-• Notizen, Themen oder ganze Bereiche lassen sich als Paket mit Kopien an andere weitergeben, die sie als ihre eigenen behalten.
-```
-```
-• Notizen, Themen oder ganze Bereiche lassen sich als Paket mit Kopien an andere weitergeben, die sie als ihre eigenen behalten.
-• Notizen, Erinnerungen und Routinen gehen als AXT-Dateien, einem offenen Format für kleine Apps, an andere Apps und kommen von ihnen.
 ```
 
 ## Screenshots: Play
