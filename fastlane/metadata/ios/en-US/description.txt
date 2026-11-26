@@ -28,6 +28,7 @@ Sync and sharing
 • A single Area can be shared with another person. Other Areas are not shared.
 • A Note can be sent to another person as a file, with its Routines and Reminders, to accept or decline.
 • Notes, Topics or whole Areas can be handed to others as a Pack of copies, which they keep as their own.
+• Notes, Reminders and Routines go to other apps, and come from them, as AXT files, an open format for small apps.
 
 Privacy and security
 • No account, no server, no analytics, no advertising.

@@ -4,7 +4,7 @@ Paste source for the Google Play Console and App Store Connect: the release's Wh
 
 ## Summary
 
-Version 0.9.0. Live: 0.8.0 on Google Play, 0.7.2 on the App Store (0.8.0 not submitted there yet), read with `live.py` on 2026-11-25. Every text here describes the `## [0.9.0]` section of the changelog against 0.8.0: AXT files to and from other apps (export, open and take, later updates and deletions), the desktop's layout on tablets and iPads from 700 dp wide, and the iPad as a device of its own. The Play and App Store texts name all three; the desktop's own AXT dialog and menus stay out of the phone texts. Listing: the App Store description's first line names the iPad (decided in the grilling, Q3), and one line per description names AXT files, pending. Frames: Play's 10" tablet frames and the App Store's iPad 13" frames are new (1 to 8 each); the iPhone's frame 4 now shows Export as AXT file… in the Share group; the phone frames are unchanged.
+Version 0.9.0. Live: 0.8.0 on Google Play, 0.7.2 on the App Store (0.8.0 not submitted there yet), read with `live.py` on 2026-11-25. Every text here describes the `## [0.9.0]` section of the changelog against 0.8.0: AXT files to and from other apps (export, open and take, later updates and deletions), the desktop's layout on tablets and iPads from 700 dp wide, and the iPad as a device of its own. The Play and App Store texts name all three; the desktop's own AXT dialog and menus stay out of the phone texts. Listing: the App Store description's first line names the iPad (decided in the grilling, Q3), and one line per description names AXT files, accepted on 2026-11-26. Frames: Play's 10" tablet frames and the App Store's iPad 13" frames are new (1 to 8 each); the iPhone's frame 4 now shows Export as AXT file… in the Share group; the phone frames are unchanged.
 
 - [Play Kit](https://claude.ai/artifact/Ds5iewxVwTLoPwAWFbpWiJ)
 - [App Store Kit](https://claude.ai/artifact/PvZUte3cRrwyoHg2feLj1T)
@@ -112,6 +112,7 @@ Old Brain Fix is a note and reminder app for Android. A desktop app for Linux, W
 • Your Profile unites all of your Devices. Your name, a unique code and an optional picture show on the Notes you share with others.
 • A Note can be sent to another person as a file, together with its Routines and Reminders. The receiver can accept or decline it.
 • Notes, Topics or whole Areas can be handed to others as a Pack of copies, which they keep as their own.
+• Notes, Reminders and Routines go to other apps, and come from them, as AXT files, an open format for small apps.
 
 <b>Privacy and security</b>
 • No account, no server, no analytics, no advertising.
@@ -157,6 +158,7 @@ Old Brain Fix ist eine Notiz- und Erinnerungs-App für Android. Eine Desktop-App
 • Ein einzelner Bereich lässt sich mit einer anderen Person teilen, andere nicht.
 • Dein Profil vereint alle deine Geräte. Name, eindeutiger Code und optionales Bild stehen an den Notizen, die du mit anderen teilst.
 • Eine Notiz kann samt Routinen und Erinnerungen als Datei an eine andere Person geschickt werden, die sie annimmt oder ablehnt.
+• Notizen, Erinnerungen und Routinen gehen als AXT-Dateien, einem offenen Format für kleine Apps, an andere Apps und kommen von ihnen.
 
 <b>Datenschutz und Sicherheit</b>
 • Kein Konto, kein Server, keine Analyse, keine Werbung.
@@ -245,6 +247,7 @@ Sync and sharing
 • A single Area can be shared with another person. Other Areas are not shared.
 • A Note can be sent to another person as a file, with its Routines and Reminders, to accept or decline.
 • Notes, Topics or whole Areas can be handed to others as a Pack of copies, which they keep as their own.
+• Notes, Reminders and Routines go to other apps, and come from them, as AXT files, an open format for small apps.
 
 Privacy and security
 • No account, no server, no analytics, no advertising.
@@ -331,7 +334,7 @@ Old Brain Fix ist eine Notiz- und Erinnerungs-App für das iPhone. Eine Desktop-
 Old Brain Fix ist eine Notiz- und Erinnerungs-App für iPhone und iPad. Eine Desktop-App für Linux, Windows und macOS nutzt dieselben Daten. Es gibt kein Konto und keinen Server; alle Daten liegen auf den eigenen Geräten.
 ```
 
-<!-- edit block=play_full_en status=pending -->
+<!-- edit block=play_full_en status=accepted -->
 Changelog 0.9.0, Added: "Export as AXT file… hands Notes, a selection, a Topic or an Area to other apps that speak AXT."
 ```
 • Notes, Topics or whole Areas can be handed to others as a Pack of copies, which they keep as their own.
@@ -341,7 +344,7 @@ Changelog 0.9.0, Added: "Export as AXT file… hands Notes, a selection, a Topic
 • Notes, Reminders and Routines go to other apps, and come from them, as AXT files, an open format for small apps.
 ```
 
-<!-- edit block=play_full_de status=pending -->
+<!-- edit block=play_full_de status=accepted -->
 Changelog 0.9.0, Added: "Export as AXT file… hands Notes, a selection, a Topic or an Area to other apps that speak AXT."
 ```
 • Eine Notiz kann samt Routinen und Erinnerungen als Datei an eine andere Person geschickt werden, die sie annimmt oder ablehnt.
@@ -351,7 +354,7 @@ Changelog 0.9.0, Added: "Export as AXT file… hands Notes, a selection, a Topic
 • Notizen, Erinnerungen und Routinen gehen als AXT-Dateien, einem offenen Format für kleine Apps, an andere Apps und kommen von ihnen.
 ```
 
-<!-- edit block=appstore_desc_en status=pending -->
+<!-- edit block=appstore_desc_en status=accepted -->
 Changelog 0.9.0, Added: "Export as AXT file… hands Notes, a selection, a Topic or an Area to other apps that speak AXT."
 ```
 • Notes, Topics or whole Areas can be handed to others as a Pack of copies, which they keep as their own.
