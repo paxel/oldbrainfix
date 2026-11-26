@@ -218,7 +218,8 @@ jobs:
         working-directory: desktop
         run: cargo clippy -p oldbrainfix-gui --all-targets --locked -- -D warnings
 
-  # The release tools' tests and the changelog's shape.
+  # The release tools' tests, the changelog's shape and the apt
+  # repository builder.
   tools:
     name: ${{ github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork && 'Tools (unit tests, changelog) (runs on push)' || 'Tools (unit tests, changelog)' }}
     if: github.event_name == 'push' || github.event.pull_request.head.repo.fork
@@ -235,6 +236,11 @@ jobs:
         run: python3 -m unittest test_whats_new test_store_release test_alarm_sound test_osv_gate test_coverage_floor test_whisper_pin test_appstore_listing test_ios_icon test_tested_tree test_sonar_gate test_glibc_ceiling test_changelog_check
       - name: The changelog's current section is one short sentence per entry
         run: python3 tool/changelog_check.py CHANGELOG.md site/changelog.de.md
+      - name: The apt repository builder — signed, every version in its pool
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends apt-utils
+          tool/test_apt_repo.sh
 
   apk:
     name: ${{ github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork && 'Debug APK (runs on push)' || 'Debug APK' }}

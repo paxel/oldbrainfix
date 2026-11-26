@@ -67,11 +67,14 @@
 #   release        — GitHub Release, notes = the CHANGELOG section for the tag
 #   channels       — the rendered files pushed to the tap and the bucket, after
 #                    the Release, when publishing
+#   apt            — after the Release, the Pages workflow run again on
+#                    the tag, so the apt repository on the site takes the
+#                    tag's .deb files (obf-1153)
 #
 # The Whisper model is not part of any of this: the app downloads it from
 # the separate `whisper-model-v1` release, which no tag here touches.
 #
-# Publishing (Play, TestFlight, F-Droid, the Release, the tap and the bucket) happens on a tag, or on a manual
+# Publishing (Play, TestFlight, F-Droid, the Release, the tap, the bucket and the apt repository) happens on a tag, or on a manual
 # dispatch that says publish=true. A dispatch without it is the dry run:
 # every artifact is built and uploaded, nothing leaves GitHub. The App
 # Store submission needs both publish=true and submit_app_store=true on a
@@ -96,6 +99,10 @@
 #                 profile (.mobileprovision base64, #241)
 #   APPLE_TEAM_ID — the Apple Developer team id
 #                 (steps: docs/agents/ios-release.md)
+#   APT_SIGNING_KEY / APT_SIGNING_PASSPHRASE — the apt repository's key
+#                 (ASCII-armoured secret key) and its passphrase, read by
+#                 pages.yml, which the apt job starts; without them the
+#                 site has no /apt/ (steps: docs/agents/apt-repository.md)
 #
 # No Flatpak (obf-1151): Flathub's generative AI policy forbids
 # AI-written manifests and AI-opened pull requests, and this project is
@@ -1222,3 +1229,19 @@ jobs:
           git -C bucket add bucket/oldbrainfix.json
           git -C bucket diff --cached --quiet || git -C bucket commit -m "oldbrainfix $ver"
           git -C bucket push
+
+  # The apt repository on the Pages site (obf-1153) is built from the
+  # Releases' .deb files, so the Pages run of the tag push, which came
+  # before this Release, lacks this version: Pages runs again on the tag.
+  apt:
+    name: Apt repository (Pages again on the tag)
+    needs: release
+    if: github.ref_type == 'tag' || github.event.inputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Run the Pages workflow on the tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --repo "$GITHUB_REPOSITORY" --ref "$RELEASE_TAG"

@@ -12,6 +12,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Eine AXT-Datei aus einer anderen App öffnet sich in Old Brain Fix, und ihre angehakten Einträge werden Notizen am gewählten Ort. ([obf-1146](https://github.com/paxel/oldbrainfix/issues/462))
 - Eine spätere AXT-Datei derselben App ändert oder entfernt die Notizen, die sie gebracht hat, außer du hast sie seither geändert. ([obf-1147](https://github.com/paxel/oldbrainfix/issues/463))
 - Fedora und openSUSE bekommen ein .rpm der Desktop-App, neben dem .deb, dem AppImage und dem Tar-Archiv. ([obf-1152](https://github.com/paxel/oldbrainfix/issues/470))
+- Debian und Ubuntu können die Desktop-App aus einem apt-Repository installieren und bekommen jede neue Version mit ihren Updates. ([obf-1153](https://github.com/paxel/oldbrainfix/issues/471))
 
 ### Entfernt
 
