@@ -6,6 +6,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
 import 'announcements.dart';
+import 'axt_open_screen.dart';
 import 'bundle_platform.dart';
 import 'checklist_view.dart';
 import 'failure_dialog.dart';
@@ -188,8 +189,9 @@ class _SendNoteDialogState extends State<SendNoteDialog> {
   }
 }
 
-/// Opens a file another app handed over, or the user picked: a Pack
-/// (#164) shows its tree or why it did not open, a Profile card file
+/// Opens a file another app handed over, or the user picked: an AXT
+/// file (obf-1146), told by its first bytes, shows its records or why it
+/// did not open, a Pack (#164) shows its tree or why it did not open, a Profile card file
 /// (#144) shows the person's Profile or why nobody was added,
 /// a Sent Item shows its preview, anything else is imported as a bundle.
 /// A card file is JSON as a Sent Item is, so it is asked for first. The
@@ -203,6 +205,17 @@ Future<int> openReceivedFile(
   final t = context.t;
   final announcements = AnnouncementsScope.of(context);
   final navigator = Navigator.of(context);
+  if (await axtFileBytes(path) case final axt?) {
+    try {
+      File(path).deleteSync();
+    } on FileSystemException {
+      // Gone already.
+    }
+    if (!context.mounted) return 0;
+    await openAxtBytes(context, store, axt);
+    return 0;
+  }
+  if (!context.mounted) return 0;
   // A Pack is JSON as a card file is, and of any size (#164): asked
   // for first, and read whole.
   if (await packFileBytes(path) case final pack?) {

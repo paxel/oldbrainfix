@@ -50,7 +50,7 @@ decisions in [docs/adr](docs/adr), the plan in the GitHub issues.
 | Platform | Install                                                                                                               |
 |----------|-----------------------------------------------------------------------------------------------------------------------|
 | Android  | Add the F-Droid repository `https://paxel.github.io/fdroid/repo`, or the APK from the latest release                  |
-| Linux    | `brew install paxel/tap/oldbrainfix`, or the `.deb`, `.flatpak` or `.AppImage` from the latest release                |
+| Linux    | `brew install paxel/tap/oldbrainfix`, or the `.deb`, `.rpm` or `.AppImage` from the latest release                    |
 | macOS    | `brew install --cask paxel/tap/oldbrainfix`, or the `.dmg` from the latest release                                    |
 | Windows  | `scoop bucket add paxel https://github.com/paxel/scoop-bucket`, then `scoop install paxel/oldbrainfix`, or the `.zip` |
 

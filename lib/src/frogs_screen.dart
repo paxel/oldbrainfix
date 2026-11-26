@@ -6,6 +6,7 @@ import 'agenda_group.dart';
 import 'announcements.dart';
 import 'app_lock.dart';
 import 'area_look.dart';
+import 'big_screen.dart';
 import 'browser.dart';
 import 'l10n.dart';
 import 'look.dart';
@@ -52,11 +53,7 @@ PlacedFrog? placeFrog(Frogs frogs, Places places, Frog frog) {
 
 /// Opens the Frog view.
 Future<void> openFrogs(BuildContext context, Notes notes, Places places) =>
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => FrogsScreen(notes: notes, places: places),
-      ),
-    );
+    Navigator.of(context).push(frogsRoute(notes, places));
 
 /// A long press on a Frog's row opens a menu where the finger is, with
 /// Move to trash for who may manage it (ADR 0013), which moves the Frog to the

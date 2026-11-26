@@ -17,11 +17,6 @@ fn method(vars: &[(&str, &str)], exe: Option<&str>, deb: bool, os: &str) -> Stri
 
 #[test]
 fn the_install_method_comes_from_the_packaging_and_says_unknown_when_unsure() {
-    let id = [("FLATPAK_ID", "io.github.paxel.oldbrainfix")];
-    assert_eq!(
-        method(&id, Some("/app/bin/oldbrainfix"), false, "linux"),
-        "Flatpak"
-    );
     let image = [("APPIMAGE", "/home/ann/Old.AppImage")];
     assert_eq!(
         method(
@@ -55,10 +50,17 @@ fn the_install_method_comes_from_the_packaging_and_says_unknown_when_unsure() {
     let app = "/Applications/Old Brain Fix.app/Contents/MacOS/oldbrainfix";
     assert_eq!(method(&[], Some(app), false, "macos"), "unknown");
     assert_eq!(method(&[], None, false, "linux"), "unknown");
+}
+
+#[test]
+fn a_flatpak_id_says_nothing_of_where_the_app_came_from() {
+    // No Flatpak is offered any more (obf-1151): the path counts.
+    let id = [("FLATPAK_ID", "io.github.paxel.oldbrainfix")];
     assert_eq!(
-        method(&[("FLATPAK_ID", "")], None, false, "linux"),
-        "unknown"
+        method(&id, Some("/usr/bin/oldbrainfix"), true, "linux"),
+        ".deb"
     );
+    assert_eq!(method(&id, None, false, "linux"), "unknown");
 }
 
 #[test]
@@ -82,9 +84,9 @@ fn the_body_is_the_words_then_each_fact_ticked_as_the_phone_writes_it() {
             " It counts wrong. ",
             Some("0.4.0"),
             Some("Debian, x86_64"),
-            Some("Flatpak")
+            Some(".deb")
         ),
-        "It counts wrong.\n\nVersion: 0.4.0\nSystem: Debian, x86_64\nInstalled from: Flatpak"
+        "It counts wrong.\n\nVersion: 0.4.0\nSystem: Debian, x86_64\nInstalled from: .deb"
     );
     assert_eq!(
         feedback_body("Hi", None, Some("Debian, x86_64"), None),

@@ -65,6 +65,10 @@ ureq = { version = "3", default-features = false, features = ["rustls"] }
 # yaml-rust2 MIT OR Apache-2.0, fancy-regex MIT.
 yaml-rust2 = { version = "0.13", default-features = false }
 fancy-regex = "0.20"
+# AXT files (obf-1144, ADR 0056): records exchanged with other apps,
+# signed with this Device's key, as the Dart core's `axt_protocol`
+# reads and writes them. Apache-2.0 OR MIT.
+axt-protocol = "0.1.1"
 
 [dev-dependencies]
 # A real zone for the fixtures' daylight-saving cases.

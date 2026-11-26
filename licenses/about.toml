@@ -464,3 +464,19 @@ path = "LICENSE-MIT"
 license = "MIT"
 checksum = "2a7df90e60fd5512b8bca35d3ce90e068f21c52d962855053fd1d9e2e7ca0f16"
 
+
+# ouroboros (through axt-protocol's Avro) names its licence files
+# LICENSE_MIT and LICENSE_APACHE, which cargo-about does not find alone.
+[ouroboros.clarify]
+license = "MIT OR Apache-2.0"
+[[ouroboros.clarify.files]]
+path = "LICENSE_MIT"
+license = "MIT"
+checksum = "b87740f87cbb0e8be9c4c21db4a265d5f297cd9ee3ea0ff4cf702de819ef6de7"
+
+[ouroboros_macro.clarify]
+license = "MIT OR Apache-2.0"
+[[ouroboros_macro.clarify.files]]
+path = "LICENSE_MIT"
+license = "MIT"
+checksum = "b87740f87cbb0e8be9c4c21db4a265d5f297cd9ee3ea0ff4cf702de819ef6de7"

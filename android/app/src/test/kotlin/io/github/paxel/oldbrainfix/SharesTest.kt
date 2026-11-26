@@ -62,4 +62,11 @@ class SharesTest {
         assertFalse(Shares.isOwnFile("application/pdf", "Lease.pdf"))
         assertFalse(Shares.isOwnFile("application/zip", "obfpack.zip"))
     }
+
+    @Test
+    fun `an AXT file of another app shared to the share target opens as with Open with`() {
+        assertTrue(Shares.isOwnFile("application/vnd.axt", "file"))
+        assertTrue(Shares.isOwnFile("application/octet-stream", "Vet.AXT"))
+        assertFalse(Shares.isOwnFile("application/octet-stream", "axt.txt"))
+    }
 }

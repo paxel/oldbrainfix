@@ -313,6 +313,8 @@ enum ShareTypes {
     ("io.github.paxel.oldbrainfix.item", "oldbrain", "application/vnd.oldbrainfix.item"),
     ("io.github.paxel.oldbrainfix.card", "obfcard", "application/vnd.oldbrainfix.card"),
     ("io.github.paxel.oldbrainfix.pack", "obfpack", "application/vnd.oldbrainfix.pack"),
+    // Another app's AXT file (obf-1146), which the Runner imports.
+    ("io.github.paxel.axt", "axt", "application/vnd.axt"),
   ]
 
   /// The extension of the app's own type [uti], or of the file [name];

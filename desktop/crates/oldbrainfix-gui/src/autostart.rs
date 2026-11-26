@@ -1,9 +1,7 @@
 //! Starting at login, into the tray, on by default (spec, "Desktop"):
 //! an XDG autostart entry on Linux, a LaunchAgent on macOS, a value under
-//! the user's Run key on Windows. Inside the Flatpak, which cannot write
-//! the user's autostart folder, the Background portal sets it up instead
-//! (#45). The entries are made by plain functions, so every platform's is
-//! tested here.
+//! the user's Run key on Windows. The entries are made by plain
+//! functions, so every platform's is tested here.
 
 use std::path::{Path, PathBuf};
 
@@ -106,10 +104,8 @@ pub struct Autostart {
     /// The program started at login.
     pub exe: PathBuf,
     /// The entry's file: the `.desktop` file or the LaunchAgent; unused on
-    /// Windows, where the entry is a registry value, and in the Flatpak.
+    /// Windows, where the entry is a registry value.
     pub file: PathBuf,
-    /// Inside the Flatpak: the Background portal writes the entry.
-    pub through_portal: bool,
 }
 
 impl Autostart {
@@ -120,13 +116,6 @@ impl Autostart {
         let exe = std::env::var_os("APPIMAGE")
             .map(PathBuf::from)
             .or_else(|| std::env::current_exe().ok())?;
-        if std::env::var_os("FLATPAK_ID").is_some() {
-            return Some(Autostart {
-                exe,
-                file: PathBuf::new(),
-                through_portal: true,
-            });
-        }
         let dirs = directories::BaseDirs::new()?;
         let file = if cfg!(target_os = "macos") {
             dirs.home_dir()
@@ -137,22 +126,12 @@ impl Autostart {
                 .join("autostart")
                 .join(format!("{APP_ID}.desktop"))
         };
-        Some(Autostart {
-            exe,
-            file,
-            through_portal: false,
-        })
+        Some(Autostart { exe, file })
     }
 
     /// Sets the login start up, or takes it away. Writing the same entry
-    /// again changes nothing. Through the portal the answer comes later
-    /// (the desktop may ask the user first); a refusal is only logged,
-    /// the switch keeps what the user chose.
+    /// again changes nothing.
     pub fn set(&self, on: bool) -> Result<(), String> {
-        if self.through_portal {
-            portal::request(self.portal_command(), on);
-            return Ok(());
-        }
         if cfg!(windows) {
             return self.set_run_key(on);
         }
@@ -178,23 +157,8 @@ impl Autostart {
         std::fs::write(&self.file, content).map_err(|e| format!("{}: {e}", self.file.display()))
     }
 
-    /// What the portal's entry runs inside the sandbox: the program by
-    /// its name in `/app/bin`, into the tray.
-    pub fn portal_command(&self) -> Vec<String> {
-        let name = self.exe.file_name().map_or_else(
-            || "oldbrainfix".into(),
-            |n| n.to_string_lossy().into_owned(),
-        );
-        vec![name, TRAY_ARG.to_string()]
-    }
-
-    /// Whether the login start is set up. The portal's entry lies outside
-    /// the sandbox, so through the portal this is never known: the stored
-    /// setting counts.
+    /// Whether the login start is set up.
     pub fn is_set(&self) -> bool {
-        if self.through_portal {
-            return false;
-        }
         if cfg!(windows) {
             return std::process::Command::new("reg")
                 .args(["query", RUN_KEY, "/v", RUN_VALUE])
@@ -221,40 +185,6 @@ impl Autostart {
             Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
         }
     }
-}
-
-#[cfg(target_os = "linux")]
-mod portal {
-    use ashpd::desktop::background::Background;
-
-    /// Asks the Background portal for the login start (`on`) or to drop
-    /// it, on a thread of its own: the desktop may show a dialog first.
-    pub fn request(command: Vec<String>, on: bool) {
-        std::thread::spawn(move || {
-            let asked = async_io::block_on(async {
-                Background::request()
-                    .auto_start(on)
-                    .command(&command)
-                    .dbus_activatable(false)
-                    .send()
-                    .await?
-                    .response()
-            });
-            match asked {
-                Ok(answer) if answer.auto_start() != on => {
-                    eprintln!("oldbrainfix: the desktop kept the login start as it was");
-                }
-                Ok(_) => {}
-                Err(e) => eprintln!("oldbrainfix: no login start from the desktop: {e}"),
-            }
-        });
-    }
-}
-
-#[cfg(not(target_os = "linux"))]
-mod portal {
-    /// There is no Flatpak, and so no portal, off Linux.
-    pub fn request(_command: Vec<String>, _on: bool) {}
 }
 
 #[cfg(test)]

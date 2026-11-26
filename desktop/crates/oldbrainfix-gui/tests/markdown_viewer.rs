@@ -525,163 +525,28 @@ fn a_file_near_the_largest_draws_within_the_budget() -> TestResult {
     Ok(())
 }
 
-/// The Area an Import named `name` made, once made.
-fn made_area(store: &Store, name: &str) -> Option<oldbrainfix_core::Area> {
-    Places::new(store)
-        .areas()
-        .ok()
-        .and_then(|areas| areas.into_iter().find(|a| a.name == name))
-}
-
-/// The line of a viewer inside the Flatpak (Q13).
-const OPEN_FOLDER: &str = "Open the folder to follow its links";
-
-/// Steps the window until `done` says so of what it shows.
-fn settle_shown(harness: &mut Harness<'_, App>, done: impl Fn(&Harness<'_, App>) -> bool) {
-    for _ in 0..300 {
-        harness.step();
-        if done(harness) {
-            harness.run_steps(4);
-            return;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(20));
-    }
-    panic!("never settled");
-}
-
+/// A file alone in a folder of its own, away from the vault it links
+/// into: with no Flatpak (obf-1151) it asks for no folder; its links and
+/// pictures are found where it lies, or not at all.
 #[test]
-fn inside_the_flatpak_a_file_shared_alone_asks_once_for_the_folder_of_its_links() -> TestResult {
-    let store = store()?;
-    let (dir, garden) = vault();
-    // As the document portal shares a file opened with the app: alone,
-    // in a folder of its own.
-    let shared = tempfile::tempdir()?;
-    let plain = shared.path().join("Plain.md");
-    std::fs::write(&plain, "# Plain\n\nNo links at all.\n")?;
-    let alone = shared.path().join("Garden.md");
+fn a_file_away_from_its_links_asks_for_no_folder() -> TestResult {
+    let (_dir, garden) = vault();
+    let elsewhere = tempfile::tempdir()?;
+    let alone = elsewhere.path().join("Garden.md");
     std::fs::copy(&garden, &alone)?;
-    let handed = Arc::default();
-    let mut harness = window(&store, Arc::clone(&handed));
-    let asked = Arc::new(Mutex::new(Vec::new()));
-    let (into, folder) = (asked.clone(), dir.path().to_path_buf());
-    harness.state_mut().set_link_folders(
-        true,
-        Box::new(move |title| {
-            into.lock().unwrap().push(title.to_string());
-            Some(folder.clone())
-        }),
-    );
-    // A file without links or pictures has nothing to follow.
-    open(&mut harness, &handed, &plain);
-    assert!(shows(&harness, "No links at all."));
-    assert!(harness.query_by_label(OPEN_FOLDER).is_none());
-    handed.lock().unwrap().push(alone.clone());
-    settle(&mut harness, |app| {
-        app.markdown_viewers().get(1).is_some_and(|v| v.loaded())
-    });
-    assert!(harness.query_by_label(OPEN_FOLDER).is_some());
-    assert!(shows(&harness, "Picture not found: rose.png"));
-    // Not found yet, its link opens nothing.
-    harness
-        .get_by_role_and_label(Role::Link, "the roses")
-        .click_accesskit();
-    harness.run_steps(4);
-    assert!(shows(&harness, "Mind the frost"));
-    harness.get_by_label(OPEN_FOLDER).click_accesskit();
-    settle_shown(&mut harness, |h| !shows(h, "Picture not found: rose.png"));
-    assert!(harness.query_by_label(OPEN_FOLDER).is_none());
-    assert_eq!(
-        *asked.lock().unwrap(),
-        ["Choose the folder its links are in"]
-    );
-    // Imported, its copy in the folder is the Note, linked to the file
-    // it links to.
-    // The second viewer's, Plain's being first.
-    harness
-        .query_all_by(|n| {
-            n.role() == Role::Button && n.label().as_deref() == Some("Import as Note…")
-        })
-        .next_back()
-        .unwrap()
-        .click_accesskit();
-    harness.run_steps(4);
-    assert!(shows(&harness, "Also import the file it links to?"));
-    harness.get_by_label("Import them too").click_accesskit();
-    settle_shown(&mut harness, |h| {
-        made_area(&store, "From Garden").is_some() && !h.state().importing()
-    });
-    let area = made_area(&store, "From Garden").ok_or("no Area From Garden")?;
-    let notes = Notes::new(&store).inside(&area.id)?;
-    assert_eq!(notes.len(), 2);
-    let roses = notes
-        .iter()
-        .find(|n| n.text.starts_with("# Roses"))
-        .unwrap();
-    let garden = notes
-        .iter()
-        .find(|n| n.text.starts_with("# Garden"))
-        .unwrap();
-    assert!(
-        garden
-            .text
-            .contains(&format!("[the roses](oldbrainfix://note/{})", roses.id))
-    );
-    assert_eq!(garden.photos.len(), 1);
-    // The file is still the one opened; its links are found in the vault.
-    // The viewer's link, drawn after the list's Notes.
-    harness
-        .query_all_by(|n| n.role() == Role::Link && n.label().as_deref() == Some("the roses"))
-        .next_back()
-        .unwrap()
-        .click_accesskit();
-    settle(&mut harness, |app| {
-        app.markdown_viewers()
-            .get(1)
-            .is_some_and(|v| v.loaded() && v.file().ends_with("plants/Roses.md"))
-    });
-    assert!(shows(&harness, "Back to the Garden."));
-    // Another file shared alone whose copy the folder holds: its links
-    // are found there at once, nothing asked again.
-    let roses = shared.path().join("Roses.md");
-    std::fs::copy(dir.path().join("plants/Roses.md"), &roses)?;
-    handed.lock().unwrap().push(roses);
-    settle(&mut harness, |app| {
-        app.markdown_viewers().get(2).is_some_and(|v| v.loaded())
-    });
-    assert!(!harness.state().markdown_viewers()[2].asks_for_folder());
-    assert!(harness.query_by_label(OPEN_FOLDER).is_none());
-    assert_eq!(asked.lock().unwrap().len(), 1);
-    Ok(())
-}
-
-#[test]
-fn the_folder_line_asks_the_main_window_for_the_folder_of_its_viewer() -> TestResult {
-    let (dir, garden) = vault();
-    let shared = tempfile::tempdir()?;
-    let alone = shared.path().join("Garden.md");
-    std::fs::copy(&garden, &alone)?;
-    let shown = Viewer::open_granted(alone, 7, egui::vec2(900.0, 700.0), None, Vec::new());
-    let t = L10n::new("en");
-    let mut harness = Harness::builder()
-        .with_size(egui::vec2(900.0, 700.0))
-        .build_ui_state(
-            move |ui, (viewer, asked): &mut (Viewer, Vec<Asked>)| {
-                App::install(ui.ctx());
-                let (_, wanted) = viewer.frame(ui, &t, false, false);
-                asked.extend(wanted);
-            },
-            (shown, Vec::new()),
-        );
-    viewer_settle(&mut harness, |v| v.loaded());
-    assert!(harness.state().0.asks_for_folder());
-    harness.get_by_label(OPEN_FOLDER).click();
+    let mut harness = viewer(&alone);
     harness.run_steps(2);
-    let viewport = harness.state().0.viewport;
-    assert_eq!(harness.state().1, [Asked::OpenFolder(viewport)]);
-    harness.state_mut().0.grant(dir.path().to_path_buf());
-    // The line goes at once, and stays gone once the file is read again.
-    assert!(!harness.state().0.asks_for_folder());
-    harness.run_steps(2);
-    assert!(harness.query_by_label(OPEN_FOLDER).is_none());
+    let says = |text: &str| {
+        harness
+            .query_all_by(|n| {
+                n.value().is_some_and(|v| v.contains(text))
+                    || n.label().is_some_and(|l| l.contains(text))
+            })
+            .next()
+            .is_some()
+    };
+    assert!(says("Picture not found: rose.png"));
+    assert!(!says("Open the folder"));
+    assert!(harness.state().1.is_empty());
     Ok(())
 }

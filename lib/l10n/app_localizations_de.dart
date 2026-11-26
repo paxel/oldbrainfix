@@ -587,6 +587,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get allNotesTitle => 'Alle Notizen';
 
   @override
+  String get sidebarAgenda => 'Agenda';
+
+  @override
   String get newRoutineTooltip => 'Neue Routine oder Erinnerung';
 
   @override
@@ -6208,6 +6211,146 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get exportAsPack => 'Als Paket exportieren…';
+
+  @override
+  String get exportAsAxt => 'Als AXT-Datei exportieren…';
+
+  @override
+  String get axtNotSent => 'Die AXT-Datei wurde nicht geteilt.';
+
+  @override
+  String get axtNotSentTitle => 'AXT-Datei nicht geteilt';
+
+  @override
+  String get axtNotWrittenCause =>
+      'Die AXT-Datei konnte nicht geschrieben werden.';
+
+  @override
+  String get axtNoNotes => 'Hier gibt es keine Notizen für eine AXT-Datei.';
+
+  @override
+  String get axtTitle => 'AXT-Datei';
+
+  @override
+  String get axtFromOwnDevice => 'Von deinem eigenen Gerät';
+
+  @override
+  String axtFromApp(String app) {
+    return 'Von $app';
+  }
+
+  @override
+  String get axtFromNoName => 'Von einer App ohne Namen';
+
+  @override
+  String axtKey(String fingerprint) {
+    return 'Schlüssel $fingerprint';
+  }
+
+  @override
+  String get axtTypeNote => 'Notiz';
+
+  @override
+  String get axtTypeTask => 'Aufgabe';
+
+  @override
+  String get axtTypeAppointment => 'Termin';
+
+  @override
+  String get axtNoType => 'Ein Eintrag ohne Typ, etwa eine Löschung';
+
+  @override
+  String get axtNotTakenHeading => 'Nicht übernommen';
+
+  @override
+  String get axtInto => 'Übernehmen nach';
+
+  @override
+  String get axtTake => 'Übernehmen';
+
+  @override
+  String get axtNothingToTake =>
+      'Nichts in dieser Datei kann übernommen werden.';
+
+  @override
+  String axtTaken(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Notizen übernommen',
+      one: '1 Notiz übernommen',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get axtNotOpened => 'Die AXT-Datei wurde nicht geöffnet.';
+
+  @override
+  String get axtNotOpenedTitle => 'AXT-Datei nicht geöffnet';
+
+  @override
+  String get axtUnreadable =>
+      'Diese Datei ist keine AXT-Datei, die diese App lesen kann, oder sie wurde verändert, nachdem sie signiert wurde.';
+
+  @override
+  String get axtSendAgainFix =>
+      'Bitte noch einmal um die Datei, oder schreib sie in der anderen App noch einmal.';
+
+  @override
+  String get axtNotTaken => 'Die Einträge wurden nicht übernommen.';
+
+  @override
+  String get axtNotTakenTitle => 'Einträge nicht übernommen';
+
+  @override
+  String get axtPlaceRefused => 'Dieses Gerät darf sie dort nicht ablegen.';
+
+  @override
+  String get axtPickAnotherFix =>
+      'Wähle einen anderen Ort, etwa Unsortiert, und übernimm sie noch einmal. Nichts wurde geändert.';
+
+  @override
+  String axtUpdates(String note) {
+    return 'Ändert „$note“';
+  }
+
+  @override
+  String axtDeletes(String note) {
+    return 'Verschiebt „$note“ in den Papierkorb';
+  }
+
+  @override
+  String get axtKeptChange => 'Deine Änderung bleibt';
+
+  @override
+  String axtRefusedRecord(String note) {
+    return 'Darf „$note“ nicht ändern';
+  }
+
+  @override
+  String axtStaleRecord(String note) {
+    return '„$note“ hat das schon';
+  }
+
+  @override
+  String axtRecordsTaken(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Einträge übernommen',
+      one: '1 Eintrag übernommen',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get axtNothingChanged =>
+      'Nichts geändert: Diese Einträge wurden schon übernommen.';
+
+  @override
+  String get axtChangeRefused =>
+      'Dieses Gerät darf sie dort nicht ablegen, oder es darf eine der Notizen nicht ändern, die sie ändern sollen.';
 
   @override
   String get packExportTitle => 'Als Paket exportieren';

@@ -491,8 +491,6 @@
   "deskMarkdownAlone": "Nur diese Datei",
   "deskMarkdownUnreadable": "Diese Datei lässt sich nicht lesen.",
   "deskMarkdownNotFound": "Nicht in diesem Ordner gefunden",
-  "deskMarkdownOpenFolder": "Ordner öffnen, um den Links zu folgen",
-  "deskMarkdownFolderTitle": "Ordner wählen, in dem die Links liegen",
   "deskMarkdownFindHint": "In dieser Datei suchen",
   "deskMarkdownFindNone": "Nicht in dieser Datei",
   "deskMarkdownPictureMissing": "Bild nicht gefunden: {name}",
@@ -582,5 +580,14 @@
   "deskImportFilledIn": "{count, plural, =1{1 Notiz kam in den Bereich {area}.} other{{count} Notizen kamen in den Bereich {area}.}}",
   "deskImportAlready": "{count, plural, =1{1 wurde schon früher importiert und bleibt weg.} other{{count} wurden schon früher importiert und bleiben weg.}}",
   "deskImportNothingNew": "Nichts Neues zu importieren.",
-  "deskImportNothingNewDetails": "Nichts Neues: {count} schon importiert."
+  "deskImportNothingNewDetails": "Nichts Neues: {count} schon importiert.",
+  "deskAreaExport": "Exportieren",
+  "deskAxtSaveTitle": "Die AXT-Datei speichern",
+  "deskAxtNotSaved": "Die AXT-Datei wurde nicht gespeichert.",
+  "deskAxtNotSavedTitle": "AXT-Datei nicht gespeichert",
+  "deskOpenAxt": "AXT-Datei …",
+  "deskAxtOpenTitle": "Eine AXT-Datei öffnen",
+  "deskAxtOpening": "Die AXT-Datei wird geöffnet …",
+  "deskRunningAxtAbort": "Die AXT-Datei wird nicht gezeigt, und nichts daraus wird übernommen.",
+  "deskRunningAxtStopped": "Angehalten: Die AXT-Datei wurde nicht geöffnet."
 }

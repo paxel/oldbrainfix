@@ -17,7 +17,16 @@ fn a_fresh_register_writes_the_icon_and_a_marked_launcher() {
     );
     let desktop = fs::read_to_string(dir.path().join(ENTRY)).unwrap();
     assert!(desktop.contains("\nExec=/opt/brew/bin/oldbrainfix %F\n"));
-    assert!(desktop.contains("\nMimeType=text/markdown;text/x-markdown;\n"));
+    assert!(desktop.contains("\nMimeType=text/markdown;text/x-markdown;application/vnd.axt;\n"));
+    // The AXT file's type beside it (obf-1146), by its ending only.
+    let mime = fs::read_to_string(
+        dir.path()
+            .join("mime/packages/io.github.paxel.oldbrainfix.xml"),
+    )
+    .unwrap();
+    assert!(mime.contains("<mime-type type=\"application/vnd.axt\">"));
+    assert!(mime.contains("<glob pattern=\"*.axt\"/>"));
+    assert!(!mime.contains("<magic"));
     assert!(desktop.contains("\nTryExec=/opt/brew/bin/oldbrainfix\n"));
     assert!(desktop.contains("\nIcon=oldbrainfix\n"));
     assert!(desktop.contains("\nStartupWMClass=io.github.paxel.oldbrainfix\n"));

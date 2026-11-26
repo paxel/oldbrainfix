@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'app_lock.dart';
+import 'big_screen.dart';
 import 'card_glance.dart';
 import 'found_marks.dart';
 import 'l10n.dart';
@@ -213,14 +214,18 @@ class BrowserTrail {
 /// slides out to the left, side by side, since the pages are transparent
 /// over the question marks. A swipe moves both with the finger
 /// ([BrowserSwipes]). With the system's animations off the change is
-/// immediate.
+/// immediate. On the big screen the sidebar stands beside it, marking
+/// [place], and only the page slides (obf-1148).
 class BrowserRoute<T> extends MaterialPageRoute<T> {
   static const _duration = Duration(milliseconds: 300);
   static const _curve = Curves.easeInOutCubic;
   static final _enter = Tween(begin: const Offset(1, 0), end: Offset.zero);
   static final _leave = Tween(begin: Offset.zero, end: const Offset(-1, 0));
 
-  BrowserRoute({required super.builder});
+  /// The place the page shows, which the sidebar marks.
+  final ShownPlace? place;
+
+  BrowserRoute({required super.builder, this.place});
 
   /// Whether a finger moves the page: then it follows the finger
   /// exactly, and lets go with its own curve.
@@ -253,11 +258,16 @@ class BrowserRoute<T> extends MaterialPageRoute<T> {
     Animation<double> animation,
     Animation<double> secondaryAnimation,
     Widget child,
-  ) => SlideTransition(
-    position: animation.drive(_enter),
-    child: SlideTransition(
-      position: secondaryAnimation.drive(_leave),
-      child: child,
+  ) => BesideSidebar(
+    shown: place,
+    child: ClipRect(
+      child: SlideTransition(
+        position: animation.drive(_enter),
+        child: SlideTransition(
+          position: secondaryAnimation.drive(_leave),
+          child: child,
+        ),
+      ),
     ),
   );
 

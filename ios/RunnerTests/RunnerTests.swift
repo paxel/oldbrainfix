@@ -68,10 +68,25 @@ class RunnerTests: XCTestCase {
     XCTAssertEqual(info("UIBackgroundModes") as? [String], ["fetch", "audio"])
   }
 
-  /// iPhone only (#236, #244): no iPad, so the App Store asks for no
-  /// iPad screenshots. Xcode writes TARGETED_DEVICE_FAMILY as this key.
-  func testIphoneOnly() {
-    XCTAssertEqual(info("UIDeviceFamily") as? [Int], [1])
+  /// The iPhone and the iPad (obf-1149), the iPad with the big screen's
+  /// layout. Xcode writes TARGETED_DEVICE_FAMILY as this key.
+  func testIphoneAndIpad() {
+    XCTAssertEqual(info("UIDeviceFamily") as? [Int], [1, 2])
+  }
+
+  /// The iPad turns every way, as the App Store wants of an iPad app that
+  /// runs beside others (obf-1149).
+  func testTheIpadTurnsEveryWay() {
+    // Read from the Info.plist file itself: on an iPhone the bundle folds
+    // the "~ipad" keys away, so infoDictionary never shows them there.
+    let url = Bundle.main.url(forResource: "Info", withExtension: "plist")
+    let plist = url.flatMap { NSDictionary(contentsOf: $0) }
+    XCTAssertEqual(
+      Set(plist?["UISupportedInterfaceOrientations~ipad"] as? [String] ?? []),
+      [
+        "UIInterfaceOrientationPortrait", "UIInterfaceOrientationPortraitUpsideDown",
+        "UIInterfaceOrientationLandscapeLeft", "UIInterfaceOrientationLandscapeRight",
+      ])
   }
 
   func testIos26AndNewer() {

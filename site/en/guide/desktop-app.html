@@ -27,9 +27,9 @@
 </box-tab>
 <box-more>
 <p>
-  The app is installed with Homebrew, Scoop, a .deb, a Flatpak file, an AppImage, a disk image or a
-  zip file; see <a href="../reference/install.html">Install</a>. On Linux, outside the Flatpak,
-  every start writes or refreshes the app's entry in the application menu and its icon.
+  The app is installed with Homebrew, Scoop, a .deb, an .rpm, an AppImage, a disk image or a zip
+  file; see <a href="../reference/install.html">Install</a>. On Linux every start writes or refreshes the
+  app's entry in the application menu and its icon.
 </p>
 <p>
   An update replaces the running app on the next start: when an older version still runs in the
@@ -74,7 +74,7 @@
   centred.
 </p>
 <ul>
-  <li><strong>Left</strong>, the sidebar: Agenda, Unsorted, All Notes and Frogs, then "Areas" with a "+" for a new Area, each Area with its Topics below it, Tags, which lists every #tag by its levels (see <a href="formatted-text-transcripts-photo-texts.html#browse-your-tags">Browse your #tags</a>), and the Trash. A shield at the end of an Area's row shows that it is hidden from AI. The place the list shows is marked. Unsorted says how many Notes it holds, such as "Unsorted 7"; no other place shows a count. The chevron at the end of an Area's row folds its Topics and unfolds them again; this computer keeps each fold, and a folded Area still shows the Topic the list shows. The Areas stand in your own order, the same on all your Devices: drag an Area by its row up or down, and a line shows where it goes when you let go; dropped where it stands or away from the Areas, it stays. A card dropped on an Area's row is filed there instead. A right-click on an Area opens, as far as you manage it, New Topic, in Advanced, and Name, colour and icon…; Share with people…, which also lists the people of a Shared Area for everyone in it; Move ▸ with Move up and Move down, but not past the first or last place; Export as Pack…; Hidden from AI when it is not shared or is marked; and, as far as you manage it, Delete. A right-click on a Topic opens Export as Pack… and, as far as you manage its Area, Rename and Delete. These menus close once an entry is picked, with the mouse, the keyboard or a screen reader. An Area you delete is deleted beside the window: its row shows how far it is, such as "Being deleted: 120 of 340 Notes moved", with a turning circle, and takes no click until the Area is gone, while you go on working; if it fails, the top of the window says so.</li>
+  <li><strong>Left</strong>, the sidebar: Agenda, Unsorted, All Notes and Frogs, then "Areas" with a "+" for a new Area, each Area with its Topics below it, Tags, which lists every #tag by its levels (see <a href="formatted-text-transcripts-photo-texts.html#browse-your-tags">Browse your #tags</a>), and the Trash. A shield at the end of an Area's row shows that it is hidden from AI. The place the list shows is marked. Unsorted says how many Notes it holds, such as "Unsorted 7"; no other place shows a count. The chevron at the end of an Area's row folds its Topics and unfolds them again; this computer keeps each fold, and a folded Area still shows the Topic the list shows. The Areas stand in your own order, the same on all your Devices: drag an Area by its row up or down, and a line shows where it goes when you let go; dropped where it stands or away from the Areas, it stays. A card dropped on an Area's row is filed there instead. A right-click on an Area opens, as far as you manage it, New Topic, in Advanced, and Name, colour and icon…; Share with people…, which also lists the people of a Shared Area for everyone in it; Move ▸ with Move up and Move down, but not past the first or last place; Export ▸ with Export as Pack… and Export as AXT file…; Hidden from AI when it is not shared or is marked; and, as far as you manage it, Delete. A right-click on a Topic opens Export as Pack…, Export as AXT file… and, as far as you manage its Area, Rename and Delete. These menus close once an entry is picked, with the mouse, the keyboard or a screen reader. An Area you delete is deleted beside the window: its row shows how far it is, such as "Being deleted: 120 of 340 Notes moved", with a turning circle, and takes no click until the Area is gone, while you go on working; if it fails, the top of the window says so.</li>
   <li><strong>Middle</strong>, the list: on top the back and forward arrows and the path to the place shown, such as "Areas › Household › Repairs", where a click on a level shows it; "Areas" leads to All Notes. Below them what is selected on the left. All Notes, Unsorted, an Area, a Topic and the Trash start with one band with a line under it, the cards scrolling under the line. Its first row holds the arrows and the path, the place shown last and large as the title; its second the search field, then <strong>View</strong>, the switch between the compact and the detailed view of the cards, <strong>Show Notes by…</strong> and <strong>+ New Note</strong>, each its icon and words in a button, in an Area or a Topic then ⋮ with what can be done with it (see <a href="#use-the-menu-bar">Use the menu bar</a>), the Trash's the search field and <strong>Empty the trash now</strong>. The search field is as tall as those buttons, with the magnifier at its left and ✕ at its right, which clears what is typed; its text is as large as a card's. Each person the filter by person keeps shows as a chip with ✕ after <strong>Show Notes by…</strong>; a click on it takes them out. In a narrow window the buttons go to the line under the search field. The band grows with the text size.</li>
 </ul>
 <p>
@@ -167,7 +167,8 @@
   href="backups-locks-and-privacy.html#hide-a-note-from-the-ai">Hide a Note from the AI</a>);
   <strong>Add</strong> with Remind me…, in Advanced Frog and Session…, Attach a file… and Add a part,
   which opens the Note dialog with the box for a part; <strong>Share</strong> with Send to a person,
-  Copy text, Save as Markdown… and Export as Pack…; and <strong>Tidy</strong> with Merge into…, a
+  Copy text, Save as Markdown…, Export as Pack… and Export as AXT file…, which on a selected card
+  writes all the cards selected into one file; and <strong>Tidy</strong> with Merge into…, a
   Checklist's Uncheck all and Move to trash. Voice, Paste and Add to a Shopping List are in the Note
   dialog only. A file on a card opens with a click (see
   <a href="formatted-text-transcripts-photo-texts.html#attach-a-file-to-a-note">Attach a file to a
@@ -222,7 +223,9 @@
   enough: <strong>Add</strong> with "+", <strong>Voice</strong>, <strong>Paste</strong>,
   <strong>Attach a file…</strong> and <strong>Add a part</strong>, which opens Add to Note with its
   field above the groups; <strong>Share</strong> with <strong>Send to a person</strong>, <strong>Copy
-  text</strong>, <strong>Save as Markdown…</strong> and <strong>Export as Pack…</strong>; and
+  text</strong>, <strong>Save as Markdown…</strong>, <strong>Export as Pack…</strong> and
+  <strong>Export as AXT file…</strong>, which asks where to save the AXT file for another app,
+  named after the Note, such as "Buy milk.axt"; and
   <strong>Tidy</strong> with <strong>Merge into…</strong>, <strong>Add to a Shopping List</strong>
   and <strong>Move to trash</strong>. A group shows only what you may do with the Note; an
   existing Note gets a part only when asked. A Note just made, by "+" or <strong>Open in the editor</strong>,
@@ -340,7 +343,7 @@
 </box-tab>
 <box-more>
 <ul>
-  <li><strong>File</strong>: <strong>New Note</strong> (Ctrl+N) opens the quick note as a dialog over the window, the cursor in its field; while an Area or a Topic is shown, it opens the Note dialog on a new Note filed there instead, the cursor in its text (see <a href="capture-and-sort.html#on-the-desktop">Capture and sort</a>). <strong>Quick note</strong> opens the capture popup, as the hotkey does. <strong>Import…</strong> opens the Import dialog with <strong>A folder…</strong>, which makes Notes of a folder of Markdown, text, AsciiDoc, Org, reStructuredText or HTML files, and <strong>Google Keep…</strong>, which makes them of a Google Takeout export of Keep (see <a href="getting-started.html#import-notes-from-another-app">Import notes from another app</a>). <strong>Open</strong> holds <strong>Markdown file…</strong>, which shows a Markdown file in a viewer of its own, to read or import (see <a href="#capture-from-the-command-line">Capture from the command line</a>), <strong>Pack…</strong>, which opens a Pack someone sent you (see <a href="sharing-and-sync.html">Sharing and sync</a>), and <strong>A Backup…</strong>, which opens a Backup to take Notes back from it, as on the Backups dialog (see <a href="backups-locks-and-privacy.html">Backups, locks and privacy</a>). <strong>Export as vault…</strong> writes every Note as Markdown files for another app (see <a href="#take-your-notes-to-another-app">Take your Notes to another app</a>). <strong>Quit</strong> ends the app, also where closing the window leaves it in the tray.</li>
+  <li><strong>File</strong>: <strong>New Note</strong> (Ctrl+N) opens the quick note as a dialog over the window, the cursor in its field; while an Area or a Topic is shown, it opens the Note dialog on a new Note filed there instead, the cursor in its text (see <a href="capture-and-sort.html#on-the-desktop">Capture and sort</a>). <strong>Quick note</strong> opens the capture popup, as the hotkey does. <strong>Import…</strong> opens the Import dialog with <strong>A folder…</strong>, which makes Notes of a folder of Markdown, text, AsciiDoc, Org, reStructuredText or HTML files, and <strong>Google Keep…</strong>, which makes them of a Google Takeout export of Keep (see <a href="getting-started.html#import-notes-from-another-app">Import notes from another app</a>). <strong>Open</strong> holds <strong>Markdown file…</strong>, which shows a Markdown file in a viewer of its own, to read or import (see <a href="#capture-from-the-command-line">Capture from the command line</a>), <strong>Pack…</strong>, which opens a Pack someone sent you (see <a href="sharing-and-sync.html">Sharing and sync</a>), <strong>AXT file…</strong>, which shows the records another app wrote, to take as Notes, and <strong>A Backup…</strong>, which opens a Backup to take Notes back from it, as on the Backups dialog (see <a href="backups-locks-and-privacy.html">Backups, locks and privacy</a>). <strong>Export as vault…</strong> writes every Note as Markdown files for another app (see <a href="#take-your-notes-to-another-app">Take your Notes to another app</a>). <strong>Quit</strong> ends the app, also where closing the window leaves it in the tray.</li>
   <li><strong>Edit</strong>: <strong>Undo</strong> (Ctrl+Z) takes back the last delete, check-off, filing or Merge, of all the cards selected at once where they went together; with a Note open, the Note's last change instead, unless the delete or check-off came later. It is greyed while there is nothing to undo. <strong>Cut</strong>, <strong>Copy</strong> and <strong>Paste</strong> for the text field the cursor was in. <strong>Search</strong> (Ctrl+F) puts the cursor into the search field of the list shown, All Notes' where the list has none, such as the Agenda, and over the Settings into theirs; with a Note open in the Note dialog it reads <strong>Find in Note</strong> and opens the Note's find bar instead. <strong>Settings…</strong> (Ctrl+,) opens the Settings, whose search field at the top shows only the settings that hold the words typed. In the Settings, <strong>AI…</strong> opens the AI settings; the search finds it by the words of every AI setting, such as "API key".</li>
   <li><strong>View</strong>: <strong>Go to</strong> with Agenda, Unsorted, All Notes, Frogs and All Routines and Reminders; <strong>Detailed views</strong> and <strong>Compact views</strong> for the cards of the list shown; <strong>Running</strong>, what runs in the background, with Abort (see <a href="#find-your-way-in-the-window">Find your way in the window</a>); <strong>Theme</strong> and <strong>Text size</strong>, with <strong>Larger text</strong> (Ctrl+Plus) and <strong>Smaller text</strong> (Ctrl+Minus) (see <a href="#change-the-theme-and-the-size">Change the theme and the size</a>).</li>
   <li><strong>AI</strong>: <strong>AI (experimental)</strong> at the top switches the AI on or off, off at first; <strong>Ask…</strong> (Ctrl+K), there only while it is on, shows the Ask panel in the list (see <a href="#ask-about-your-notes">Ask about your Notes</a>), <strong>AI settings…</strong> opens the page with every AI setting, the switch, the Ask panel's provider and the AI port, and <strong>Review the AI Task</strong> shows the review of the AI Task, or "No changes yet" while there is none (see <a href="#open-the-ai-port">Open the AI port</a>).</li>
@@ -354,9 +357,10 @@
   Topic</strong>, <strong>Name, colour and icon…</strong> (F2), one dialog for all three, kept with
   Save, <strong>Share with people…</strong>, which lists its people first where it is shared,
   <strong>Move</strong> with <strong>Move up</strong> (Alt+Up) and <strong>Move down</strong>
-  (Alt+Down), <strong>Export as Pack…</strong>, <strong>Hidden from AI</strong> and
+  (Alt+Down), <strong>Export</strong> with <strong>Export as Pack…</strong> and <strong>Export as
+  AXT file…</strong>, <strong>Hidden from AI</strong> and
   <strong>Delete</strong>. A Topic's ⋮ holds <strong>Rename</strong> (F2), <strong>Export as
-  Pack…</strong> and <strong>Delete</strong>. Each is greyed where the right-click leaves it out,
+  Pack…</strong>, <strong>Export as AXT file…</strong> and <strong>Delete</strong>. Each is greyed where the right-click leaves it out,
   such as Hidden from AI for a Shared Area, Move up for the first Area and Move down for the last,
   and all of them while a dialog, the Note dialog too, lies over the list. A Note's actions are in
   its card's ⋮ and right-click, grouped as in the Note dialog, and in the Note dialog: its badges,
@@ -471,7 +475,7 @@
 </p>
 <p>
   Settings, "This computer", <strong>Start at login</strong> is on unless switched off. It writes
-  an autostart entry on Linux (inside the Flatpak through the desktop's Background portal), a
+  an autostart entry on Linux, a
   LaunchAgent on macOS and a Run entry for your user on Windows. The login start goes into the tray
   without a window; on Linux without a tray it opens the window.
 </p>
@@ -537,7 +541,7 @@
   <li><code>oldbrainfix capture -</code> keeps what comes in on standard input.</li>
   <li><code>oldbrainfix import FILE</code> imports a sync bundle and prints what came in.</li>
   <li><code>oldbrainfix open FILE</code> shows a Sent Item in the window, to accept or decline; a Profile card file adds the person and opens their Profile.</li>
-  <li><code>oldbrainfix notes.md more.md</code> shows each Markdown file (<code>.md</code>, <code>.markdown</code>) in a viewer window of its own, in the running app when one runs. On Linux, Windows and macOS, "Open with" offers Old Brain Fix for Markdown files without making it their default program, and <strong>File</strong> ▸ <strong>Open</strong> ▸ <strong>Markdown file…</strong> picks one.</li>
+  <li><code>oldbrainfix notes.md more.md</code> shows each Markdown file (<code>.md</code>, <code>.markdown</code>) in a viewer window of its own, in the running app when one runs. On Linux, Windows and macOS, "Open with" offers Old Brain Fix for Markdown files without making it their default program, and <strong>File</strong> ▸ <strong>Open</strong> ▸ <strong>Markdown file…</strong> picks one. <code>oldbrainfix records.axt</code> and "Open with" do the same for an AXT file, which opens in its dialog.</li>
   <li><code>oldbrainfix --version</code> or <code>-V</code> prints the version, such as "Old Brain Fix 0.6.0", without starting the app.</li>
   <li><code>oldbrainfix --help</code> prints the usage.</li>
 </ul>
@@ -565,10 +569,7 @@
   to?" first. Imported together, their links become links between their Notes, and the pictures
   they show become photos. Imported before, the main window asks whether to fill in that Import
   or import it as new, as for a folder. ⋮ ▸ <strong>Open in another app</strong> opens the file in the
-  program the system has for it. In the Flatpak only the file opened is shared with the app: the line
-  <strong>Open the folder to follow its links</strong> under the bar asks once for the folder its
-  links are in, and the viewer then reads only inside it. The app keeps that folder until it ends,
-  for other files opened from it.
+  program the system has for it.
 </p>
 </box-more>
 </guide-box>
@@ -593,7 +594,7 @@
   <li>Files dropped onto the window open the quick note and wait in it, a picture as a "Photo" line, a sound file as a "Voice recording" line and any other file as a line with its name, and are saved with what is typed as one Note, the other files as its Attachments (see <a href="formatted-text-transcripts-photo-texts.html#attach-a-file-to-a-note">Attach a file to a Note</a>). Pictures are JPEG, PNG and WebP; sound files are Ogg, Opus, M4A, MP3, WAV and AAC. A recording that cannot be transcribed is kept all the same, and a line at the top of the window says so once the Note is saved.</li>
   <li>Files dropped onto the Note dialog, or onto a Note's own window, go onto that Note at once, a picture as its photo, a sound file as its voice recording, any other file as its Attachment. While another dialog lies over the Note dialog, they wait in the quick note for a new Note instead.</li>
   <li>A file larger than 256 MB, or one that cannot be read, is not attached, and a line at the top says so; the other files are. <strong>Attach a file…</strong> under Add in the Note dialog, and in a card's ⋮ ▸ Add, does the same as a drop onto that Note with files picked in the system's dialog.</li>
-  <li>A sync bundle (<code>.obfsync</code>) dropped onto the window is imported; a Sent Item (<code>.oldbrain</code>) is shown to accept or decline; a Profile card file (<code>.obfcard</code>) adds the person and opens their Profile; a Pack (<code>.obfpack</code>) shows what it holds to add.</li>
+  <li>A sync bundle (<code>.obfsync</code>) dropped onto the window is imported; a Sent Item (<code>.oldbrain</code>) is shown to accept or decline; a Profile card file (<code>.obfcard</code>) adds the person and opens their Profile; a Pack (<code>.obfpack</code>) shows what it holds to add; an AXT file (<code>.axt</code>, also renamed) shows its records to take, in a dialog with who sent it, every record it can take ticked, those it cannot greyed under Not taken, and <strong>Take them into</strong> with Unsorted first, then each Area and its Topics; <strong>Take it</strong> makes the ticked ones Notes there. A later file of the same app updates the Notes taken from it, or moves them to the trash, each listed with the Note it changes; a Note you changed since keeps your change, greyed with "Kept your change". While it is read, the line under the menu bar says "Opening the AXT file…".</li>
   <li>A Note's card dragged onto an Area or Topic in the sidebar is filed there, with the other cards selected when it is one of them.</li>
 </ul>
 </box-more>

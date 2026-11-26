@@ -70,8 +70,14 @@ object Shares {
         else -> Kind.FILE
     }
 
-    /** The endings of the app's own files: a bundle, a Sent Item, a Profile card, a Pack. */
-    private val ownEndings = listOf(".obfsync", ".oldbrain", ".obfcard", ".obfpack")
+    /**
+     * The endings of the files the app opens: a bundle, a Sent Item, a
+     * Profile card, a Pack, and an AXT file of another app (obf-1146).
+     */
+    private val ownEndings = listOf(".obfsync", ".oldbrain", ".obfcard", ".obfpack", ".axt")
+
+    /** The type of an AXT file (AXT `spec/envelope.md`, section 9). */
+    private const val AXT_TYPE = "application/vnd.axt"
 
     /**
      * Whether a file of MIME [type] named [name] is one of the app's own,
@@ -81,6 +87,7 @@ object Shares {
      */
     fun isOwnFile(type: String?, name: String): Boolean =
         type?.startsWith("application/vnd.oldbrainfix.") == true ||
+            type == AXT_TYPE ||
             ownEndings.any { name.endsWith(it, ignoreCase = true) }
 
     /**

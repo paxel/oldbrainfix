@@ -141,6 +141,7 @@ void main() {
       'send-note-file',
       'share-note',
       'pack-note',
+      'axt-note',
     ]);
     expect(members(tester, 'editor-group-tidy'), [
       'editor-merge',

@@ -37,8 +37,10 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
+import 'package:axt_protocol/axt_protocol.dart';
 import 'package:image/image.dart' as img;
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
+import 'package:oldbrainfix_core/src/axt_types.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 /// The writer's fixed key seed: bytes 1 to 32.
@@ -12539,6 +12541,559 @@ Map<String, Object?> _questionMarks() => {
   ],
 };
 
+/// Where the AXT files both cores read lie, beside the desktop core's
+/// fixture test and outside the corpus written anew here: their bytes are
+/// not the same twice, as the library draws its sync marker and the low
+/// bits of each version at random (ADR 0056). With `UPDATE_AXT=1` the
+/// generator writes `from-dart.axt` and `catalog.axt` again, and the
+/// desktop core's fixture test `from-rust.axt`, which it also writes
+/// when it is missing.
+const _axtFiles = '../../desktop/crates/oldbrainfix-core/tests/axt';
+
+/// A file of another app, signed by a key of its own: an Appointment at
+/// 10:00 in Berlin's winter time with reminders a day and 20 minutes
+/// before it and one after, a Task done on its due day repeating
+/// monthly, and a Memo, a type Old Brain Fix does not take.
+Future<Uint8List> _catalogAxt() async {
+  final memo = TypeDescription.fromJson({
+    'name': 'memo',
+    'doc': 'A memo.',
+    'texts': <String, Object?>{},
+    'kind': {
+      'axt.ObjectField': {
+        'name': 'org.example.Memo',
+        'version': 1,
+        'fields': [
+          {
+            'name': 'text',
+            'doc': 'The text.',
+            'texts': <String, Object?>{},
+            'required': true,
+            'kind': {'axt.StringField': <String, Object?>{}},
+          },
+        ],
+      },
+    },
+  });
+  final node = await AxtNode.open(
+    store: _AxtMemory(),
+    signingSeed: Uint8List.fromList(List.generate(32, (i) => 200 - i)),
+    manifest: {
+      'app_name': 'cat-a-log',
+      'app_url': null,
+      'formats': [1],
+      'takes': <Object?>[],
+      'any_type': null,
+      'sends': null,
+      'encryption_key': null,
+      'relay': null,
+    },
+    clock: () => DateTime.utc(2026, 11, 20),
+  );
+  Map<String, Object?> wall(int y, int m, int d, int h, [int? instant]) => {
+    'year': y,
+    'month': m,
+    'day': d,
+    'hour': h,
+    'minute': 0,
+    'second': 0,
+    'millisecond': 0,
+    'zone': instant == null ? null : 'Europe/Berlin',
+    'offset_seconds': instant == null ? null : 3600,
+    'instant_ms': instant,
+  };
+  Map<String, Object?> before(int days, int millis) => {
+    'months': 0,
+    'days': days,
+    'millis': millis,
+  };
+  TypeDescription example(String text) =>
+      TypeDescription.fromJson(jsonDecode(text));
+  return node.writeFile([
+    OutgoingRecord(
+      '0b9a8f1e-3c2d-4e5f-8a7b-6c5d4e3f2a10',
+      example(axtAppointmentDescription),
+      {
+        'title': 'Vet: Mia',
+        'start': wall(
+          2026,
+          12,
+          3,
+          10,
+          DateTime.utc(2026, 12, 3, 9).millisecondsSinceEpoch,
+        ),
+        'end': null,
+        'all_day': false,
+        'location': 'Main Street 4',
+        'notes': 'Bring the booklet',
+        'reminders': [before(-1, 0), before(0, -1200000), before(0, 600000)],
+        'relations': <Object?>[],
+        'extensions': <Object?>[],
+      },
+    ),
+    OutgoingRecord(
+      '1c2d3e4f-5a6b-4c7d-8e9f-a0b1c2d3e4f5',
+      example(axtTaskDescription),
+      {
+        'title': 'Order food',
+        'notes': 'The dry kind',
+        'due': wall(2026, 11, 18, 0),
+        'due_all_day': true,
+        'repeat': 'FREQ=MONTHLY',
+        'done': true,
+        'done_at': null,
+        'priority': 'NONE',
+        'relations': <Object?>[],
+        'extensions': <Object?>[],
+      },
+    ),
+    OutgoingRecord('2d3e4f5a-6b7c-4d8e-9fa0-b1c2d3e4f5a6', memo, {
+      'text': 'Not for Old Brain Fix',
+    }),
+  ]);
+}
+
+/// A later file of the key [seed] at [at], with [records]: what the
+/// generator writes as another app would, deletions among them.
+Future<Uint8List> _laterAxt(
+  Uint8List seed,
+  DateTime at,
+  List<OutgoingRecord> records,
+) async {
+  final node = await AxtNode.open(
+    store: _AxtMemory(),
+    signingSeed: seed,
+    manifest: axtManifest,
+    readers: [
+      for (final text in [
+        axtNoteDescription,
+        axtTaskDescription,
+        axtAppointmentDescription,
+      ])
+        TypeDescription.fromJson(jsonDecode(text)),
+    ],
+    clock: () => at,
+  );
+  return node.writeFile(records);
+}
+
+/// Ada's later file (obf-1147), signed with her key a day after the
+/// desktop core's: Shopping and Garden as Notes again, Dentist and Pills
+/// deleted, Walk at another time and count, Bins without its Routine,
+/// Plants as a Note under its Task's id, and a new Note Tea.
+Future<Uint8List> _adaLaterAxt(Uint8List seed, List<String> ids) {
+  final [shopping, garden, dentist, pills, walk, bins, plants, ...] = ids;
+  final note = TypeDescription.fromJson(jsonDecode(axtNoteDescription));
+  final task = TypeDescription.fromJson(jsonDecode(axtTaskDescription));
+  Map<String, Object?> asNote(String text, {bool markdown = false}) => {
+    'title': text.split('\n').first.replaceAll('# ', ''),
+    'text': text,
+    'format': markdown ? 'MARKDOWN' : 'PLAIN',
+    'created': null,
+    'updated': null,
+    'tags': <Object?>[],
+    'relations': <Object?>[],
+    'extensions': <Object?>[],
+  };
+  Map<String, Object?> asTask(String title, String notes, {String? repeat}) => {
+    'title': title,
+    'notes': notes,
+    'due': repeat == null
+        ? null
+        : {
+            'year': 2026,
+            'month': 11,
+            'day': 2,
+            'hour': 7,
+            'minute': 15,
+            'second': 0,
+            'millisecond': 0,
+            'zone': null,
+            'offset_seconds': null,
+            'instant_ms': null,
+          },
+    'due_all_day': false,
+    'repeat': repeat,
+    'done': false,
+    'done_at': null,
+    'priority': 'NONE',
+    'relations': <Object?>[],
+    'extensions': <Object?>[],
+  };
+  return _laterAxt(seed, DateTime.utc(2026, 11, 26), [
+    OutgoingRecord(
+      axtRecordId(shopping, AxtTypes.note),
+      note,
+      asNote('Shopping\nMilk, #Eggs ☐ and bread'),
+    ),
+    OutgoingRecord(
+      axtRecordId(garden, AxtTypes.note),
+      note,
+      asNote('# Garden\nWater the roses and the tulips', markdown: true),
+    ),
+    OutgoingRecord.deleted(axtRecordId(dentist, AxtTypes.task)),
+    OutgoingRecord.deleted(axtRecordId(pills, AxtTypes.task)),
+    OutgoingRecord(
+      axtRecordId(walk, AxtTypes.task),
+      task,
+      asTask('Walk', 'Around the park', repeat: 'FREQ=DAILY;COUNT=3'),
+    ),
+    OutgoingRecord(
+      axtRecordId(bins, AxtTypes.task),
+      task,
+      asTask('Bins out', 'Blue bin this week'),
+    ),
+    OutgoingRecord(axtRecordId(plants, AxtTypes.task), note, asNote('Plants')),
+    OutgoingRecord('5f6a7b8c-9d0e-4f1a-8b2c-3d4e5f6a7b8c', note, asNote('Tea')),
+  ]);
+}
+
+/// The catalog's later file (obf-1147), a day after it: the Appointment
+/// an hour later for two with one reminder a day before, the Task and
+/// the Memo deleted, and a Note under the id of Ada's Shopping.
+Future<Uint8List> _catalogLaterAxt(String shopping) {
+  final appointment = TypeDescription.fromJson(
+    jsonDecode(axtAppointmentDescription),
+  );
+  final note = TypeDescription.fromJson(jsonDecode(axtNoteDescription));
+  return _laterAxt(
+    Uint8List.fromList(List.generate(32, (i) => 200 - i)),
+    DateTime.utc(2026, 11, 21),
+    [
+      OutgoingRecord('0b9a8f1e-3c2d-4e5f-8a7b-6c5d4e3f2a10', appointment, {
+        'title': 'Vet: Mia and Leo',
+        'start': {
+          'year': 2026,
+          'month': 12,
+          'day': 3,
+          'hour': 11,
+          'minute': 0,
+          'second': 0,
+          'millisecond': 0,
+          'zone': 'Europe/Berlin',
+          'offset_seconds': 3600,
+          'instant_ms': DateTime.utc(2026, 12, 3, 10).millisecondsSinceEpoch,
+        },
+        'end': null,
+        'all_day': false,
+        'location': 'Main Street 4',
+        'notes': 'Bring both booklets',
+        'reminders': [
+          {'months': 0, 'days': -1, 'millis': 0},
+        ],
+        'relations': <Object?>[],
+        'extensions': <Object?>[],
+      }),
+      OutgoingRecord.deleted('1c2d3e4f-5a6b-4c7d-8e9f-a0b1c2d3e4f5'),
+      OutgoingRecord.deleted('2d3e4f5a-6b7c-4d8e-9fa0-b1c2d3e4f5a6'),
+      OutgoingRecord(axtRecordId(shopping, AxtTypes.note), note, {
+        'title': 'Not from Ada',
+        'text': 'Not from Ada',
+        'format': 'PLAIN',
+        'created': null,
+        'updated': null,
+        'tags': <Object?>[],
+        'relations': <Object?>[],
+        'extensions': <Object?>[],
+      }),
+    ],
+  );
+}
+
+/// The library's state for one file, in memory.
+final class _AxtMemory implements AxtStore {
+  final _values = <String, Uint8List>{};
+
+  @override
+  Future<Uint8List?> read(String key) async => _values[key];
+
+  @override
+  Future<void> write(String key, Uint8List value) async => _values[key] = value;
+
+  @override
+  Future<void> delete(String key) async => _values.remove(key);
+
+  @override
+  Future<List<String>> list(String prefix) async => [
+    for (final k in _values.keys)
+      if (k.startsWith(prefix)) k,
+  ];
+
+  @override
+  Future<T> transaction<T>(Future<T> Function() body) => body();
+}
+
+Map<String, Object?> _axtFileJson(AxtFile file) => {
+  'sender': file.sender,
+  'shortFingerprint': file.shortFingerprint,
+  'appName': file.appName,
+  'fromOwnDevice': file.fromOwnDevice,
+  'records': [
+    for (final r in file.records)
+      {
+        'id': r.id,
+        'version': r.version,
+        'type': r.type,
+        'result': r.result,
+        'kind': r.kind.code,
+        'noteId': r.noteId,
+        'kept': r.kept,
+        'draft': switch (r.draft) {
+          null => null,
+          final d => {
+            'text': d.text,
+            'format': d.format,
+            'schedule': switch (d.schedule) {
+              null => null,
+              final s => {
+                'start': s.start.toString(),
+                'times': [for (final t in s.times) t.toString()],
+                'rule': s.rule?.format(),
+              },
+            },
+            'done': d.done,
+            'doneAt': d.doneAt?.toUtc().toIso8601String(),
+            'headsUps': d.headsUps,
+          },
+        },
+      },
+  ],
+};
+
+/// Later files of both senders (obf-1147): Ben changes Garden and checks
+/// off the first Pills, reads the desktop core's file again and the later
+/// files of Ada and of the catalog, takes every record of them an hour
+/// later, and reads Ada's later file again. The later files are written
+/// when they are missing or with `UPDATE_AXT=1`.
+Future<Map<String, Object?>> _axtLater(
+  Directory dir,
+  Directory out,
+  Store ada,
+  Store ben,
+  List<String> ids, {
+  required List<String> takenCatalog,
+  required List<String> takenRust,
+}) async {
+  final update = Platform.environment['UPDATE_AXT'] == '1';
+  final laterFile = File('${dir.path}/later.axt');
+  if (update || !laterFile.existsSync()) {
+    _writeBytes(laterFile, await _adaLaterAxt(ada.signingKey.seed, ids));
+  }
+  final catalogLaterFile = File('${dir.path}/catalog-later.axt');
+  if (update || !catalogLaterFile.existsSync()) {
+    _writeBytes(catalogLaterFile, await _catalogLaterAxt(ids.first));
+  }
+  Future<AxtFile> read(File file) =>
+      AxtFiles(ben).read(file.readAsBytesSync(), wallClock: (utc) => utc);
+  _held = DateTime.utc(2026, 11, 25, 14);
+  final mark = ben.currentSeq();
+  final [_, garden, _, pills, ...] = takenRust;
+  Notes(ben).edit(garden, '# Garden\nWater the roses today');
+  final pillsRoutine = Routines(ben).ofNote(pills).single;
+  Routines(ben)
+      .markDone(pillsRoutine.id, Occurrence(Day(2026, 11, 1), ClockTime(8, 0)));
+  final again = await read(File('${dir.path}/from-rust.axt'));
+  final later = await read(laterFile);
+  final catalogLater = await read(catalogLaterFile);
+  _held = DateTime.utc(2026, 11, 25, 15);
+  final takenLater = AxtFiles(ben)
+      .take(later, [for (final r in later.records) r.id]);
+  final takenCatalogLater = AxtFiles(ben)
+      .take(catalogLater, [for (final r in catalogLater.records) r.id]);
+  _writeAfter(ben, mark, File('${out.path}/later.jsonl'));
+  final laterAgain = await read(laterFile);
+  return {
+    'changed': {
+      'garden': garden,
+      'pills': pillsRoutine.id,
+      'at': '2026-11-25T14:00:00.000Z',
+    },
+    'again': _axtFileJson(again),
+    'later': {
+      'later': _axtFileJson(later),
+      'catalog-later': _axtFileJson(catalogLater),
+    },
+    'laterAt': '2026-11-25T15:00:00.000Z',
+    'takenLater': takenLater,
+    'takenCatalogLater': takenCatalogLater,
+    'laterAgain': _axtFileJson(laterAgain),
+    'fromAfterLater': {
+      for (final id in [...takenCatalog, ...takenRust, ...takenLater])
+        id: AxtFiles(ben).from(id)?.encode(),
+    },
+  };
+}
+
+/// AXT files (obf-1144, ADR 0056): Ada's Notes as records, the files of
+/// both cores and of another app read by Ben, and what Ben takes of them.
+Future<void> _axtFixture(Directory root) async {
+  final out = Directory('${root.path}/axt')..createSync(recursive: true);
+  final ada = _store();
+  final ben = Store.inMemory(
+    clock: _clock,
+    newKey: () => SigningKey.fromSeed(_joinerSeed),
+  )..setLocalSetting('author', 'Ben');
+  final cy = Store.inMemory(
+    clock: _clock,
+    newKey: () => SigningKey.fromSeed(Uint8List.fromList(List.filled(32, 99))),
+  )..setLocalSetting('author', 'Cy');
+  try {
+    final notes = Notes(ada);
+    final routines = Routines(ada);
+    Schedule daily(int y, int m, int d, List<ClockTime> times, String rule) =>
+        Schedule(
+          start: Day(y, m, d),
+          times: times,
+          rule: Recurrence.parse(rule),
+        );
+    final shopping = notes.capture('Shopping\nMilk and #Eggs ☐ #eggs').id;
+    final garden = notes
+        .capture(
+          '# Garden\nWater the **roses** #garden/roses',
+          format: TextFormats.markdown,
+        )
+        .id;
+    final dentist = notes.capture('Dentist\nAt the new place').id;
+    final at10 = Occurrence(Day(2026, 12, 3), ClockTime(10, 0));
+    final reminder = routines.spawn(
+      dentist,
+      Schedule(start: at10.day, times: [ClockTime(10, 0)]),
+    );
+    routines.markDone(reminder.id, at10);
+    final pills = notes.capture('Pills\nWith water').id;
+    routines.spawn(
+      pills,
+      daily(2026, 11, 1, [
+        ClockTime(8, 0),
+        ClockTime(20, 0),
+      ], 'FREQ=DAILY;COUNT=10'),
+    );
+    final walk = notes.capture('Walk').id;
+    routines.spawn(
+      walk,
+      daily(2026, 11, 1, [
+        ClockTime(7, 15),
+        ClockTime(19, 40),
+      ], 'FREQ=DAILY;COUNT=4'),
+    );
+    final bins = notes.capture('Bins out').id;
+    routines.spawn(
+      bins,
+      daily(2026, 11, 2, [], 'FREQ=WEEKLY;BYDAY=MO;UNTIL=20261228'),
+    );
+    final plants = notes.capture('Plants').id;
+    routines.spawn(
+      plants,
+      Schedule(start: Day(2026, 12, 10), times: [ClockTime(9, 0)]),
+    );
+    routines.spawn(
+      plants,
+      daily(2026, 11, 5, [ClockTime(18, 0)], 'FREQ=WEEKLY'),
+    );
+    final old = notes.capture('Old').id;
+    notes.trash(old);
+    final ids = [shopping, garden, dentist, pills, walk, bins, plants, old];
+    _write(File('${out.path}/sender.jsonl'), _log(ada));
+    final files = AxtFiles(ada);
+    final dir = Directory(_axtFiles);
+    final update = Platform.environment['UPDATE_AXT'] == '1';
+    if (update) {
+      _writeBytes(File('${dir.path}/from-dart.axt'), await files.write(ids));
+      _writeBytes(File('${dir.path}/catalog.axt'), await _catalogAxt());
+    }
+    _held = DateTime.utc(2026, 11, 25, 12);
+    final read = <String, Object?>{};
+    final opened = <String, AxtFile>{};
+    for (final name in ['from-dart', 'from-rust', 'catalog']) {
+      final file = File('${dir.path}/$name.axt');
+      // The desktop core writes its own file from this one's log.
+      if (!file.existsSync() && update) continue;
+      final bytes = file.readAsBytesSync();
+      final axt = await AxtFiles(ben).read(bytes, wallClock: (utc) => utc);
+      opened[name] = axt;
+      read[name] = _axtFileJson(axt);
+    }
+    var counted = 0x2000;
+    Store.idMaker = () => (++counted).toRadixString(16).padLeft(32, '0');
+    final vet = Places(ben).addArea('Vet');
+    final catalog = opened['catalog']!;
+    final fromRust = opened['from-rust'];
+    final mark = ben.currentSeq();
+    final takenCatalog = AxtFiles(ben)
+        .take(catalog, [for (final r in catalog.records) r.id], place: vet.id);
+    final takenRust = fromRust == null
+        ? <String>[]
+        : AxtFiles(ben)
+              .take(fromRust, [for (final r in fromRust.records) r.id]);
+    _writeAfter(ben, mark, File('${out.path}/taken.jsonl'));
+    Map<String, Object?> fromOf() => {
+      for (final id in [...takenCatalog, ...takenRust])
+        id: AxtFiles(ben).from(id)?.encode(),
+    };
+    final from = fromOf();
+    // Another person's Device writes `axtFrom` on a taken Note and on one
+    // without it, later: neither counts.
+    _held = DateTime.utc(2026, 11, 25, 13);
+    final plain = Notes(ben).capture('Milk').id;
+    final forged = AxtFrom(
+      sender: 'ab' * 32,
+      id: '3e4f5a6b-7c8d-4e9f-a0b1-c2d3e4f5a6b7',
+      type: AxtTypes.note,
+      version: 1,
+    ).encode();
+    final foreign = StringBuffer();
+    for (final id in [takenCatalog.first, plain]) {
+      final entry = cy.append(id, AxtKeys.from, forged);
+      ben.insert(entry);
+      foreign.writeln(jsonEncode(entry.toJson()));
+    }
+    _write(File('${out.path}/foreign.jsonl'), foreign.toString());
+    final fromAfterForeign = fromOf();
+    // Later files of both senders (obf-1147), once Ben took the desktop
+    // core's file.
+    final later = fromRust == null
+        ? const <String, Object?>{}
+        : await _axtLater(
+            dir,
+            out,
+            ada,
+            ben,
+            ids,
+            takenCatalog: takenCatalog,
+            takenRust: takenRust,
+          );
+    _write(
+      File('${out.path}/expected.json'),
+      '${_json.convert({
+        'fingerprints': axtTypeFingerprints,
+        'manifest': axtManifest,
+        'notes': ids,
+        'ids': {
+          for (final id in ids) id: {for (final type in AxtTypes.taken) type: axtRecordId(id, type)},
+        },
+        'records': {
+          for (final id in ids)
+            if (files.axtRecordOf(id) case (final type, final value)) id: {'type': type, 'value': value},
+        },
+        'read': read,
+        'times': {'taken': '2026-11-25T12:00:00.000Z', 'foreign': '2026-11-25T13:00:00.000Z'},
+        'vet': vet.id,
+        'takenCatalog': takenCatalog,
+        'takenRust': takenRust,
+        'from': from,
+        'plain': plain,
+        'fromAfterForeign': fromAfterForeign,
+        ...later,
+      })}\n',
+    );
+  } finally {
+    ada.close();
+    ben.close();
+    cy.close();
+    _held = null;
+  }
+}
+
 Future<void> main(List<String> args) async {
   if (args.length != 1) {
     stderr.writeln('usage: dart run tool/gen_fixtures.dart <fixtures dir>');
@@ -13025,6 +13580,33 @@ Future<void> main(List<String> args) async {
     'then refused: the signed one changed '
     '(`changed.obfpack`), a format to come (`later.obfpack`), and the '
     'signed one after he blocked her (`expected.json`).\n'
+    '- `axt/`: AXT files (obf-1144, ADR 0056): Ada\'s log '
+    '(`sender.jsonl`) with a plain Note with Tags and a Box, a formatted '
+    'one, a Reminder Done, Routines at two times of day that BYHOUR and '
+    'BYMINUTE say and two they do not, an all-day weekly one with an '
+    'UNTIL, a Note with a Reminder and a Routine, and one in the trash; '
+    'the fingerprints of the three types, the manifest, each Note\'s '
+    'record id as each of them and the record it goes as '
+    '(`expected.json`). The files '
+    'beside the desktop core\'s fixture test (`tests/axt/`: '
+    '`from-dart.axt` written by this core, `from-rust.axt` by the desktop '
+    'core, `catalog.axt` by the library for another app, with an '
+    'Appointment, a Task and a Memo), each read by Ben (`read`); Ben '
+    'making an Area Vet and taking every record of the catalog into it '
+    'and every one of the desktop core\'s file into Unsorted at a held '
+    'clock (`taken.jsonl`, ids counted from 0x2001), where each Note came '
+    'from, and the same once another person\'s Device wrote `axtFrom` on '
+    'a taken Note and on one of his own an hour later (`foreign.jsonl`, '
+    '`fromAfterForeign`). Then later files of both senders (obf-1147, '
+    '`tests/axt/later.axt` by Ada\'s key and `catalog-later.axt` by the '
+    'catalog\'s, written by the library): Ben changes Garden and checks '
+    'off the first Pills, reads the desktop core\'s file again (`again`, '
+    'every record stale) and both later files (`later`: updates, '
+    'deletions, a change of type and another sender\'s record refused, '
+    'Garden and Pills kept as he changed them), takes every record of '
+    'them an hour later (`later.jsonl`, `takenLater`, '
+    '`takenCatalogLater`), and reads Ada\'s again (`laterAgain`, '
+    '`fromAfterLater`).\n'
     '- `block/`: Ann shares her Household with Carol as a Member and '
     'joins the School Carol manages; Carol writes a Note with a photo and '
     'its Photo Text, Amends Ann\'s Note and checks off Ann\'s Routine, and '
@@ -13153,6 +13735,7 @@ Future<void> main(List<String> args) async {
   await _offerFixture(root);
   _packFixture(root);
   await _backupNotesFixture(root);
+  await _axtFixture(root);
   for (final scenario in _scenarios) {
     final store = _store();
     try {

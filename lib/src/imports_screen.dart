@@ -8,6 +8,7 @@ import '../l10n/app_localizations.dart';
 import 'announcements.dart';
 import 'app_lock.dart';
 import 'areas_screen.dart';
+import 'big_screen.dart';
 import 'browser.dart';
 import 'failure_dialog.dart';
 import 'folder_import.dart';
@@ -460,6 +461,7 @@ class _ImportsScreenState extends State<ImportsScreen> {
     unawaited(
       navigator.push(
         BrowserRoute<void>(
+          place: const ShownPlace(PlaceKind.areas),
           builder: (_) =>
               AreasScreen(notes: notes, places: places, trail: trail),
         ),
@@ -471,6 +473,7 @@ class _ImportsScreenState extends State<ImportsScreen> {
     unawaited(
       navigator.push(
         BrowserRoute<void>(
+          place: ShownPlace.area(area.id),
           builder: (_) => AreaScreen(
             notes: notes,
             places: places,

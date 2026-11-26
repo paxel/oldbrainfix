@@ -180,6 +180,8 @@ Future<void> _openAndRun(Directory dir) async {
       spotlights: true,
       // And show each button tap (obf-1143).
       tapMarks: true,
+      // And a tablet's sidebar from 700 dp wide (obf-1148).
+      bigScreen: true,
     ),
   );
 }

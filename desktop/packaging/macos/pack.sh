@@ -30,7 +30,9 @@ iconutil -c icns "$iconset" -o "$app/Contents/Resources/oldbrainfix.icns"
 
 # The microphone needs its usage text, or macOS ends the app on the
 # first recording. Markdown files list it under "Open With" (obf-1056),
-# as an Alternate handler, so it never becomes their default.
+# as an Alternate handler, so it never becomes their default; so do AXT
+# files (obf-1146), whose type macOS does not know and the bundle
+# imports: application/vnd.axt with the ending .axt.
 cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -57,6 +59,31 @@ cat > "$app/Contents/Info.plist" <<PLIST
       <array><string>net.daringfireball.markdown</string></array>
       <key>CFBundleTypeExtensions</key>
       <array><string>md</string><string>markdown</string></array>
+    </dict>
+    <dict>
+      <key>CFBundleTypeName</key><string>AXT file</string>
+      <key>CFBundleTypeRole</key><string>Viewer</string>
+      <key>LSHandlerRank</key><string>Alternate</string>
+      <key>LSItemContentTypes</key>
+      <array><string>io.github.paxel.axt</string></array>
+      <key>CFBundleTypeExtensions</key>
+      <array><string>axt</string></array>
+    </dict>
+  </array>
+  <key>UTImportedTypeDeclarations</key>
+  <array>
+    <dict>
+      <key>UTTypeIdentifier</key><string>io.github.paxel.axt</string>
+      <key>UTTypeDescription</key><string>AXT file</string>
+      <key>UTTypeConformsTo</key>
+      <array><string>public.data</string></array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key>
+        <array><string>axt</string></array>
+        <key>public.mime-type</key>
+        <array><string>application/vnd.axt</string></array>
+      </dict>
     </dict>
   </array>
 </dict>

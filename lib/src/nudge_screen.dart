@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'areas_screen.dart';
+import 'big_screen.dart';
 import 'browser.dart';
 import 'l10n.dart';
 import 'merge_into_screen.dart';
@@ -140,11 +141,7 @@ class _NudgeScreenState extends State<NudgeScreen>
 
 /// Opens the list of all Unsorted Notes.
 Future<void> openUnsorted(BuildContext context, Notes notes, Places places) =>
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => UnsortedScreen(notes: notes, places: places),
-      ),
-    );
+    Navigator.of(context).push(unsortedRoute(notes, places));
 
 /// Every Unsorted Note as a card, oldest first, as the Nudge screen
 /// starts them, each offering to sort it; reached from the "x Unsorted"

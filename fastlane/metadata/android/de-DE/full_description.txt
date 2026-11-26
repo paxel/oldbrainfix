@@ -28,7 +28,7 @@ Old Brain Fix ist eine Notiz- und Erinnerungs-App für Android. Eine Desktop-App
 • Telefon und Desktop gleichen sich direkt im lokalen Netz ab (TLS, gekoppelt per QR-Code oder eingetippten Code), über einen geteilten Ordner wie Syncthing oder Nextcloud (Ende-zu-Ende-verschlüsselt) oder über eine verschlüsselte Datei, die eine beliebige App verschickt.
 • Ein einzelner Bereich lässt sich mit einer anderen Person teilen, andere nicht.
 • Dein Profil vereint alle deine Geräte. Name, eindeutiger Code und optionales Bild stehen an den Notizen, die du mit anderen teilst.
-• Eine Notiz kann samt Routinen und Erinnerungen als Datei an eine andere Person geschickt werden, die sie annimmt oder ablehnt.
+• Eine Notiz geht samt Routinen und Erinnerungen an eine Person, die sie annimmt oder ablehnt, oder als AXT-Datei an andere Apps.
 
 <b>Datenschutz und Sicherheit</b>
 • Kein Konto, kein Server, keine Analyse, keine Werbung.

@@ -746,6 +746,39 @@ There are three kinds, and an action takes the first that fits.
   sit on the bar, the size over the tree. A Pack opened shows the same
   tree, all ticked, under who it is from; its ticks ("Add my Profile",
   "Claim as mine") go below their text.
+- **"Export as AXT file…"** (obf-1145, ADR 0056) stands right after each
+  "Export as Pack…" and in the bar of a selection of Notes: the Notes of
+  the Note, the selection, the Topic or the Area go at once as an AXT
+  file named after it (`<title>.axt`), nothing asked, to the share
+  sheet; with no Note in it nothing is written and the top says so.
+- **An AXT file opened shows its records as an opened Pack does**
+  (obf-1146, ADR 0056): told by what it holds, not by its name, it opens
+  a page titled "AXT file" with who it is from ("From your own Device",
+  else "From" and the app name its file gives) and the key's short
+  fingerprint under it, then every record to take, each ticked, by its
+  first line with its type and its Reminder or Routine under it, "Tick
+  all" and "Untick all" on the bar; the records not taken follow greyed
+  under "Not taken", each named by its type. "Take them into" with its
+  place, Unsorted at first, opens at the finger Unsorted, then the Areas
+  and Topics this Device may file into, as File into… lists them, and
+  while a ticked record brings a Reminder or Routine only where it may
+  make them. "Take it" makes the ticked records Notes there, says how
+  many at the top and closes the page; greyed while nothing is ticked.
+  A file that does not read, and a place refused, are announced at the
+  top with why.
+- **A later AXT file of the same sender changes what was taken**
+  (obf-1147, ADR 0056): on the same page each update says "Updates
+  “Dentist”" and each deletion "Moves “Dentist” to the trash" under its
+  line, by the Note it changes, ticked as the new records are; one whose
+  Note the user changed since is greyed and cannot be ticked, its line
+  ending "· Kept your change". A record refused under the id of a Note
+  taken ("May not change “Dentist”") and one no newer than it
+  ("“Dentist” has this already") are named under "Not taken". The place
+  shows only while the file holds a new record. "Take it" says "1
+  record taken" when changes were among them, and "Nothing changed:
+  these records were taken before." when it wrote nothing, as for the
+  same file taken twice; a Note this Device may not change is refused at
+  the top with why, nothing written, and the page stays.
 - **"Open a Backup…"** (#285) is on the Backups page, in a card of its
   own ("Take Notes back"), set up or not, and on the desktop also in the
   File menu, its page then alone, without the way back to Backups. It
@@ -1550,8 +1583,8 @@ There are three kinds, and an action takes the first that fits.
   extension open its app, so "Old Brain Fix" in the share sheet keeps
   the text, links, pictures, the app's own files or any other file and
   says so on a small card with OK. The next time the app opens or comes back, each share
-  opens Capture as on Android, and a Pack, Profile card, Sent Item or
-  bundle opens as "Open with" opens it. A share carries no source app on
+  opens Capture as on Android, and a Pack, Profile card, Sent Item,
+  bundle or AXT file (obf-1146) opens as "Open with" opens it. A share carries no source app on
   the iPhone.
 - **On the iPhone iOS's own prompts may come beside Capture** (#243,
   #244): the first Photo asks iOS's camera permission, and Paste may
@@ -1562,7 +1595,8 @@ There are three kinds, and an action takes the first that fits.
   app shares, other than a picture or a sound file, opens Capture with it
   attached, one Note with the text and pictures shared with it, written
   at once; a file of the app's own types (a bundle, Sent Item, Profile
-  card or Pack) shared to the app opens as "Open with" opens it.
+  card or Pack) and an AXT file (`.axt` or `application/vnd.axt`,
+  obf-1146) shared to the app open as "Open with" opens them.
 - **A page printed to the app comes in as a shared PDF does** (#293):
   on Android, Old Brain Fix is a print service with one printer, "Old
   Brain Fix"; a print job opens Capture with its PDF attached, named
@@ -1605,7 +1639,8 @@ There are three kinds, and an action takes the first that fits.
   as in the desktop's Note dialog: **This Note**, the row of badges
   under the text; at the page's end, after all the Note holds, **Add**
   ("+", Voice, Photo, Gallery, Paste, Attach a file…, Add a part),
-  **Share** (Send to a person, Share to an app, Export as Pack…) and
+  **Share** (Send to a person, Share to an app, Export as Pack…, Export
+  as AXT file…, obf-1145) and
   **Tidy** (Merge into…, Add to a Shopping List, Move to trash, the
   last filled on the error colour, obf-1099). Each group is a small heading, read as a
   heading, over its compact buttons side by side, wrapping; a group
@@ -1767,8 +1802,8 @@ There are three kinds, and an action takes the first that fits.
   choices in a menu of their own) and Back to a plain Note; **Add**
   Remind me…, in Advanced Frog and Session… (compact card), Add a part
   and a Tally's Add entry; **Share** Send to a person, Share to an app,
-  Copy text, Export as Pack…, Add to calendar and Share as calendar
-  file; **Tidy** Merge into… (compact card), Add to a Shopping List,
+  Copy text, Export as Pack…, Export as AXT file… (obf-1145), Add to
+  calendar and Share as calendar file; **Tidy** Merge into… (compact card), Add to a Shopping List,
   Uncheck all, Move to trash, which asks nothing and is undone at the
   top (#268), and Remove photo, keep text and its kin, one per photo,
   recording or file. A group past seven entries shows six and More…,
@@ -1796,7 +1831,9 @@ There are three kinds, and an action takes the first that fits.
   (ADR 0013); only the box ticks, a tap and a long press on the card
   still do what they do. While it selects the bar's title says how many
   are ticked ("3 selected") and its buttons are, in this order, Stop
-  selecting, File into…, Merge into…, Importance and Move to trash, in
+  selecting, File into…, Merge into…, Importance, Export as AXT file…
+  (obf-1145; a single Note names the file, several go under the day's
+  name) and Move to trash, in
   the Trash Stop selecting and Restore, each greyed while none is
   ticked. File into… opens the picker of #272, marking the place when
   all of them sit in one; Merge into… opens the Note picker with every
@@ -2076,6 +2113,44 @@ There are three kinds, and an action takes the first that fits.
   (obf-1088). Pages without a search bar keep their top bar in the
   ground's colour.
 
+### The big screen
+
+- **From 700 dp wide the phone app takes the desktop's layout**
+  (obf-1148), on a tablet, an iPad, and a phone held sideways that wide:
+  **the sidebar** on the left, 240 wide, with the Agenda, Unsorted with
+  its count as the desktop's, All Notes, Frogs, Areas, under it each
+  Area with its Topics, then Tags and the Trash, marking the place
+  shown; **the list** beside it, the phone's own pages, each as it is
+  on the phone with the room left of the window. Below 700 dp nothing
+  of it shows and the phone's layout stands as above. It replaces
+  Navigation's folder and the swipe between the Agenda and the Areas
+  list: the Agenda's bar has no folder, the two pages do not swipe, and
+  the sidebar's Agenda and Areas move between them.
+- **A tap in the sidebar shows its place anew**: the pages over the
+  Agenda or the Areas list close, as the desktop's sidebar shows a
+  place. Areas shows the Areas list, with its search, row of tags, ⋮
+  and "+"; an Area and a Topic open over the Areas list, a Topic over
+  its Area, so back leads up the levels as on the phone; Tags opens the
+  tag tree, and a tag tapped there the Areas list searching for it. The
+  sidebar stays put while the list's pages come and go beside it. Pages
+  that are no place (Settings, Capture, the Routine editor and the like)
+  cover the window as on the phone.
+- **A closed locked Area lists no Topics in the sidebar**, its padlock
+  at the end of its row; a tap asks for the PIN first, as its row in the
+  Areas list does. While the App Lock is locked the sidebar is hidden
+  with the Agenda.
+- **A Note opens as a dialog over the list and the sidebar**, as the
+  desktop's Note dialog: at most 840 wide, 32 from the window's edges,
+  8 from the sides of a window under 700 wide and from the top and
+  bottom of one under 600 high, so a phone held sideways keeps room
+  over its keyboard.
+  Back, its bar's arrow and a tap beside it leave it, keeping what was
+  typed. The editor in it is the phone's.
+- **Turning the screen across 700 dp keeps the place shown**: the same
+  pages stay, the sidebar comes or goes beside them, and a Note open
+  stays open with what was typed, as a dialog or as the page it opened
+  as.
+
 ### Settings
 
 - **Every Settings section is a card with its title on top** (obf-1085,
@@ -2260,14 +2335,9 @@ There are three kinds, and an action takes the first that fits.
   asks first "Also import the N files it links to?"; imported together,
   their links become App links to each other's Notes, their pictures
   photos. While an Import runs, the bar says so in its place. What the
-  Import made is announced at the top of the main window. Inside the
-  Flatpak, where only the file opened is shared, a line under the bar,
-  "Open the folder to follow its links", asks once through the folder
-  portal for the folder its links are in, for a file with links or
-  pictures only; the viewer then reads only inside that folder, finding
-  the file's copy there by its name and bytes (a folder without it is
-  asked for again), Import as Note imports that copy, and the app keeps
-  the folder while it runs, for other files whose copy it holds (Q13).
+  Import made is announced at the top of the main window. The viewer
+  asks for no folder; its links are found where the file lies
+  (obf-1151).
 - **Unsorted says how many Notes it holds in the sidebar** ("Unsorted
   7", #279), as the one list that asks to be emptied; no other place
   shows a count, and an empty Unsorted shows none. **An Area with Topics
@@ -2405,8 +2475,8 @@ There are three kinds, and an action takes the first that fits.
   badges, its buttons and its bar's ⋮, which holds History). Its menus
   keep to seven entries (#321, obf-1014): **File** holds New Note
   (Ctrl+N; the quick note, while an Area or a Topic is shown the Note
-  dialog on a new Note filed there, obf-1140), Quick note, Import…, Open ▸ (Markdown file…, Pack…, A
-  Backup…), Export as vault… and Quit; **Edit** Undo, Cut, Copy, Paste,
+  dialog on a new Note filed there, obf-1140), Quick note, Import…, Open ▸ (Markdown file…, Pack…, AXT file…
+  (obf-1146), A Backup…), Export as vault… and Quit; **Edit** Undo, Cut, Copy, Paste,
   Find in Note (Ctrl+F) where it opens the Note's find bar, else Search,
   and Settings…; **View** Go to ▸ (Agenda, Unsorted, All Notes, Frogs,
   All Routines and Reminders, the one shown marked), Running, Detailed
@@ -2439,7 +2509,7 @@ There are three kinds, and an action takes the first that fits.
   Import, the Transcripts, Photo Texts and Attachment Texts being read,
   the speech model's download, an Area being deleted, the trash being
   emptied, a Pack being
-  opened, the Agenda's first read) with what it does, how far it is when
+  opened, an AXT file being read (obf-1146), the Agenda's first read) with what it does, how far it is when
   known ("120 of 340 Notes"), "Since 14:32", and Abort, which stops it at
   its next safe point and reads "Stopping…" until then; with none, "Nothing
   runs in the background." An Import stops before its next Note and keeps
@@ -2463,13 +2533,14 @@ There are three kinds, and an action takes the first that fits.
   ⋮ last in its list band's second row ("More for this Area" to a
   screen reader) offer New Topic (in Advanced), **Name, colour and
   icon…** (F2), **Share with people…**, Move ▸ (Move up with Alt+Up,
-  Move down with Alt+Down), Export as Pack…, the switch Hidden from AI
+  Move down with Alt+Down), Export ▸ (Export as Pack… and Export as AXT
+  file…, obf-1145), the switch Hidden from AI
   (#267) and Delete, seven entries. The right-click leaves out what this
   Device may not do there, the band's ⋮ greys it, and greys all of it
   while a dialog lies over the list, the Note dialog included, so that
   none acts on a place behind it; its keys rest there too. A Topic's
   right-click and band ⋮ ("More for this Topic") offer Rename (F2),
-  Export as Pack… and Delete. F2 rests in a text field and while a menu
+  Export as Pack…, Export as AXT file… (obf-1145) and Delete. F2 rests in a text field and while a menu
   is open. Name, colour and icon… is one dialog: the name, the colours
   and the icons, each marked as it is picked, kept with Save or Enter
   and dropped with Cancel. Share with people… is offered to whoever
@@ -2668,6 +2739,43 @@ There are three kinds, and an action takes the first that fits.
   stands beside its words; Save… saves the file where the user says, in
   place of Share…; "Add … to People" takes the person in and keeps the
   dialog open.
+- **An AXT file opened is a dialog on the desktop** (obf-1146): File ▸
+  Open ▸ AXT file…, a drop on the window, `oldbrainfix records.axt` on
+  the command line and "Open with" open it, a later start handing it to
+  the running app; it is known by its content (Avro's header) or by its
+  ending `.axt`, and a drop of one opens it rather than attaching it.
+  While it is read beside the window the line under the menu bar says
+  "Opening the AXT file…" and Running lists it with Abort. The dialog
+  holds what the phone's page holds; under "Take them into" the places
+  are a column of radio buttons, Unsorted first and picked, then each
+  Area and its Topics ("Health / Running"), and Cancel takes nothing. A
+  refused "Take it" keeps the dialog and its ticks. A later file of the
+  same sender (obf-1147) lists its updates and deletions among the
+  records to take, ticked, each with the Note it changes under it
+  ("Updates “Dentist”", "Moves “Dentist” to the trash"); one whose Note
+  the user changed since is greyed and unticked with "Kept your
+  change"; one that may not change its Note, and one the Note has
+  already, stand greyed under "Not taken" with why ("May not change
+  “Dentist”", "“Dentist” has this already"), so the same file opened
+  again takes nothing. "Take it" passes the ticked changes along, says
+  "n records taken" when changes were among them, and "Nothing
+  changed: these records were taken before." when it made and changed
+  nothing; refused, the top says that this Device may not put them
+  there or may not change a Note they update. The app is offered
+  for `.axt` (`application/vnd.axt`) under "Open with", never as its
+  default: on Linux the launcher's MimeType with a mime type of its own
+  (`io.github.paxel.oldbrainfix.xml`, by the ending only), on macOS the
+  bundle's document types, on Windows the ending's OpenWithList.
+- **Export as AXT file… saves where the user says on the desktop**
+  (obf-1145): in place of the phone's share sheet the system's save
+  dialog asks, the file proposed under the Note's, the Topic's or the
+  Area's name as the phone names it (`Buy milk.axt`), several cards
+  selected under the day's (`oldbrainfix-notes-2026-11-25.axt`), and it
+  is written beside the window. Backing out writes nothing and says
+  nothing; a failure says "The AXT file was not saved." at the top, why
+  behind the click; with no Note there the top says so and nothing is
+  asked. It asks nothing about Hidden from AI, as Copy text and Save as
+  Markdown… do not.
 - **A custom Heads-up is a small dialog over the Routine editor**
   (obf-1087): "Custom heads-up" with "How long before" over a number
   field, "From 1 to 720." small under it for hours, the units as a
@@ -2706,7 +2814,7 @@ There are three kinds, and an action takes the first that fits.
   end, after the Note's files, Sections and Linked from, **Add** ("+"
   with Remind me…, Frog and Session…, Voice, Paste, Attach a file…, Add
   a part), **Share** (Send to a person, Copy text, Save as Markdown…,
-  Export as Pack…) and
+  Export as Pack…, Export as AXT file…, obf-1145) and
   **Tidy** (Merge into…, Add to a Shopping List, Move to trash in the
   error colour). Each group is a small strong heading, read as a
   heading, over its compact buttons side by side, wrapping; the groups
@@ -2738,7 +2846,7 @@ There are three kinds, and an action takes the first that fits.
   in Advanced Frog while the Note has no open Frog and Session… on a
   plain Note, Attach a file… and Add a part, which opens the Note dialog
   with its Amend box), **Share ▸** (Send to a person, Copy text, Save as
-  Markdown…, Export as Pack…) and **Tidy ▸** (Merge into…, a Checklist's
+  Markdown…, Export as Pack…, Export as AXT file…, obf-1145) and **Tidy ▸** (Merge into…, a Checklist's
   Uncheck all, Move to trash in the error colour), each entry only where
   this Device may do it and a group without one left out. Voice, Paste
   and Add to a Shopping List act on the Note open and stay in the
@@ -2746,7 +2854,8 @@ There are three kinds, and an action takes the first that fits.
 - **A selection is acted on from a card's right-click** (#273, Q656):
   File into…, Importance ▸, Merge into… (on an Unsorted Note's card
   picked as a capture picks its Note, #308) and Move to trash, each only
-  on a card this Device may change; a card in the Trash has no ⋮, and
+  on a card this Device may change, and Share ▸ Export as AXT file…,
+  which writes the cards selected into one file (obf-1145); a card in the Trash has no ⋮, and
   its right-click offers Restore alone. Remind me…, Frog and Session…
   (#281) are only for who may set them up (ADR 0013) and for that card
   alone, selected or not. On a selected card each acts on all

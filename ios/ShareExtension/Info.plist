@@ -29,7 +29,8 @@
 	<dict>
 		<key>NSExtensionAttributes</key>
 		<dict>
-			<!-- Text, links, pictures and the app's own files (#241);
+			<!-- Text, links, pictures, the app's own files (#241) and
+			     AXT files of other apps (obf-1146);
 			     any other file never shows the app in the share sheet. -->
 			<key>NSExtensionActivationRule</key>
 			<string>SUBQUERY (
@@ -45,6 +46,7 @@
         || ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "io.github.paxel.oldbrainfix.item"
         || ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "io.github.paxel.oldbrainfix.card"
         || ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "io.github.paxel.oldbrainfix.pack"
+        || ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "io.github.paxel.axt"
         || ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "public.data"
     ).@count &gt; 0
 ).@count &gt; 0</string>

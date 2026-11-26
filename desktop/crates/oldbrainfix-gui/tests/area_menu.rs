@@ -104,18 +104,24 @@ fn pick(harness: &mut Harness<'_, App>, menu: &str, entry: &str) {
 }
 
 /// The entries of an Area's band ⋮ (obf-1014), Name, colour and icon…
-/// with its key, Hidden from AI being a switch.
+/// with its key, Hidden from AI being a switch, Export ▸ holding Export
+/// as Pack… and Export as AXT file… (obf-1145).
 const ENTRIES: [&str; 6] = [
     "New Topic",
     "Name, colour and icon… F2",
     "Share with people…",
     "Move ⏵",
-    "Export as Pack…",
+    "Export ⏵",
     "Delete",
 ];
 
 /// The entries of a Topic's band ⋮, Rename with its key.
-const TOPIC_ENTRIES: [&str; 3] = ["Rename F2", "Export as Pack…", "Delete"];
+const TOPIC_ENTRIES: [&str; 4] = [
+    "Rename F2",
+    "Export as Pack…",
+    "Export as AXT file…",
+    "Delete",
+];
 
 #[test]
 fn no_area_menu_shows_where_no_area_or_topic_shows() -> TestResult {
@@ -203,7 +209,7 @@ fn a_topics_menu_renames_exports_and_deletes() -> TestResult {
     // As its right-click in the sidebar (obf-1014), none of the Area's.
     assert_eq!(
         enabled(&mut harness, TOPIC, TOPIC_ENTRIES),
-        [true, true, true]
+        [true, true, true, true]
     );
     open(&mut harness, TOPIC);
     for gone in ["Name, colour and icon… F2", "Share with people…", "Move ⏵"] {

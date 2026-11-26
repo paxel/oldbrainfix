@@ -33,6 +33,8 @@ pub enum JobId {
     /// Deleting the Area of this id.
     AreaDeletion(String),
     PackOpening,
+    /// An AXT file being read (obf-1146).
+    AxtOpening,
     AgendaRead,
     /// The trash being emptied (obf-1095).
     TrashEmptying,

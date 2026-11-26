@@ -15,6 +15,16 @@ name: Pages
 # repository skips it under another name, so the skipped job stands in for
 # no check of the push run.
 #
+# On a tag the site also carries the apt repository under /apt/
+# (obf-1153): tool/apt-repo.sh builds it from the .deb files of the
+# newest published Releases, signed with the key in the secrets
+# APT_SIGNING_KEY and APT_SIGNING_PASSPHRASE (docs/agents/apt-repository.md);
+# without them it skips with a notice and the site has no /apt/. A deploy
+# replaces the whole site, so every run builds the repository anew; the
+# earlier versions come back from their Releases. The tag's own .deb files
+# exist only once the release workflow has made its Release, so that
+# workflow runs this one again on the tag (workflow_dispatch) afterwards.
+#
 # One-time steps in the repository settings:
 #   1. Settings -> Pages -> Source: "GitHub Actions".
 #   2. Settings -> Environments -> github-pages -> Deployment branches and tags:
@@ -25,6 +35,8 @@ on:
     branches: ["**"]
     tags: ["v*"]
   pull_request:
+  # The release workflow, once the tag's Release holds its .deb files.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -32,7 +44,7 @@ permissions:
 jobs:
   build:
     name: ${{ github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork && 'build (runs on push)' || 'build' }}
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.fork
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork
     runs-on: ubuntu-latest
     concurrency:
       group: pages-build-${{ github.ref }}
@@ -58,6 +70,36 @@ jobs:
             echo "::error::Tag $GITHUB_REF_NAME does not match pubspec.yaml version ($expected); the site would describe the wrong release"
             exit 1
           fi
+
+      # The newest Releases' .deb files, at most APT_VERSIONS of them: about
+      # 50 MB a version, and a Pages site may be 1 GB. With the secrets a
+      # failure fails the build, as a deploy without /apt/ would take the
+      # repository away from everyone who added it.
+      - name: Apt repository from the Releases' .deb files
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APT_SIGNING_KEY: ${{ secrets.APT_SIGNING_KEY }}
+          APT_SIGNING_PASSPHRASE: ${{ secrets.APT_SIGNING_PASSPHRASE }}
+          APT_VERSIONS: 10
+        run: |
+          missing=""
+          [ -n "$APT_SIGNING_KEY" ] || missing="$missing APT_SIGNING_KEY"
+          [ -n "$APT_SIGNING_PASSPHRASE" ] || missing="$missing APT_SIGNING_PASSPHRASE"
+          if [ -n "$missing" ]; then
+            echo "::notice title=Apt repository skipped::Missing repository secrets:$missing. The steps are in docs/agents/apt-repository.md."
+            exit 0
+          fi
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends apt-utils
+          tags=$(gh release list --repo "$GITHUB_REPOSITORY" --exclude-drafts --exclude-pre-releases \
+            --limit 100 --json tagName --jq '.[].tagName' | grep '^v' | sed -n "1,${APT_VERSIONS}p")
+          [ -n "$tags" ] || { echo "::error::No published Release to take .deb files from"; exit 1; }
+          mkdir debs
+          for tag in $tags; do
+            gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern '*.deb' --dir debs
+          done
+          tool/apt-repo.sh debs site-dist/apt
 
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:

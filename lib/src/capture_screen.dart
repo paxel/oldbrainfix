@@ -7,6 +7,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'app_lock.dart';
 import 'announcements.dart';
 import 'attachment_views.dart';
+import 'big_screen.dart';
 import 'context_platform.dart';
 import 'drafts.dart';
 import 'edit_history.dart';
@@ -830,8 +831,9 @@ class _CaptureScreenState extends State<CaptureScreen> {
     unawaited(
       navigator
           .pushReplacement<void, Captured>(
-            MaterialPageRoute(
-              builder: (_) => NoteEditorScreen(
+            noteRoute(
+              context,
+              (_) => NoteEditorScreen(
                 notes: notes,
                 places: Places(notes.store),
                 drafts: drafts,

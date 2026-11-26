@@ -66,6 +66,14 @@ class ManifestTest {
     }
 
     @Test
+    fun anAxtFileOpensWithTheAppAsAPackDoes() {
+        val types = dataOf(activity(".BundleActivity"), "mimeType")
+        assertTrue(types.contains("application/vnd.axt"))
+        // Messengers that keep no type hand it over as some file.
+        assertTrue(types.contains("application/octet-stream"))
+    }
+
+    @Test
     fun theAgendaWidgetsTapsLandOnAnActivityNoOtherAppStarts() {
         val tap = activity(".AgendaTapActivity")
         assertEquals("false", tap.getAttributeNS(android, "exported"))

@@ -58,10 +58,10 @@ impl FeedbackFacts {
     }
 }
 
-/// Where the app came from, by its packaging: Flatpak by `FLATPAK_ID`,
-/// an AppImage by `APPIMAGE`, Homebrew and Scoop by the path of the
-/// executable `exe`, the .deb by `/usr/bin` and dpkg's list of it
-/// (`deb_listed`), else a binary unpacked by hand. On macOS an app
+/// Where the app came from, by its packaging: an AppImage by
+/// `APPIMAGE`, Homebrew and Scoop by the path of the executable `exe`,
+/// the .deb by `/usr/bin` and dpkg's list of it (`deb_listed`), else a
+/// binary unpacked by hand. On macOS an app
 /// outside Homebrew's paths may be the .dmg's or Homebrew's cask, so it
 /// is "unknown", as is any executable whose path cannot be read.
 pub fn install_method(
@@ -70,9 +70,6 @@ pub fn install_method(
     deb_listed: bool,
     os: &str,
 ) -> String {
-    if env("FLATPAK_ID").is_some_and(|id| !id.is_empty()) {
-        return "Flatpak".into();
-    }
     if env("APPIMAGE").is_some_and(|p| !p.is_empty()) {
         return "AppImage".into();
     }

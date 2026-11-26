@@ -10,6 +10,9 @@ dependencies:
   # The bundle file (ADR 0003): a zip, stored, read and written as a
   # stream. MIT.
   archive: ^4.3.0
+  # AXT files (obf-1144, ADR 0056): records exchanged with other apps,
+  # signed with this Device's key. Apache-2.0 OR MIT.
+  axt_protocol: ^0.2.0
   # Profile initials by what people see as one character. BSD-3-Clause.
   characters: ^1.4.0
   crypto: ^3.0.6

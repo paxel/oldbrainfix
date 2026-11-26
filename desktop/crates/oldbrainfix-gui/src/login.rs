@@ -70,8 +70,8 @@ pub fn gecos_name(gecos: &str, login: &str) -> String {
 }
 
 /// The login's full name from the user database (`getpwuid_r`): on Linux
-/// what AccountsService and the login screen show, inside the Flatpak
-/// the copy of it the sandbox gets; on macOS the account's full name.
+/// what AccountsService and the login screen show; on macOS the
+/// account's full name.
 #[cfg(unix)]
 fn full_name() -> Option<String> {
     let (gecos, login) = passwd()?;
@@ -136,8 +136,7 @@ fn full_name() -> Option<String> {
 
 /// The login's account picture: on Linux the one AccountsService keeps
 /// for the login screen, else `~/.face`, as KDE and GNOME set them. Not
-/// reachable inside the Flatpak, and not looked for on Windows and
-/// macOS, where the initials stand in.
+/// looked for on Windows and macOS, where the initials stand in.
 #[cfg(target_os = "linux")]
 fn account_picture() -> Option<Vec<u8>> {
     let (_, login) = passwd()?;

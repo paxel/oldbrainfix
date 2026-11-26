@@ -10,7 +10,7 @@ every release.
 - App Store: the app record for bundle id `io.github.paxel.oldbrainfix`
   (the same id as the Android package), Apple id `6830820925`
   (<https://apps.apple.com/app/id6830820925>, live since 0.5.1), SKU
-  `oldbrainfix`, iOS 26 and newer, iPhone only. The tag
+  `oldbrainfix`, iOS 26 and newer, iPhone and iPad (obf-1149). The tag
   pipeline uploads each build to TestFlight once the Apple secrets exist
   (`docs/agents/ios-release.md`); a manual dispatch with `publish` and
   `submit_app_store` also submits it for App Store review with the
@@ -31,6 +31,27 @@ What's new, OSV, the whisper.cpp pin and the open CodeQL alerts. The jobs
 that publish wait for SonarQube Cloud's quality gate of the tagged commit,
 up to 75 minutes while `summer`'s analysis of the merge runs, and stop when
 it fails.
+
+## Before the release pull request
+
+The store kit is done on the release branch, before its pull request is
+called green, never after the tag:
+
+1. `python3 ~/.claude/skills/store-kit/scripts/live.py --package
+   io.github.paxel.oldbrainfix --bundle io.github.paxel.oldbrainfix`: the
+   live versions.
+2. `docs/release-notes-<version>.md` for every change of the release, and
+   the listing edits put to the user, or the user's answer that there are
+   none; `check.py` passes.
+3. The store frames regenerated where a screen on them changed, and the
+   console steps naming exactly those frames.
+4. `python3 tool/whats_new.py --bundle --require <version>` and
+   `python3 tool/store_release.py appstore docs/release-notes-<version>.md`
+   write the bundled What's new and the App Store's What's New files.
+5. `python3 tool/store_release.py frames docs/release-notes-<version>.md
+   <last tag>` passes, and both kit pages are published.
+
+The tag pipeline checks 4 and 5 again and stops on a difference.
 
 ## Locales
 
@@ -98,8 +119,18 @@ and F-Droid both take them. `docs/screenshots/play` links to
 | 7 | `7-history.png` | Routine history with Streak and Adherence                                                |
 | 8 | `8-dark.png`    | Agenda in the dark theme, scrolled to the rest of the week                               |
 
-No tablet frames. Feature graphic (1024 × 500) and hi-res icon (512 × 512)
-are uploaded in the Play Console by hand.
+The same run writes Play's 10" tablet frames (obf-1150), 1440 × 2560
+(900 × 1600 at 1.6, 9:16 as Play's screenshots are), per locale to
+`fastlane/metadata/android/<locale>/images/tenInchScreenshots/`, the same
+eight scenes in the big screen's layout (obf-1148): the sidebar beside the
+list, the diary reached through the sidebar, the Note editor as a dialog
+over it. They are uploaded in the Play Console as the 10-inch tablet
+screenshots. The Play steps of a release record name them as "replace
+tablet screenshots N…", apart from the phone's "replace phone
+screenshots N…".
+
+Feature graphic (1024 × 500) and hi-res icon (512 × 512) are uploaded in
+the Play Console by hand.
 
 ### App Store
 
@@ -131,6 +162,7 @@ Sizes, from Apple's
 | iPhone with Face ID (large), 6.5"              | 1284 × 2778, 1242 × 2688              | scaled by Apple           |
 | iPhone with Dynamic Island (medium), 6.3"/6.1" | 1206 × 2622, 1179 × 2556              | scaled by Apple           |
 | Smaller iPhones                                | down to 640 × 1136                    | scaled by Apple           |
+| iPad 13"                                       | 2064 × 2752, 2048 × 2732              | 2064 × 2752, `ipad-13`    |
 
 - Apple requires at least one screenshot for the iPhone with Dynamic
   Island (medium); "you only need to provide screenshots for the highest
@@ -139,9 +171,18 @@ Sizes, from Apple's
   Face ID (large) size the Dynamic Island (large) ones, so the one set at
   1320 × 2868 covers every iPhone.
 - Up to 10 screenshots per size, PNG or JPEG, no alpha channel.
-- No iPad frames: the app is iPhone only (`TARGETED_DEVICE_FAMILY = 1`
-  for the app and both extensions, #236), so App Store Connect asks for
-  no iPad 13" screenshots.
+- iPad frames: the app runs on the iPhone and the iPad
+  (`TARGETED_DEVICE_FAMILY = "1,2"` for the app and both extensions,
+  obf-1149; iPhone only before, #236), so App Store Connect asks for
+  iPad 13" screenshots as well. The same run of 'iphone screenshots'
+  writes them (obf-1150), 2064 × 2752 (the 13" iPad Pro's 1032 × 1376
+  points at 2, with its status bar and home indicator), opaque, to
+  `fastlane/metadata/ios/<locale>/screenshots/ipad-13/`: the same
+  eight files as the iPhone's in the big screen's layout (obf-1148),
+  the Note editor as a dialog over the list. The release job's
+  `appstore-screenshots` artifact carries them with the iPhone's. The
+  App Store steps of a release record name them as "Replace iPad frames
+  N…", apart from the iPhone's "Replace frames N…".
 - iPhone Duo (1398 × 2034 outer, 2007 × 2853 inner) is required from
   April 2027 for apps built with the iOS 27.1 SDK or later; no frames for
   it yet.

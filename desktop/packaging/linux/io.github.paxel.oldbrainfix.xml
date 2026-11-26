@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The AXT file (obf-1146, ADR 0056): the open format small apps
+     exchange typed records in, application/vnd.axt with the ending .axt
+     (AXT spec/envelope.md, section 9). By its name only: its content is
+     an Avro container, and a rule on Avro's header would claim every
+     Avro file. The launcher's MimeType offers Old Brain Fix for it under
+     "Open with", never as its default program. The app writes this file
+     into the user's mime packages on every start, as it does the
+     launcher; the .deb ships it. -->
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/vnd.axt">
+    <comment>AXT file</comment>
+    <comment xml:lang="de">AXT-Datei</comment>
+    <glob pattern="*.axt"/>
+  </mime-type>
+</mime-info>

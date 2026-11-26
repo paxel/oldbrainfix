@@ -200,7 +200,7 @@ fn for_a_member_the_area_menu_offers_its_people_and_export_only() -> TestResult 
         ("New Topic", false),
         ("Name, colour and icon… F2", false),
         ("Share with people…", true),
-        ("Export as Pack…", true),
+        ("Export ⏵", true),
         ("Delete", false),
     ] {
         assert_eq!(!greyed(entry), may, "{entry}");

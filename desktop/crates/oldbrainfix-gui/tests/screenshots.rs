@@ -2,7 +2,7 @@
 //! window over a small demo store, drawn by egui_kittest through wgpu and
 //! written as PNG files to `$SCREENSHOTS_DIR` (else
 //! `target/screenshots`). The release workflow renders them and
-//! attaches them to the GitHub Release, which the metainfo points at.
+//! attaches them to the GitHub Release.
 //! Ignored: they need a GPU or a software Vulkan such as lavapipe.
 //!
 //! ```sh
@@ -56,7 +56,7 @@ use parking_lot::Mutex;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-/// The file names the metainfo lists, in its order.
+/// The screenshots' file names, in their order.
 pub const FILES: [&str; 3] = [
     "screenshot-agenda.png",
     "screenshot-notes.png",
@@ -1954,8 +1954,17 @@ fn sharing_frames(
         }),
         // Packs (#165): the Household's tree, and Lena's Pack opened.
         ("send-pack", plain, |harness, _, texts| {
+            // Under the Area menu's Export ▸ (obf-1145).
+            let export = format!("{} ⏵", harness.state().t().desk_area_export());
             let pack = harness.state().t().export_as_pack().to_string();
-            area_menu(harness, texts.household, &pack)
+            area_menu(harness, texts.household, &export)?;
+            harness
+                .query_all_by_label(&pack)
+                .last()
+                .ok_or_else(|| format!("the entry {pack}"))?
+                .click();
+            harness.run();
+            Ok(())
         }),
         ("open-pack", plain, |harness, people, _| {
             let (_, path) = people.pack.as_ref().ok_or("Lena's Pack")?;
@@ -2143,7 +2152,7 @@ fn privacy_frames(
             harness.state_mut().set_feedback_facts(FeedbackFacts {
                 version: "0.4.0".into(),
                 system: "Debian GNU/Linux 13 (trixie), x86_64".into(),
-                install: "Flatpak".into(),
+                install: ".deb".into(),
             });
             harness.state_mut().open(Page::Settings);
             harness.run();

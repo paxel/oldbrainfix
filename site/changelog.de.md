@@ -2,7 +2,23 @@
 
 Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `CHANGELOG.md` und `OLDER_CHANGES.md` im Wurzelverzeichnis, in einer Datei: die aktuelle Version oben ohne Datum, die veröffentlichten darunter mit dem Datum ihres Tags. Die Seite "Was ist neu" der Dokumentation wird daraus gebaut; eine englische Version ohne deutschen Abschnitt lässt den Bau fehlschlagen.
 
-## [0.8.0]
+## [0.9.0]
+
+### Neu
+
+- Auf einem Tablet oder iPad ab 700 dp Breite zeigt die App das Desktop-Layout: eine Seitenleiste neben der Liste, eine Notiz als Dialog. ([obf-1148](https://github.com/paxel/oldbrainfix/issues/464))
+- Die App läuft auf dem iPad als iPad-App, nicht in iPhone-Größe. ([obf-1149](https://github.com/paxel/oldbrainfix/issues/465))
+- „Als AXT-Datei exportieren…“ gibt Notizen, eine Auswahl, ein Thema oder einen Bereich an andere Apps, die AXT verstehen. ([obf-1145](https://github.com/paxel/oldbrainfix/issues/461))
+- Eine AXT-Datei aus einer anderen App öffnet sich in Old Brain Fix, und ihre angehakten Einträge werden Notizen am gewählten Ort. ([obf-1146](https://github.com/paxel/oldbrainfix/issues/462))
+- Eine spätere AXT-Datei derselben App ändert oder entfernt die Notizen, die sie gebracht hat, außer du hast sie seither geändert. ([obf-1147](https://github.com/paxel/oldbrainfix/issues/463))
+- Fedora und openSUSE bekommen ein .rpm der Desktop-App, neben dem .deb, dem AppImage und dem Tar-Archiv. ([obf-1152](https://github.com/paxel/oldbrainfix/issues/470))
+- Debian und Ubuntu können die Desktop-App aus einem apt-Repository installieren und bekommen jede neue Version mit ihren Updates. ([obf-1153](https://github.com/paxel/oldbrainfix/issues/471))
+
+### Entfernt
+
+- Das Flatpak wird nicht mehr angeboten; unter Linux gibt es das Tar-Archiv, das .deb, das AppImage oder Homebrew. ([obf-1151](https://github.com/paxel/oldbrainfix/issues/469))
+
+## [0.8.0] - 2026-11-25
 
 ### Neu
 

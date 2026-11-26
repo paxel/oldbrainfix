@@ -1,0 +1,1268 @@
+{
+  "fingerprints": {
+    "axt.example.v1.Note": "71370900793ce87c",
+    "axt.example.v1.Task": "d9644c7ca6591b4e",
+    "axt.example.v1.Appointment": "25addb947073d010"
+  },
+  "manifest": {
+    "app_name": "Old Brain Fix",
+    "app_url": null,
+    "formats": [
+      1
+    ],
+    "takes": [
+      {
+        "type": "axt.example.v1.Appointment",
+        "min_version": 1,
+        "max_version": null,
+        "purpose": "An Appointment becomes a Note with a Reminder at its start.",
+        "purpose_translations": {
+          "de": "Ein Termin wird zu einer Notiz mit einer Erinnerung zu seinem Beginn."
+        }
+      },
+      {
+        "type": "axt.example.v1.Task",
+        "min_version": 1,
+        "max_version": null,
+        "purpose": "A Task becomes a Note with a Reminder or Routine.",
+        "purpose_translations": {
+          "de": "Eine Aufgabe wird zu einer Notiz mit einer Erinnerung oder Routine."
+        }
+      },
+      {
+        "type": "axt.example.v1.Note",
+        "min_version": 1,
+        "max_version": null,
+        "purpose": "A Note becomes a Note.",
+        "purpose_translations": {
+          "de": "Eine Notiz wird zu einer Notiz."
+        }
+      }
+    ],
+    "any_type": null,
+    "sends": [
+      {
+        "type": "axt.example.v1.Note",
+        "min_version": 1,
+        "max_version": 1,
+        "proposals": false
+      },
+      {
+        "type": "axt.example.v1.Task",
+        "min_version": 1,
+        "max_version": 1,
+        "proposals": false
+      }
+    ],
+    "encryption_key": null,
+    "relay": null
+  },
+  "notes": [
+    "note:00000000000000000000000000000001",
+    "note:00000000000000000000000000000003",
+    "note:00000000000000000000000000000004",
+    "note:00000000000000000000000000000006",
+    "note:00000000000000000000000000000008",
+    "note:0000000000000000000000000000000a",
+    "note:0000000000000000000000000000000c",
+    "note:0000000000000000000000000000000f"
+  ],
+  "ids": {
+    "note:00000000000000000000000000000001": {
+      "axt.example.v1.Note": "00000000-0000-4000-8000-000000000001",
+      "axt.example.v1.Task": "94022ceb-1266-4112-aa84-cdd5772089a2",
+      "axt.example.v1.Appointment": "d5c34206-97ad-42b8-bc16-ece56d79c0ec"
+    },
+    "note:00000000000000000000000000000003": {
+      "axt.example.v1.Note": "00000000-0000-4000-8000-000000000003",
+      "axt.example.v1.Task": "ef980e8b-0c9e-4a47-aad6-e7253e90891b",
+      "axt.example.v1.Appointment": "7d59a459-930b-42c5-a9bf-d5b7c52c0140"
+    },
+    "note:00000000000000000000000000000004": {
+      "axt.example.v1.Note": "00000000-0000-4000-8000-000000000004",
+      "axt.example.v1.Task": "60094f98-ca8d-4986-a18d-1fafe8d21c4a",
+      "axt.example.v1.Appointment": "e832145f-4794-4671-b519-556e926f975d"
+    },
+    "note:00000000000000000000000000000006": {
+      "axt.example.v1.Note": "00000000-0000-4000-8000-000000000006",
+      "axt.example.v1.Task": "f22fa875-2821-4f90-9838-10b60519708d",
+      "axt.example.v1.Appointment": "2bf10610-9d1a-45d6-a5cb-83f0af27e2ca"
+    },
+    "note:00000000000000000000000000000008": {
+      "axt.example.v1.Note": "00000000-0000-4000-8000-000000000008",
+      "axt.example.v1.Task": "bbbb9f1c-bffb-409d-945f-746d1fda9e5c",
+      "axt.example.v1.Appointment": "8cd795cd-3b10-495c-9e78-ec2867337915"
+    },
+    "note:0000000000000000000000000000000a": {
+      "axt.example.v1.Note": "00000000-0000-4000-8000-00000000000a",
+      "axt.example.v1.Task": "bba8fb7f-4ba1-4998-9454-86233889f549",
+      "axt.example.v1.Appointment": "c1a13723-9932-413e-9fdb-10b38de82ec1"
+    },
+    "note:0000000000000000000000000000000c": {
+      "axt.example.v1.Note": "00000000-0000-4000-8000-00000000000c",
+      "axt.example.v1.Task": "bd22cc7c-572a-4d4b-9a51-50ba59a9800e",
+      "axt.example.v1.Appointment": "036a1d5f-130a-4075-9f39-5c9230c554e7"
+    },
+    "note:0000000000000000000000000000000f": {
+      "axt.example.v1.Note": "00000000-0000-4000-8000-00000000000f",
+      "axt.example.v1.Task": "86bf6ba1-8c2a-4e11-977f-83a7d455baa6",
+      "axt.example.v1.Appointment": "4c075fd2-0dac-494f-be2d-eb5f43c1c0db"
+    }
+  },
+  "records": {
+    "note:00000000000000000000000000000001": {
+      "type": "axt.example.v1.Note",
+      "value": {
+        "title": "Shopping",
+        "text": "Shopping\nMilk and #Eggs ☐ #eggs",
+        "format": "PLAIN",
+        "created": {
+          "year": 2026,
+          "month": 1,
+          "day": 1,
+          "hour": 10,
+          "minute": 0,
+          "second": 1,
+          "millisecond": 0,
+          "zone": "Etc/UTC",
+          "offset_seconds": 0,
+          "instant_ms": 1767261601000
+        },
+        "updated": {
+          "year": 2026,
+          "month": 1,
+          "day": 1,
+          "hour": 10,
+          "minute": 0,
+          "second": 1,
+          "millisecond": 0,
+          "zone": "Etc/UTC",
+          "offset_seconds": 0,
+          "instant_ms": 1767261601000
+        },
+        "tags": [
+          "Eggs"
+        ],
+        "relations": [],
+        "extensions": []
+      }
+    },
+    "note:00000000000000000000000000000003": {
+      "type": "axt.example.v1.Note",
+      "value": {
+        "title": "Garden",
+        "text": "# Garden\nWater the **roses** #garden/roses",
+        "format": "MARKDOWN",
+        "created": {
+          "year": 2026,
+          "month": 1,
+          "day": 1,
+          "hour": 10,
+          "minute": 0,
+          "second": 5,
+          "millisecond": 0,
+          "zone": "Etc/UTC",
+          "offset_seconds": 0,
+          "instant_ms": 1767261605000
+        },
+        "updated": {
+          "year": 2026,
+          "month": 1,
+          "day": 1,
+          "hour": 10,
+          "minute": 0,
+          "second": 5,
+          "millisecond": 0,
+          "zone": "Etc/UTC",
+          "offset_seconds": 0,
+          "instant_ms": 1767261605000
+        },
+        "tags": [
+          "garden/roses"
+        ],
+        "relations": [],
+        "extensions": []
+      }
+    },
+    "note:00000000000000000000000000000004": {
+      "type": "axt.example.v1.Task",
+      "value": {
+        "title": "Dentist",
+        "notes": "At the new place",
+        "due": {
+          "year": 2026,
+          "month": 12,
+          "day": 3,
+          "hour": 10,
+          "minute": 0,
+          "second": 0,
+          "millisecond": 0,
+          "zone": null,
+          "offset_seconds": null,
+          "instant_ms": null
+        },
+        "due_all_day": false,
+        "repeat": null,
+        "done": true,
+        "done_at": {
+          "year": 2026,
+          "month": 1,
+          "day": 1,
+          "hour": 10,
+          "minute": 0,
+          "second": 20,
+          "millisecond": 0,
+          "zone": "Etc/UTC",
+          "offset_seconds": 0,
+          "instant_ms": 1767261620000
+        },
+        "priority": "NONE",
+        "relations": [],
+        "extensions": []
+      }
+    },
+    "note:00000000000000000000000000000006": {
+      "type": "axt.example.v1.Task",
+      "value": {
+        "title": "Pills",
+        "notes": "With water",
+        "due": {
+          "year": 2026,
+          "month": 11,
+          "day": 1,
+          "hour": 8,
+          "minute": 0,
+          "second": 0,
+          "millisecond": 0,
+          "zone": null,
+          "offset_seconds": null,
+          "instant_ms": null
+        },
+        "due_all_day": false,
+        "repeat": "FREQ=DAILY;COUNT=10;BYHOUR=8,20;BYMINUTE=0",
+        "done": false,
+        "done_at": null,
+        "priority": "NONE",
+        "relations": [],
+        "extensions": []
+      }
+    },
+    "note:00000000000000000000000000000008": {
+      "type": "axt.example.v1.Task",
+      "value": {
+        "title": "Walk",
+        "notes": "",
+        "due": {
+          "year": 2026,
+          "month": 11,
+          "day": 1,
+          "hour": 7,
+          "minute": 15,
+          "second": 0,
+          "millisecond": 0,
+          "zone": null,
+          "offset_seconds": null,
+          "instant_ms": null
+        },
+        "due_all_day": false,
+        "repeat": "FREQ=DAILY;UNTIL=20261102T194000",
+        "done": false,
+        "done_at": null,
+        "priority": "NONE",
+        "relations": [],
+        "extensions": []
+      }
+    },
+    "note:0000000000000000000000000000000a": {
+      "type": "axt.example.v1.Task",
+      "value": {
+        "title": "Bins out",
+        "notes": "",
+        "due": {
+          "year": 2026,
+          "month": 11,
+          "day": 2,
+          "hour": 0,
+          "minute": 0,
+          "second": 0,
+          "millisecond": 0,
+          "zone": null,
+          "offset_seconds": null,
+          "instant_ms": null
+        },
+        "due_all_day": true,
+        "repeat": "FREQ=WEEKLY;UNTIL=20261228;BYDAY=MO",
+        "done": false,
+        "done_at": null,
+        "priority": "NONE",
+        "relations": [],
+        "extensions": []
+      }
+    },
+    "note:0000000000000000000000000000000c": {
+      "type": "axt.example.v1.Task",
+      "value": {
+        "title": "Plants",
+        "notes": "",
+        "due": {
+          "year": 2026,
+          "month": 11,
+          "day": 5,
+          "hour": 18,
+          "minute": 0,
+          "second": 0,
+          "millisecond": 0,
+          "zone": null,
+          "offset_seconds": null,
+          "instant_ms": null
+        },
+        "due_all_day": false,
+        "repeat": "FREQ=WEEKLY",
+        "done": false,
+        "done_at": null,
+        "priority": "NONE",
+        "relations": [],
+        "extensions": []
+      }
+    }
+  },
+  "read": {
+    "from-dart": {
+      "sender": "79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664",
+      "shortFingerprint": "35997 89796 54926 44216 31974",
+      "appName": "Old Brain Fix",
+      "fromOwnDevice": false,
+      "records": [
+        {
+          "id": "00000000-0000-4000-8000-000000000001",
+          "version": 115819261263894875,
+          "type": "axt.example.v1.Note",
+          "result": "APPLIED",
+          "kind": "new",
+          "noteId": null,
+          "kept": false,
+          "draft": {
+            "text": "Shopping\nMilk and #Eggs ☐ #eggs",
+            "format": "plain",
+            "schedule": null,
+            "done": false,
+            "doneAt": null,
+            "headsUps": []
+          }
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000003",
+          "version": 115819261263900002,
+          "type": "axt.example.v1.Note",
+          "result": "APPLIED",
+          "kind": "new",
+          "noteId": null,
+          "kept": false,
+          "draft": {
+            "text": "# Garden\nWater the **roses** #garden/roses",
+            "format": "markdown",
+            "schedule": null,
+            "done": false,
+            "doneAt": null,
+            "headsUps": []
+          }
+        },
+        {
+          "id": "60094f98-ca8d-4986-a18d-1fafe8d21c4a",
+          "version": 115819261263909723,
+          "type": "axt.example.v1.Task",
+          "result": "APPLIED",
+          "kind": "new",
+          "noteId": null,
+          "kept": false,
+          "draft": {
+            "text": "Dentist\nAt the new place",
+            "format": "plain",
+            "schedule": {
+              "start": "2026-12-03",
+              "times": [
+                "10:00"
+              ],
+              "rule": null
+            },
+            "done": true,
+            "doneAt": "2026-01-01T10:00:20.000Z",
+            "headsUps": []
+          }
+        },
+        {
+          "id": "f22fa875-2821-4f90-9838-10b60519708d",
+          "version": 115819261263939162,
+          "type": "axt.example.v1.Task",
+          "result": "APPLIED",
+          "kind": "new",
+          "noteId": null,
+          "kept": false,
+          "draft": {
+            "text": "Pills\nWith water",
+            "format": "plain",
+            "schedule": {
+              "start": "2026-11-01",
+              "times": [
+                "08:00"
+              ],
+              "rule": "FREQ=DAILY;COUNT=10;BYHOUR=8,20;BYMINUTE=0"
+            },
+            "done": false,
+            "doneAt": null,
+            "headsUps": []
+          }
+        },
+        {
+          "id": "bbbb9f1c-bffb-409d-945f-746d1fda9e5c",
+          "version": 115819261263943870,
+          "type": "axt.example.v1.Task",
+          "result": "APPLIED",
+          "kind": "new",
+          "noteId": null,
+          "kept": false,
+          "draft": {
+            "text": "Walk",
+            "format": "plain",
+            "schedule": {
+              "start": "2026-11-01",
+              "times": [
+                "07:15"
+              ],
+              "rule": "FREQ=DAILY;UNTIL=20261102T194000"
+            },
+            "done": false,
+            "doneAt": null,
+            "headsUps": []
+          }
+        },
+        {
+          "id": "bba8fb7f-4ba1-4998-9454-86233889f549",
+          "version": 115819261263959116,
+          "type": "axt.example.v1.Task",
+          "result": "APPLIED",
+          "kind": "new",
+          "noteId": null,
+          "kept": false,
+          "draft": {
+            "text": "Bins out",
+            "format": "plain",
+            "schedule": {
+              "start": "2026-11-02",
+              "times": [],
+              "rule": "FREQ=WEEKLY;UNTIL=20261228;BYDAY=MO"
+            },
+            "done": false,
+            "doneAt": null,
+            "headsUps": []
+          }
+        },
+        {
+          "id": "bd22cc7c-572a-4d4b-9a51-50ba59a9800e",
+          "version": 115819261263969346,
+          "type": "axt.example.v1.Task",
+          "result": "APPLIED",
+          "kind": "new",
+          "noteId": null,
+          "kept": false,
+          "draft": {
+            "text": "Plants",
+            "format": "plain",
+            "schedule": {
+              "start": "2026-11-05",
+              "times": [
+                "18:00"
+              ],
+              "rule": "FREQ=WEEKLY"
+            },
+            "done": false,
+            "doneAt": null,
+            "headsUps": []
+          }
+        }
+      ]
+    },
+    "from-rust": {
+      "sender": "79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664",
+      "shortFingerprint": "35997 89796 54926 44216 31974",
+      "appName": "Old Brain Fix",
+      "fromOwnDevice": false,
+      "records": [
+        {
+          "id": "00000000-0000-4000-8000-000000000001",
+          "version": 117676965888017052,
+          "type": "axt.example.v1.Note",
+          "result": "APPLIED",
+          "kind": "new",
+          "noteId": null,
+          "kept": false,
+          "draft": {
+            "text": "Shopping\nMilk and #Eggs ☐ #eggs",
+            "format": "plain",
+            "schedule": null,
+            "done": false,
+            "doneAt": null,
+            "headsUps": []
+          }
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000003",
+          "version": 117676965888039393,
+          "type": "axt.example.v1.Note",
+          "result": "APPLIED",
+          "kind": "new",
+          "noteId": null,
+          "kept": false,
+          "draft": {
+            "text": "# Garden\nWater the **roses** #garden/roses",
+            "format": "markdown",
+            "schedule": null,
+            "done": false,
+            "doneAt": null,
+            "headsUps": []
+          }
+        },
+        {
+          "id": "60094f98-ca8d-4986-a18d-1fafe8d21c4a",
+          "version": 117676965888041345,
+          "type": "axt.example.v1.Task",
+          "result": "APPLIED",
+          "kind": "new",
+          "noteId": null,
+          "kept": false,
+          "draft": {
+            "text": "Dentist\nAt the new place",
+            "format": "plain",
+            "schedule": {
+              "start": "2026-12-03",
+              "times": [
+                "10:00"
+              ],
+              "rule": null
+            },
+            "done": true,
+            "doneAt": "2026-01-01T10:00:20.000Z",
+            "headsUps": []
+          }
+        },
+        {
+          "id": "f22fa875-2821-4f90-9838-10b60519708d",
+          "version": 117676965888066573,
+          "type": "axt.example.v1.Task",
+          "result": "APPLIED",
+          "kind": "new",
+          "noteId": null,
+          "kept": false,
+          "draft": {
+            "text": "Pills\nWith water",
+            "format": "plain",
+            "schedule": {
+              "start": "2026-11-01",
+              "times": [
+                "08:00"
+              ],
+              "rule": "FREQ=DAILY;COUNT=10;BYHOUR=8,20;BYMINUTE=0"
+            },
+            "done": false,
+            "doneAt": null,
+            "headsUps": []
+          }
+        },
+        {
+          "id": "bbbb9f1c-bffb-409d-945f-746d1fda9e5c",
+          "version": 117676965888073939,
+          "type": "axt.example.v1.Task",
+          "result": "APPLIED",
+          "kind": "new",
+          "noteId": null,
+          "kept": false,
+          "draft": {
+            "text": "Walk",
+            "format": "plain",
+            "schedule": {
+              "start": "2026-11-01",
+              "times": [
+                "07:15"
+              ],
+              "rule": "FREQ=DAILY;UNTIL=20261102T194000"
+            },
+            "done": false,
+            "doneAt": null,
+            "headsUps": []
+          }
+        },
+        {
+          "id": "bba8fb7f-4ba1-4998-9454-86233889f549",
+          "version": 117676965888083609,
+          "type": "axt.example.v1.Task",
+          "result": "APPLIED",
+          "kind": "new",
+          "noteId": null,
+          "kept": false,
+          "draft": {
+            "text": "Bins out",
+            "format": "plain",
+            "schedule": {
+              "start": "2026-11-02",
+              "times": [],
+              "rule": "FREQ=WEEKLY;UNTIL=20261228;BYDAY=MO"
+            },
+            "done": false,
+            "doneAt": null,
+            "headsUps": []
+          }
+        },
+        {
+          "id": "bd22cc7c-572a-4d4b-9a51-50ba59a9800e",
+          "version": 117676965888091080,
+          "type": "axt.example.v1.Task",
+          "result": "APPLIED",
+          "kind": "new",
+          "noteId": null,
+          "kept": false,
+          "draft": {
+            "text": "Plants",
+            "format": "plain",
+            "schedule": {
+              "start": "2026-11-05",
+              "times": [
+                "18:00"
+              ],
+              "rule": "FREQ=WEEKLY"
+            },
+            "done": false,
+            "doneAt": null,
+            "headsUps": []
+          }
+        }
+      ]
+    },
+    "catalog": {
+      "sender": "274ed6b26805d2fe8d060529ee9a2f28763b6976d9c5fd1dee38ff36b3b76939",
+      "shortFingerprint": "80673 35412 24212 06712 25309",
+      "appName": "cat-a-log",
+      "fromOwnDevice": false,
+      "records": [
+        {
+          "id": "0b9a8f1e-3c2d-4e5f-8a7b-6c5d4e3f2a10",
+          "version": 117645823180826648,
+          "type": "axt.example.v1.Appointment",
+          "result": "APPLIED",
+          "kind": "new",
+          "noteId": null,
+          "kept": false,
+          "draft": {
+            "text": "Vet: Mia\nMain Street 4\nBring the booklet",
+            "format": "plain",
+            "schedule": {
+              "start": "2026-12-03",
+              "times": [
+                "09:00"
+              ],
+              "rule": null
+            },
+            "done": false,
+            "doneAt": null,
+            "headsUps": [
+              20,
+              1440
+            ]
+          }
+        },
+        {
+          "id": "1c2d3e4f-5a6b-4c7d-8e9f-a0b1c2d3e4f5",
+          "version": 117645823180857539,
+          "type": "axt.example.v1.Task",
+          "result": "APPLIED",
+          "kind": "new",
+          "noteId": null,
+          "kept": false,
+          "draft": {
+            "text": "Order food\nThe dry kind",
+            "format": "plain",
+            "schedule": {
+              "start": "2026-11-18",
+              "times": [],
+              "rule": "FREQ=MONTHLY"
+            },
+            "done": true,
+            "doneAt": null,
+            "headsUps": []
+          }
+        },
+        {
+          "id": "2d3e4f5a-6b7c-4d8e-9fa0-b1c2d3e4f5a6",
+          "version": 117645823180886783,
+          "type": "org.example.Memo",
+          "result": "APPLIED",
+          "kind": "none",
+          "noteId": null,
+          "kept": false,
+          "draft": null
+        }
+      ]
+    }
+  },
+  "times": {
+    "taken": "2026-11-25T12:00:00.000Z",
+    "foreign": "2026-11-25T13:00:00.000Z"
+  },
+  "vet": "area:00000000000000000000000000002001",
+  "takenCatalog": [
+    "note:00000000000000000000000000002002",
+    "note:00000000000000000000000000002004"
+  ],
+  "takenRust": [
+    "note:00000000000000000000000000002006",
+    "note:00000000000000000000000000002008",
+    "note:00000000000000000000000000002009",
+    "note:0000000000000000000000000000200b",
+    "note:0000000000000000000000000000200d",
+    "note:0000000000000000000000000000200f",
+    "note:00000000000000000000000000002011"
+  ],
+  "from": {
+    "note:00000000000000000000000000002002": "{\"id\":\"0b9a8f1e-3c2d-4e5f-8a7b-6c5d4e3f2a10\",\"sender\":\"274ed6b26805d2fe8d060529ee9a2f28763b6976d9c5fd1dee38ff36b3b76939\",\"type\":\"axt.example.v1.Appointment\",\"version\":117645823180826648}",
+    "note:00000000000000000000000000002004": "{\"id\":\"1c2d3e4f-5a6b-4c7d-8e9f-a0b1c2d3e4f5\",\"sender\":\"274ed6b26805d2fe8d060529ee9a2f28763b6976d9c5fd1dee38ff36b3b76939\",\"type\":\"axt.example.v1.Task\",\"version\":117645823180857539}",
+    "note:00000000000000000000000000002006": "{\"id\":\"00000000-0000-4000-8000-000000000001\",\"sender\":\"79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664\",\"type\":\"axt.example.v1.Note\",\"version\":117676965888017052}",
+    "note:00000000000000000000000000002008": "{\"id\":\"00000000-0000-4000-8000-000000000003\",\"sender\":\"79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664\",\"type\":\"axt.example.v1.Note\",\"version\":117676965888039393}",
+    "note:00000000000000000000000000002009": "{\"id\":\"60094f98-ca8d-4986-a18d-1fafe8d21c4a\",\"sender\":\"79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664\",\"type\":\"axt.example.v1.Task\",\"version\":117676965888041345}",
+    "note:0000000000000000000000000000200b": "{\"id\":\"f22fa875-2821-4f90-9838-10b60519708d\",\"sender\":\"79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664\",\"type\":\"axt.example.v1.Task\",\"version\":117676965888066573}",
+    "note:0000000000000000000000000000200d": "{\"id\":\"bbbb9f1c-bffb-409d-945f-746d1fda9e5c\",\"sender\":\"79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664\",\"type\":\"axt.example.v1.Task\",\"version\":117676965888073939}",
+    "note:0000000000000000000000000000200f": "{\"id\":\"bba8fb7f-4ba1-4998-9454-86233889f549\",\"sender\":\"79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664\",\"type\":\"axt.example.v1.Task\",\"version\":117676965888083609}",
+    "note:00000000000000000000000000002011": "{\"id\":\"bd22cc7c-572a-4d4b-9a51-50ba59a9800e\",\"sender\":\"79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664\",\"type\":\"axt.example.v1.Task\",\"version\":117676965888091080}"
+  },
+  "plain": "note:00000000000000000000000000002013",
+  "fromAfterForeign": {
+    "note:00000000000000000000000000002002": "{\"id\":\"0b9a8f1e-3c2d-4e5f-8a7b-6c5d4e3f2a10\",\"sender\":\"274ed6b26805d2fe8d060529ee9a2f28763b6976d9c5fd1dee38ff36b3b76939\",\"type\":\"axt.example.v1.Appointment\",\"version\":117645823180826648}",
+    "note:00000000000000000000000000002004": "{\"id\":\"1c2d3e4f-5a6b-4c7d-8e9f-a0b1c2d3e4f5\",\"sender\":\"274ed6b26805d2fe8d060529ee9a2f28763b6976d9c5fd1dee38ff36b3b76939\",\"type\":\"axt.example.v1.Task\",\"version\":117645823180857539}",
+    "note:00000000000000000000000000002006": "{\"id\":\"00000000-0000-4000-8000-000000000001\",\"sender\":\"79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664\",\"type\":\"axt.example.v1.Note\",\"version\":117676965888017052}",
+    "note:00000000000000000000000000002008": "{\"id\":\"00000000-0000-4000-8000-000000000003\",\"sender\":\"79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664\",\"type\":\"axt.example.v1.Note\",\"version\":117676965888039393}",
+    "note:00000000000000000000000000002009": "{\"id\":\"60094f98-ca8d-4986-a18d-1fafe8d21c4a\",\"sender\":\"79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664\",\"type\":\"axt.example.v1.Task\",\"version\":117676965888041345}",
+    "note:0000000000000000000000000000200b": "{\"id\":\"f22fa875-2821-4f90-9838-10b60519708d\",\"sender\":\"79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664\",\"type\":\"axt.example.v1.Task\",\"version\":117676965888066573}",
+    "note:0000000000000000000000000000200d": "{\"id\":\"bbbb9f1c-bffb-409d-945f-746d1fda9e5c\",\"sender\":\"79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664\",\"type\":\"axt.example.v1.Task\",\"version\":117676965888073939}",
+    "note:0000000000000000000000000000200f": "{\"id\":\"bba8fb7f-4ba1-4998-9454-86233889f549\",\"sender\":\"79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664\",\"type\":\"axt.example.v1.Task\",\"version\":117676965888083609}",
+    "note:00000000000000000000000000002011": "{\"id\":\"bd22cc7c-572a-4d4b-9a51-50ba59a9800e\",\"sender\":\"79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664\",\"type\":\"axt.example.v1.Task\",\"version\":117676965888091080}"
+  },
+  "changed": {
+    "garden": "note:00000000000000000000000000002008",
+    "pills": "routine:0000000000000000000000000000200c",
+    "at": "2026-11-25T14:00:00.000Z"
+  },
+  "again": {
+    "sender": "79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664",
+    "shortFingerprint": "35997 89796 54926 44216 31974",
+    "appName": "Old Brain Fix",
+    "fromOwnDevice": false,
+    "records": [
+      {
+        "id": "00000000-0000-4000-8000-000000000001",
+        "version": 117676965888017052,
+        "type": "axt.example.v1.Note",
+        "result": "APPLIED",
+        "kind": "stale",
+        "noteId": "note:00000000000000000000000000002006",
+        "kept": false,
+        "draft": {
+          "text": "Shopping\nMilk and #Eggs ☐ #eggs",
+          "format": "plain",
+          "schedule": null,
+          "done": false,
+          "doneAt": null,
+          "headsUps": []
+        }
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000003",
+        "version": 117676965888039393,
+        "type": "axt.example.v1.Note",
+        "result": "APPLIED",
+        "kind": "stale",
+        "noteId": "note:00000000000000000000000000002008",
+        "kept": false,
+        "draft": {
+          "text": "# Garden\nWater the **roses** #garden/roses",
+          "format": "markdown",
+          "schedule": null,
+          "done": false,
+          "doneAt": null,
+          "headsUps": []
+        }
+      },
+      {
+        "id": "60094f98-ca8d-4986-a18d-1fafe8d21c4a",
+        "version": 117676965888041345,
+        "type": "axt.example.v1.Task",
+        "result": "APPLIED",
+        "kind": "stale",
+        "noteId": "note:00000000000000000000000000002009",
+        "kept": false,
+        "draft": {
+          "text": "Dentist\nAt the new place",
+          "format": "plain",
+          "schedule": {
+            "start": "2026-12-03",
+            "times": [
+              "10:00"
+            ],
+            "rule": null
+          },
+          "done": true,
+          "doneAt": "2026-01-01T10:00:20.000Z",
+          "headsUps": []
+        }
+      },
+      {
+        "id": "f22fa875-2821-4f90-9838-10b60519708d",
+        "version": 117676965888066573,
+        "type": "axt.example.v1.Task",
+        "result": "APPLIED",
+        "kind": "stale",
+        "noteId": "note:0000000000000000000000000000200b",
+        "kept": false,
+        "draft": {
+          "text": "Pills\nWith water",
+          "format": "plain",
+          "schedule": {
+            "start": "2026-11-01",
+            "times": [
+              "08:00"
+            ],
+            "rule": "FREQ=DAILY;COUNT=10;BYHOUR=8,20;BYMINUTE=0"
+          },
+          "done": false,
+          "doneAt": null,
+          "headsUps": []
+        }
+      },
+      {
+        "id": "bbbb9f1c-bffb-409d-945f-746d1fda9e5c",
+        "version": 117676965888073939,
+        "type": "axt.example.v1.Task",
+        "result": "APPLIED",
+        "kind": "stale",
+        "noteId": "note:0000000000000000000000000000200d",
+        "kept": false,
+        "draft": {
+          "text": "Walk",
+          "format": "plain",
+          "schedule": {
+            "start": "2026-11-01",
+            "times": [
+              "07:15"
+            ],
+            "rule": "FREQ=DAILY;UNTIL=20261102T194000"
+          },
+          "done": false,
+          "doneAt": null,
+          "headsUps": []
+        }
+      },
+      {
+        "id": "bba8fb7f-4ba1-4998-9454-86233889f549",
+        "version": 117676965888083609,
+        "type": "axt.example.v1.Task",
+        "result": "APPLIED",
+        "kind": "stale",
+        "noteId": "note:0000000000000000000000000000200f",
+        "kept": false,
+        "draft": {
+          "text": "Bins out",
+          "format": "plain",
+          "schedule": {
+            "start": "2026-11-02",
+            "times": [],
+            "rule": "FREQ=WEEKLY;UNTIL=20261228;BYDAY=MO"
+          },
+          "done": false,
+          "doneAt": null,
+          "headsUps": []
+        }
+      },
+      {
+        "id": "bd22cc7c-572a-4d4b-9a51-50ba59a9800e",
+        "version": 117676965888091080,
+        "type": "axt.example.v1.Task",
+        "result": "APPLIED",
+        "kind": "stale",
+        "noteId": "note:00000000000000000000000000002011",
+        "kept": false,
+        "draft": {
+          "text": "Plants",
+          "format": "plain",
+          "schedule": {
+            "start": "2026-11-05",
+            "times": [
+              "18:00"
+            ],
+            "rule": "FREQ=WEEKLY"
+          },
+          "done": false,
+          "doneAt": null,
+          "headsUps": []
+        }
+      }
+    ]
+  },
+  "later": {
+    "later": {
+      "sender": "79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664",
+      "shortFingerprint": "35997 89796 54926 44216 31974",
+      "appName": "Old Brain Fix",
+      "fromOwnDevice": false,
+      "records": [
+        {
+          "id": "00000000-0000-4000-8000-000000000001",
+          "version": 117679797043221266,
+          "type": "axt.example.v1.Note",
+          "result": "APPLIED",
+          "kind": "update",
+          "noteId": "note:00000000000000000000000000002006",
+          "kept": false,
+          "draft": {
+            "text": "Shopping\nMilk, #Eggs ☐ and bread",
+            "format": "plain",
+            "schedule": null,
+            "done": false,
+            "doneAt": null,
+            "headsUps": []
+          }
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000003",
+          "version": 117679797043239715,
+          "type": "axt.example.v1.Note",
+          "result": "APPLIED",
+          "kind": "update",
+          "noteId": "note:00000000000000000000000000002008",
+          "kept": true,
+          "draft": {
+            "text": "# Garden\nWater the roses and the tulips",
+            "format": "markdown",
+            "schedule": null,
+            "done": false,
+            "doneAt": null,
+            "headsUps": []
+          }
+        },
+        {
+          "id": "60094f98-ca8d-4986-a18d-1fafe8d21c4a",
+          "version": 117679797043267232,
+          "type": null,
+          "result": "APPLIED",
+          "kind": "deletion",
+          "noteId": "note:00000000000000000000000000002009",
+          "kept": false,
+          "draft": null
+        },
+        {
+          "id": "f22fa875-2821-4f90-9838-10b60519708d",
+          "version": 117679797043268538,
+          "type": null,
+          "result": "APPLIED",
+          "kind": "deletion",
+          "noteId": "note:0000000000000000000000000000200b",
+          "kept": true,
+          "draft": null
+        },
+        {
+          "id": "bbbb9f1c-bffb-409d-945f-746d1fda9e5c",
+          "version": 117679797043289318,
+          "type": "axt.example.v1.Task",
+          "result": "APPLIED",
+          "kind": "update",
+          "noteId": "note:0000000000000000000000000000200d",
+          "kept": false,
+          "draft": {
+            "text": "Walk\nAround the park",
+            "format": "plain",
+            "schedule": {
+              "start": "2026-11-02",
+              "times": [
+                "07:15"
+              ],
+              "rule": "FREQ=DAILY;COUNT=3"
+            },
+            "done": false,
+            "doneAt": null,
+            "headsUps": []
+          }
+        },
+        {
+          "id": "bba8fb7f-4ba1-4998-9454-86233889f549",
+          "version": 117679797043289565,
+          "type": "axt.example.v1.Task",
+          "result": "APPLIED",
+          "kind": "update",
+          "noteId": "note:0000000000000000000000000000200f",
+          "kept": false,
+          "draft": {
+            "text": "Bins out\nBlue bin this week",
+            "format": "plain",
+            "schedule": null,
+            "done": false,
+            "doneAt": null,
+            "headsUps": []
+          }
+        },
+        {
+          "id": "bd22cc7c-572a-4d4b-9a51-50ba59a9800e",
+          "version": 117679797043320571,
+          "type": "axt.example.v1.Note",
+          "result": "APPLIED",
+          "kind": "refused",
+          "noteId": "note:00000000000000000000000000002011",
+          "kept": false,
+          "draft": {
+            "text": "Plants",
+            "format": "plain",
+            "schedule": null,
+            "done": false,
+            "doneAt": null,
+            "headsUps": []
+          }
+        },
+        {
+          "id": "5f6a7b8c-9d0e-4f1a-8b2c-3d4e5f6a7b8c",
+          "version": 117679797043335554,
+          "type": "axt.example.v1.Note",
+          "result": "APPLIED",
+          "kind": "new",
+          "noteId": null,
+          "kept": false,
+          "draft": {
+            "text": "Tea",
+            "format": "plain",
+            "schedule": null,
+            "done": false,
+            "doneAt": null,
+            "headsUps": []
+          }
+        }
+      ]
+    },
+    "catalog-later": {
+      "sender": "274ed6b26805d2fe8d060529ee9a2f28763b6976d9c5fd1dee38ff36b3b76939",
+      "shortFingerprint": "80673 35412 24212 06712 25309",
+      "appName": "Old Brain Fix",
+      "fromOwnDevice": false,
+      "records": [
+        {
+          "id": "0b9a8f1e-3c2d-4e5f-8a7b-6c5d4e3f2a10",
+          "version": 117651485491200925,
+          "type": "axt.example.v1.Appointment",
+          "result": "APPLIED",
+          "kind": "update",
+          "noteId": "note:00000000000000000000000000002002",
+          "kept": false,
+          "draft": {
+            "text": "Vet: Mia and Leo\nMain Street 4\nBring both booklets",
+            "format": "plain",
+            "schedule": {
+              "start": "2026-12-03",
+              "times": [
+                "10:00"
+              ],
+              "rule": null
+            },
+            "done": false,
+            "doneAt": null,
+            "headsUps": [
+              1440
+            ]
+          }
+        },
+        {
+          "id": "1c2d3e4f-5a6b-4c7d-8e9f-a0b1c2d3e4f5",
+          "version": 117651485491203246,
+          "type": null,
+          "result": "APPLIED",
+          "kind": "deletion",
+          "noteId": "note:00000000000000000000000000002004",
+          "kept": false,
+          "draft": null
+        },
+        {
+          "id": "2d3e4f5a-6b7c-4d8e-9fa0-b1c2d3e4f5a6",
+          "version": 117651485491231449,
+          "type": null,
+          "result": "APPLIED",
+          "kind": "none",
+          "noteId": null,
+          "kept": false,
+          "draft": null
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000001",
+          "version": 117651485491234404,
+          "type": "axt.example.v1.Note",
+          "result": "APPLIED",
+          "kind": "refused",
+          "noteId": "note:00000000000000000000000000002006",
+          "kept": false,
+          "draft": {
+            "text": "Not from Ada",
+            "format": "plain",
+            "schedule": null,
+            "done": false,
+            "doneAt": null,
+            "headsUps": []
+          }
+        }
+      ]
+    }
+  },
+  "laterAt": "2026-11-25T15:00:00.000Z",
+  "takenLater": [
+    "note:00000000000000000000000000002015"
+  ],
+  "takenCatalogLater": [],
+  "laterAgain": {
+    "sender": "79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664",
+    "shortFingerprint": "35997 89796 54926 44216 31974",
+    "appName": "Old Brain Fix",
+    "fromOwnDevice": false,
+    "records": [
+      {
+        "id": "00000000-0000-4000-8000-000000000001",
+        "version": 117679797043221266,
+        "type": "axt.example.v1.Note",
+        "result": "APPLIED",
+        "kind": "stale",
+        "noteId": "note:00000000000000000000000000002006",
+        "kept": false,
+        "draft": {
+          "text": "Shopping\nMilk, #Eggs ☐ and bread",
+          "format": "plain",
+          "schedule": null,
+          "done": false,
+          "doneAt": null,
+          "headsUps": []
+        }
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000003",
+        "version": 117679797043239715,
+        "type": "axt.example.v1.Note",
+        "result": "APPLIED",
+        "kind": "update",
+        "noteId": "note:00000000000000000000000000002008",
+        "kept": true,
+        "draft": {
+          "text": "# Garden\nWater the roses and the tulips",
+          "format": "markdown",
+          "schedule": null,
+          "done": false,
+          "doneAt": null,
+          "headsUps": []
+        }
+      },
+      {
+        "id": "60094f98-ca8d-4986-a18d-1fafe8d21c4a",
+        "version": 117679797043267232,
+        "type": null,
+        "result": "APPLIED",
+        "kind": "stale",
+        "noteId": "note:00000000000000000000000000002009",
+        "kept": false,
+        "draft": null
+      },
+      {
+        "id": "f22fa875-2821-4f90-9838-10b60519708d",
+        "version": 117679797043268538,
+        "type": null,
+        "result": "APPLIED",
+        "kind": "deletion",
+        "noteId": "note:0000000000000000000000000000200b",
+        "kept": true,
+        "draft": null
+      },
+      {
+        "id": "bbbb9f1c-bffb-409d-945f-746d1fda9e5c",
+        "version": 117679797043289318,
+        "type": "axt.example.v1.Task",
+        "result": "APPLIED",
+        "kind": "stale",
+        "noteId": "note:0000000000000000000000000000200d",
+        "kept": false,
+        "draft": {
+          "text": "Walk\nAround the park",
+          "format": "plain",
+          "schedule": {
+            "start": "2026-11-02",
+            "times": [
+              "07:15"
+            ],
+            "rule": "FREQ=DAILY;COUNT=3"
+          },
+          "done": false,
+          "doneAt": null,
+          "headsUps": []
+        }
+      },
+      {
+        "id": "bba8fb7f-4ba1-4998-9454-86233889f549",
+        "version": 117679797043289565,
+        "type": "axt.example.v1.Task",
+        "result": "APPLIED",
+        "kind": "stale",
+        "noteId": "note:0000000000000000000000000000200f",
+        "kept": false,
+        "draft": {
+          "text": "Bins out\nBlue bin this week",
+          "format": "plain",
+          "schedule": null,
+          "done": false,
+          "doneAt": null,
+          "headsUps": []
+        }
+      },
+      {
+        "id": "bd22cc7c-572a-4d4b-9a51-50ba59a9800e",
+        "version": 117679797043320571,
+        "type": "axt.example.v1.Note",
+        "result": "APPLIED",
+        "kind": "refused",
+        "noteId": "note:00000000000000000000000000002011",
+        "kept": false,
+        "draft": {
+          "text": "Plants",
+          "format": "plain",
+          "schedule": null,
+          "done": false,
+          "doneAt": null,
+          "headsUps": []
+        }
+      },
+      {
+        "id": "5f6a7b8c-9d0e-4f1a-8b2c-3d4e5f6a7b8c",
+        "version": 117679797043335554,
+        "type": "axt.example.v1.Note",
+        "result": "APPLIED",
+        "kind": "stale",
+        "noteId": "note:00000000000000000000000000002015",
+        "kept": false,
+        "draft": {
+          "text": "Tea",
+          "format": "plain",
+          "schedule": null,
+          "done": false,
+          "doneAt": null,
+          "headsUps": []
+        }
+      }
+    ]
+  },
+  "fromAfterLater": {
+    "note:00000000000000000000000000002002": "{\"id\":\"0b9a8f1e-3c2d-4e5f-8a7b-6c5d4e3f2a10\",\"sender\":\"274ed6b26805d2fe8d060529ee9a2f28763b6976d9c5fd1dee38ff36b3b76939\",\"type\":\"axt.example.v1.Appointment\",\"version\":117651485491200925}",
+    "note:00000000000000000000000000002004": "{\"id\":\"1c2d3e4f-5a6b-4c7d-8e9f-a0b1c2d3e4f5\",\"sender\":\"274ed6b26805d2fe8d060529ee9a2f28763b6976d9c5fd1dee38ff36b3b76939\",\"type\":\"axt.example.v1.Task\",\"version\":117651485491203246}",
+    "note:00000000000000000000000000002006": "{\"id\":\"00000000-0000-4000-8000-000000000001\",\"sender\":\"79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664\",\"type\":\"axt.example.v1.Note\",\"version\":117679797043221266}",
+    "note:00000000000000000000000000002008": "{\"id\":\"00000000-0000-4000-8000-000000000003\",\"sender\":\"79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664\",\"type\":\"axt.example.v1.Note\",\"version\":117676965888039393}",
+    "note:00000000000000000000000000002009": "{\"id\":\"60094f98-ca8d-4986-a18d-1fafe8d21c4a\",\"sender\":\"79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664\",\"type\":\"axt.example.v1.Task\",\"version\":117679797043267232}",
+    "note:0000000000000000000000000000200b": "{\"id\":\"f22fa875-2821-4f90-9838-10b60519708d\",\"sender\":\"79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664\",\"type\":\"axt.example.v1.Task\",\"version\":117676965888066573}",
+    "note:0000000000000000000000000000200d": "{\"id\":\"bbbb9f1c-bffb-409d-945f-746d1fda9e5c\",\"sender\":\"79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664\",\"type\":\"axt.example.v1.Task\",\"version\":117679797043289318}",
+    "note:0000000000000000000000000000200f": "{\"id\":\"bba8fb7f-4ba1-4998-9454-86233889f549\",\"sender\":\"79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664\",\"type\":\"axt.example.v1.Task\",\"version\":117679797043289565}",
+    "note:00000000000000000000000000002011": "{\"id\":\"bd22cc7c-572a-4d4b-9a51-50ba59a9800e\",\"sender\":\"79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664\",\"type\":\"axt.example.v1.Task\",\"version\":117676965888091080}",
+    "note:00000000000000000000000000002015": "{\"id\":\"5f6a7b8c-9d0e-4f1a-8b2c-3d4e5f6a7b8c\",\"sender\":\"79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664\",\"type\":\"axt.example.v1.Note\",\"version\":117679797043335554}"
+  }
+}

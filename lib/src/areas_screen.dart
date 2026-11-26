@@ -10,6 +10,8 @@ import 'announcements.dart';
 import 'app_lock.dart';
 import 'area_deletion.dart';
 import 'area_look.dart';
+import 'axt_export.dart';
+import 'big_screen.dart';
 import 'browser.dart';
 import 'browser_add.dart';
 import 'failure_dialog.dart';
@@ -24,7 +26,6 @@ import 'merge_into_screen.dart';
 import 'note_card.dart';
 import 'note_editor_screen.dart';
 import 'note_selection.dart';
-import 'notes_screen.dart';
 import 'pack_screen.dart';
 import 'page_bar.dart';
 import 'place_names.dart';
@@ -38,7 +39,6 @@ import 'system_bars.dart';
 import 'tag_tree_screen.dart';
 import 'tap_mark.dart';
 import 'text_marks_view.dart';
-import 'trash_screen.dart';
 
 /// The notes browser's first level: a search field over every Note, and
 /// the Areas while it is empty, with "+" to add an Area. Tapping an Area
@@ -320,6 +320,7 @@ class _AreasScreenState extends State<AreasScreen>
     widget.trail.choseArea(area);
     setState(() {});
     final route = BrowserRoute<void>(
+      place: ShownPlace.area(area.id),
       builder: (_) => AreaScreen(
         notes: widget.notes,
         places: widget.places,
@@ -352,12 +353,8 @@ class _AreasScreenState extends State<AreasScreen>
 
   Future<void> _openAllNotes() async {
     _stopRearranging();
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) =>
-            AllNotesScreen(notes: widget.notes, places: widget.places),
-      ),
-    );
+    await Navigator.of(context)
+        .push(allNotesRoute(widget.notes, widget.places));
     if (!mounted) return;
     _reload();
   }
@@ -374,11 +371,8 @@ class _AreasScreenState extends State<AreasScreen>
   /// a tag tapped there is searched for here.
   Future<void> _openTags() async {
     _stopRearranging();
-    final tag = await Navigator.of(context).push(
-      MaterialPageRoute<String>(
-        builder: (_) => TagTreeScreen(store: widget.places.store),
-      ),
-    );
+    final tag = await Navigator.of(context)
+        .push(tagTreeRoute(widget.places.store));
     if (!mounted) return;
     if (tag == null) return _reload();
     _searchTag(context, tag);
@@ -386,11 +380,7 @@ class _AreasScreenState extends State<AreasScreen>
 
   Future<void> _openTrash() async {
     _stopRearranging();
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => TrashScreen(notes: widget.notes, places: widget.places),
-      ),
-    );
+    await Navigator.of(context).push(trashRoute(widget.notes, widget.places));
     if (!mounted) return;
     _reload();
   }
@@ -484,6 +474,12 @@ class _AreasScreenState extends State<AreasScreen>
         if (!mounted) return;
       case _AreaAction.pack:
         await exportPack(context, widget.places.store, area.id);
+        if (!mounted) return;
+      case _AreaAction.axt:
+        final store = widget.places.store;
+        await exportAxt(context, store, [
+          for (final note in Notes(store).inside(area.id)) note.id,
+        ], title: areaName(t, area));
         if (!mounted) return;
       case _AreaAction.people:
         await Navigator.of(context).push(
@@ -639,6 +635,11 @@ class _AreasScreenState extends State<AreasScreen>
           key: ValueKey('area-pack-${area.id}'),
           value: _AreaAction.pack,
           child: Text(t.exportAsPack),
+        ),
+        PopupMenuItem(
+          key: ValueKey('area-axt-${area.id}'),
+          value: _AreaAction.axt,
+          child: Text(t.exportAsAxt),
         ),
         if (shared)
           PopupMenuItem(value: _AreaAction.people, child: Text(t.peopleTitle)),
@@ -892,9 +893,9 @@ Widget _lifted(Widget row, int _, Animation<double> lift) => AnimatedBuilder(
   child: row,
 );
 
-enum _AreaAction { rename, look, share, pack, people, hideFromAi, delete }
+enum _AreaAction { rename, look, share, pack, axt, people, hideFromAi, delete }
 
-enum _TopicAction { rename, pack, delete }
+enum _TopicAction { rename, pack, axt, delete }
 
 /// The browser's second level, one Area: its Topics and the diary of
 /// its Notes without a Topic, with a search field over its Notes and
@@ -1064,6 +1065,7 @@ class _AreaScreenState extends State<AreaScreen>
     widget.trail.choseTopic(topic);
     setState(() {});
     final route = BrowserRoute<void>(
+      place: ShownPlace.topic(topic.id),
       builder: (_) => TopicScreen(
         notes: widget.notes,
         places: widget.places,
@@ -1143,6 +1145,12 @@ class _AreaScreenState extends State<AreaScreen>
       case _TopicAction.pack:
         await exportPack(context, widget.places.store, topic.id);
         if (!mounted) return;
+      case _TopicAction.axt:
+        final store = widget.places.store;
+        await exportAxt(context, store, [
+          for (final note in Notes(store).inside(topic.id)) note.id,
+        ], title: topicName(t, topic));
+        if (!mounted) return;
       case _TopicAction.delete:
         final go = await confirmDeleteTopic(
           context,
@@ -1183,6 +1191,11 @@ class _AreaScreenState extends State<AreaScreen>
                 key: ValueKey('topic-pack-${topic.id}'),
                 value: _TopicAction.pack,
                 child: Text(t.exportAsPack),
+              ),
+              PopupMenuItem(
+                key: ValueKey('topic-axt-${topic.id}'),
+                value: _TopicAction.axt,
+                child: Text(t.exportAsAxt),
               ),
               if (_manages)
                 PopupMenuItem(

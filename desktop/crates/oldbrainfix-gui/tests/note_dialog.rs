@@ -1450,6 +1450,7 @@ fn assert_grouped(harness: &Harness<'_, App>) {
         ("Copy text", "Share"),
         ("Save as Markdown…", "Share"),
         ("Export as Pack…", "Share"),
+        ("Export as AXT file…", "Share"),
         ("Merge into…", "Tidy"),
         ("Move to trash", "Tidy"),
     ] {

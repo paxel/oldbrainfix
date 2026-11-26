@@ -1,0 +1,3 @@
+Old Brain Fix now speaks AXT, an open format small apps use to hand records to each other. "Export as AXT file…", beside Export as Pack…, gives a Note, a selection, a Topic or an Area to another app; a Note with a Reminder or Routine goes as a task. An AXT file opened or shared to Old Brain Fix shows its records, all ticked, and "Take it" files them into the place picked, Unsorted at first; an appointment becomes a Reminder with its Heads-ups. A later file from the same app updates or removes what it brought, unless you changed it in the meantime.
+
+On the iPad, Old Brain Fix is now an iPad app, and on a screen from 700 points wide it shows a sidebar with the Agenda, Unsorted, All Notes, Frogs and your Areas beside the list, and a Note opens as a dialog over it.

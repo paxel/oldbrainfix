@@ -1,6 +1,6 @@
-//! "Open with" for Markdown files on Windows (obf-1056): the app lists
-//! itself among the programs offered for `.md` and `.markdown` files,
-//! for this user only, on every start, so a moved program is found
+//! "Open with" for Markdown files on Windows (obf-1056) and AXT files
+//! (obf-1146): the app lists itself among the programs offered for
+//! `.md`, `.markdown` and `.axt` files, for this user only, on every start, so a moved program is found
 //! again. It never becomes their default: only the `OpenWithList` of
 //! each ending and its own entry under `Applications` are written, never
 //! the ending's own program. The Windows release is a zip without an
@@ -14,8 +14,8 @@
 
 use std::path::Path;
 
-/// The Markdown endings offered.
-pub const ENDINGS: [&str; 2] = [".md", ".markdown"];
+/// The endings offered: Markdown's, then the AXT file's.
+pub const ENDINGS: [&str; 3] = [".md", ".markdown", ".axt"];
 
 /// The name of the program file `exe`, by Windows' separators too.
 fn program_name(exe: &Path) -> String {
@@ -35,7 +35,7 @@ fn application_key(exe: &Path) -> String {
 }
 
 /// The `reg.exe` calls, each its arguments, that offer `exe` for
-/// Markdown files: its command with the file as one argument, its name,
+/// Markdown and AXT files: its command with the file as one argument, its name,
 /// the endings it supports, and its place in each ending's Open with
 /// list.
 pub fn reg_calls(exe: &Path) -> Vec<Vec<String>> {
@@ -86,7 +86,7 @@ pub fn reg_calls(exe: &Path) -> Vec<Vec<String>> {
     calls
 }
 
-/// Offers the running program for Markdown files, on Windows only; call
+/// Offers the running program for Markdown and AXT files, on Windows only; call
 /// from a thread of its own. Best effort: a failure is only logged.
 pub fn register() {
     if !cfg!(windows) {
