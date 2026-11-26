@@ -412,6 +412,10 @@ void main() {
         inviting: Invite(area, role: AreaRole.member),
       )!;
       applyAnswer(store, _wire(done.answer), shared: true);
+      // Each step at a later instant: entries of the same instant are
+      // ordered by their devices' random ids, so leaving at the instant
+      // of the invite would count before it as often as after.
+      now = now.add(const Duration(minutes: 1));
       final id = Notes(ann).capture('Milk').id;
       final first = await read(
         tester,
@@ -420,6 +424,7 @@ void main() {
       final milk = AxtFiles(store)
           .take(first, [first.taken.single.id], place: area)
           .single;
+      now = now.add(const Duration(minutes: 1));
       store.leaveArea(area);
       now = now.add(const Duration(minutes: 5));
       Notes(ann).edit(id, 'Milk and eggs');
