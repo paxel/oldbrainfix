@@ -77,8 +77,12 @@ class RunnerTests: XCTestCase {
   /// The iPad turns every way, as the App Store wants of an iPad app that
   /// runs beside others (obf-1149).
   func testTheIpadTurnsEveryWay() {
+    // Read from the Info.plist file itself: on an iPhone the bundle folds
+    // the "~ipad" keys away, so infoDictionary never shows them there.
+    let url = Bundle.main.url(forResource: "Info", withExtension: "plist")
+    let plist = url.flatMap { NSDictionary(contentsOf: $0) }
     XCTAssertEqual(
-      Set(info("UISupportedInterfaceOrientations~ipad") as? [String] ?? []),
+      Set(plist?["UISupportedInterfaceOrientations~ipad"] as? [String] ?? []),
       [
         "UIInterfaceOrientationPortrait", "UIInterfaceOrientationPortraitUpsideDown",
         "UIInterfaceOrientationLandscapeLeft", "UIInterfaceOrientationLandscapeRight",
