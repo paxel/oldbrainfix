@@ -158,7 +158,6 @@ Old Brain Fix ist eine Notiz- und Erinnerungs-App für Android. Eine Desktop-App
 • Ein einzelner Bereich lässt sich mit einer anderen Person teilen, andere nicht.
 • Dein Profil vereint alle deine Geräte. Name, eindeutiger Code und optionales Bild stehen an den Notizen, die du mit anderen teilst.
 • Eine Notiz kann samt Routinen und Erinnerungen als Datei an eine andere Person geschickt werden, die sie annimmt oder ablehnt.
-• Notizen, Erinnerungen und Routinen gehen als AXT-Dateien, einem offenen Format für kleine Apps, an andere Apps und kommen von ihnen.
 
 <b>Datenschutz und Sicherheit</b>
 • Kein Konto, kein Server, keine Analyse, keine Werbung.
@@ -344,7 +343,7 @@ Changelog 0.9.0, Added: "Export as AXT file… hands Notes, a selection, a Topic
 • Notes, Reminders and Routines go to other apps, and come from them, as AXT files, an open format for small apps.
 ```
 
-<!-- edit block=play_full_de status=accepted -->
+<!-- edit block=play_full_de status=pending -->
 Changelog 0.9.0, Added: "Export as AXT file… hands Notes, a selection, a Topic or an Area to other apps that speak AXT."
 ```
 • Eine Notiz kann samt Routinen und Erinnerungen als Datei an eine andere Person geschickt werden, die sie annimmt oder ablehnt.
