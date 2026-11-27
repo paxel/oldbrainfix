@@ -480,6 +480,9 @@ void main() {
       ]);
       await reveal(tester, key('tally-entries'));
       expect(find.textContaining('2/3 sets'), findsOneWidget);
+      // The entries scrolled the card's name out of view.
+      await tester.ensureVisible(find.text('Rows'));
+      await tester.pumpAndSettle();
       await tester.longPress(find.text('Rows'));
       await tester.pumpAndSettle();
       expect(
