@@ -19,6 +19,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 
 - The Flatpak is no longer offered; Linux users take the tarball, the .deb, the AppImage or Homebrew. ([obf-1151](https://github.com/paxel/oldbrainfix/issues/469))
 
+### Fixed
+
+- On the desktop Agenda, a Session's picks wrap onto more lines instead of being cut off. ([obf-1160](https://github.com/paxel/oldbrainfix/issues/480))
+
 ---
 
 Historical changes have been moved to [OLDER_CHANGES.md](OLDER_CHANGES.md).

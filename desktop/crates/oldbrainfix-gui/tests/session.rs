@@ -1260,3 +1260,22 @@ fn framed(harness: &Harness<'_, App>, label: &str) -> bool {
         .iter()
         .any(|clipped| flat(&clipped.shape, at, look))
 }
+
+#[test]
+fn a_long_pick_on_the_agenda_wraps_instead_of_being_cut_off() -> TestResult {
+    // obf-1160: the whole name and the target show, over several lines.
+    let device = device()?;
+    let store = &device.store;
+    let name = "Push-ups with the hands on a chair, slowly down and quickly up again, \
+                the elbows close to the body and the back straight from head to heels";
+    let note = Notes::new(store).capture(name, None, None)?;
+    Tallies::new(store).add_field(&note.id, "Push-ups", "times", Some(20.0), None)?;
+    let pool = vec![note.id];
+    Sessions::new(store).spawn(&device.sport, &daily()?, &pool, 1, SessionRule::Rolling)?;
+    let harness = window(store, None);
+    let label = format!("{name} 20 times");
+    let rect = harness.get_by_role_and_label(Role::Button, &label).rect();
+    // Taller than one line of words at the Agenda's text size.
+    assert!(rect.height() > 30.0, "{rect:?}");
+    Ok(())
+}

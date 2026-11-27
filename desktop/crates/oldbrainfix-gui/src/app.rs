@@ -24023,11 +24023,37 @@ struct EntryClicks {
 /// words, struck through and dimmed when `struck`, indented under the
 /// heading, `depth` steps further for a Line under another. The box
 /// clicks while `boxes`, the words while `opens`, as a button named by
-/// them; `id` keeps their click apart from every other's.
+/// them; `id` keeps their click apart from every other's. The words stay
+/// on one line, cut off at the card's edge.
 fn agenda_entry(
     ui: &mut Ui,
     tones: Tones,
-    (id, words, depth): (Id, &str, usize),
+    shown: (Id, &str, usize),
+    states: (bool, bool),
+    clicks: (bool, bool),
+) -> EntryClicks {
+    entry_row(ui, tones, (shown, false), states, clicks)
+}
+
+/// A Session's pick under its heading, as [`agenda_entry`], its words
+/// wrapping onto more lines, so its name and targets show whole
+/// (obf-1160).
+fn agenda_pick(
+    ui: &mut Ui,
+    tones: Tones,
+    shown: (Id, &str, usize),
+    states: (bool, bool),
+    clicks: (bool, bool),
+) -> EntryClicks {
+    entry_row(ui, tones, (shown, true), states, clicks)
+}
+
+/// The entry [`agenda_entry`] and [`agenda_pick`] draw, its words
+/// wrapping where `wraps`.
+fn entry_row(
+    ui: &mut Ui,
+    tones: Tones,
+    ((id, words, depth), wraps): ((Id, &str, usize), bool),
     (checked, struck): (bool, bool),
     (boxes, opens): (bool, bool),
 ) -> EntryClicks {
@@ -24048,7 +24074,11 @@ fn agenda_entry(
         if struck {
             shown = shown.strikethrough().color(weak);
         }
-        let label = ui.add(egui::Label::new(shown).truncate());
+        let label = if wraps {
+            ui.add(egui::Label::new(shown).wrap())
+        } else {
+            ui.add(egui::Label::new(shown).truncate())
+        };
         let sense = if opens {
             Sense::click()
         } else {
@@ -24278,7 +24308,7 @@ fn session_picks(
         let words = shown.texts.get(i).map(String::as_str).unwrap_or_default();
         let opens = shown.opens.get(i).copied().unwrap_or(false);
         let id = Id::new(("session pick", session, occurrence.key(), &pick.note_id));
-        let clicks = agenda_entry(
+        let clicks = agenda_pick(
             ui,
             tones,
             (id, words, 0),

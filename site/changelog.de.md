@@ -18,6 +18,10 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 - Das Flatpak wird nicht mehr angeboten; unter Linux gibt es das Tar-Archiv, das .deb, das AppImage oder Homebrew. ([obf-1151](https://github.com/paxel/oldbrainfix/issues/469))
 
+### Behoben
+
+- Auf der Agenda am Desktop brechen die Auswahlen einer Einheit in weitere Zeilen um, statt abgeschnitten zu werden. ([obf-1160](https://github.com/paxel/oldbrainfix/issues/480))
+
 ## [0.8.0] - 2026-11-25
 
 ### Neu
