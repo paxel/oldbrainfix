@@ -145,6 +145,26 @@ void main() {
       await reveal(tester, key('session-runs'));
       expect(find.text('Push-ups: done'), findsOneWidget);
     });
+
+    testWidgets('a past run names each pick without its tags or '
+        'Description (obf-1158)', (tester) async {
+      final pushUps = tally('Push-ups #sport\nSlowly down, quickly up');
+      final made = session([pushUps], count: 1);
+      DateTime wall(DateTime utc) => utc.toLocal();
+      sessions.pickToday(wall);
+      now = now.add(const Duration(days: 1));
+      sessions.pickToday(wall);
+      await start(tester);
+      await edit(tester, made.noteId);
+      await reveal(tester, key('session-runs'));
+      expect(
+        find.descendant(
+          of: key('session-run-0'),
+          matching: find.text('Push-ups: not done'),
+        ),
+        findsOneWidget,
+      );
+    });
   });
 
   group('where a Session starts', () {
@@ -704,6 +724,18 @@ void main() {
       await start(tester);
       expect(find.text('Push-ups 20 times ×3'), findsOneWidget);
       expect(find.text('Wall sit 30 times'), findsOneWidget);
+    });
+
+    testWidgets('a pick shows its name without tags and its targets, not '
+        'its Description (obf-1158)', (tester) async {
+      final pushUps = tally('Push-ups #sport\nSlowly down, quickly up');
+      final tagsOnly = tally('#sport', target: 30);
+      session([pushUps, tagsOnly]);
+      await start(tester);
+      expect(find.text('Push-ups 20 times'), findsOneWidget);
+      // Without words left it shows what its row shows.
+      expect(find.text('#sport 30 times'), findsOneWidget);
+      expect(find.textContaining('Slowly'), findsNothing);
     });
 
     testWidgets('today\'s row lists the picks with their targets; tapping one '

@@ -1300,3 +1300,82 @@ fn a_long_pick_on_the_agenda_wraps_instead_of_being_cut_off() -> TestResult {
     assert!(rect.height() > 30.0, "{rect:?}");
     Ok(())
 }
+
+#[test]
+fn a_pick_shows_only_its_name_without_tags_and_its_targets() -> TestResult {
+    // obf-1158: neither the tags of its first line nor its Description.
+    let device = device()?;
+    let store = &device.store;
+    let note = Notes::new(store).capture("Push-ups #sport\nSlowly down, quickly up", None, None)?;
+    Tallies::new(store).add_field(&note.id, "Push-ups", "times", Some(20.0), None)?;
+    let pool = vec![note.id];
+    Sessions::new(store).spawn(&device.sport, &daily()?, &pool, 1, SessionRule::Rolling)?;
+    let harness = window(store, None);
+    assert!(
+        harness
+            .query_all_by_role_and_label(Role::Button, "Push-ups 20 times")
+            .next()
+            .is_some()
+    );
+    assert!(
+        harness
+            .query_all_by_label_contains("#sport")
+            .next()
+            .is_none()
+    );
+    assert!(
+        harness
+            .query_all_by_label_contains("Slowly")
+            .next()
+            .is_none()
+    );
+    Ok(())
+}
+
+#[test]
+fn a_pick_named_only_by_tags_shows_them() -> TestResult {
+    // obf-1158: without words left, it shows what its row shows.
+    let device = device()?;
+    let store = &device.store;
+    let note = Notes::new(store).capture("#sport", None, None)?;
+    Tallies::new(store).add_field(&note.id, "Push-ups", "times", Some(20.0), None)?;
+    let pool = vec![note.id];
+    Sessions::new(store).spawn(&device.sport, &daily()?, &pool, 1, SessionRule::Rolling)?;
+    let harness = window(store, None);
+    assert!(
+        harness
+            .query_all_by_role_and_label(Role::Button, "#sport 20 times")
+            .next()
+            .is_some()
+    );
+    Ok(())
+}
+
+#[test]
+fn a_past_run_names_each_pick_without_tags_or_description() -> TestResult {
+    // obf-1158: as the pick showed, without its targets.
+    use oldbrainfix_core::sessions::keys;
+    let device = device()?;
+    let store = &device.store;
+    let note = Notes::new(store).capture("Push-ups #sport\nSlowly down, quickly up", None, None)?;
+    Tallies::new(store).add_field(&note.id, "Push-ups", "times", Some(20.0), None)?;
+    let rule = Recurrence::parse("FREQ=DAILY").map_err(|e| e.source)?;
+    let from = today().add_days(-1);
+    let schedule = Schedule::new(from, &[], Some(rule)).ok_or("a schedule")?;
+    let pool = vec![note.id.clone()];
+    let made =
+        Sessions::new(store).spawn(&device.sport, &schedule, &pool, 1, SessionRule::Rolling)?;
+    let yesterday = Occurrence::new(from, None);
+    store.append(
+        &made.routine.id,
+        &keys::pick(&yesterday),
+        Some(&note.id),
+        None,
+    )?;
+    let t = L10n::new("en");
+    let harness = window(store, Some(&device.sport));
+    // On its card, and on its page in the Note dialog.
+    let not_done = t.session_run_not_done("Push-ups");
+    assert_eq!(harness.query_all_by_label(&not_done).count(), 2);
+    Ok(())
+}

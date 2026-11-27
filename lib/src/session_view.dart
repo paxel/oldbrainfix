@@ -7,18 +7,17 @@ import 'l10n.dart';
 import 'tally_entry_screen.dart';
 import 'tally_view.dart';
 
-/// A Tally a Session picked, as its row on the Agenda shows it: its
-/// Note's text and the targets of its fields, each with the field's name
-/// when it has more than one ("Push-ups 20 times"), and ` ×N` for its N
-/// sets while above 1 (obf-1159).
+/// A Tally a Session picked, as its row on the Agenda shows it: its Name
+/// without its tags ([pickName], obf-1158) and the targets of its fields,
+/// each with the field's name when it has more than one ("Push-ups 20
+/// times"), and ` ×N` for its N sets while above 1 (obf-1159).
 String pickText(
   AppLocalizations t,
   SessionPick pick,
   UnitSystem system,
   String decimal,
 ) {
-  final note = pick.note;
-  final name = note == null ? t.noteGone : noteText(t, note);
+  final name = pickName(t, pick.note);
   final aimed = [
     for (final field in pick.tally?.shown ?? const <TallyField>[])
       if (field.target != null) field,
@@ -36,6 +35,27 @@ String pickText(
     null => '',
   };
   return targets.isEmpty ? '$name$times' : '$name ${targets.join(' · ')}$times';
+}
+
+/// The name a pick goes by (obf-1158): its Note's first line, the
+/// Tally's Name, as it reads without its tags and their marks; what its
+/// row shows ([noteText]) when no words are left of it, as the desktop's
+/// `pick_name`.
+String pickName(AppLocalizations t, Note? note) {
+  if (note == null) return t.noteGone;
+  final name = NoteKinds.name(note.shownText);
+  final kept = StringBuffer();
+  var at = 0;
+  for (final tag in TagTree.tagsIn(note.textFormat, name)) {
+    kept.write(name.substring(at, tag.start));
+    at = tag.end;
+  }
+  kept.write(name.substring(at));
+  final words = TextFormats.visible(
+    note.textFormat,
+    kept.toString(),
+  ).trim().split(RegExp(r'\s+')).join(' ');
+  return words.isEmpty ? noteText(t, note) : words;
 }
 
 /// Opens the entry form of [pick] of [today]: a new entry prefilled with
