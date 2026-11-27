@@ -102,7 +102,7 @@
 #   APT_SIGNING_KEY / APT_SIGNING_PASSPHRASE — the apt repository's key
 #                 (ASCII-armoured secret key) and its passphrase, read by
 #                 pages.yml, which the apt job starts; without them the
-#                 site has no /apt/ (steps: docs/agents/apt-repository.md)
+#                 site has no /apt/
 #
 # No Flatpak (obf-1151): Flathub's generative AI policy forbids
 # AI-written manifests and AI-opened pull requests, and this project is

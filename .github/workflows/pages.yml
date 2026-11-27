@@ -18,7 +18,7 @@ name: Pages
 # On a tag the site also carries the apt repository under /apt/
 # (obf-1153): tool/apt-repo.sh builds it from the .deb files of the
 # newest published Releases, signed with the key in the secrets
-# APT_SIGNING_KEY and APT_SIGNING_PASSPHRASE (docs/agents/apt-repository.md);
+# APT_SIGNING_KEY (the ASCII-armoured secret key) and APT_SIGNING_PASSPHRASE;
 # without them it skips with a notice and the site has no /apt/. A deploy
 # replaces the whole site, so every run builds the repository anew; the
 # earlier versions come back from their Releases. The tag's own .deb files
@@ -87,7 +87,7 @@ jobs:
           [ -n "$APT_SIGNING_KEY" ] || missing="$missing APT_SIGNING_KEY"
           [ -n "$APT_SIGNING_PASSPHRASE" ] || missing="$missing APT_SIGNING_PASSPHRASE"
           if [ -n "$missing" ]; then
-            echo "::notice title=Apt repository skipped::Missing repository secrets:$missing. The steps are in docs/agents/apt-repository.md."
+            echo "::notice title=Apt repository skipped::Missing repository secrets:$missing."
             exit 0
           fi
           sudo apt-get update
