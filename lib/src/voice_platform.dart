@@ -168,6 +168,15 @@ class Playback extends ValueNotifier<String?> {
   /// Keeps a chosen speed for the next start.
   final ValueChanged<double>? onSpeed;
 
+  /// The Note pages open now, for the playing bar to stay off the page
+  /// of the Note playing (obf-1155).
+  final pages = NotePages();
+
+  /// The Note whose recording plays, for the playing bar to name and
+  /// open (obf-1155); null while none plays or one plays of no Note yet.
+  String? get noteId => value == null ? null : _noteId;
+  String? _noteId;
+
   late final StreamSubscription<void> _ended;
 
   Playback({
@@ -180,14 +189,17 @@ class Playback extends ValueNotifier<String?> {
     _ended = voice.playbackEnded.listen((_) => value = null);
   }
 
-  /// Plays the recording [hash], or stops it when it is the one playing.
-  Future<void> toggle(String hash) async {
+  /// Plays the recording [hash] of the Note [noteId], or stops it when
+  /// it is the one playing.
+  Future<void> toggle(String hash, {String? noteId}) async {
     if (value == hash) return stop();
     final recording = bytes(hash);
     if (recording == null) return;
     // The player may not know the speed yet, as after a start.
     await voice.setSpeed(speed.value);
-    value = await voice.play(recording) ? hash : null;
+    final plays = await voice.play(recording);
+    _noteId = plays ? noteId : null;
+    value = plays ? hash : null;
   }
 
   /// Plays recordings at [rate] from now on, the one playing included,
@@ -210,8 +222,94 @@ class Playback extends ValueNotifier<String?> {
   void dispose() {
     unawaited(_ended.cancel());
     speed.dispose();
+    pages.dispose();
     super.dispose();
   }
+}
+
+/// The Note pages open, the editor's and the big screen's Note dialog,
+/// by their route (obf-1155).
+class NotePages extends ChangeNotifier {
+  final _open = <Route<dynamic>, String>{};
+  var _disposed = false;
+
+  /// The Note the page [route] shows, or null when it shows none.
+  String? noteOf(Route<dynamic> route) => _open[route];
+
+  void _shown(Route<dynamic> route, String noteId) {
+    if (_disposed) return;
+    _open[route] = noteId;
+    notifyListeners();
+  }
+
+  void _gone(Route<dynamic> route) {
+    if (_disposed || _open.remove(route) == null) return;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+}
+
+/// Tells the playing bar that [child] is the page of the Note [noteId],
+/// which shows its own stop button (obf-1155).
+class NotePageMark extends StatefulWidget {
+  /// Null while the page holds no Note yet, as Capture before it saves.
+  final String? noteId;
+  final Widget child;
+
+  const NotePageMark({super.key, required this.noteId, required this.child});
+
+  @override
+  State<NotePageMark> createState() => _NotePageMarkState();
+}
+
+class _NotePageMarkState extends State<NotePageMark> {
+  NotePages? _pages;
+  Route<dynamic>? _route;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _pages = VoiceScope.playbackOf(context)?.pages;
+    // Called again as the page is covered or uncovered.
+    _route = ModalRoute.of(context);
+    _tell();
+  }
+
+  @override
+  void didUpdateWidget(NotePageMark old) {
+    super.didUpdateWidget(old);
+    if (old.noteId != widget.noteId) _tell();
+  }
+
+  @override
+  void dispose() {
+    final (pages, route) = (_pages, _route);
+    if (pages != null && route != null) {
+      // Not while the tree is built: the bar is built anew.
+      WidgetsBinding.instance.addPostFrameCallback((_) => pages._gone(route));
+    }
+    super.dispose();
+  }
+
+  /// Tells the pages after this frame, as the bar may not be built anew
+  /// while the tree is.
+  void _tell() => WidgetsBinding.instance.addPostFrameCallback((_) {
+    final (pages, route, noteId) = (_pages, _route, widget.noteId);
+    if (!mounted || pages == null || route == null) return;
+    if (noteId == null) {
+      pages._gone(route);
+    } else {
+      pages._shown(route, noteId);
+    }
+  });
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 /// Hands the app's [VoicePlatform] and its [Playback] down to every
@@ -248,9 +346,18 @@ class VoiceScope extends InheritedWidget {
 /// card, a labelled one in the editor when [compact] is false.
 class RecordingButton extends StatelessWidget {
   final String hash;
+
+  /// The Note the recording is shown in, for the playing bar (obf-1155);
+  /// null for one of no Note yet.
+  final String? noteId;
   final bool compact;
 
-  const RecordingButton({super.key, required this.hash, this.compact = true});
+  const RecordingButton({
+    super.key,
+    required this.hash,
+    required this.noteId,
+    this.compact = true,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -264,7 +371,7 @@ class RecordingButton extends StatelessWidget {
       builder: (context, playing, _) {
         final on = playing == hash;
         final icon = Icon(on ? Icons.stop : Icons.play_arrow);
-        void onPressed() => unawaited(playback.toggle(hash));
+        void onPressed() => unawaited(playback.toggle(hash, noteId: noteId));
         // The speed goes under the button where both do not fit.
         return Wrap(
           spacing: 4,

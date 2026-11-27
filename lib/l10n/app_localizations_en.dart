@@ -1455,6 +1455,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get stopPlaying => 'Stop';
 
   @override
+  String get privateRecording => 'Private recording';
+
+  @override
   String get microphoneExplainTitle => 'Use the microphone?';
 
   @override

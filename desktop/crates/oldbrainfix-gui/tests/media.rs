@@ -1063,6 +1063,114 @@ fn open_newest(harness: &mut Harness<'_, App>) {
 }
 
 #[test]
+fn a_recording_plays_on_after_its_note_closes_and_the_bar_on_top_stops_it() -> TestResult {
+    let store = empty_store()?;
+    let devices: Shared = Rc::default();
+    let mut harness = window(store, &devices);
+    record_note(&mut harness, &devices);
+    let garage = harness
+        .state()
+        .selected_note()
+        .ok_or("Garage open")?
+        .to_string();
+    harness
+        .get_all_by_label("Play the voice recording")
+        .last()
+        .ok_or("the dialog's play button")?
+        .click();
+    harness.run_steps(3);
+    // In its own dialog only its own stop button shows (obf-1155).
+    assert_eq!(harness.query_all_by_label("Stop").count(), 1);
+    harness.state_mut().close_note();
+    harness.run_steps(3);
+    assert!(devices.borrow().playing, "it plays on");
+    // The bar at the top: the Note's name beside Stop.
+    let stop = harness.get_by_label("Stop").rect();
+    let name = harness
+        .query_all_by_label("Garage")
+        .find(|n| (n.rect().center().y - stop.center().y).abs() < 8.0)
+        .ok_or("the Note's name in the bar")?;
+    let top = name.rect().top();
+    assert!(top < 80.0, "at the top, under the menu bar: {top}");
+    // A click on the name opens the Note, where the bar goes.
+    name.click();
+    harness.run_steps(3);
+    assert_eq!(harness.state().selected_note(), Some(garage.as_str()));
+    assert_eq!(harness.query_all_by_label("Stop").count(), 1);
+    harness.state_mut().close_note();
+    harness.run_steps(3);
+    let stopped = devices.borrow().stopped;
+    harness.get_by_label("Stop").click();
+    harness.run_steps(3);
+    assert_eq!(devices.borrow().stopped, stopped + 1);
+    assert!(!devices.borrow().playing);
+    assert!(harness.query_by_label("Stop").is_none(), "the bar went");
+    Ok(())
+}
+
+#[test]
+fn the_bar_on_top_keeps_stop_beside_a_long_name() -> TestResult {
+    let store = empty_store()?;
+    let devices: Shared = Rc::default();
+    let mut harness = window(store.clone(), &devices);
+    devices.borrow_mut().mic = true;
+    let long = "Garage ".repeat(60);
+    let id = Notes::new(&store).capture(long.trim(), None, None)?.id;
+    harness.state_mut().select_note(&id);
+    harness.run();
+    harness.get_by_label("Voice").click();
+    harness.run();
+    harness.get_by_label("Stop").click();
+    harness.run();
+    harness
+        .get_all_by_label("Play the voice recording")
+        .last()
+        .ok_or("the dialog's play button")?
+        .click();
+    harness.run_steps(3);
+    harness.state_mut().close_note();
+    harness.run_steps(3);
+    let stop = harness.get_by_label("Stop").rect();
+    assert!(stop.right() <= 1280.0, "in the window: {stop:?}");
+    let name = harness
+        .query_all_by(|n| {
+            // A shortened label tells its words as its value.
+            n.label()
+                .or_else(|| n.value())
+                .is_some_and(|l| l.starts_with("Garage Garage"))
+        })
+        .find(|n| (n.rect().center().y - stop.center().y).abs() < 8.0)
+        .ok_or("the Note's name in the bar")?
+        .rect();
+    assert!(!name.intersects(stop), "{name:?} over {stop:?}");
+    harness.get_by_label("Stop").click();
+    harness.run_steps(3);
+    assert!(!devices.borrow().playing);
+    Ok(())
+}
+
+#[test]
+fn the_bar_on_top_goes_once_the_recording_played_to_its_end() -> TestResult {
+    let store = empty_store()?;
+    let devices: Shared = Rc::default();
+    let mut harness = window(store, &devices);
+    record_note(&mut harness, &devices);
+    harness
+        .get_all_by_label("Play the voice recording")
+        .last()
+        .ok_or("the dialog's play button")?
+        .click();
+    harness.run_steps(3);
+    harness.state_mut().close_note();
+    harness.run_steps(3);
+    assert!(harness.query_by_label("Stop").is_some());
+    devices.borrow_mut().playing = false;
+    harness.run_steps(3);
+    assert!(harness.query_by_label("Stop").is_none());
+    Ok(())
+}
+
+#[test]
 fn the_playback_speed_changes_what_plays_and_stays_on_this_device() -> TestResult {
     let dir = tempfile::tempdir()?;
     let devices: Shared = Rc::default();

@@ -16,6 +16,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - Debian and Ubuntu can install the desktop app from an apt repository and get each new version with their updates. ([obf-1153](https://github.com/paxel/oldbrainfix/issues/471))
 - Return on a line starting with a box (☐, ✅ or ❌) puts an open ☐ on the next line; twice ends the boxes. ([obf-1154](https://github.com/paxel/oldbrainfix/issues/474))
 - Topics get an icon in their Area's colour, picked from about 60 icons; Areas pick from 18 colours, each readable in light and dark. ([obf-1156](https://github.com/paxel/oldbrainfix/issues/476))
+- While a recording plays, a bar at the top of every screen names its Note, opens it with a tap, and stops it. ([obf-1155](https://github.com/paxel/oldbrainfix/issues/475))
 
 ### Changed
 

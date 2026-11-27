@@ -1465,6 +1465,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get stopPlaying => 'Anhalten';
 
   @override
+  String get privateRecording => 'Private Aufnahme';
+
+  @override
   String get microphoneExplainTitle => 'Mikrofon verwenden?';
 
   @override

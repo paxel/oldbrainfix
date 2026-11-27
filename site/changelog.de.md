@@ -15,6 +15,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Debian und Ubuntu können die Desktop-App aus einem apt-Repository installieren und bekommen jede neue Version mit ihren Updates. ([obf-1153](https://github.com/paxel/oldbrainfix/issues/471))
 - Die Eingabetaste in einer Zeile mit einem Statuskästchen (☐, ✅ oder ❌) vorn setzt ein offenes ☐ in die nächste; zweimal beendet die Kästchen. ([obf-1154](https://github.com/paxel/oldbrainfix/issues/474))
 - Themen bekommen ein Symbol in der Farbe ihres Bereichs, aus rund 60 Symbolen; Bereiche wählen aus 18 Farben, jede hell und dunkel gut lesbar. ([obf-1156](https://github.com/paxel/oldbrainfix/issues/476))
+- Während eine Aufnahme spielt, nennt eine Leiste oben auf jeder Seite ihre Notiz, öffnet sie per Tippen und hält sie an. ([obf-1155](https://github.com/paxel/oldbrainfix/issues/475))
 
 ### Geändert
 

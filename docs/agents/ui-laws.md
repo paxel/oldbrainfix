@@ -286,6 +286,19 @@ There are three kinds, and an action takes the first that fits.
   third button.
 - An answer to a form field (name taken, not a code) is that field's
   own error text, red, under the field.
+- **The playing bar is no announcement** (obf-1155): while a recording
+  plays, and its Note is left, every screen shows a slim bar at the
+  top, under the status bar (on the desktop under the menu bar, and at
+  the top of a dialog where its announcements go), pushing the page
+  down; never at the bottom. It holds the Note's name, its first line
+  as rows show it, whose tap opens the Note, and Stop. A recording of a
+  closed locked Area, or any behind the App Lock, reads "Private
+  recording", and the tap asks to unlock first. It goes once the
+  recording ends or stops, and does not show on the page or dialog of
+  the Note playing, where its own stop button is. It stacks: the bar
+  stays on top and the one announcement shows under it, both pushing
+  the page down. Phone: `PlayingBar` in `playing_bar.dart`. Desktop:
+  `playing_bar` in `app.rs`.
 
 ### Capture
 

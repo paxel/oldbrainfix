@@ -369,6 +369,7 @@
   "voiceRecording": "Sprachaufnahme",
   "playRecording": "Sprachaufnahme abspielen",
   "stopPlaying": "Anhalten",
+  "privateRecording": "Private Aufnahme",
   "microphoneExplainTitle": "Mikrofon verwenden?",
   "microphoneExplainBody": "Sprachnotizen nehmen auf, was du sagst – so bleibt ein Gedanke erhalten, bevor er weg ist. Old Brain Fix nutzt das Mikrofon nur, während du aufnimmst. Die Aufnahme geht nur dorthin, wohin ihre Notiz geht: auf deine eigenen Geräte und zu den Menschen eines geteilten Bereichs, in dem du die Notiz ablegst. Sonst zu niemandem.",
   "microphoneMissing": "Sprachnotizen brauchen das Mikrofon.",

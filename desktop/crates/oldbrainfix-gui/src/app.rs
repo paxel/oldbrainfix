@@ -2491,6 +2491,9 @@ pub struct App {
     player: Option<Box<dyn Player>>,
     /// The recording playing, by its hash.
     playing: Option<String>,
+    /// The Note whose recording plays, for the playing bar (obf-1155);
+    /// set with [`App::playing`] as it starts.
+    playing_note: Option<String>,
     /// How fast recordings play, 1 being normal speed; a Device setting.
     speed: f64,
     /// The recordings that ended, held on the capture field until its
@@ -3185,6 +3188,7 @@ impl App {
             recorder: None,
             player: None,
             playing: None,
+            playing_note: None,
             speed,
             recorded: Vec::new(),
             recording_into: None,
@@ -9244,6 +9248,9 @@ impl App {
                     && player.play(bytes)
                 {
                     self.playing = Some(hash);
+                    // Played in the Note dialog or a Note's window, of the
+                    // Note it shows.
+                    self.playing_note = self.view.detail.as_ref().map(|(p, _)| p.note.id.clone());
                 }
             }
             Action::Speed(speed) => {
@@ -11900,6 +11907,7 @@ impl App {
         swap(&mut self.recorder, &mut to.recorder);
         swap(&mut self.player, &mut to.player);
         swap(&mut self.playing, &mut to.playing);
+        swap(&mut self.playing_note, &mut to.playing_note);
         swap(&mut self.clipboard, &mut to.clipboard);
         swap(&mut self.transcriber, &mut to.transcriber);
         swap(&mut self.reader, &mut to.reader);
@@ -15113,10 +15121,73 @@ impl App {
             });
     }
 
+    /// While a recording plays, the slim bar at the top, above the
+    /// announcement, wherever announcements show (obf-1155, UI laws "The
+    /// playing bar"): its Note's name, a click on it opening the Note, and
+    /// Stop. Not over the Note it is of, whose own stop button shows.
+    fn playing_bar(&self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
+        let Some(hash) = self.playing.clone() else {
+            return;
+        };
+        let note = self.playing_note.as_deref();
+        let shown = self.view.detail.as_ref().map(|(p, _)| p.note.id.as_str());
+        if note.is_some() && note == shown {
+            return;
+        }
+        let t = self.t;
+        let found = note.and_then(|id| Notes::new(&self.store).by_id(id).ok().flatten());
+        let name = match &found {
+            Some(note) => match note.shown_name() {
+                name if name.is_empty() => {
+                    l10n::wordless(&t, note.wordless(), &note.wordless_name())
+                }
+                name => name.lines().next().unwrap_or_default().to_string(),
+            },
+            None => t.voice_recording().to_string(),
+        };
+        egui::Panel::top("playing bar")
+            .frame(
+                Frame::NONE
+                    .inner_margin(Margin::symmetric(12, 6))
+                    .fill(tones.card),
+            )
+            .show(ui, |ui| {
+                let colour = ui.visuals().text_color();
+                // Stop first, so a long name leaves it room.
+                let (said, stop) = egui::containers::Sides::new()
+                    .shrink_left()
+                    .truncate()
+                    .show(
+                        ui,
+                        |ui| {
+                            let label = egui::Label::new(RichText::new(name).color(colour))
+                                .sense(egui::Sense::click());
+                            ui.add(label)
+                                .on_hover_cursor(egui::CursorIcon::PointingHand)
+                        },
+                        |ui| design::text_button(ui, icons::STOP, t.stop_playing()),
+                    );
+                if stop.clicked() {
+                    actions.push(Action::Play(hash));
+                }
+                if let Some(id) = note
+                    && said.clicked()
+                {
+                    // Over a page, the Note dialog shows only once it is
+                    // closed.
+                    if !self.pages.is_empty() {
+                        actions.push(Action::ClosePage);
+                    }
+                    actions.push(Action::FollowLink(AppLink::Note(id.to_string())));
+                }
+            });
+    }
+
     /// The one announcement at the top (UI laws, "Announcements"), the
     /// most pressing first: of the window, or of the dialog shown over it
     /// (#145).
     fn announcements(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
+        self.playing_bar(ui, tones, actions);
         if self.made_hidden_shows(ui) {
             // A Note made that the filter hides, back in its list
             // (obf-1070), before what waits; the click shows it.

@@ -2258,6 +2258,12 @@ abstract class AppLocalizations {
   /// **'Stop'**
   String get stopPlaying;
 
+  /// The playing bar at the top in place of the Note's name while the recording playing is of a locked Area or the App Lock is locked (obf-1155).
+  ///
+  /// In en, this message translates to:
+  /// **'Private recording'**
+  String get privateRecording;
+
   /// No description provided for @microphoneExplainTitle.
   ///
   /// In en, this message translates to:
