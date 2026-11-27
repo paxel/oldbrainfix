@@ -403,12 +403,13 @@ void main() {
         'kg',
         'rounds',
       ]);
-      expect(tallies.byNote(note)!.countsInSets, isFalse);
+      expect(tallies.byNote(note)!.sets, 1);
       // As #200 wrote it: Rounds multiplies Reps.
       ann.append(note, TallyKeys.field(rounds, TallyKeys.multiplies), reps);
       final entry = tallies.add(note, values: {reps: 20, kg: 60, rounds: 3});
       final read = tallies.byNote(note)!;
-      expect(read.countsInSets, isTrue);
+      // As many sets as its newest entry holds (obf-1159).
+      expect(read.sets, 3);
       final row = {reps: 20.0, kg: 60.0};
       expect(read.setsOf(entry), [row, row, row]);
       expect(read.counted(entry, reps), 60);
@@ -426,12 +427,12 @@ void main() {
         expect(read.setsOf(e), hasLength(count), reason: '$times');
       }
       // Switched off, the entries keep their sets.
-      tallies.setCountsInSets(note, false);
+      tallies.setSets(note, 1);
       final off = tallies.byNote(note)!;
       expect(off.countsInSets, isFalse);
       expect(off.counted(entry, reps), 60);
       // Changed with its sets, it holds them itself.
-      tallies.setCountsInSets(note, true);
+      tallies.setSets(note, 2);
       tallies.editEntry(
         entry.id,
         more: [
@@ -449,8 +450,9 @@ void main() {
     test('sets are rows, each field totalling by its rule', () {
       final tallies = Tallies(ann);
       final (note, [reps, kg]) = tally(ann, 'Bench', ['reps', 'kg']);
-      tallies.setCountsInSets(note, true);
+      tallies.setSets(note, 3);
       expect(ann.current(note, TallyKeys.sets), 'true');
+      expect(ann.current(note, TallyKeys.setCount), '3');
       final entry = tallies.add(
         note,
         values: {reps: 10, kg: 60},
@@ -580,6 +582,77 @@ void main() {
       for (final key in ['v1:a', 'v02:a', 'v100:a', 'v2:', 'vx:a', 'va']) {
         expect(TallyKeys.valueOf(key), isNull, reason: key);
       }
+    });
+
+    test('a Tally holds its number of sets beside the switch', () {
+      final tallies = Tallies(ann);
+      final (note, [reps]) = tally(ann, 'Bench', ['reps']);
+      int sets() => tallies.byNote(note)!.sets;
+      expect(sets(), 1);
+      expect(ann.current(note, TallyKeys.setCount), isNull);
+      tallies.setSets(note, 3);
+      expect(sets(), 3);
+      expect(ann.current(note, TallyKeys.setCount), '3');
+      expect(ann.current(note, TallyKeys.sets), 'true');
+      // Only what differs is written.
+      final written = ann.history(note).length;
+      tallies.setSets(note, 3);
+      expect(ann.history(note), hasLength(written));
+      // A new number writes the switch too, though it holds it, so the
+      // two keep together where Devices merge them.
+      tallies.setSets(note, 5);
+      expect(ann.history(note), hasLength(written + 2));
+      tallies.setSets(note, 1);
+      expect(ann.current(note, TallyKeys.sets), 'false');
+      expect(ann.history(note), hasLength(written + 4));
+      expect(() => tallies.setSets(note, 0), throwsArgumentError);
+      expect(
+        () => tallies.setSets(note, TallyKeys.maxSets + 1),
+        throwsArgumentError,
+      );
+      tallies.setSets(note, 4);
+      // An older app switches only `tally:sets`: off, the number no
+      // longer counts; on again, it does.
+      ann.append(note, TallyKeys.sets, 'false');
+      expect(sets(), 1);
+      ann.append(note, TallyKeys.sets, 'true');
+      expect(sets(), 4);
+      // Switched on with the number at 1, it reads as its newest entry.
+      tallies.setSets(note, 1);
+      ann.append(note, TallyKeys.sets, 'true');
+      expect(sets(), 2, reason: 'no entry: 2');
+      tallies.add(
+        note,
+        values: {reps: 10},
+        more: [
+          for (var i = 0; i < 3; i++) {reps: 8},
+        ],
+        at: DateTime.utc(2026, 1, 1, 7),
+      );
+      expect(sets(), 4);
+      // A newer entry of one set reads as 2 at least; one removed as none.
+      final newer = tallies.add(
+        note,
+        values: {reps: 5},
+        at: DateTime.utc(2026, 1, 2, 7),
+      );
+      expect(sets(), 2);
+      tallies.trashEntry(newer.id);
+      expect(sets(), 4);
+      // An entry for an earlier day, though written later, does not count.
+      tallies.add(note, values: {reps: 5}, at: DateTime.utc(2025, 12, 1, 7));
+      expect(sets(), 4);
+      // Anything but 1 to 99 without a leading zero reads as absent.
+      for (final odd in ['0', '03', '100', '+3', ' 3', '3 ', '', 'x']) {
+        ann.append(note, TallyKeys.setCount, odd);
+        expect(sets(), 4, reason: '"$odd"');
+      }
+      ann.append(note, TallyKeys.setCount, '99');
+      expect(sets(), 99);
+      // Without the switch, the number alone counts.
+      ann.append(note, TallyKeys.sets, null);
+      ann.append(note, TallyKeys.setCount, '5');
+      expect(sets(), 5);
     });
 
     test('settings the cores read as no multiplier', () {

@@ -55,7 +55,8 @@ pub fn read(
                     .filter(|b| b.start <= today && today <= b.end)
                     .and_then(|b| b.value)
                     .unwrap_or(0.0);
-                lines.push(field_line(t, field, total, system, decimal));
+                let times = tally_view::sets_times(t, &tally);
+                lines.push(field_line(t, (field, &times), total, system, decimal));
             }
             glances.insert(id.clone(), lines);
         } else if let Some(setup) = sessions.setup_of(id)? {
@@ -98,20 +99,24 @@ pub fn read(
     Ok(glances)
 }
 
-/// `field`'s `total` today against its target.
+/// `field`'s `total` today against its target, with `times`, the
+/// Tally's ` ×N` (obf-1159), after it.
 fn field_line(
     t: &L10n,
-    field: &TallyField,
+    (field, times): (&TallyField, &str),
     total: f64,
     system: UnitSystem,
     decimal: &str,
 ) -> String {
     match field.target {
-        Some(target) => t.tally_card_total(
-            &field.name,
-            &typed_value(Some(total), &field.unit, system, decimal),
-            &shown_value(target, &field.unit, system, decimal),
-        ),
+        Some(target) => {
+            let target = shown_value(target, &field.unit, system, decimal);
+            t.tally_card_total(
+                &field.name,
+                &typed_value(Some(total), &field.unit, system, decimal),
+                &format!("{target}{times}"),
+            )
+        }
         None => t.tally_card_total_only(
             &field.name,
             &shown_value(total, &field.unit, system, decimal),

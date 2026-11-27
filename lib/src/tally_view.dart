@@ -91,6 +91,11 @@ String tallyPeriodName(AppLocalizations t, TallyPeriod period) =>
 /// [CardTally.shownEntries].
 String tallyEntriesShownSetting(String noteId) => 'tallyEntriesShown:$noteId';
 
+/// ` ×N` after a Tally's targets, its number of sets N (obf-1159), while
+/// above 1; empty otherwise.
+String tallySetsTimes(AppLocalizations t, Tally tally) =>
+    tally.countsInSets ? ' ${t.tallySetsTimes(tally.sets)}' : '';
+
 /// The person filter a Tally of [noteId] counts by unless one is picked:
 /// the user's own entries in a Shared Area (ADR 0028), everyone's, which
 /// are the user's own too, elsewhere. The compact view's totals and the
@@ -187,30 +192,31 @@ class _TallySetupState extends State<TallySetup> with ReloadsOnLogChange {
     },
   ).then((_) => mounted ? setState(_load) : null);
 
-  /// Whether it counts in sets: a dialog with the switch, written at once.
+  /// How many sets a new entry starts with (obf-1159): a dialog with a
+  /// stepper, each step written at once.
   Future<void> _pickSets(Tally tally) => showDialog<void>(
     context: context,
     builder: (context) {
       final t = context.t;
       return BadgeDialog(
-        setting: t.tallyCountsInSets,
+        setting: t.tallySets,
         icon: Icons.repeat,
-        content: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(t.tallyCountsInSetsDetail),
-            const SizedBox(height: 8),
-            BadgeSwitch(
-              key: const ValueKey('tally-sets'),
-              setting: t.tallyCountsInSets,
-              on: tally.countsInSets,
-              toggle: () => _tallies.setCountsInSets(
-                widget.noteId,
-                !(_tallies.byNote(widget.noteId)?.countsInSets ?? false),
+        content: StatefulBuilder(
+          builder: (context, setDialogState) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(t.tallySetsDetail),
+              const SizedBox(height: 8),
+              CountStepper(
+                key: const ValueKey('tally-sets'),
+                value: _tallies.byNote(widget.noteId)?.sets ?? tally.sets,
+                max: TallyKeys.maxSets,
+                onChanged: (sets) =>
+                    setDialogState(() => _tallies.setSets(widget.noteId, sets)),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     },
@@ -287,7 +293,8 @@ class _TallySetupState extends State<TallySetup> with ReloadsOnLogChange {
                   icon: Icons.flag_outlined,
                   value: target == null
                       ? t.tallyNoTarget
-                      : shownValue(target, field.unit, _system, decimal),
+                      : '${shownValue(target, field.unit, _system, decimal)}'
+                            '${tallySetsTimes(t, tally)}',
                   onTap: open == null ? null : (_) => open(),
                 ),
               if (field.hidden)
@@ -339,10 +346,9 @@ class _TallySetupState extends State<TallySetup> with ReloadsOnLogChange {
                   ),
                   SettingBadge(
                     key: const ValueKey('tally-setup-sets'),
-                    setting: t.tallyCountsInSets,
+                    setting: t.tallySets,
                     icon: Icons.repeat,
-                    value: tally.countsInSets ? t.settingOn : t.settingOff,
-                    valueIcon: switchIcon(tally.countsInSets),
+                    value: '${tally.sets}',
                     onTap: changes ? (_) => _pickSets(tally) : null,
                   ),
                 ],
@@ -570,8 +576,10 @@ class _CardTallyState extends State<CardTally> {
   }
 
   /// What [entry] holds for the fields shown (#264): the Check fields it
-  /// ticks, then its sets, each a line of its values one after the other,
-  /// numbered while there are several ("1. Weight 60 kg · Reps 10").
+  /// ticks, then how many sets it holds of the Tally's number while fewer
+  /// ("2/3 sets", obf-1159), then its sets, each a line of its values one
+  /// after the other, numbered while there are several ("1. Weight 60 kg
+  /// · Reps 10").
   List<String> _values(Tally tally, TallyEntry entry, String decimal) {
     final ticked = [
       for (final field in tally.checks)
@@ -585,8 +593,13 @@ class _CardTallyState extends State<CardTally> {
               '${field.name} ${shownValue(value, field.unit, _system, decimal)}',
         ].join(' · '),
     ].where((line) => line.isNotEmpty).toList();
+    // One holding no number, only ticks or a line, says nothing of its
+    // sets.
+    final held = tally.setsOf(entry).length;
     return [
       if (ticked.isNotEmpty) ticked.join(' · '),
+      if (held > 0 && held < tally.sets)
+        context.t.tallyEntrySets(held, tally.sets),
       if (sets.length == 1)
         sets.single
       else

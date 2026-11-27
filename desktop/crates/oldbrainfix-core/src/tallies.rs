@@ -44,6 +44,26 @@ pub mod keys {
     /// Tally's Note; absent, it does while a field counts sets as a
     /// multiplier did (#264).
     pub const SETS: &str = "tally:sets";
+    /// How many sets an entry of the Tally starts with, its target
+    /// (obf-1159): `1` to `99`, written without a leading zero, on the
+    /// Tally's Note beside [`SETS`], which says whether it is above 1 for
+    /// an older app. It counts only while [`SETS`] is absent or agrees
+    /// with it; otherwise, or while absent or anything else, the Tally
+    /// reads as [`SETS`] says: one that counts in sets as many as its
+    /// newest entry holds, at least 2.
+    pub const SET_COUNT: &str = "tally:setCount";
+
+    /// `value` as a number of sets, `1` to `99` without a leading zero,
+    /// or `None`.
+    pub fn set_count_of(value: Option<&str>) -> Option<usize> {
+        let value = value?;
+        let bytes = value.as_bytes();
+        let digits = bytes.iter().all(u8::is_ascii_digit);
+        if !digits || bytes.len() > 2 || bytes.first().is_none_or(|b| *b == b'0') {
+            return None;
+        }
+        value.parse().ok()
+    }
     /// How many sets an entry holds at most.
     pub const MAX_SETS: usize = 99;
 
@@ -145,11 +165,17 @@ pub struct Tally {
     pub fields: Vec<TallyField>,
     /// How long a bar of its charts is; its targets count per bar (#264).
     pub bar: TallyPeriod,
-    /// Whether its entry form has "+ Set" (#264).
-    pub counts_in_sets: bool,
+    /// How many sets an entry starts with, its target (obf-1159): 1 for
+    /// a Tally without sets.
+    pub sets: usize,
 }
 
 impl Tally {
+    /// Whether it counts in sets: its entry form has "Add set" (#264).
+    pub fn counts_in_sets(&self) -> bool {
+        self.sets > 1
+    }
+
     /// The fields that show: those not hidden.
     pub fn shown(&self) -> Vec<&TallyField> {
         self.fields.iter().filter(|f| !f.hidden).collect()
@@ -405,7 +431,7 @@ impl<'a> Tallies<'a> {
             note_id: note_id.to_string(),
             fields,
             bar: TallyPeriod::Day,
-            counts_in_sets: false,
+            sets: 1,
         }
         .multiplied();
         tally.bar = shape
@@ -413,10 +439,21 @@ impl<'a> Tallies<'a> {
             .as_deref()
             .and_then(TallyPeriod::parse)
             .unwrap_or(TallyPeriod::Day);
-        tally.counts_in_sets = match shape.sets.as_deref() {
-            Some("true") => true,
-            Some("false") => false,
-            _ => tally.fields.iter().any(|f| f.multiplies.is_some()),
+        let count = keys::set_count_of(shape.set_count.as_deref());
+        let on = match shape.sets.as_deref() {
+            Some("true") => Some(true),
+            Some("false") => Some(false),
+            _ => None,
+        };
+        tally.sets = match count {
+            Some(count) if on.is_none_or(|on| on == (count > 1)) => count,
+            _ if on.unwrap_or_else(|| tally.fields.iter().any(|f| f.multiplies.is_some())) => {
+                match self.newest()?.get(note_id) {
+                    Some(entry) => tally.sets_of(entry).len().clamp(2, keys::MAX_SETS),
+                    None => 2,
+                }
+            }
+            _ => 1,
         };
         Ok(Some(tally))
     }
@@ -575,19 +612,35 @@ impl<'a> Tallies<'a> {
     /// Sets how long a bar of the charts of the Tally of `note_id` is
     /// (#264), on its Note; its targets count per bar.
     pub fn set_bar(&self, note_id: &str, bar: TallyPeriod) -> Result<()> {
-        self.set_on_tally(note_id, keys::BAR, bar.name())
+        self.set_on_tally(note_id, keys::BAR, bar.name(), false)
     }
 
-    /// Switches whether the Tally of `note_id` counts in sets (#264): its
-    /// entry form has "+ Set" then. The entries keep their sets either
-    /// way.
-    pub fn set_counts_in_sets(&self, note_id: &str, on: bool) -> Result<()> {
-        self.set_on_tally(note_id, keys::SETS, if on { "true" } else { "false" })
+    /// Sets how many sets an entry of the Tally of `note_id` starts with
+    /// (obf-1159), 1 to [`keys::MAX_SETS`]: above 1 its entry form has
+    /// "Add set". Writes the number unless it holds that already, and
+    /// whether it is above 1, for an older app, with a new number always,
+    /// so the two keep together where Devices merge them, else unless it
+    /// holds that already. The entries keep their sets either way.
+    pub fn set_sets(&self, note_id: &str, sets: usize) -> Result<()> {
+        if !(1..=keys::MAX_SETS).contains(&sets) {
+            return Err(Error::Invalid(format!(
+                "not 1 to {} sets: {sets}",
+                keys::MAX_SETS
+            )));
+        }
+        let count = sets.to_string();
+        self.store.batch(|| {
+            let held = self.store.current(note_id, keys::SET_COUNT)?;
+            let changed = held.as_deref() != Some(count.as_str());
+            self.set_on_tally(note_id, keys::SET_COUNT, &count, false)?;
+            let on = if sets > 1 { "true" } else { "false" };
+            self.set_on_tally(note_id, keys::SETS, on, changed)
+        })
     }
 
     /// Writes `value` under `key` on the Note of the Tally `note_id`,
-    /// unless it holds that already.
-    fn set_on_tally(&self, note_id: &str, key: &str, value: &str) -> Result<()> {
+    /// unless it holds that already and not `always`.
+    fn set_on_tally(&self, note_id: &str, key: &str, value: &str, always: bool) -> Result<()> {
         let note = Notes::new(self.store).by_id(note_id)?;
         let in_lists = note.is_some_and(|n| !n.is_trashed() && !n.is_merged());
         if self.by_note(note_id)?.is_none() || !in_lists {
@@ -598,7 +651,7 @@ impl<'a> Tallies<'a> {
         if !self.store.may_change(note_id)? {
             return Err(Error::Invalid(format!("may not change {note_id}")));
         }
-        if self.store.current(note_id, key)?.as_deref() == Some(value) {
+        if !always && self.store.current(note_id, key)?.as_deref() == Some(value) {
             return Ok(());
         }
         self.store.append(note_id, key, Some(value), None).map(drop)
@@ -1003,20 +1056,29 @@ impl<'a> Tallies<'a> {
             for (note, mut on) in holders {
                 on.sort_by(|a, b| utf16_cmp(a, b));
                 let mut fields = Vec::new();
-                let (mut bar, mut sets) = (None, None);
+                let (mut bar, mut sets, mut set_count) = (None, None, None);
                 for holder in &on {
                     let current = self.store.current_fields(holder)?;
                     fields.extend(self.fields_on(holder, &current)?);
                     if *holder == note {
                         bar = current.get(keys::BAR).map(str::to_string);
                         sets = current.get(keys::SETS).map(str::to_string);
+                        set_count = current.get(keys::SET_COUNT).map(str::to_string);
                     }
                 }
                 if fields.is_empty() {
                     continue;
                 }
                 fields.sort_by(|a, b| a.added.cmp(&b.added).then_with(|| utf16_cmp(&a.id, &b.id)));
-                shapes.insert(note, Shape { fields, bar, sets });
+                shapes.insert(
+                    note,
+                    Shape {
+                        fields,
+                        bar,
+                        sets,
+                        set_count,
+                    },
+                );
             }
             Ok(shapes)
         })
@@ -1089,6 +1151,36 @@ impl<'a> Tallies<'a> {
         })
     }
 
+    /// The newest entry not removed of each Tally, by the Note it shows
+    /// under, as [`Tallies::entries`] orders them (obf-1159): every entry
+    /// read in one query, kept until the log changes, as the Dart core's
+    /// `_newest`.
+    fn newest(&self) -> Result<Arc<HashMap<String, TallyEntry>>> {
+        self.store.worked_out("tallies:newest", || {
+            let shown_under = self.shown_under()?;
+            let mut newest: HashMap<String, TallyEntry> = HashMap::new();
+            for (id, fields) in self.store.current_fields_of_type(keys::TYPE_ENTRY)? {
+                let Some(entry) = Self::entry_from(&id, &fields) else {
+                    continue;
+                };
+                if entry.is_trashed() {
+                    continue;
+                }
+                let under = shown_under
+                    .get(&entry.note_id)
+                    .cloned()
+                    .unwrap_or_else(|| entry.note_id.clone());
+                let newer = newest
+                    .get(&under)
+                    .is_none_or(|held| newest_first(&entry, held).is_lt());
+                if newer {
+                    newest.insert(under, entry);
+                }
+            }
+            Ok(newest)
+        })
+    }
+
     /// Every Note with a field of a Tally on it, by the Note it shows
     /// under: itself, or the one it was merged into. Kept until the log
     /// changes (#216).
@@ -1122,11 +1214,13 @@ impl<'a> Tallies<'a> {
 }
 
 /// A Tally as its Notes hold it, read without its entries: its fields,
-/// and its bar length and sets switch as stored on its own Note.
+/// and its bar length, sets switch and number of sets as stored on its
+/// own Note.
 struct Shape {
     fields: Vec<TallyField>,
     bar: Option<String>,
     sets: Option<String>,
+    set_count: Option<String>,
 }
 
 /// Newest first, by id on the same moment.

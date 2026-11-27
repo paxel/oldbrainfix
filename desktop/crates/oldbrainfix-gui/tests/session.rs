@@ -276,6 +276,27 @@ fn a_click_on_a_pick_records_an_entry_prefilled_with_its_targets() -> TestResult
 }
 
 #[test]
+fn a_pick_of_a_tally_in_sets_shows_how_many_and_any_entry_makes_it_done() -> TestResult {
+    let device = device()?;
+    let id = spawn(&device)?;
+    Tallies::new(&device.store).set_sets(&device.tallies[0], 3)?;
+    let mut harness = window(&device.store, None);
+    let t = L10n::new("en");
+    // The number of sets after its targets (obf-1159).
+    assert!(shows(&harness, "Push-ups 20 times ×3"));
+    assert!(shows(&harness, "Wall sit 30 times"));
+    click_button(&mut harness, "Push-ups 20 times ×3");
+    assert!(shows(&harness, &t.tally_set(3)));
+    // One set fewer still makes the pick done.
+    click_button(&mut harness, &t.tally_remove_set(3));
+    click_button(&mut harness, t.save());
+    let today = Sessions::new(&device.store).on(&id, &occurrence())?;
+    assert!(today.picks[0].done());
+    assert_eq!(today.picks[0].entries.len(), 1);
+    Ok(())
+}
+
+#[test]
 fn a_picks_field_without_a_target_starts_with_the_latest_own_value() -> TestResult {
     let device = device()?;
     let push_ups = &device.tallies[0];

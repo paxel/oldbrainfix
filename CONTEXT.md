@@ -242,7 +242,7 @@ The phone's page for its calendars: "Read from your calendar", which shows the a
 ### Tallies
 
 **Tally**:
-A Note that records how much of something was done, such as push-ups, pages read or minutes of video: its text is its Name and Description, and its content its fields, each a number with a unit, an optional target per bar and a rule for several Sets or entries in a bar (their sum or the largest), or a Check field, and its entries, listed as rows, newest first, and shown as one chart per field, a bar per its bar length, a day, week, month or year, set up with the Tally. With "Counts in sets" each entry holds Sets. A Tally whose field multiplied another one before (#200) counts in Sets. German: Strichliste.
+A Note that records how much of something was done, such as push-ups, pages read or minutes of video: its text is its Name and Description, and its content its fields, each a number with a unit, an optional target per bar and a rule for several Sets or entries in a bar (their sum or the largest), or a Check field, and its entries, listed as rows, newest first, and shown as one chart per field, a bar per its bar length, a day, week, month or year, set up with the Tally, and its number of Sets, 1 at first: above 1 it counts in Sets, each new entry starts with that many and it is a target, shown as "×3" after its targets. A Tally that counted in Sets before the number (obf-1159), or whose field multiplied another one (#200), starts with as many as its newest entry holds, at least 2. German: Strichliste.
 _Avoid_: tracker, log, workout, exercise, habit
 
 **Entry**:
@@ -250,7 +250,7 @@ One record of a Tally: a tick for some of its Check fields, a value for some of 
 _Avoid_: Section (a Section is a dated part of a Note's text), record
 
 **Set**:
-One row of an Entry across its Tally's number fields, such as 60 kg × 10 and then 65 kg × 8, in a Tally that counts in Sets; "Add set" starts one with the values of the Set before, and each field totals the Sets of an Entry by its rule, reps by their sum, a weight by the largest. An Entry recorded while a field multiplied another, such as 3 Rounds × 20 Push-ups, reads as that many Sets. German: Satz.
+One row of an Entry across its Tally's number fields, such as 60 kg × 10 and then 65 kg × 8, in a Tally that counts in Sets: a Set repeats all of its fields, and different exercises are different Tallies. A new Entry starts with the Tally's number of Sets, each from the Set before, the first from its targets; "Add set" starts one more with the values of the Set before, and an Entry with fewer still makes a Session's pick done, showing "2/3 sets"; and each field totals the Sets of an Entry by its rule, reps by their sum, a weight by the largest. An Entry recorded while a field multiplied another, such as 3 Rounds × 20 Push-ups, reads as that many Sets. German: Satz.
 _Avoid_: round, repetition, multiplier
 
 **Check field**:

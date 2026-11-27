@@ -5689,14 +5689,18 @@ fn write_tallies(store: &Store) -> Built {
         None,
     )?;
     let tally_keys = oldbrainfix_core::tallies::keys::BAR;
-    tallies.set_counts_in_sets(&gym, false)?;
+    // As an older app switches it (#264).
+    let sets_key = oldbrainfix_core::tallies::keys::SETS;
+    store.append(&gym, sets_key, Some("false"), None)?;
     store.append(&evenings, tally_keys, Some("fortnight"), None)?;
     store.append(&reading, tally_keys, Some("year"), None)?;
     let press = notes.capture("Bench", None, None)?.id;
     let weight = tallies.add_field(&press, "Weight", "kg", None, Some(TallyRule::Max))?;
     let times = tallies.add_field(&press, "Reps", "", Some(30.0), None)?;
     let warm = tallies.add_check(&press, "Warmed up", Some(2.0))?;
-    tallies.set_counts_in_sets(&press, true)?;
+    // As an older app switches it: as many sets as the newest entry holds
+    // (obf-1159).
+    store.append(&press, sets_key, Some("true"), None)?;
     tallies.set_bar(&press, TallyPeriod::Week)?;
     let heavy = tallies.add_with(
         &press,
@@ -5736,6 +5740,36 @@ fn write_tallies(store: &Store) -> Built {
     store.append(&light.id, &format!("v5:{times}"), Some("4"), None)?;
     let set_value = oldbrainfix_core::tallies::keys::set_value;
     store.append(&light.id, &set_value(2, &warm), Some("1"), None)?;
+    let rows = notes.capture("Rows", None, None)?.id;
+    let pulls = tallies.add_field(&rows, "Pulls", "", Some(12.0), None)?;
+    tallies.set_sets(&rows, 3)?;
+    tallies.add_with(
+        &rows,
+        &by_field(&[(&pulls, 12.0)]),
+        &[by_field(&[(&pulls, 10.0)])],
+        "",
+        Some(utc(2026, 1, 3, 18)?),
+        |_| Ok(()),
+    )?;
+    let dips = notes.capture("Dips", None, None)?.id;
+    let dipped = tallies.add_field(&dips, "Dips", "", None, None)?;
+    store.append(&dips, sets_key, Some("true"), None)?;
+    // As a modified app would: no number, read as the newest entry.
+    let set_count = oldbrainfix_core::tallies::keys::SET_COUNT;
+    store.append(&dips, set_count, Some("03"), None)?;
+    tallies.add_with(
+        &dips,
+        &by_field(&[(&dipped, 10.0)]),
+        &[by_field(&[(&dipped, 8.0)]), by_field(&[(&dipped, 6.0)])],
+        "",
+        None,
+        |_| Ok(()),
+    )?;
+    let chins = notes.capture("Chins", None, None)?.id;
+    tallies.add_field(&chins, "Chins", "", None, None)?;
+    tallies.set_sets(&chins, 4)?;
+    // An older app switches it off: the number no longer counts.
+    store.append(&chins, sets_key, Some("false"), None)?;
     let steps = notes.capture("Steps", None, None)?.id;
     let count = tallies.add_field(&steps, "Steps", "steps", None, None)?;
     tallies.add(&steps, &by_field(&[(&count, 8000.0)]), "", None)?;
@@ -5919,7 +5953,11 @@ fn tallies_come_to_what_the_dart_core_says(scenario: &str) -> TestResult {
         every.insert(id.clone(), json!(fields));
         settings.insert(
             id.clone(),
-            json!({"bar": tally.bar.name(), "countsInSets": tally.counts_in_sets}),
+            json!({
+                "bar": tally.bar.name(),
+                "countsInSets": tally.counts_in_sets(),
+                "sets": tally.sets,
+            }),
         );
         let mut listed = Vec::new();
         for e in tallies.entries(id, &PersonFilter::default())? {

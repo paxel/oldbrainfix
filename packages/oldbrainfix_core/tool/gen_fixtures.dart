@@ -1469,8 +1469,12 @@ final _scenarios = <Scenario>[
         'writes: one naming a multiplier, one itself; a Tally counting in '
         'sets (#264) with a Check field and weekly bars, entries with sets, '
         'one set holding nothing, one changed with fewer sets, one only '
-        'ticked, set keys no app writes and a bar length nobody knows; an '
-        'Unsorted Note beside them.',
+        'ticked, set keys no app writes and a bar length nobody knows, '
+        'switched on as an older app does and so read as its newest entry; '
+        'a Tally of three sets (obf-1159) with an entry of two, one switched '
+        'on with a number no app writes, read as its newest entry, and one '
+        'of four sets an older app switched off; an Unsorted Note beside '
+        'them.',
     build: (store) {
       final notes = Notes(store);
       final tallies = Tallies(store);
@@ -1592,7 +1596,8 @@ final _scenarios = <Scenario>[
         pages,
       );
       tallies.add(evenings, values: {pages: 8, books: 2});
-      tallies.setCountsInSets(gym, false);
+      // As an older app switches it (#264).
+      store.append(gym, TallyKeys.sets, 'false');
       store.append(evenings, TallyKeys.bar, 'fortnight');
       store.append(reading, TallyKeys.bar, 'year');
       final press = notes.capture('Bench').id;
@@ -1609,7 +1614,9 @@ final _scenarios = <Scenario>[
         target: 2,
         check: true,
       );
-      tallies.setCountsInSets(press, true);
+      // As an older app switches it: as many sets as the newest entry
+      // holds (obf-1159).
+      store.append(press, TallyKeys.sets, 'true');
       tallies.setBar(press, TallyPeriod.week);
       final heavy = tallies.add(
         press,
@@ -1641,6 +1648,35 @@ final _scenarios = <Scenario>[
       store.append(light.id, 'v1:$times', '2');
       store.append(light.id, 'v5:$times', '4');
       store.append(light.id, TallyKeys.setValue(2, warm), '1');
+      final rows = notes.capture('Rows').id;
+      final pulls = tallies.addField(rows, name: 'Pulls', target: 12);
+      tallies.setSets(rows, 3);
+      tallies.add(
+        rows,
+        values: {pulls: 12},
+        more: [
+          {pulls: 10},
+        ],
+        at: DateTime.utc(2026, 1, 3, 18),
+      );
+      final dips = notes.capture('Dips').id;
+      final dipped = tallies.addField(dips, name: 'Dips');
+      store.append(dips, TallyKeys.sets, 'true');
+      // As a modified app would: no number, read as the newest entry.
+      store.append(dips, TallyKeys.setCount, '03');
+      tallies.add(
+        dips,
+        values: {dipped: 10},
+        more: [
+          {dipped: 8},
+          {dipped: 6},
+        ],
+      );
+      final chins = notes.capture('Chins').id;
+      tallies.addField(chins, name: 'Chins');
+      tallies.setSets(chins, 4);
+      // An older app switches it off: the number no longer counts.
+      store.append(chins, TallyKeys.sets, 'false');
       final steps = notes.capture('Steps').id;
       final count = tallies.addField(steps, name: 'Steps', unit: 'steps');
       tallies.add(steps, values: {count: 8000});
@@ -3988,7 +4024,11 @@ Map<String, Object?> _tallies(Store store) {
     'settings': {
       for (final id in noteIds)
         if (tallies.byNote(id) case final tally?)
-          id: {'bar': tally.bar.name, 'countsInSets': tally.countsInSets},
+          id: {
+            'bar': tally.bar.name,
+            'countsInSets': tally.countsInSets,
+            'sets': tally.sets,
+          },
     },
     'all': [for (final tally in tallies.all()) tally.noteId],
     'entries': {
@@ -8952,6 +8992,7 @@ void _packFixture(Directory root) {
     tallies.addField(digging.id, name: 'Minutes', unit: 'min');
     tallies.addField(digging.id, name: 'Watered', check: true);
     tallies.setBar(digging.id, TallyPeriod.month);
+    tallies.setSets(digging.id, 3);
     tallies.add(digging.id, values: {}, line: 'Beds');
     final training = notes.capture('Training', place: running.id);
     Sessions(ada).spawn(
@@ -13180,7 +13221,8 @@ Future<void> main(List<String> args) async {
     'frog" section the day before, on and after the clock held, on the '
     'same clock.\n'
     '- `tallies/tallies.json`: each Tally of the `tallies` log with its '
-    'fields and what each multiplies, the Tallies in the lists, the '
+    'fields and what each multiplies, its bar length, whether it counts '
+    'in sets and its number of sets, the Tallies in the lists, the '
     'entries of each with what each counts for its fields in millionths, '
     'everyone\'s '
     'and the user\'s own, its removed entries, its charts by day, week, month and year on the '

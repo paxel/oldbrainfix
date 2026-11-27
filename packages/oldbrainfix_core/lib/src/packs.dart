@@ -246,6 +246,11 @@ class PackNote {
   /// whether it counts in sets.
   final TallyPeriod? bar;
   final bool sets;
+
+  /// How many sets an entry of its Tally starts with (obf-1159), 2 to
+  /// [TallyKeys.maxSets] while it counts in sets; null for none given,
+  /// as an older app's Pack gives none.
+  final int? setCount;
   final PackSession? session;
 
   /// Its Routines and Reminders, as their schedules.
@@ -272,6 +277,7 @@ class PackNote {
     this.fields = const [],
     this.bar,
     this.sets = false,
+    this.setCount,
     this.session,
     this.routines = const [],
     this.frog = false,
@@ -680,6 +686,7 @@ extension PackTree on Pack {
             fields: notes[i].fields,
             bar: notes[i].bar,
             sets: notes[i].sets,
+            setCount: notes[i].setCount,
             session: switch (notes[i].session) {
               final s? => PackSession(
                 pool: [for (final t in s.pool) ?newIndex[t]],
@@ -820,7 +827,10 @@ Map<String, Object?> _noteJson(
         'pool': s.pool,
         'rule': s.rule.name,
       },
-    if (n.fields.isNotEmpty && n.sets) 'sets': true,
+    if (n.fields.isNotEmpty && n.sets) ...{
+      'setCount': ?n.setCount,
+      'sets': true,
+    },
     'text': n.text,
     'topic': ?n.topic,
     if (n.version != TextFormats.version) 'v': n.version,
@@ -1037,6 +1047,10 @@ PackNote _note(Object? json) {
         TallyPeriod.values.asNameMap()[bar] ?? (throw const NotAPack()),
     },
     sets: _optional<bool>(json, 'sets') ?? false,
+    setCount: switch (_optional<int>(json, 'setCount')) {
+      final n? when n > 1 && n <= TallyKeys.maxSets => n,
+      _ => null,
+    },
     session: switch (json['session']) {
       null => null,
       final s => _session(s),
@@ -1479,6 +1493,10 @@ extension PackExport on Store {
         final bar => bar,
       },
       sets: tally?.countsInSets ?? false,
+      setCount: switch (tally?.sets) {
+        final n? when n > 1 => n,
+        _ => null,
+      },
       session: setup == null
           ? null
           : PackSession(
@@ -1939,6 +1957,9 @@ extension PackImport on Store {
     if (n.fields.isNotEmpty) {
       if (n.bar case final bar?) append(id, TallyKeys.bar, bar.name);
       if (n.sets) append(id, TallyKeys.sets, 'true');
+      if (n.sets && n.setCount != null) {
+        append(id, TallyKeys.setCount, '${n.setCount}');
+      }
     }
   }
 

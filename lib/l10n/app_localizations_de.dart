@@ -4303,8 +4303,21 @@ class AppLocalizationsDe extends AppLocalizations {
   String get tallyCountsInSets => 'Zählt in Sätzen';
 
   @override
-  String get tallyCountsInSetsDetail =>
-      'Jeder Eintrag hält mehrere Sätze, etwa 60 kg × 10 und dann 65 kg × 8. Jedes Feld fasst die Sätze eines Eintrags nach seiner Regel zusammen: Wiederholungen als Summe, ein Gewicht als das größte.';
+  String get tallySets => 'Sätze';
+
+  @override
+  String get tallySetsDetail =>
+      'Mit wie vielen Sätzen ein neuer Eintrag beginnt, 1 für keine. Jeder Satz wiederholt die Felder, etwa dreimal 60 kg × 10, und Satz hinzufügen fügt weitere hinzu. Jedes Feld fasst die Sätze eines Eintrags nach seiner Regel zusammen: Wiederholungen als Summe, ein Gewicht als das größte.';
+
+  @override
+  String tallySetsTimes(int count) {
+    return '×$count';
+  }
+
+  @override
+  String tallyEntrySets(int held, int target) {
+    return '$held/$target Sätze';
+  }
 
   @override
   String get tallyAddSet => 'Satz hinzufügen';

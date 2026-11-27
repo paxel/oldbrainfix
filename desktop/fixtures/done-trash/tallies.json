@@ -20,7 +20,8 @@
   "settings": {
     "note:0000000000000000000000000000000f": {
       "bar": "day",
-      "countsInSets": false
+      "countsInSets": false,
+      "sets": 1
     }
   },
   "all": [

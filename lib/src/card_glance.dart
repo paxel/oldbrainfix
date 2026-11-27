@@ -59,7 +59,7 @@ class CardGlances {
   /// The lines of the Note [noteId].
   List<String> of(String noteId) {
     if (_tallies.byNote(noteId) case final tally?) {
-      return [for (final field in tally.counting) _fieldLine(noteId, field)];
+      return [for (final field in tally.counting) _fieldLine(tally, field)];
     }
     final setup = _sessions.setupOf(noteId);
     if (setup == null) return const [];
@@ -104,8 +104,10 @@ class CardGlances {
     ];
   }
 
-  /// [field]'s total of the current bar against its target.
-  String _fieldLine(String noteId, TallyField field) {
+  /// [field]'s total of the current bar against its target, with the
+  /// Tally's ` ×N` after it (obf-1159).
+  String _fieldLine(Tally tally, TallyField field) {
+    final noteId = tally.noteId;
     final today = Day.today(store.clock(), deviceWallClock);
     final bars = _tallies.chart(
       noteId,
@@ -126,7 +128,8 @@ class CardGlances {
         : t.tallyCardTotal(
             field.name,
             typedValue(total, field.unit, _system, decimal),
-            shownValue(target, field.unit, _system, decimal),
+            '${shownValue(target, field.unit, _system, decimal)}'
+            '${tallySetsTimes(t, tally)}',
           );
   }
 }

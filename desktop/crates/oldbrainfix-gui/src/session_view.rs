@@ -307,7 +307,8 @@ pub enum SessionAction {
 
 /// A picked Tally as its line shows: its Note's text and the targets of
 /// its fields, each with the field's name when it has more than one
-/// ("Push-ups 20 times").
+/// ("Push-ups 20 times"), and ` ×N` for its N sets while above 1
+/// (obf-1159).
 pub fn pick_text(t: &L10n, pick: &SessionPick, system: UnitSystem) -> String {
     let name = row_title(t, pick.note.as_ref());
     let decimal = decimal_sign(t);
@@ -330,10 +331,15 @@ pub fn pick_text(t: &L10n, pick: &SessionPick, system: UnitSystem) -> String {
             })
         })
         .collect();
+    let times = pick
+        .tally
+        .as_ref()
+        .map(|tally| crate::tally_view::sets_times(t, tally))
+        .unwrap_or_default();
     if targets.is_empty() {
-        name
+        format!("{name}{times}")
     } else {
-        format!("{name} {}", targets.join(" · "))
+        format!("{name} {}{times}", targets.join(" · "))
     }
 }
 

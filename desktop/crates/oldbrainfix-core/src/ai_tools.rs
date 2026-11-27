@@ -493,7 +493,7 @@ fn field_properties() -> Value {
 fn tally_properties() -> Value {
     json!({
         "bar": {"description": "How long a bar of its charts is; its targets count per bar. A day when never set", "enum": ["day", "week", "month", "year"], "type": "string"},
-        "sets": {"description": "Whether it counts in sets: an entry then holds several sets, each a row across its number fields, such as 60 kg × 10 and then 65 kg × 8", "type": "boolean"},
+        "sets": {"description": "How many sets an entry starts with, 1 to 99: above 1 an entry holds that many sets, each a row across its number fields, such as 60 kg × 10 three times; 1 for none. 1 when never set", "type": "integer"},
     })
 }
 
@@ -521,7 +521,7 @@ fn set_up_tools() -> Vec<Value> {
     vec![
         tool(
             "make_tally",
-            "Makes a Note a Tally with the fields given, which takes it out of Unsorted, with its bar length and whether it counts in sets when given. A Checklist or Shopping List is never a Tally.",
+            "Makes a Note a Tally with the fields given, which takes it out of Unsorted, with its bar length and its number of sets when given. A Checklist or Shopping List is never a Tally.",
             false,
             {
                 let mut properties = tally_properties();
@@ -535,7 +535,7 @@ fn set_up_tools() -> Vec<Value> {
         ),
         tool(
             "set_tally",
-            "Sets a Tally's bar length or whether it counts in sets; what is left out stays.",
+            "Sets a Tally's bar length or its number of sets; what is left out stays.",
             false,
             {
                 let mut properties = tally_properties();
@@ -1171,7 +1171,7 @@ fn tally_json(tally: &Tally) -> Value {
             })
         })
         .collect();
-    json!({"bar": tally.bar.name(), "fields": fields, "sets": tally.counts_in_sets})
+    json!({"bar": tally.bar.name(), "fields": fields, "sets": tally.sets})
 }
 
 /// The Boxes of a text, each with its state and its latest tick.
@@ -2450,7 +2450,7 @@ impl Store {
                 }
                 if !self.ai_set_tally(note, args)? {
                     return Err(Error::Invalid(
-                        "nothing to set: give a bar or whether it counts in sets".into(),
+                        "nothing to set: give a bar or a number of sets".into(),
                     ));
                 }
                 done(note)
@@ -2756,8 +2756,10 @@ impl Store {
         }
     }
 
-    /// Sets the bar length and whether it counts in sets of the Tally of
-    /// `note` as `args` give them; whether they gave any.
+    /// Sets the bar length and the number of sets of the Tally of `note`
+    /// as `args` give them; whether they gave any. `sets` as true or false,
+    /// as the tools took it before (obf-1159), still counts: true as 2
+    /// unless it counts in sets already, false as 1.
     fn ai_set_tally(&self, note: &str, args: &Value) -> Result<bool> {
         let tallies = Tallies::new(self);
         let mut set = false;
@@ -2770,10 +2772,19 @@ impl Store {
             set = true;
         }
         if let Some(sets) = args.get("sets") {
-            let on = sets
-                .as_bool()
-                .ok_or_else(|| Error::Invalid("sets is no true or false".into()))?;
-            tallies.set_counts_in_sets(note, on)?;
+            let count = match sets {
+                Value::Bool(false) => 1,
+                Value::Bool(true) => match tallies.by_note(note)? {
+                    Some(tally) if tally.counts_in_sets() => tally.sets,
+                    _ => 2,
+                },
+                _ => sets
+                    .as_u64()
+                    .and_then(|n| usize::try_from(n).ok())
+                    .filter(|n| (1..=crate::tallies::keys::MAX_SETS).contains(n))
+                    .ok_or_else(|| Error::Invalid("sets is no whole number from 1 to 99".into()))?,
+            };
+            tallies.set_sets(note, count)?;
             set = true;
         }
         Ok(set)

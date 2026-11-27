@@ -171,8 +171,10 @@ class _TallyEntryScreenState extends State<TallyEntryScreen> {
     final decimal = decimalSign(context);
     final entry = _entry;
     final tally = _tally;
+    // A new entry starts with as many sets as the Tally's number, each
+    // from the one before, as "Add set" starts them (obf-1159).
     final rows = entry == null || tally == null
-        ? [_startValues(tally)]
+        ? List.filled(tally?.sets ?? 1, _startValues(tally))
         : tally.setsOf(entry);
     _asOpened = [
       for (final row in rows.isEmpty ? [const <String, double>{}] : rows)
@@ -468,7 +470,7 @@ class _TallyEntryScreenState extends State<TallyEntryScreen> {
     final entry = _entry;
     final store = widget.notes.store;
     final date = DateFormat.yMMMEd(Localizations.localeOf(context).toString());
-    final countsInSets = _tally?.countsInSets ?? false;
+    final countsInSets = (_tally?.sets ?? 1) > 1;
     final inSets = countsInSets || _sets.length > 1;
     return LeaveSaves(
       changed: _changed,

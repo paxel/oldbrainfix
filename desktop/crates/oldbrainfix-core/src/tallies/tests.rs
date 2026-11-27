@@ -383,7 +383,7 @@ fn a_former_multiplier_reads_its_entries_as_sets() -> TestResult {
     let (note, fields) = tally(&ann, "Gym", &["reps", "kg", "rounds"], None)?;
     let (reps, kg, rounds) = (&fields[0], &fields[1], &fields[2]);
     let plain = tallies.by_note(&note)?.ok_or("a Tally")?;
-    assert!(!plain.counts_in_sets);
+    assert_eq!(plain.sets, 1);
     // As #200 wrote it: Rounds multiplies Reps.
     ann.append(
         &note,
@@ -398,7 +398,8 @@ fn a_former_multiplier_reads_its_entries_as_sets() -> TestResult {
         None,
     )?;
     let read = tallies.by_note(&note)?.ok_or("a Tally")?;
-    assert!(read.counts_in_sets);
+    // As many sets as its newest entry holds (obf-1159).
+    assert_eq!(read.sets, 3);
     let row = values(&[(reps, 20.0), (kg, 60.0)]);
     assert_eq!(read.sets_of(&entry), vec![row.clone(), row.clone(), row]);
     assert_eq!(read.counted(&entry, reps), Some(60.0));
@@ -412,12 +413,12 @@ fn a_former_multiplier_reads_its_entries_as_sets() -> TestResult {
         assert_eq!(read.sets_of(&e).len(), count, "{times}");
     }
     // Switched off, the entries keep their sets.
-    tallies.set_counts_in_sets(&note, false)?;
+    tallies.set_sets(&note, 1)?;
     let off = tallies.by_note(&note)?.ok_or("a Tally")?;
-    assert!(!off.counts_in_sets);
+    assert!(!off.counts_in_sets());
     assert_eq!(off.counted(&entry, reps), Some(60.0));
     // Changed with its sets, it holds them itself.
-    tallies.set_counts_in_sets(&note, true)?;
+    tallies.set_sets(&note, 2)?;
     let row = BTreeMap::from([(reps.clone(), 20.0)]);
     tallies.edit_entry_sets(
         &entry.id,
@@ -440,8 +441,9 @@ fn sets_are_rows_each_field_totalling_by_its_rule() -> TestResult {
     let tallies = Tallies::new(&ann);
     let (note, fields) = tally(&ann, "Bench", &["reps", "kg"], None)?;
     let (reps, kg) = (&fields[0], &fields[1]);
-    tallies.set_counts_in_sets(&note, true)?;
+    tallies.set_sets(&note, 3)?;
     assert_eq!(ann.current(&note, keys::SETS)?.as_deref(), Some("true"));
+    assert_eq!(ann.current(&note, keys::SET_COUNT)?.as_deref(), Some("3"));
     let more = [
         values(&[(reps, 8.0), (kg, 65.0)]),
         BTreeMap::new(),
@@ -593,6 +595,82 @@ fn only_the_set_keys_the_apps_write_are_read() {
 }
 
 #[test]
+fn a_tally_holds_its_number_of_sets_beside_the_switch() -> TestResult {
+    let ann = device(1, "Ann")?;
+    let tallies = Tallies::new(&ann);
+    let (note, fields) = tally(&ann, "Bench", &["reps"], None)?;
+    let reps = &fields[0];
+    let sets = |store: &Store| -> Made<usize> {
+        Ok(Tallies::new(store).by_note(&note)?.ok_or("a Tally")?.sets)
+    };
+    assert_eq!(sets(&ann)?, 1);
+    assert_eq!(ann.current(&note, keys::SET_COUNT)?, None);
+    tallies.set_sets(&note, 3)?;
+    assert_eq!(sets(&ann)?, 3);
+    assert_eq!(ann.current(&note, keys::SET_COUNT)?.as_deref(), Some("3"));
+    assert_eq!(ann.current(&note, keys::SETS)?.as_deref(), Some("true"));
+    // Only what differs is written.
+    let written = ann.history(&note)?.len();
+    tallies.set_sets(&note, 3)?;
+    assert_eq!(ann.history(&note)?.len(), written);
+    // A new number writes the switch too, though it holds it, so the two
+    // keep together where Devices merge them.
+    tallies.set_sets(&note, 5)?;
+    assert_eq!(ann.history(&note)?.len(), written + 2);
+    tallies.set_sets(&note, 1)?;
+    assert_eq!(ann.current(&note, keys::SETS)?.as_deref(), Some("false"));
+    assert_eq!(ann.history(&note)?.len(), written + 4);
+    assert!(tallies.set_sets(&note, 0).is_err());
+    assert!(tallies.set_sets(&note, keys::MAX_SETS + 1).is_err());
+    tallies.set_sets(&note, 4)?;
+    // An older app switches only `tally:sets`: off, the number no longer
+    // counts; on again, it does.
+    ann.append(&note, keys::SETS, Some("false"), None)?;
+    assert_eq!(sets(&ann)?, 1);
+    ann.append(&note, keys::SETS, Some("true"), None)?;
+    assert_eq!(sets(&ann)?, 4);
+    // Switched on with the number at 1, it reads as its newest entry.
+    tallies.set_sets(&note, 1)?;
+    ann.append(&note, keys::SETS, Some("true"), None)?;
+    assert_eq!(sets(&ann)?, 2, "no entry: 2");
+    let four = vec![values(&[(reps, 8.0)]); 3];
+    tallies.add_with(
+        &note,
+        &values(&[(reps, 10.0)]),
+        &four,
+        "",
+        Some(at(2026, 1, 1, 7)?),
+        |_| Ok(()),
+    )?;
+    assert_eq!(sets(&ann)?, 4);
+    // A newer entry of one set reads as 2 at least; one removed as none.
+    let newer = tallies.add(&note, &values(&[(reps, 5.0)]), "", Some(at(2026, 1, 2, 7)?))?;
+    assert_eq!(sets(&ann)?, 2);
+    tallies.trash_entry(&newer.id)?;
+    assert_eq!(sets(&ann)?, 4);
+    // An entry for an earlier day, though written later, does not count.
+    tallies.add(
+        &note,
+        &values(&[(reps, 5.0)]),
+        "",
+        Some(at(2025, 12, 1, 7)?),
+    )?;
+    assert_eq!(sets(&ann)?, 4);
+    // Anything but 1 to 99 without a leading zero reads as absent.
+    for odd in ["0", "03", "100", "+3", " 3", "3 ", "", "x"] {
+        ann.append(&note, keys::SET_COUNT, Some(odd), None)?;
+        assert_eq!(sets(&ann)?, 4, "{odd:?}");
+    }
+    ann.append(&note, keys::SET_COUNT, Some("99"), None)?;
+    assert_eq!(sets(&ann)?, 99);
+    // Without the switch, the number alone counts.
+    ann.append(&note, keys::SETS, None, None)?;
+    ann.append(&note, keys::SET_COUNT, Some("5"), None)?;
+    assert_eq!(sets(&ann)?, 5);
+    Ok(())
+}
+
+#[test]
 fn settings_the_cores_read_as_no_multiplier() -> TestResult {
     let ann = device(1, "Ann")?;
     let tallies = Tallies::new(&ann);
@@ -604,7 +682,7 @@ fn settings_the_cores_read_as_no_multiplier() -> TestResult {
     ann.append(&note, &keys::field(c, keys::MULTIPLIES), Some(c), None)?;
     let read = tallies.by_note(&note)?.ok_or("a Tally")?;
     assert!(read.fields.iter().all(|f| f.multiplies.is_none()));
-    assert!(!read.counts_in_sets);
+    assert!(!read.counts_in_sets());
     Ok(())
 }
 

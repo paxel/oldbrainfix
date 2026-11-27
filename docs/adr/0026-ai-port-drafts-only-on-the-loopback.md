@@ -124,6 +124,10 @@ Amended by #294 (Q692): the `instructions` the port sends on `initialize` carry 
 
 Amended by obf-1156: a Topic has an icon, one of the Area icons, shown in its Area's colour and without a colour of its own. `set_topic_icon` sets it up as `set_area_icon` sets an Area's, and `list_places` gives each Topic's `icon` beside its id and name. It is a field of the place like its name, so an AI Task may write it on a Topic; no trust rule changed.
 
+## A number of sets per Tally (obf-1159)
+
+Amended by obf-1159 (ADR 0028): `read_note` reports a Tally's `sets` as its number of sets, 1 for none, and `make_tally` and `set_tally` take `sets` as a whole number from 1 to 99. A boolean, as the tools took it before, still counts so an older call does not break: `true` as 2 unless the Tally counts in sets already, `false` as 1. An AI Task may write `tally:setCount` beside `tally:sets`; no trust rule changed.
+
 ## Sync goes on while the port is open (#389)
 
 Sync no longer waits from the opening of the port until the review is decided. The AI Task's drafts are kept apart from the log, as a transaction is, so pausing guarded nothing that keeping them apart does not: every path that syncs, relays or backs up reads entries of the log, none reads a pending set (ADR 0022). The one path that read through the shown sets, the Sent Item made from a Note, now reads the log alone. What another Device writes meanwhile comes in by sync and goes into the log; the review marks each field such an edit touched since the task wrote it (`synced`), and Accept decides as before: an edit of the user's own Devices made after the draft stays, another person's is written over. The Trust rules, The review and the Consequences above say so; `Error::SyncPaused` is returned nowhere.

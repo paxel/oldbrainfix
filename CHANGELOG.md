@@ -20,6 +20,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 ### Changed
 
 - In the desktop sidebar an Area's name is bold, and its Topics stand indented under it in smaller text. ([obf-1157](https://github.com/paxel/oldbrainfix/issues/477))
+- A Tally sets a number of sets instead of Counts in sets; new entries start with that many, and ×3 shows by its targets. ([obf-1159](https://github.com/paxel/oldbrainfix/issues/479))
 
 ### Removed
 

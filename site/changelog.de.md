@@ -19,6 +19,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 ### Geändert
 
 - In der Seitenleiste der Desktop-App ist der Name eines Bereichs fett, und seine Themen stehen eingerückt in kleinerer Schrift darunter. ([obf-1157](https://github.com/paxel/oldbrainfix/issues/477))
+- Eine Strichliste hat eine Zahl der Sätze statt „Zählt in Sätzen“; neue Einträge beginnen mit so vielen, und ×3 steht bei ihren Zielen. ([obf-1159](https://github.com/paxel/oldbrainfix/issues/479))
 
 ### Entfernt
 

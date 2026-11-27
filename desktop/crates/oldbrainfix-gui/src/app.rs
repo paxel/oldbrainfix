@@ -11520,7 +11520,7 @@ impl App {
                 });
             }
             TallyAction::Bar(bar) => tallies.set_bar(&note, bar)?,
-            TallyAction::Sets(on) => tallies.set_counts_in_sets(&note, on)?,
+            TallyAction::Sets(sets) => tallies.set_sets(&note, sets)?,
             TallyAction::AllShown(shown) => {
                 let setting = tally_view::entries_shown_setting(&note);
                 if shown {
@@ -12597,7 +12597,7 @@ impl App {
             tally: view
                 .tally
                 .as_ref()
-                .map(|shown| (shown.tally.bar, shown.tally.counts_in_sets)),
+                .map(|shown| (shown.tally.bar, shown.tally.sets)),
             session: view.session_setup.clone(),
         };
         Some(State { typed, kept })
@@ -16855,16 +16855,20 @@ impl App {
                 }
                 None => true,
             },
+            // Each step written at once, as on the phone (obf-1159).
             NoteBadge::TallySets => match &self.view.tally {
                 Some(shown) => {
-                    let setting = t.tally_counts_in_sets();
-                    let mut on = shown.tally.counts_in_sets;
+                    let setting = t.tally_sets();
+                    let mut sets = shown.tally.sets as i64;
                     badge_dialog(ctx, (&t, tones), (icons::TALLY_SETS, None), setting, |ui| {
                         let weak = ui.visuals().weak_text_color();
-                        let detail = t.tally_counts_in_sets_detail();
+                        let detail = t.tally_sets_detail();
                         ui.label(RichText::new(detail).small().color(weak));
-                        if badge_switch(ui, &t, setting, &mut on) {
-                            actions.push(Action::Tally(TallyAction::Sets(on)));
+                        let most = oldbrainfix_core::tallies::keys::MAX_SETS as i64;
+                        if crate::routine_editor::stepper(ui, &t, &mut sets, (1, Some(most)), None)
+                        {
+                            let sets = usize::try_from(sets).unwrap_or(1);
+                            actions.push(Action::Tally(TallyAction::Sets(sets)));
                         }
                     })
                 }

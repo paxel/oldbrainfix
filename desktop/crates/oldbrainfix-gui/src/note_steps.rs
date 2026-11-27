@@ -118,8 +118,8 @@ pub struct Kept {
     pub hidden: bool,
     /// Whether Show ticks is on for it.
     pub ticks: bool,
-    /// A Tally's bar and whether it counts in sets.
-    pub tally: Option<(TallyPeriod, bool)>,
+    /// A Tally's bar and its number of sets (obf-1159).
+    pub tally: Option<(TallyPeriod, usize)>,
     pub session: Option<SessionSetup>,
 }
 

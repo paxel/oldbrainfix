@@ -90,3 +90,18 @@ The user found the chart one big block with few bars, the target blind to the mu
 
 Considered: sets as one JSON value per entry (rejected: no JSON in the log, and two Devices changing different sets would lose one); the number of sets as a key of its own (rejected: the highest set held says it, and an older version would show it as a field); the bar length kept per Device (rejected by Q604: it syncs with the Note); a volume field (rejected by Q608); writing former multiplier entries out as sets (rejected: every Device would rewrite the same entries).
 
+## A number of sets per Tally (obf-1159)
+
+The user found the switch confusing: sets were switched on for the Tally but had no target, so how many were meant showed nowhere. A Set repeats all of a Tally's fields (10 kg × 5 reps, 3 times); different exercises are different Tallies. Both cores read and write the following alike; the cross-core fixtures cover them.
+
+- **The number** lies on the Tally's own Note beside the switch: `tally:setCount`, `1` to `99` written without a leading zero; anything else reads as absent. Writing it also writes `tally:sets`, `true` above 1 and `false` at 1, so an older app still reads whether the Tally counts in sets. The number is written only when it differs; the switch always with a new number, so the two keep together where Devices merge them key by key, and otherwise only when it differs.
+- **Reading.** The number counts while `tally:sets` is absent or agrees with it (`true` above 1, `false` at 1). Otherwise, so after an older app switched it, or while the number is absent, the Tally reads as `tally:sets` says, absent as #264 reads it: one that counts in sets has as many as its newest entry holds, not removed, in the order the entries list, at least 2 and 2 without an entry; one that does not has 1. That number is worked out on reading and never written, so no Device rewrites a Tally.
+- **The entry form** of a new entry starts with that many sets, each from the one before, the first from the targets as before; "Add set" shows above 1 and still adds more. Entries keep and count their sets as before; one with fewer sets than the number still makes a Session's pick done and shows `2/3 sets` (one holding no number says nothing of its sets).
+- **`×N`** follows a Tally's targets above 1: on its compact card, its target badges, a Session's pick on the Agenda and the Session.
+- **Packs** carry the number as `setCount` beside `sets` while above 1, the number as read; an older app's Pack, without it, reads as 2 once in.
+- **The vault** (ADR 0050) writes `setCount` beside `sets` and reads it back when present.
+- **The AI port** (ADR 0026) reports `sets` as the number; `make_tally` and `set_tally` take it.
+
+This replaces "the switch only decides the entry form" above and refines "the number of sets as a key of its own" under Considered: that was the number of sets of an entry, which its highest set says; this is the Tally's own target, which nothing else says.
+
+Considered: replacing `tally:sets` with the number (rejected: an older app would no longer read that the Tally counts in sets); letting the number win over a later `tally:sets` (rejected: an older app's switch would then do nothing on a newer one); writing the number of a Tally that counts in sets once on reading (rejected: every Device would write it); a number of sets per field (rejected in the interview: a Set repeats all fields).

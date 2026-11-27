@@ -49,7 +49,7 @@ use crate::sessions::{SessionRule, Sessions, keys as session_keys};
 use crate::shopping_lists::{Reappear, ShoppingLists, keys as shopping_keys};
 use crate::signing::{SigningKey, verify_signature};
 use crate::store::{Fields, Store};
-use crate::tallies::{Tallies, TallyPeriod, keys as tally_keys};
+use crate::tallies::{Tallies, Tally, TallyPeriod, keys as tally_keys};
 use crate::tally_units::{TallyRule, decode_number, encode_number};
 use crate::text_format::{self, StoredText};
 use crate::transcript_prompts::dart_trim;
@@ -218,6 +218,10 @@ pub struct PackNote {
     /// whether it counts in sets.
     pub bar: Option<TallyPeriod>,
     pub sets: bool,
+    /// How many sets an entry of its Tally starts with (obf-1159), 2 to
+    /// [`tally_keys::MAX_SETS`] while it counts in sets; `None` for none
+    /// given, as an older app's Pack gives none.
+    pub set_count: Option<usize>,
     pub session: Option<PackSession>,
     /// Its Routines and Reminders, as their schedules.
     pub routines: Vec<Schedule>,
@@ -802,6 +806,7 @@ impl Pack {
                 fields: n.fields.clone(),
                 bar: n.bar,
                 sets: n.sets,
+                set_count: n.set_count,
                 session: n.session.as_ref().map(|s| PackSession {
                     pool: s
                         .pool
@@ -1041,6 +1046,9 @@ fn note_json(n: &PackNote, files: Option<&BytesOf>) -> Result<Value> {
         pairs.push(("session", object(session)));
     }
     if !n.fields.is_empty() && n.sets {
+        if let Some(count) = n.set_count {
+            pairs.push(("setCount", json!(count)));
+        }
         pairs.push(("sets", json!(true)));
     }
     pairs.push(("text", json!(n.text)));
@@ -1351,6 +1359,9 @@ fn note(json: &Value) -> Option<PackNote> {
         Some(bar) => Some(TallyPeriod::parse(bar)?),
     };
     let sets = optional_bool(json, "sets")?.unwrap_or(false);
+    let set_count = optional_int(json, "setCount")?
+        .and_then(|n| usize::try_from(n).ok())
+        .filter(|n| (2..=tally_keys::MAX_SETS).contains(n));
     let session = match present(json, "session") {
         None => None,
         Some(s) => Some(session(s)?),
@@ -1385,6 +1396,7 @@ fn note(json: &Value) -> Option<PackNote> {
         fields,
         bar,
         sets,
+        set_count,
         session,
         routines,
         frog,
@@ -1827,7 +1839,8 @@ impl Store {
             .as_ref()
             .map(|t| t.bar)
             .filter(|b| *b != TallyPeriod::Day);
-        let sets = tally.as_ref().is_some_and(|t| t.counts_in_sets);
+        let sets = tally.as_ref().is_some_and(Tally::counts_in_sets);
+        let set_count = tally.as_ref().map(|t| t.sets).filter(|n| *n > 1);
         let fields = tally.map(|t| t.fields).unwrap_or_default();
         let field_index: HashMap<&str, usize> = fields
             .iter()
@@ -1927,6 +1940,7 @@ impl Store {
                 .collect(),
             bar,
             sets,
+            set_count,
             session,
             routines: routines.into_iter().map(|r| r.schedule).collect(),
             frog: Frogs::new(self).of_note(id)?.iter().any(|f| !f.is_done()),
@@ -2409,6 +2423,10 @@ impl Store {
             }
             if n.sets {
                 self.append(id, tally_keys::SETS, Some("true"), None)?;
+            }
+            if let Some(count) = n.set_count.filter(|_| n.sets) {
+                let count = count.to_string();
+                self.append(id, tally_keys::SET_COUNT, Some(&count), None)?;
             }
         }
         Ok(())

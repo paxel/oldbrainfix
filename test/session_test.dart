@@ -695,6 +695,17 @@ void main() {
   });
 
   group('the Agenda', () {
+    testWidgets('a pick of a Tally in sets shows how many after its '
+        'targets (obf-1159)', (tester) async {
+      final pushUps = tally('Push-ups');
+      final wallSit = tally('Wall sit', target: 30);
+      tallies.setSets(pushUps, 3);
+      session([pushUps, wallSit]);
+      await start(tester);
+      expect(find.text('Push-ups 20 times ×3'), findsOneWidget);
+      expect(find.text('Wall sit 30 times'), findsOneWidget);
+    });
+
     testWidgets('today\'s row lists the picks with their targets; tapping one '
         'records an entry prefilled with them; "Another one" swaps; once '
         'each has an entry the box stays checked', (tester) async {

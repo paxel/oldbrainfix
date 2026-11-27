@@ -251,8 +251,8 @@ pub enum TallyAction {
     Badge(TallyBadge),
     /// Sets the length of a bar of the Tally's charts (#264).
     Bar(TallyPeriod),
-    /// Switches whether the Tally counts in sets (#264).
-    Sets(bool),
+    /// Sets how many sets a new entry starts with (obf-1159).
+    Sets(usize),
     /// Keeps whether the older entries show.
     AllShown(bool),
     /// Keeps whether "Removed entries" is open.
@@ -319,9 +319,10 @@ pub(crate) fn kind_name(t: &L10n, kind: UnitKind) -> &'static str {
 }
 
 /// What `entry` holds for the fields shown (#264): the Check fields it
-/// ticks, then its sets, each a line of its values one after the other,
-/// numbered while there are several ("1. Weight 60 kg · Reps 10"), as the
-/// phone's `_values`.
+/// ticks, then how many sets it holds of the Tally's number while fewer
+/// ("2/3 sets", obf-1159), then its sets, each a line of its values one
+/// after the other, numbered while there are several ("1. Weight 60 kg ·
+/// Reps 10"), as the phone's `_values`.
 fn values_lines(t: &L10n, tally: &Tally, entry: &TallyEntry, system: UnitSystem) -> Vec<String> {
     let decimal = decimal_sign(t);
     let ticked: Vec<String> = tally
@@ -351,6 +352,12 @@ fn values_lines(t: &L10n, tally: &Tally, entry: &TallyEntry, system: UnitSystem)
     if !ticked.is_empty() {
         lines.push(ticked.join(" · "));
     }
+    // Fewer sets than the Tally's number (obf-1159); one holding no
+    // number, only ticks or a line, says nothing of its sets.
+    let held = tally.sets_of(entry).len();
+    if held > 0 && held < tally.sets {
+        lines.push(t.tally_entry_sets(held as i64, tally.sets as i64));
+    }
     if sets.len() == 1 {
         lines.extend(sets);
     } else {
@@ -365,10 +372,10 @@ fn values_lines(t: &L10n, tally: &Tally, entry: &TallyEntry, system: UnitSystem)
 
 /// The setup of a Tally in the Note dialog (#190), in the card of its
 /// name (obf-1071): the Tally's own
-/// settings as badges (#264), the length of a bar and whether it counts
-/// in sets; then a row per field, its name and its settings as badges as
-/// on the New Tally page (#161), how several sets or entries in a bar
-/// count, its unit and its target, a Check field its kind and its
+/// settings as badges (#264), the length of a bar and its number of sets
+/// (obf-1159); then a row per field, its name and its settings as badges
+/// as on the New Tally page (#161), how several sets or entries in a bar
+/// count, its unit and its target with ` ×N` for N sets, a Check field its kind and its
 /// target, a field that counted sets as a multiplier did (#200) that it
 /// counts the sets of older entries, "Hidden" while it is hidden; a
 /// click on the name or a badge opens the field's
@@ -403,10 +410,9 @@ pub fn setup(
             {
                 actions.push(TallyAction::Badge(TallyBadge::Bar));
             }
-            let on = tally.counts_in_sets;
-            let words = if on { t.setting_on() } else { t.setting_off() };
-            let sets = Icon(switch_icon(on), words);
-            let setting = t.tally_counts_in_sets();
+            let count = tally.sets.to_string();
+            let sets = Text(&count);
+            let setting = t.tally_sets();
             if badge(
                 ui,
                 look,
@@ -437,7 +443,11 @@ pub fn setup(
                 unit
             };
             let target_value = match field.target {
-                Some(target) => shown_value(target, &field.unit, system, decimal),
+                Some(target) => format!(
+                    "{}{}",
+                    shown_value(target, &field.unit, system, decimal),
+                    sets_times(t, tally)
+                ),
                 None => t.tally_no_target().to_string(),
             };
             let counts_sets = field.multiplies.is_some();
@@ -1303,8 +1313,9 @@ pub struct EntryForm {
     /// The ticks as the page opened, to tell on leaving whether anything
     /// changed (#275).
     checks_opened: Vec<bool>,
-    /// Whether the Tally counts in sets: "Add set" shows then.
-    counts_in_sets: bool,
+    /// How many sets a new entry starts with (obf-1159): "Add set" shows
+    /// while above 1.
+    target_sets: usize,
     pub line: String,
     pub day: Day,
     day_as_opened: Day,
@@ -1360,6 +1371,16 @@ fn start_values(
     (values, latest)
 }
 
+/// ` ×N` after a Tally's targets, its number of sets N (obf-1159), while
+/// above 1; empty otherwise.
+pub fn sets_times(t: &L10n, tally: &Tally) -> String {
+    if tally.counts_in_sets() {
+        format!(" {}", t.tally_sets_times(tally.sets as i64))
+    } else {
+        String::new()
+    }
+}
+
 /// The key of the value of `field` in the set `set` of the entry page.
 fn value_key(set: usize, field: &str) -> String {
     format!("{set}:{field}")
@@ -1379,10 +1400,12 @@ impl EntryForm {
         let fields: Vec<TallyField> = tally.numbers().into_iter().cloned().collect();
         let mut from_latest = HashSet::new();
         let rows = match &entry {
+            // As many sets as the Tally's number, each from the one
+            // before, as "Add set" starts them (obf-1159).
             None => {
                 let (values, latest) = start_values(tally, &fields, mine);
                 from_latest = latest;
-                vec![values]
+                vec![values; tally.sets.max(1)]
             }
             Some((entry, _)) => tally.sets_of(entry),
         };
@@ -1427,7 +1450,7 @@ impl EntryForm {
             sets,
             checks_opened: checks.iter().map(|(_, on)| *on).collect(),
             checks,
-            counts_in_sets: tally.counts_in_sets,
+            target_sets: tally.sets,
             day,
             day_as_opened: day,
             day_text: day.to_string(),
@@ -1638,7 +1661,7 @@ impl EntryForm {
         };
         let mut intent = None;
         let system = self.system;
-        let in_sets = self.counts_in_sets || self.sets.len() > 1;
+        let in_sets = self.target_sets > 1 || self.sets.len() > 1;
         egui::ScrollArea::vertical()
             .id_salt("tally entry")
             .auto_shrink([false, false])
@@ -1723,7 +1746,7 @@ impl EntryForm {
                 if let Some(i) = removed {
                     self.sets.remove(i);
                 }
-                if self.counts_in_sets
+                if self.target_sets > 1
                     && !self.fields.is_empty()
                     && design::text_button(ui, icons::ADD, t.tally_add_set()).clicked()
                 {

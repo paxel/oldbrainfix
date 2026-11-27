@@ -460,7 +460,8 @@ There are three kinds, and an action takes the first that fits.
 - **A Session's group today lists its picks under its title** (#208),
   in the order picked, each an entry with its box, checked and struck
   through once it has an entry, each Tally's name with its targets
-  ("Push-ups 20 times"). The pick's box and words open its entry form,
+  ("Push-ups 20 times"), and "×3" after them for a Tally of three Sets
+  (obf-1159). The pick's box and words open its entry form,
   prefilled as any new entry; saving records it for this Occurrence.
   Each pick without an entry offers "Another one" under it while the
   pool holds a Tally not picked. **The heading's box only shows Done**:
@@ -548,7 +549,8 @@ There are three kinds, and an action takes the first that fits.
   and how many Lines are open ("3 of 7 open"), a Shopping List its name
   and how many are open ("4 open"), a Tally its name and each field's
   but one counting sets total of the current bar, today's for a Tally
-  of days (#264), against its target ("Steps 7000 / 10000 steps"), in a
+  of days (#264), against its target ("Steps 7000 / 10000 steps"), "×3"
+  after the target for a Tally of three Sets (obf-1159), in a
   Shared Area of the user's own entries, as its detailed view counts at
   first (#190), a Session
   its name, the next run of any of its Routines and "done 4 / skipped 1
@@ -573,8 +575,9 @@ There are three kinds, and an action takes the first that fits.
   counting sets, a bar per the Tally's bar length with no choice of it
   here (#264): slim bars of a fixed width with gaps, the newest on the
   right, as many as fit, the target as a thin line, never scrolled
-  sideways; then its entries (ticks as "✓ Wiped", several sets a line
-  each, "1. Weight 60 kg · Reps 10"), newest first, the latest five and
+  sideways; then its entries (ticks as "✓ Wiped", fewer sets than the
+  Tally's number as "2/3 sets" (obf-1159), several sets a line each,
+  "1. Weight 60 kg · Reps 10"), newest first, the latest five and
   the older
   folded under how many ("12 older entries") until a tap shows them,
   kept open per Note on this Device; a tap on an entry edits it, a long
@@ -693,9 +696,11 @@ There are three kinds, and an action takes the first that fits.
   a Pack brought the Note unclaimed (#164), `inventory_2` with the
   name, its tap offering "Remove “From Ann”" at the finger, which asks
   nothing and is undone (#268). A Tally's setup
-  is the Tally's own badges, "One bar per" and "Counts in sets" (#264),
-  each opening its small editor, then its fields (#190), each its name
-  with its rule, unit and target as badges, as on the Tally page, a
+  is the Tally's own badges, "One bar per" (#264) and "Sets", its number
+  of Sets with − and +, 1 at first, each step written at once
+  (obf-1159), each opening its small editor, then its fields (#190),
+  each its name with its rule, unit and target as badges, as on the
+  Tally page, the target with "×3" for three Sets, a
   Check field its kind and target, a field that counted sets as a
   multiplier did "Counts the sets of older entries" without its rule and
   target, and "Hidden" while it is hidden, a tap

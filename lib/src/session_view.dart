@@ -9,7 +9,8 @@ import 'tally_view.dart';
 
 /// A Tally a Session picked, as its row on the Agenda shows it: its
 /// Note's text and the targets of its fields, each with the field's name
-/// when it has more than one ("Push-ups 20 times").
+/// when it has more than one ("Push-ups 20 times"), and ` ×N` for its N
+/// sets while above 1 (obf-1159).
 String pickText(
   AppLocalizations t,
   SessionPick pick,
@@ -30,7 +31,11 @@ String pickText(
           shownValue(target, field.unit, system, decimal),
         ].join(' '),
   ];
-  return targets.isEmpty ? name : '$name ${targets.join(' · ')}';
+  final times = switch (pick.tally) {
+    final tally? => tallySetsTimes(t, tally),
+    null => '',
+  };
+  return targets.isEmpty ? '$name$times' : '$name ${targets.join(' · ')}$times';
 }
 
 /// Opens the entry form of [pick] of [today]: a new entry prefilled with

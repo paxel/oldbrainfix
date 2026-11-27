@@ -398,6 +398,11 @@ fn change_line(
                 .to_string()
             }));
         }
+        (note_keys::TYPE_NOTE, tally_keys::SET_COUNT) => {
+            return Ok(words(t.tally_sets().to_string(), &|v| {
+                v.unwrap_or("1").to_string()
+            }));
+        }
         (routine_keys::TYPE_ROUTINE | note_keys::TYPE_NOTE, session_keys::COUNT) => {
             return Ok(words(t.session_count().to_string(), &|v| {
                 v.unwrap_or("1").to_string()
