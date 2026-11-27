@@ -14880,7 +14880,8 @@ impl App {
                 ];
                 for (selection, icon, label) in rows {
                     let on = self.selection == selection;
-                    if row(ui, tones, on, 0.0, Some((icon, text)), label, false).clicked() {
+                    let shown = (0.0, RowName::Plain);
+                    if row(ui, tones, on, shown, Some((icon, text)), label, false).clicked() {
                         actions.push(Action::Select(selection));
                     }
                 }
@@ -14906,7 +14907,7 @@ impl App {
                     // was, nothing to click, drag, drop on or open a menu
                     // of; its Topics go with it.
                     if let Some(moved) = self.deletions.of(&area.id) {
-                        let resp = row(ui, tones, on, 0.0, icon, &name, false);
+                        let resp = row(ui, tones, on, (0.0, RowName::Area), icon, &name, false);
                         let spinner = egui::Rect::from_center_size(
                             egui::pos2(resp.rect.right() - 18.0, resp.rect.center().y),
                             egui::vec2(16.0, 16.0),
@@ -14930,7 +14931,7 @@ impl App {
                     }
                     // Dragged by its row into the person's own order
                     // (#280); a card dropped on it files.
-                    let resp = row(ui, tones, on, 0.0, icon, &name, true)
+                    let resp = row(ui, tones, on, (0.0, RowName::Area), icon, &name, true)
                         .interact(Sense::click_and_drag());
                     // A shield before its chevron while it is Hidden from
                     // AI (#267).
@@ -15045,6 +15046,9 @@ impl App {
                         }
                     });
                     let row_rect = resp.rect;
+                    // Its Topics stand under its name, their icons where
+                    // its name starts (obf-1157).
+                    let under = if icon.is_some() { ROW_ICON_ROOM } else { 0.0 };
                     for topic in topics {
                         let on = self.selection == Selection::Place(topic.id.clone());
                         // A folded Area still shows the Topic shown, which
@@ -15055,7 +15059,8 @@ impl App {
                         // Its icon in the Area's colour, where it has one
                         // (obf-1156).
                         let icon = icons::area_icon(topic.icon.as_deref()).map(|i| (i, colour));
-                        let resp = row(ui, tones, on, 24.0, icon, &topic_name(&t, topic), true);
+                        let shown = (under, RowName::Topic);
+                        let resp = row(ui, tones, on, shown, icon, &topic_name(&t, topic), true);
                         place_row(&resp, &topic.id, actions);
                         // Export as Pack… for anyone who may read it
                         // (#165), the rest for who manages the Area.
@@ -15092,7 +15097,17 @@ impl App {
                 ui.add_space(12.0);
                 let on = self.selection == Selection::Trash;
                 let trash = Some((icons::OPEN_TRASH, text));
-                if row(ui, tones, on, 0.0, trash, t.trash_title(), false).clicked() {
+                if row(
+                    ui,
+                    tones,
+                    on,
+                    (0.0, RowName::Plain),
+                    trash,
+                    t.trash_title(),
+                    false,
+                )
+                .clicked()
+                {
                     actions.push(Action::Select(Selection::Trash));
                 }
             });
@@ -24885,19 +24900,40 @@ fn place_line(t: &L10n, placed: &Placed) -> Option<String> {
     })
 }
 
+/// How a row of the left pane sets its name (obf-1157).
+#[derive(Clone, Copy, PartialEq)]
+enum RowName {
+    /// In the body's text, as Agenda, All Notes or Trash.
+    Plain,
+    /// Bold, so its Topics stand apart from it.
+    Area,
+    /// One text size smaller, after its icon or the room of one, so the
+    /// names of an Area's Topics stand in one column.
+    Topic,
+}
+
+/// The room a row of the left pane gives its icon, the gap included.
+const ROW_ICON_ROOM: f32 = 26.0;
+
 /// A row of the left pane: self-painted so its text reads in every
 /// state, with the accent while selected. A `droppable` row is outlined
-/// while a card is held over it.
+/// while a card is held over it. `indent` moves its icon and name right,
+/// `name` sets how its name looks.
 fn row(
     ui: &mut Ui,
     tones: Tones,
     on: bool,
-    indent: f32,
+    (indent, name): (f32, RowName),
     icon: Option<(char, Color32)>,
     label: &str,
     droppable: bool,
 ) -> egui::Response {
-    let font = egui::TextStyle::Body.resolve(ui.style());
+    // Grown by this Device's text size, as egui's text styles are.
+    let style = match name {
+        RowName::Topic => egui::TextStyle::Small,
+        RowName::Plain | RowName::Area => egui::TextStyle::Body,
+    };
+    let font = style.resolve(ui.style());
     let height = 30.0;
     let width = ui.available_width();
     let (rect, resp) = ui.allocate_exact_size(egui::vec2(width, height), Sense::click());
@@ -24929,7 +24965,9 @@ fn row(
                 egui::vec2(18.0, 18.0),
             );
             icons::paint(ui.painter(), icon_rect, glyph, colour);
-            x += 26.0;
+            x += ROW_ICON_ROOM;
+        } else if name == RowName::Topic {
+            x += ROW_ICON_ROOM;
         }
         let text = ui.painter().layout(
             label.to_string(),
@@ -24938,6 +24976,12 @@ fn row(
             (rect.right() - x - 8.0).max(0.0),
         );
         let y = rect.center().y - text.size().y / 2.0;
+        // egui's fonts have no bold: drawn again a little to the right,
+        // as a Note's bold text is.
+        if name == RowName::Area {
+            let again = egui::pos2(x + 0.6, y);
+            ui.painter().galley(again, text.clone(), fg);
+        }
         ui.painter().galley(egui::pos2(x, y), text, fg);
     }
     resp

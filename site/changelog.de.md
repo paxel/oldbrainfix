@@ -16,6 +16,10 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Die Eingabetaste in einer Zeile mit einem Statuskästchen (☐, ✅ oder ❌) vorn setzt ein offenes ☐ in die nächste; zweimal beendet die Kästchen. ([obf-1154](https://github.com/paxel/oldbrainfix/issues/474))
 - Themen bekommen ein Symbol in der Farbe ihres Bereichs, aus rund 60 Symbolen; Bereiche wählen aus 18 Farben, jede hell und dunkel gut lesbar. ([obf-1156](https://github.com/paxel/oldbrainfix/issues/476))
 
+### Geändert
+
+- In der Seitenleiste der Desktop-App ist der Name eines Bereichs fett, und seine Themen stehen eingerückt in kleinerer Schrift darunter. ([obf-1157](https://github.com/paxel/oldbrainfix/issues/477))
+
 ### Entfernt
 
 - Das Flatpak wird nicht mehr angeboten; unter Linux gibt es das Tar-Archiv, das .deb, das AppImage oder Homebrew. ([obf-1151](https://github.com/paxel/oldbrainfix/issues/469))

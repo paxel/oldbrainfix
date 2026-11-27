@@ -14,8 +14,9 @@
 
 use std::sync::Arc;
 
-use egui::Key;
 use egui::accesskit::Toggled;
+use egui::epaint::ClippedShape;
+use egui::{Key, Pos2, Rect, Shape};
 use egui_kittest::kittest::{NodeT, Queryable};
 use egui_kittest::{Harness, Node};
 use oldbrainfix_core::{Notes, Places, SigningKey, Store};
@@ -376,5 +377,74 @@ fn a_topics_dialog_picks_its_icon_and_no_colour() -> TestResult {
     let area = places.area_by_id(&household)?.ok_or("the Area")?;
     assert_eq!(area.icon, None);
     assert_eq!(area.colour.as_deref(), Some("1565C0"));
+    Ok(())
+}
+
+/// Where the left pane draws the name `label` in its row, in points, and
+/// the size of its text: once for each time it is drawn.
+fn drawn_names(harness: &Harness<'_, App>, label: &str) -> Vec<(Pos2, f32)> {
+    fn flat(shape: &Shape, into: &mut Vec<Shape>) {
+        match shape {
+            Shape::Vec(shapes) => shapes.iter().for_each(|s| flat(s, into)),
+            other => into.push(other.clone()),
+        }
+    }
+    let scale = harness.ctx.pixels_per_point();
+    let rows: Vec<Rect> = harness
+        .query_all_by_label(label)
+        .map(|n| {
+            let r = n.rect();
+            Rect::from_min_max(
+                (r.min.to_vec2() / scale).to_pos2(),
+                (r.max.to_vec2() / scale).to_pos2(),
+            )
+        })
+        .collect();
+    let mut shapes = Vec::new();
+    for ClippedShape { shape, .. } in &harness.output().shapes {
+        flat(shape, &mut shapes);
+    }
+    shapes
+        .iter()
+        .filter_map(|shape| match shape {
+            Shape::Text(text) if text.galley.text() == label => {
+                let size = text.galley.job.sections[0].format.font_id.size;
+                rows.iter()
+                    .any(|r| r.contains(text.pos))
+                    .then_some((text.pos, size))
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn a_topic_stands_under_its_area_in_smaller_text() -> TestResult {
+    let (store, household, _repairs) = store()?;
+    let places = Places::new(&store);
+    places.set_icon(&household, Some("home"))?;
+    let bills = places.add_topic(&household, "Bills")?;
+    places.set_topic_icon(&bills.id, Some("mail"))?;
+    let harness = window(App::new(store, "en"));
+    // The Area's name bold (obf-1157): drawn twice, a little apart.
+    let area = drawn_names(&harness, "Household");
+    assert_eq!(area.len(), 2, "{area:?}");
+    let (area_at, area_size) = area[0];
+    // A Topic one text size smaller, its name further right than the
+    // Area's, with its icon or without.
+    let [(repairs_at, repairs_size)] = drawn_names(&harness, "Repairs")[..] else {
+        panic!("Repairs drawn once");
+    };
+    let [(bills_at, bills_size)] = drawn_names(&harness, "Bills")[..] else {
+        panic!("Bills drawn once");
+    };
+    assert!(repairs_size < area_size, "{repairs_size} < {area_size}");
+    assert_eq!(bills_size, repairs_size);
+    assert!(repairs_at.x > area_at.x + 1.0, "{repairs_at:?} {area_at:?}");
+    // A Topic without an icon keeps its room: the names in one column.
+    assert!(
+        (repairs_at.x - bills_at.x).abs() < 0.5,
+        "{repairs_at:?} {bills_at:?}"
+    );
     Ok(())
 }

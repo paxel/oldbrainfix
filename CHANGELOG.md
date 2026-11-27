@@ -17,6 +17,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - Return on a line starting with a box (☐, ✅ or ❌) puts an open ☐ on the next line; twice ends the boxes. ([obf-1154](https://github.com/paxel/oldbrainfix/issues/474))
 - Topics get an icon in their Area's colour, picked from about 60 icons; Areas pick from 18 colours, each readable in light and dark. ([obf-1156](https://github.com/paxel/oldbrainfix/issues/476))
 
+### Changed
+
+- In the desktop sidebar an Area's name is bold, and its Topics stand indented under it in smaller text. ([obf-1157](https://github.com/paxel/oldbrainfix/issues/477))
+
 ### Removed
 
 - The Flatpak is no longer offered; Linux users take the tarball, the .deb, the AppImage or Homebrew. ([obf-1151](https://github.com/paxel/oldbrainfix/issues/469))
