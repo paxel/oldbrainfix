@@ -254,6 +254,96 @@ abstract final class TextBoxes {
     return out.toString();
   }
 
+  /// What Return does to a line that starts with a box (obf-1154): [text]
+  /// in [format] right after a line break was typed at [cursor] - 1, the
+  /// cursor at [cursor] after it, as the editor holds it then; null when
+  /// the break stays as it is. A line starts with a box when after its
+  /// indent of spaces and tabs, and an optional `-` and blanks, comes a
+  /// ☐, ✅ or ❌ ([find]'s glyph, its selector and id with it). The break
+  /// after the box, the line's words or some of them still after it,
+  /// gives the new line the same indent and `-` and a bare ☐ and a space
+  /// before the words carried over, their blanks in front dropped; the
+  /// cursor goes before them. The break on a line that holds its box
+  /// alone is taken back with the indent, the `-` and the box, so the
+  /// line is empty, the cursor on it. A break before the box, a box later
+  /// in the line, a Code text (#213) and in a formatted text a box in a
+  /// code block or in inline code carry nothing. The same in both cores
+  /// (`text_boxes.rs`).
+  static ({String text, int cursor})? carriedOn(
+    String text,
+    int cursor, {
+    String format = TextFormats.plain,
+  }) {
+    if (format == TextFormats.code ||
+        cursor < 1 ||
+        cursor > text.length ||
+        text.codeUnitAt(cursor - 1) != _lf) {
+      return null;
+    }
+    final broke = cursor - 1;
+    final lineStart = broke == 0 ? 0 : text.lastIndexOf('\n', broke - 1) + 1;
+    var at = lineStart;
+    while (at < broke && _blank(text.codeUnitAt(at))) {
+      at++;
+    }
+    if (at < broke && text.codeUnitAt(at) == _dash) {
+      var after = at + 1;
+      while (after < broke && _blank(text.codeUnitAt(after))) {
+        after++;
+      }
+      if (after > at + 1) at = after;
+    }
+    final glyphStart = at;
+    if (glyphStart >= broke || _glyph(text.codeUnitAt(glyphStart)) == null) {
+      return null;
+    }
+    var boxEnd = glyphStart + 1;
+    if (boxEnd < text.length) {
+      final next = text.codeUnitAt(boxEnd);
+      if (next == _textStyle || next == _emojiStyle) boxEnd++;
+    }
+    if (boxEnd < text.length && text.codeUnitAt(boxEnd) == _joiner) {
+      return null;
+    }
+    if (_idAt(text, boxEnd) != null) boxEnd += 2 * (idLength + 1);
+    if (boxEnd > broke) return null;
+    if (format == TextFormats.markdown &&
+        Markdown.literalRanges(text)
+            .any((r) => glyphStart >= r.$1 && glyphStart < r.$2)) {
+      return null;
+    }
+    var lineEnd = text.indexOf('\n', cursor);
+    if (lineEnd < 0) lineEnd = text.length;
+    bool blank(int from, int to) {
+      for (var i = from; i < to; i++) {
+        if (!_blank(text.codeUnitAt(i))) return false;
+      }
+      return true;
+    }
+
+    if (blank(boxEnd, broke) && blank(cursor, lineEnd)) {
+      return (
+        text: text.substring(0, lineStart) + text.substring(lineEnd),
+        cursor: lineStart,
+      );
+    }
+    var words = cursor;
+    while (words < lineEnd && _blank(text.codeUnitAt(words))) {
+      words++;
+    }
+    final carried =
+        '${text.substring(lineStart, glyphStart)}${BoxState.open.glyph} ';
+    return (
+      text: text.substring(0, cursor) + carried + text.substring(words),
+      cursor: cursor + carried.length,
+    );
+  }
+
+  static const _lf = 0x0A;
+  static const _dash = 0x2D;
+
+  static bool _blank(int c) => c == 0x20 || c == 0x09;
+
   /// The id [id] as it is written after a glyph: its tag characters and
   /// the cancel tag.
   static String encodeId(String id) => String.fromCharCodes([

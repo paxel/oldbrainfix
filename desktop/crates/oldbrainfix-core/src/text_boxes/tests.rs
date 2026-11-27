@@ -132,3 +132,51 @@ fn each_box_shows_its_latest_tick_without_its_id() {
         "Pack ☐ ✅ x"
     );
 }
+
+/// Return on a line with a box (obf-1154), the same cases as
+/// `boxes_test.dart`: `|` is the cursor, `{id}` a box's id; `None` where
+/// the break stays as it is.
+#[test]
+fn return_on_a_line_with_a_box_carries_it_on() {
+    let id = encode_id("a7k2");
+    let spelt = |s: &str| s.replace("{id}", &id);
+    let (plain, markdown, code) = (text_format::PLAIN, text_format::MARKDOWN, text_format::CODE);
+    let cases: [(&str, &str, Option<&str>); 22] = [
+        ("☐ milk\n|", plain, Some("☐ milk\n☐ |")),
+        ("✅ milk\n|", plain, Some("✅ milk\n☐ |")),
+        ("❌\u{FE0F} milk\n|", plain, Some("❌\u{FE0F} milk\n☐ |")),
+        ("☐{id} milk\n|", plain, Some("☐{id} milk\n☐ |")),
+        ("  - ☐{id} milk\n|", plain, Some("  - ☐{id} milk\n  - ☐ |")),
+        ("\t☐ milk\n|", plain, Some("\t☐ milk\n\t☐ |")),
+        ("☐ milk and\n| eggs", plain, Some("☐ milk and\n☐ |eggs")),
+        ("☐\n|milk", plain, Some("☐\n☐ |milk")),
+        (
+            "Shop\n☐ milk\n|\nbread",
+            plain,
+            Some("Shop\n☐ milk\n☐ |\nbread"),
+        ),
+        ("☐ \n|", plain, Some("|")),
+        ("Shop\n  - ☐{id}\n|\nbread", plain, Some("Shop\n|\nbread")),
+        ("- ☐ milk\n|", markdown, Some("- ☐ milk\n- ☐ |")),
+        ("```\n☐ milk\n|\n```", plain, Some("```\n☐ milk\n☐ |\n```")),
+        ("```\n☐ milk\n|\n```", markdown, None),
+        ("☐ milk\n|", code, None),
+        ("buy ☐ milk\n|", plain, None),
+        ("\n|☐ milk", plain, None),
+        ("☐\u{200D}🔥 x\n|", plain, None),
+        ("* ☐ milk\n|", plain, None),
+        ("-☐ milk\n|", plain, None),
+        ("milk\n|", plain, None),
+        ("☐ milk|", plain, None),
+    ];
+    for (typed, format, carried) in cases {
+        let text = spelt(typed);
+        let at = text.find('|').unwrap_or(text.len());
+        let got = carried_on(&text.replacen('|', "", 1), at, format).map(|(text, cursor)| {
+            let mut marked = text;
+            marked.insert(cursor, '|');
+            marked
+        });
+        assert_eq!(got, carried.map(spelt), "{typed:?} in {format}");
+    }
+}

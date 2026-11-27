@@ -878,6 +878,68 @@ void main() {
       expect(controller.selection, const TextSelection.collapsed(offset: 14));
     });
 
+    testWidgets('Return carries a box on to the next line, splits its '
+        'words, and ends the boxes on a line with its box alone '
+        '(obf-1154)', (tester) async {
+      final id = TextBoxes.encodeId('a7k2');
+      final controller = await pumpField(tester, text: '- ☐$id milk');
+      await tester.enterText(find.byType(TextField), '- ☐$id milk\n');
+      await tester.pump();
+      expect(controller.text, '- ☐$id milk\n- ☐ ');
+      expect(
+        controller.selection,
+        TextSelection.collapsed(offset: controller.text.length),
+      );
+      await tester.enterText(find.byType(TextField), '${controller.text}\n');
+      await tester.pump();
+      expect(controller.text, '- ☐$id milk\n');
+      expect(
+        controller.selection,
+        TextSelection.collapsed(offset: controller.text.length),
+      );
+      // In the middle of its words.
+      controller.value = const TextEditingValue(
+        text: '✅ milk and eggs',
+        selection: TextSelection.collapsed(offset: 10),
+      );
+      await tester.pump();
+      tester.testTextInput.updateEditingValue(
+        const TextEditingValue(
+          text: '✅ milk and\n eggs',
+          selection: TextSelection.collapsed(offset: 11),
+        ),
+      );
+      await tester.pump();
+      expect(controller.text, '✅ milk and\n☐ eggs');
+      expect(controller.selection, const TextSelection.collapsed(offset: 13));
+      // In place of a selection, as on the desktop.
+      controller.value = const TextEditingValue(
+        text: '☐ milk old',
+        selection: TextSelection(baseOffset: 6, extentOffset: 10),
+      );
+      await tester.pump();
+      tester.testTextInput.updateEditingValue(
+        const TextEditingValue(
+          text: '☐ milk\n',
+          selection: TextSelection.collapsed(offset: 7),
+        ),
+      );
+      await tester.pump();
+      expect(controller.text, '☐ milk\n☐ ');
+      expect(controller.selection, const TextSelection.collapsed(offset: 9));
+    });
+
+    testWidgets('Return keeps a Code text as it is (obf-1154, #213)', (
+      tester,
+    ) async {
+      final controller = await pumpField(tester, text: '☐ x');
+      controller.code = true;
+      await tester.pump();
+      await tester.enterText(find.byType(TextField), '☐ x\n');
+      await tester.pump();
+      expect(controller.text, '☐ x\n');
+    });
+
     testWidgets('pasted task list items become boxes, not in code (#263)', (
       tester,
     ) async {

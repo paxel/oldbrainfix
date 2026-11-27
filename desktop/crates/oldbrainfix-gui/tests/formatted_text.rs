@@ -429,6 +429,40 @@ fn a_task_list_item_typed_becomes_a_box_at_its_space() -> TestResult {
     Ok(())
 }
 
+/// Return pressed in the field with the keyboard.
+fn press_return(harness: &mut Harness<'_, App>) {
+    harness.event(egui::Event::Key {
+        key: Key::Enter,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: Modifiers::NONE,
+    });
+    harness.run();
+}
+
+#[test]
+fn return_carries_a_box_on_and_ends_the_boxes_on_a_line_with_its_box_alone() -> TestResult {
+    let (store, note) = with_note("Shop", "plain")?;
+    let mut harness = editor(&store, &note);
+    focus_field(&mut harness, "Shop")?;
+    harness.event(egui::Event::Text("\n  ✅ milk".into()));
+    harness.run();
+    press_return(&mut harness);
+    assert!(field(&harness, "Shop\n  ✅ milk\n  ☐ "));
+    // The cursor after the new box.
+    harness.event(egui::Event::Text("eggs".into()));
+    harness.run();
+    assert!(field(&harness, "Shop\n  ✅ milk\n  ☐ eggs"));
+    press_return(&mut harness);
+    press_return(&mut harness);
+    assert!(field(&harness, "Shop\n  ✅ milk\n  ☐ eggs\n"));
+    harness.event(egui::Event::Text("bread".into()));
+    harness.run();
+    assert!(field(&harness, "Shop\n  ✅ milk\n  ☐ eggs\nbread"));
+    Ok(())
+}
+
 #[test]
 fn pasted_task_list_items_become_boxes_but_in_code() -> TestResult {
     let (store, note) = with_note("Shop", MARKDOWN)?;

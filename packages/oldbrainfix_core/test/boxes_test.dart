@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'package:test/test.dart';
 
@@ -259,5 +261,57 @@ void main() {
         BoxState.failed,
       );
     });
+  });
+  group('Return on a line with a box (obf-1154)', () {
+    // The same cases as `text_boxes/tests.rs`: `|` is the cursor, `{id}`
+    // a box's id; null where the break stays as it is.
+    final id = TextBoxes.encodeId('a7k2');
+    String spelt(String s) => s.replaceAll('{id}', id);
+    ({String text, int cursor})? returned(String typed, String format) {
+      final text = spelt(typed);
+      final at = text.indexOf('|');
+      return TextBoxes.carriedOn(
+        text.replaceFirst('|', ''),
+        at,
+        format: format,
+      );
+    }
+
+    String? marked(({String text, int cursor})? change) =>
+        change?.text.replaceRange(change.cursor, change.cursor, '|');
+
+    const plain = TextFormats.plain;
+    const markdown = TextFormats.markdown;
+    const code = TextFormats.code;
+    final cases = <(String, String, String?)>[
+      ('☐ milk\n|', plain, '☐ milk\n☐ |'),
+      ('✅ milk\n|', plain, '✅ milk\n☐ |'),
+      ('❌️ milk\n|', plain, '❌️ milk\n☐ |'),
+      ('☐{id} milk\n|', plain, '☐{id} milk\n☐ |'),
+      ('  - ☐{id} milk\n|', plain, '  - ☐{id} milk\n  - ☐ |'),
+      ('\t☐ milk\n|', plain, '\t☐ milk\n\t☐ |'),
+      ('☐ milk and\n| eggs', plain, '☐ milk and\n☐ |eggs'),
+      ('☐\n|milk', plain, '☐\n☐ |milk'),
+      ('Shop\n☐ milk\n|\nbread', plain, 'Shop\n☐ milk\n☐ |\nbread'),
+      ('☐ \n|', plain, '|'),
+      ('Shop\n  - ☐{id}\n|\nbread', plain, 'Shop\n|\nbread'),
+      ('- ☐ milk\n|', markdown, '- ☐ milk\n- ☐ |'),
+      ('```\n☐ milk\n|\n```', plain, '```\n☐ milk\n☐ |\n```'),
+      ('```\n☐ milk\n|\n```', markdown, null),
+      ('☐ milk\n|', code, null),
+      ('buy ☐ milk\n|', plain, null),
+      ('\n|☐ milk', plain, null),
+      ('☐‍🔥 x\n|', plain, null),
+      ('* ☐ milk\n|', plain, null),
+      ('-☐ milk\n|', plain, null),
+      ('milk\n|', plain, null),
+      ('☐ milk|', plain, null),
+    ];
+    for (final (typed, format, carried) in cases) {
+      test('${jsonEncode(typed)} in $format', () {
+        final expected = carried == null ? null : spelt(carried);
+        expect(marked(returned(typed, format)), expected);
+      });
+    }
   });
 }

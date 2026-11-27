@@ -14,6 +14,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - A later AXT file from the same app updates or removes the Notes it made, unless you changed them since. ([obf-1147](https://github.com/paxel/oldbrainfix/issues/463))
 - Fedora and openSUSE get an .rpm of the desktop app, beside the .deb, the AppImage and the tarball. ([obf-1152](https://github.com/paxel/oldbrainfix/issues/470))
 - Debian and Ubuntu can install the desktop app from an apt repository and get each new version with their updates. ([obf-1153](https://github.com/paxel/oldbrainfix/issues/471))
+- Return on a line starting with a box (☐, ✅ or ❌) puts an open ☐ on the next line; twice ends the boxes. ([obf-1154](https://github.com/paxel/oldbrainfix/issues/474))
 
 ### Removed
 

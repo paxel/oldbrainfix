@@ -103,7 +103,8 @@ use oldbrainfix_core::{
     OwnProfile, Person, PersonFilter, PersonSettings, Places, Profile, QuietHours, Routine,
     RoutineOccurrence, Routines, Search, Section, SessionSetup, Sessions, ShoppingLine,
     ShoppingList, ShoppingLists, ShoppingOnAgenda, ShownBox, SpeechModelChoice, SpeechModelSource,
-    Store, Tallies, TextSize, ThemeChoice, Topic, UnitSystem, bundle, markdown, text_format,
+    Store, Tallies, TextSize, ThemeChoice, Topic, UnitSystem, bundle, markdown, text_boxes,
+    text_format,
 };
 
 use crate::about_view;
@@ -26607,6 +26608,25 @@ fn edited_text(
                 *edited = change.text;
                 // Both glyphs are as many bytes as the marks they replace.
                 format_bar::select(ui, id, edited, (cursor, cursor));
+                ui.ctx().request_repaint();
+            }
+        }
+        // Return on a line that starts with a box carries a ☐ on to the
+        // next line, or ends the boxes on a line with its box alone
+        // (obf-1154).
+        let returned = ui.input(|i| {
+            i.events.iter().any(|e| {
+                matches!(e, egui::Event::Key { key: Key::Enter, pressed: true, modifiers, .. }
+                    if modifiers.matches_logically(Modifiers::NONE))
+            })
+        });
+        if output.response.response.changed() && returned && !as_code {
+            let (start, cursor) = format_bar::selection(ui, id, edited);
+            if start == cursor
+                && let Some((text, at)) = text_boxes::carried_on(edited, cursor, typed_format)
+            {
+                *edited = text;
+                format_bar::select(ui, id, edited, (at, at));
                 ui.ctx().request_repaint();
             }
         }
