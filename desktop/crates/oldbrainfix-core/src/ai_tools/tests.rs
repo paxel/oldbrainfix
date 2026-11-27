@@ -557,6 +557,42 @@ fn the_areas_list_in_the_persons_own_order_and_a_drafted_one_last() -> TestResul
 }
 
 #[test]
+fn a_topics_icon_is_set_up_and_listed_as_drafted() -> TestResult {
+    let store = store();
+    let places = Places::new(&store);
+    let home = places.add_area("Home")?.id;
+    let post = places.add_topic(&home, "Post")?.id;
+    let task = store.open_ai_task()?;
+    let set = call(
+        &store,
+        &task,
+        "set_topic_icon",
+        &json!({"id": post, "icon": "mail"}),
+    )?;
+    assert!(!set.is_error, "{set:?}");
+    let odd = call(
+        &store,
+        &task,
+        "set_topic_icon",
+        &json!({"id": post, "icon": "rocket"}),
+    )?;
+    assert!(odd.is_error, "{odd:?}");
+    let area = call(
+        &store,
+        &task,
+        "set_topic_icon",
+        &json!({"id": home, "icon": "mail"}),
+    )?;
+    assert!(area.is_error, "{area:?}");
+    let listed = json_of(&call(&store, &task, "list_places", &json!({}))?)?;
+    assert_eq!(
+        listed.pointer("/0/topics/0"),
+        Some(&json!({"icon": "mail", "id": post, "name": "Post"}))
+    );
+    Ok(())
+}
+
+#[test]
 fn the_tags_list_by_their_levels_and_a_drafted_one_shows() -> TestResult {
     let store = store();
     let notes = Notes::new(&store);
@@ -1116,6 +1152,7 @@ fn no_tool_writes_the_users_own_data() {
         "rename_place",
         "set_area_colour",
         "set_area_icon",
+        "set_topic_icon",
         "delete_place",
         "add_routine",
         "reschedule_routine",

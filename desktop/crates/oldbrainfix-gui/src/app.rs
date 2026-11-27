@@ -96,8 +96,8 @@ use oldbrainfix_core::settings::RECORDING_PAUSE_CHOICES;
 use oldbrainfix_core::share::{self, NoteShare};
 use oldbrainfix_core::sync::SETTINGS_SOURCE;
 use oldbrainfix_core::{
-    AREA_ICONS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, Attachment, Blob, BoxState, Boxes,
-    CaptureContext, CapturedDetail, CardTaken, Checklist, ChecklistAgendaRow, Checklists,
+    AREA_ICON_GROUPS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, Attachment, Blob, BoxState,
+    Boxes, CaptureContext, CapturedDetail, CardTaken, Checklist, ChecklistAgendaRow, Checklists,
     ClockTime, Coordinates, Day, DeviceSettings, Frog, Frogs, FrogsToday, Importance, Invite, Line,
     ListOnAgenda, MissedSummary, Note, NoteHistory, Notes, NotesGo, Occurrence, OpenOccurrence,
     OwnProfile, Person, PersonFilter, PersonSettings, Places, Profile, QuietHours, Routine,
@@ -1172,13 +1172,14 @@ enum Dialog {
         area: Option<String>,
         name: String,
     },
-    /// Renaming the Area or Topic `id`, shown as `shown`; an Area's with
-    /// its colour and icon as picked, `look`, one dialog (obf-1014).
+    /// Renaming the Area or Topic `id`, shown as `shown`, with its look
+    /// as picked, `look`, one dialog: an Area's colour and icon
+    /// (obf-1014), a Topic's icon (obf-1156).
     Rename {
         id: String,
         name: String,
         shown: String,
-        look: Option<AreaLook>,
+        look: Option<PlaceLook>,
     },
     Delete(Deleting),
     /// Picking the Note to merge `notes` into, by id and text: the
@@ -9693,10 +9694,20 @@ impl App {
             }
             Action::Rename(id) => {
                 let shown = self.shown_name(&id);
-                let look = self.view.area(&id).map(|area| AreaLook {
-                    colour: area.colour.clone(),
-                    icon: area.icon.clone(),
+                let area = self.view.area(&id).map(|area| {
+                    PlaceLook::Area(AreaLook {
+                        colour: area.colour.clone(),
+                        icon: area.icon.clone(),
+                    })
                 });
+                let topic = self.view.topic(&id).map(|topic| PlaceLook::Topic {
+                    icon: topic.icon.clone(),
+                    colour: self
+                        .view
+                        .area(&topic.area_id)
+                        .and_then(|a| a.colour.clone()),
+                });
+                let look = area.or(topic);
                 self.dialog = Some(Dialog::Rename {
                     id,
                     name: shown.clone(),
@@ -9766,13 +9777,19 @@ impl App {
                     }
                     // Only what was changed: a sync meanwhile keeps the
                     // rest.
-                    if let (Some(look), Some(area)) = (look, self.view.area(id)) {
+                    if let (Some(PlaceLook::Area(look)), Some(area)) = (look, self.view.area(id)) {
                         if look.colour != area.colour {
                             places.set_colour(id, look.colour.as_deref())?;
                         }
                         if look.icon != area.icon {
                             places.set_icon(id, look.icon.as_deref())?;
                         }
+                    }
+                    if let (Some(PlaceLook::Topic { icon, .. }), Some(topic)) =
+                        (look, self.view.topic(id))
+                        && *icon != topic.icon
+                    {
+                        places.set_topic_icon(id, icon.as_deref())?;
                     }
                     self.dialog = None;
                 }
@@ -14879,7 +14896,8 @@ impl App {
                 ui.add_space(4.0);
                 let mut blocks = Vec::new();
                 for (area, topics) in &self.view.areas {
-                    let colour = area_colour(area.colour.as_deref()).unwrap_or(text);
+                    let colour =
+                        area_colour(area.colour.as_deref(), ui.visuals().dark_mode).unwrap_or(text);
                     let icon = icons::area_icon(area.icon.as_deref()).map(|i| (i, colour));
                     let on = self.selection == Selection::Place(area.id.clone());
                     let name = area_name(&t, area);
@@ -15034,14 +15052,18 @@ impl App {
                         if folded && !on {
                             continue;
                         }
-                        let resp = row(ui, tones, on, 24.0, None, &topic_name(&t, topic), true);
+                        // Its icon in the Area's colour, where it has one
+                        // (obf-1156).
+                        let icon = icons::area_icon(topic.icon.as_deref()).map(|i| (i, colour));
+                        let resp = row(ui, tones, on, 24.0, icon, &topic_name(&t, topic), true);
                         place_row(&resp, &topic.id, actions);
                         // Export as Pack… for anyone who may read it
                         // (#165), the rest for who manages the Area.
                         resp.context_menu(|ui| {
                             let mut items = Vec::new();
                             if manages {
-                                items.push((t.rename(), Action::Rename(topic.id.clone())));
+                                let look = t.desk_topic_look();
+                                items.push((look, Action::Rename(topic.id.clone())));
                             }
                             items.push((t.export_as_pack(), Action::ExportPack(topic.id.clone())));
                             // Its Notes for another app (obf-1145).
@@ -17800,7 +17822,7 @@ impl App {
             )];
             if !place.area {
                 let rename = [(
-                    t.rename(),
+                    t.desk_topic_look(),
                     keys(Modifiers::NONE, Key::F2),
                     manages,
                     Action::Rename(id.clone()),
@@ -21353,6 +21375,18 @@ struct AreaLook {
     icon: Option<String>,
 }
 
+/// What the dialog of a place picks besides its name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum PlaceLook {
+    Area(AreaLook),
+    /// A Topic's icon (obf-1156), shown in `colour`, its Area's as
+    /// stored: it has none of its own.
+    Topic {
+        icon: Option<String>,
+        colour: Option<String>,
+    },
+}
+
 /// What may be done to the Note shown (#145), by its id.
 struct NoteMenu {
     id: String,
@@ -23073,79 +23107,114 @@ fn people_form(
     }
 }
 
-/// An Area's name, colour and icon in one dialog (obf-1014): its name
-/// over the colours and icons, each marked as it is picked and kept with
-/// Save, or Enter in the name; Cancel keeps none of them.
+/// An Area's name, colour and icon in one dialog (obf-1014), or a
+/// Topic's name and icon (obf-1156): its name over the colours and the
+/// icons, a Topic's in its Area's colour, each marked as it is picked
+/// and kept with Save, or Enter in the name; Cancel keeps none of them.
 fn area_look_form(
     ui: &mut Ui,
     t: &L10n,
     (name, focus): (&mut String, bool),
-    look: &mut AreaLook,
+    look: &mut PlaceLook,
     actions: &mut Vec<Action>,
 ) {
     let text = ui.visuals().text_color();
-    title(ui, t.desk_area_look_title());
+    let dark = ui.visuals().dark_mode;
+    match look {
+        PlaceLook::Area(_) => title(ui, t.desk_area_look_title()),
+        PlaceLook::Topic { .. } => title(ui, t.desk_topic_look_title()),
+    }
     let field = focused_field(ui, t, (&mut *name, focus), "name", t.name_hint());
     let ready = !name.trim().is_empty();
     if ready && field.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
         actions.push(Action::SaveName);
     }
     ui.add_space(8.0);
-    ui.label(RichText::new(t.colour_heading()).strong());
-    ui.horizontal_wrapped(|ui| {
-        let none = look.colour.is_none();
-        if ui
-            .add(egui::Button::selectable(
-                none,
-                RichText::new(t.no_colour()).color(text),
-            ))
-            .clicked()
-        {
-            look.colour = None;
-        }
-        for hex in AREA_PALETTE {
-            let on = look.colour.as_deref() == Some(hex);
-            let colour = area_colour(Some(hex)).unwrap_or(text);
-            if swatch(ui, hex, on, |painter, rect| {
-                painter.circle_filled(rect.center(), rect.width() / 2.0 - 3.0, colour);
-            })
-            .clicked()
-            {
-                look.colour = Some(hex.to_string());
-            }
-        }
-    });
-    ui.label(RichText::new(t.icon_heading()).strong());
-    ui.horizontal_wrapped(|ui| {
-        let none = look.icon.is_none();
-        if ui
-            .add(egui::Button::selectable(
-                none,
-                RichText::new(t.no_icon()).color(text),
-            ))
-            .clicked()
-        {
-            look.icon = None;
-        }
-        for key in AREA_ICONS {
-            let Some(glyph) = icons::area_icon(Some(key)) else {
-                continue;
+    // The colours and the icons scroll, as high as the window allows,
+    // the title, the name and the buttons around them (obf-1156).
+    let high = (ui.ctx().content_rect().height() - 240.0).max(160.0);
+    egui::ScrollArea::vertical()
+        .max_height(high)
+        .show(ui, |ui| {
+            let (icon, painted) = match look {
+                PlaceLook::Area(look) => {
+                    area_colours(ui, t, &mut look.colour);
+                    (&mut look.icon, text)
+                }
+                // A Topic shows in its Area's colour: it has none of its own.
+                PlaceLook::Topic { icon, colour } => {
+                    let shown = area_colour(colour.as_deref(), dark).unwrap_or(text);
+                    (icon, shown)
+                }
             };
-            let on = look.icon.as_deref() == Some(key);
-            if swatch(ui, key, on, |painter, rect| {
-                icons::paint(painter, rect.shrink(5.0), glyph, text);
-            })
-            .clicked()
-            {
-                look.icon = Some(key.to_string());
+            ui.label(RichText::new(t.icon_heading()).strong());
+            // Each group of the core's on its own lines (obf-1156).
+            for (i, group) in AREA_ICON_GROUPS.iter().enumerate() {
+                if i > 0 {
+                    ui.add_space(6.0);
+                }
+                ui.horizontal_wrapped(|ui| {
+                    if i == 0
+                        && ui
+                            .add(egui::Button::selectable(
+                                icon.is_none(),
+                                RichText::new(t.no_icon()).color(text),
+                            ))
+                            .clicked()
+                    {
+                        *icon = None;
+                    }
+                    for &key in *group {
+                        let Some(glyph) = icons::area_icon(Some(key)) else {
+                            continue;
+                        };
+                        let on = icon.as_deref() == Some(key);
+                        if swatch(ui, key, on, |painter, rect| {
+                            icons::paint(painter, rect.shrink(5.0), glyph, painted);
+                        })
+                        .clicked()
+                        {
+                            *icon = Some(key.to_string());
+                        }
+                    }
+                });
             }
-        }
-    });
+        });
     ui.add_space(8.0);
     ui.horizontal(|ui| {
         cancel(ui, t, actions);
         if theme::main_action(ui, ready, t.save()) {
             actions.push(Action::SaveName);
+        }
+    });
+}
+
+/// An Area's colours to pick from (obf-1014), each as this look draws
+/// it, and none.
+fn area_colours(ui: &mut Ui, t: &L10n, colour: &mut Option<String>) {
+    let text = ui.visuals().text_color();
+    let dark = ui.visuals().dark_mode;
+    ui.label(RichText::new(t.colour_heading()).strong());
+    ui.horizontal_wrapped(|ui| {
+        if ui
+            .add(egui::Button::selectable(
+                colour.is_none(),
+                RichText::new(t.no_colour()).color(text),
+            ))
+            .clicked()
+        {
+            *colour = None;
+        }
+        for hex in AREA_PALETTE {
+            let on = colour.as_deref() == Some(hex);
+            let shown = area_colour(Some(hex), dark).unwrap_or(text);
+            if swatch(ui, hex, on, |painter, rect| {
+                painter.circle_filled(rect.center(), rect.width() / 2.0 - 3.0, shown);
+            })
+            .clicked()
+            {
+                *colour = Some(hex.to_string());
+            }
         }
     });
 }
@@ -24149,7 +24218,7 @@ fn agenda_row(
     let colour = row
         .area
         .as_ref()
-        .and_then(|a| area_colour(a.colour.as_deref()));
+        .and_then(|a| area_colour(a.colour.as_deref(), ui.visuals().dark_mode));
     let title = row_title(t, row.row.note.as_ref());
     let time = occurrence_time(t, &occurrence);
     let card = agenda_card(ui, tones, colour, |ui| {
@@ -24389,7 +24458,7 @@ fn shopping_row(ui: &mut Ui, tones: Tones, row: &ShoppingRow, actions: &mut Vec<
     let colour = row
         .area
         .as_ref()
-        .and_then(|a| area_colour(a.colour.as_deref()));
+        .and_then(|a| area_colour(a.colour.as_deref(), ui.visuals().dark_mode));
     agenda_card(ui, tones, colour, |ui| {
         let icon = (icons::SHOPPING_CART, row.area.as_ref(), colour);
         list_heading(ui, icon, (&row.note_id, &row.text, "shopping row"), actions);
@@ -24424,7 +24493,7 @@ fn checklist_row(ui: &mut Ui, tones: Tones, row: &ChecklistRow, actions: &mut Ve
     let colour = row
         .area
         .as_ref()
-        .and_then(|a| area_colour(a.colour.as_deref()));
+        .and_then(|a| area_colour(a.colour.as_deref(), ui.visuals().dark_mode));
     agenda_card(ui, tones, colour, |ui| {
         let icon = (icons::CHECKLIST, row.area.as_ref(), colour);
         list_heading(
@@ -24614,10 +24683,10 @@ fn missed_card(
 
 /// An Area's stored colour (`RRGGBB`), or `None` when it has none or it
 /// cannot be read.
-pub fn area_colour(hex: Option<&str>) -> Option<Color32> {
+pub fn area_colour(hex: Option<&str>, dark: bool) -> Option<Color32> {
     let value = u32::from_str_radix(hex?, 16).ok()?;
     let [_, r, g, b] = value.to_be_bytes();
-    Some(Color32::from_rgb(r, g, b))
+    Some(theme::area_shade(Color32::from_rgb(r, g, b), dark))
 }
 
 /// When something was captured, in the app's language and local time:
@@ -25265,7 +25334,7 @@ fn note_badges(
         // Area and Topic in one: File into… picks both at once.
         // The folder for every place, in the Area's colour.
         let area = placed.area.as_ref();
-        let colour = area.and_then(|a| area_colour(a.colour.as_deref()));
+        let colour = area.and_then(|a| area_colour(a.colour.as_deref(), ui.visuals().dark_mode));
         let place = place_line(t, placed).unwrap_or_else(|| t.unsorted().to_string());
         let place = badge(
             ui,
@@ -27604,7 +27673,7 @@ fn note_card(
     let colour = placed
         .area
         .as_ref()
-        .and_then(|a| area_colour(a.colour.as_deref()));
+        .and_then(|a| area_colour(a.colour.as_deref(), ui.visuals().dark_mode));
     let mut author_rect = None;
     let mut edit_rect = egui::Rect::NOTHING;
     let mut more_rect = None;

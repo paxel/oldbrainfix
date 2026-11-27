@@ -213,7 +213,7 @@ class _RoutineCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colour = areaColour(area?.colour);
+    final colour = areaColour(area?.colour, Theme.of(context).brightness);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Embossed(

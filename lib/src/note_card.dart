@@ -565,7 +565,7 @@ class NoteCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final area = this.area;
     final topic = this.topic;
-    final colour = areaColour(area?.colour);
+    final colour = areaColour(area?.colour, Theme.of(context).brightness);
     // A Note that spawned a Routine is not Unsorted, though not filed.
     final place = !showPlace
         ? null

@@ -15,6 +15,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - Fedora and openSUSE get an .rpm of the desktop app, beside the .deb, the AppImage and the tarball. ([obf-1152](https://github.com/paxel/oldbrainfix/issues/470))
 - Debian and Ubuntu can install the desktop app from an apt repository and get each new version with their updates. ([obf-1153](https://github.com/paxel/oldbrainfix/issues/471))
 - Return on a line starting with a box (☐, ✅ or ❌) puts an open ☐ on the next line; twice ends the boxes. ([obf-1154](https://github.com/paxel/oldbrainfix/issues/474))
+- Topics get an icon in their Area's colour, picked from about 60 icons; Areas pick from 18 colours, each readable in light and dark. ([obf-1156](https://github.com/paxel/oldbrainfix/issues/476))
 
 ### Removed
 

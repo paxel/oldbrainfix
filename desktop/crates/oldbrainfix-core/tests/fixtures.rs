@@ -52,7 +52,7 @@ use std::collections::BTreeMap;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 35] = [
+const SCENARIOS: [&str; 36] = [
     "added-grammars",
     "area-order",
     "area-order-shown",
@@ -87,6 +87,7 @@ const SCENARIOS: [&str; 35] = [
     "sessions",
     "shopping-lists",
     "tallies",
+    "topic-icons",
     "trash",
 ];
 
@@ -397,12 +398,19 @@ fn read(store: &Store) -> Result<Value, Box<dyn std::error::Error>> {
             "starter": area.starter,
             "colour": area.colour,
             "icon": area.icon,
-            "topics": topics.iter().map(|t| json!({
-                "id": t.id,
-                "areaId": t.area_id,
-                "name": t.name,
-                "starter": t.starter,
-            })).collect::<Vec<_>>(),
+            "topics": topics.iter().map(|t| {
+                let mut topic = json!({
+                    "id": t.id,
+                    "areaId": t.area_id,
+                    "name": t.name,
+                    "starter": t.starter,
+                });
+                // Only where one is set (obf-1156), as the generator.
+                if let (Some(icon), Some(fields)) = (&t.icon, topic.as_object_mut()) {
+                    fields.insert("icon".into(), json!(icon));
+                }
+                topic
+            }).collect::<Vec<_>>(),
         }));
     }
     let mut every = Vec::new();
@@ -841,6 +849,18 @@ fn the_store_has_the_dart_core_tables() -> TestResult {
     let theirs = std::fs::read_to_string(fixtures().join("schema.sql"))?;
     let squash = |s: &str| s.split_whitespace().collect::<Vec<_>>().join(" ");
     assert_eq!(squash(&ours), squash(&theirs));
+    Ok(())
+}
+
+#[test]
+fn the_icon_keys_are_the_dart_cores_in_its_groups() -> TestResult {
+    let fixture = read_json(&fixtures().join("area_icons.json"))?;
+    let theirs: Vec<Vec<String>> = serde_json::from_value(fixture["groups"].clone())?;
+    let ours: Vec<Vec<String>> = oldbrainfix_core::AREA_ICON_GROUPS
+        .iter()
+        .map(|g| g.iter().map(|k| k.to_string()).collect())
+        .collect();
+    assert_eq!(ours, theirs);
     Ok(())
 }
 
@@ -1809,6 +1829,23 @@ fn write_places(store: &Store) -> Built {
     places.add_topic(&gone.id, "Gone too")?;
     places.delete_area(&gone.id, NotesGo::Unsorted)?;
     notes.set_importance(&lost.id, Importance::Important)?;
+    Ok(())
+}
+
+/// The generator's `topic-icons` scenario (obf-1156).
+fn write_topic_icons(store: &Store) -> Built {
+    let places = Places::new(store);
+    let home = places.add_area("Home")?;
+    places.set_colour(&home.id, Some("F06292"))?;
+    places.set_icon(&home.id, Some("family"))?;
+    let post = places.add_topic(&home.id, "Post")?;
+    places.set_topic_icon(&post.id, Some("mail"))?;
+    places.rename(&post.id, "Letters")?;
+    let bills = places.add_topic(&home.id, "Bills")?;
+    places.set_topic_icon(&bills.id, Some("receipt"))?;
+    places.set_topic_icon(&bills.id, None)?;
+    places.add_topic(&home.id, "Attic")?;
+    Notes::new(store).capture("Pay the rent", Some(&post.id), None)?;
     Ok(())
 }
 
@@ -2984,7 +3021,7 @@ fn photos_and_recordings_are_kept_as_the_dart_core_keeps_them() -> TestResult {
 
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 35] = [
+    let writers: [(&str, Writer); 36] = [
         ("added-grammars", write_added_grammars),
         ("area-order", write_area_order),
         ("area-order-shown", write_area_order_shown),
@@ -3019,6 +3056,7 @@ fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResu
         ("sessions", write_sessions),
         ("shopping-lists", write_shopping_lists),
         ("tallies", write_tallies),
+        ("topic-icons", write_topic_icons),
         ("trash", write_trash),
     ];
     assert_eq!(writers.map(|(s, _)| s), SCENARIOS);

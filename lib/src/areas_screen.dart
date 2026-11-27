@@ -444,7 +444,7 @@ class _AreasScreenState extends State<AreasScreen>
         await Navigator.of(context).push(
           MaterialPageRoute<void>(
             builder: (_) =>
-                AreaLookScreen(places: widget.places, areaId: area.id),
+                AreaLookScreen(places: widget.places, placeId: area.id),
           ),
         );
         if (!mounted) return;
@@ -895,7 +895,7 @@ Widget _lifted(Widget row, int _, Animation<double> lift) => AnimatedBuilder(
 
 enum _AreaAction { rename, look, share, pack, axt, people, hideFromAi, delete }
 
-enum _TopicAction { rename, pack, axt, delete }
+enum _TopicAction { rename, look, pack, axt, delete }
 
 /// The browser's second level, one Area: its Topics and the diary of
 /// its Notes without a Topic, with a search field over its Notes and
@@ -1142,6 +1142,14 @@ class _AreaScreenState extends State<AreaScreen>
         final name = await askName(context, title: t.rename, initial: shown);
         if (!mounted || name == null || name == shown) return;
         widget.places.rename(topic.id, name);
+      case _TopicAction.look:
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) =>
+                AreaLookScreen(places: widget.places, placeId: topic.id),
+          ),
+        );
+        if (!mounted) return;
       case _TopicAction.pack:
         await exportPack(context, widget.places.store, topic.id);
         if (!mounted) return;
@@ -1174,6 +1182,8 @@ class _AreaScreenState extends State<AreaScreen>
       for (final topic in _topics)
         _PlaceRow(
           title: topicName(t, topic),
+          // Its icon in the Area's colour, where it has one (obf-1156).
+          leading: topicMark(context, area, topic),
           highlighted: topic.id == last,
           onTap: () => _open(topic),
           // Anyone may export copies (#164); renaming and deleting are a
@@ -1186,6 +1196,12 @@ class _AreaScreenState extends State<AreaScreen>
                 PopupMenuItem(
                   value: _TopicAction.rename,
                   child: Text(t.rename),
+                ),
+              if (_manages)
+                PopupMenuItem(
+                  key: ValueKey('topic-look-${topic.id}'),
+                  value: _TopicAction.look,
+                  child: Text(t.topicLook),
                 ),
               PopupMenuItem(
                 key: ValueKey('topic-pack-${topic.id}'),
@@ -1779,7 +1795,8 @@ class _AreaMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colour =
-        areaColour(area.colour) ?? Theme.of(context).colorScheme.outline;
+        areaColour(area.colour, Theme.of(context).brightness) ??
+        Theme.of(context).colorScheme.outline;
     return Icon(areaIconData(area.icon) ?? Icons.folder, color: colour);
   }
 }

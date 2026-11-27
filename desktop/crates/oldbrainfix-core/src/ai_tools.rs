@@ -404,6 +404,13 @@ pub fn tools() -> Vec<Value> {
             &["id", "icon"],
         ),
         tool(
+            "set_topic_icon",
+            "Sets or clears the icon of a Topic, one of the Area icons; it shows in its Area's colour.",
+            false,
+            json!({"icon": {"description": "One of the app's Area icons, or null for none", "type": ["string", "null"]}, "id": id("Topic")}),
+            &["id", "icon"],
+        ),
+        tool(
             "delete_place",
             "Deletes an Area with its Topics, or a Topic; its Notes go back to Unsorted, into the trash, or (for a Topic) into its Area.",
             false,
@@ -1684,7 +1691,7 @@ impl Store {
                     let topics: Vec<Value> = places
                         .topics(&area.id)?
                         .iter()
-                        .map(|t| json!({"id": t.id, "name": t.name}))
+                        .map(|t| json!({"icon": t.icon, "id": t.id, "name": t.name}))
                         .collect();
                     out.push(json!({
                         "access": self.access_in(&area.id, None)?.name(),
@@ -2279,6 +2286,10 @@ impl Store {
             }
             "set_area_icon" => {
                 places.set_icon(id()?, optional_text(args, "icon"))?;
+                id()?.to_string()
+            }
+            "set_topic_icon" => {
+                places.set_topic_icon(id()?, optional_text(args, "icon"))?;
                 id()?.to_string()
             }
             "delete_place" => {

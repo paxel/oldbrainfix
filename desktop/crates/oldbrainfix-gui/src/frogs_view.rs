@@ -150,7 +150,7 @@ pub fn frog_row(
     let colour = shown
         .area
         .as_ref()
-        .and_then(|a| area_colour(a.colour.as_deref()));
+        .and_then(|a| area_colour(a.colour.as_deref(), ui.visuals().dark_mode));
     let title = row_title(t, Some(&shown.note));
     agenda_card(ui, tones, colour, |ui| {
         ui.horizontal(|ui| {

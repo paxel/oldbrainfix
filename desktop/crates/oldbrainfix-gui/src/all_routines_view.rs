@@ -194,7 +194,7 @@ fn card(
     let weak = ui.visuals().weak_text_color();
     let first = name.trim().lines().next().unwrap_or_default();
     let id = Id::new(("all routines", routine));
-    let colour = area.and_then(|a| area_colour(a.colour.as_deref()));
+    let colour = area.and_then(|a| area_colour(a.colour.as_deref(), ui.visuals().dark_mode));
     banded_clickable_card(ui, tones, (id, first), colour, |ui| {
         ui.horizontal(|ui| {
             icons::show(ui, icon, 20.0, weak);

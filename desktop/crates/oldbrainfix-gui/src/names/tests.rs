@@ -30,6 +30,7 @@ fn starters_translate_until_renamed() {
         area_id: "area:a".into(),
         name: "To sort out".into(),
         starter: Some("to-sort-out".into()),
+        icon: None,
     };
     assert_eq!(
         topic_name(&de, &topic),

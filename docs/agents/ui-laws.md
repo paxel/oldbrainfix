@@ -108,6 +108,10 @@ There are three kinds, and an action takes the first that fits.
   important ones (see Cards). Phone: `Embossed` in `look.dart`. Desktop:
   `theme::embossed`, laid out by `embossed` / `agenda_card` in `app.rs`.
   An Area's colour runs down its left edge, 6 wide (`theme::area_band`).
+  An Area's colour is drawn everywhere in its shade for the look, at
+  least 3:1 to the ground, the question marks and the cards (phone
+  `areaColour`, desktop `area_colour`, obf-1156); a Topic's icon is
+  drawn in its Area's colour.
 - Its kinds are a Note's card (`NoteCard`, padding 16, on the desktop
   14; the card text is 16), a Settings section's card with its title on top
   (obf-1085, phone `SettingsSection`), and the one card of a Checklist,

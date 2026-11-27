@@ -18,31 +18,64 @@ abstract final class PlaceKeys {
   /// An Area's colour as `RRGGBB` hex.
   static const colour = 'colour';
 
-  /// An Area's icon, one of [areaIcons].
+  /// An Area's or a Topic's icon, one of [areaIcons] (obf-1156). A
+  /// Topic has no colour of its own: its icon shows in its Area's.
   static const icon = 'icon';
 
   /// The Area a Topic lives in.
   static const area = 'area';
 }
 
-/// The icons an Area can carry, as keys every front end draws its own way.
-const areaIcons = [
-  'home',
-  'work',
-  'car',
-  'health',
-  'school',
-  'kids',
-  'kitchen',
-  'garden',
-  'shopping',
-  'money',
-  'pets',
-  'sport',
-  'travel',
-  'star',
-  'brain',
+/// The icons an Area or a Topic can carry, as keys every front end draws
+/// its own way, in the groups the look page shows them in (obf-1156):
+/// home and family, work and study, health and sport, hobbies, getting
+/// around, money and things, and the rest. A key once offered stays, so
+/// every stored look still reads; new ones join a group.
+const areaIconGroups = [
+  [
+    'home',
+    'kitchen',
+    'garden',
+    'kids',
+    'pets',
+    'cleaning',
+    'laundry',
+    'bed',
+    'repairs',
+    'plants',
+    'family',
+  ],
+  [
+    'work',
+    'school',
+    'computer',
+    'meetings',
+    'mail',
+    'book',
+    'science',
+    'idea',
+    'code',
+  ],
+  [
+    'health',
+    'sport',
+    'doctor',
+    'medication',
+    'food',
+    'running',
+    'cycling',
+    'relax',
+  ],
+  ['music', 'photo', 'movie', 'games', 'art', 'crafts', 'hiking', 'football'],
+  ['car', 'travel', 'bus', 'train', 'boat', 'beach', 'map', 'hotel'],
+  ['shopping', 'money', 'gift', 'phone', 'key', 'bank', 'receipt', 'document'],
+  ['star', 'brain', 'flag', 'event', 'party', 'coffee', 'bolt', 'sun'],
 ];
+
+/// Every key of [areaIconGroups], group by group.
+final List<String> areaIcons = List.unmodifiable([
+  for (final group in areaIconGroups) ...group,
+]);
 
 /// The top level Notes are filed under (CONTEXT.md).
 class Area {
@@ -78,11 +111,15 @@ class Topic {
   /// The Starter Set slug, or null when the user made it.
   final String? starter;
 
+  /// One of [areaIcons], drawn in its Area's colour (obf-1156).
+  final String? icon;
+
   const Topic({
     required this.id,
     required this.areaId,
     required this.name,
     this.starter,
+    this.icon,
   });
 }
 
@@ -202,6 +239,19 @@ class Places {
     store.append(areaId, PlaceKeys.icon, icon);
   }
 
+  /// Sets or clears the icon of the Topic [topicId] (obf-1156), stored as
+  /// an Area's: an older app keeps it, as it writes only the fields it
+  /// changes.
+  void setTopicIcon(String topicId, String? icon) {
+    if (topicById(topicId) == null) {
+      throw ArgumentError.value(topicId, 'topicId', 'not a Topic');
+    }
+    if (icon != null && !areaIcons.contains(icon)) {
+      throw ArgumentError.value(icon, 'icon', 'not one of areaIcons');
+    }
+    store.append(topicId, PlaceKeys.icon, icon);
+  }
+
   /// The Area [id], or null when there is none.
   Area? areaById(String id) {
     final fields = store.currentFields(id);
@@ -226,6 +276,7 @@ class Places {
       areaId: areaId,
       name: fields[PlaceKeys.name] ?? '',
       starter: fields[PlaceKeys.starter],
+      icon: fields[PlaceKeys.icon],
     );
   }
 
@@ -256,6 +307,7 @@ class Places {
             areaId: areaId,
             name: held[PlaceKeys.name] ?? '',
             starter: held[PlaceKeys.starter],
+            icon: held[PlaceKeys.icon],
           ),
     ];
     topics.sort((a, b) => a.name.compareTo(b.name));

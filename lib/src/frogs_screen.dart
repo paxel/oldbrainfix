@@ -154,7 +154,7 @@ class FrogRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.t;
     final text = Theme.of(context).textTheme;
-    final colour = areaColour(area?.colour);
+    final colour = areaColour(area?.colour, Theme.of(context).brightness);
     final done = this.done ?? frog.isDone;
     final subtitle = this.subtitle;
     final onAnother = this.onAnother;

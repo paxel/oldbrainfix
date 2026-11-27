@@ -20,17 +20,113 @@ pub mod keys {
     pub const STARTER: &str = "starter";
     /// An Area's colour as `RRGGBB` hex.
     pub const COLOUR: &str = "colour";
-    /// An Area's icon, one of the core's `areaIcons`.
+    /// An Area's or a Topic's icon, one of the core's `areaIcons`
+    /// (obf-1156). A Topic has no colour of its own: its icon shows in
+    /// its Area's.
     pub const ICON: &str = "icon";
     /// The Area a Topic lives in.
     pub const AREA: &str = "area";
 }
 
-/// The icons an Area can carry, as keys every front end draws its own
-/// way: the Dart core's `areaIcons`.
-pub const AREA_ICONS: [&str; 15] = [
-    "home", "work", "car", "health", "school", "kids", "kitchen", "garden", "shopping", "money",
-    "pets", "sport", "travel", "star", "brain",
+/// The icons an Area or a Topic can carry, as keys every front end draws
+/// its own way, in the groups the look page shows them in (obf-1156):
+/// the Dart core's `areaIconGroups`. A key once offered stays, so every
+/// stored look still reads; new ones join a group.
+pub const AREA_ICON_GROUPS: [&[&str]; 7] = [
+    &[
+        "home", "kitchen", "garden", "kids", "pets", "cleaning", "laundry", "bed", "repairs",
+        "plants", "family",
+    ],
+    &[
+        "work", "school", "computer", "meetings", "mail", "book", "science", "idea", "code",
+    ],
+    &[
+        "health",
+        "sport",
+        "doctor",
+        "medication",
+        "food",
+        "running",
+        "cycling",
+        "relax",
+    ],
+    &[
+        "music", "photo", "movie", "games", "art", "crafts", "hiking", "football",
+    ],
+    &[
+        "car", "travel", "bus", "train", "boat", "beach", "map", "hotel",
+    ],
+    &[
+        "shopping", "money", "gift", "phone", "key", "bank", "receipt", "document",
+    ],
+    &[
+        "star", "brain", "flag", "event", "party", "coffee", "bolt", "sun",
+    ],
+];
+
+/// Every key of [`AREA_ICON_GROUPS`], group by group: the Dart core's
+/// `areaIcons`.
+pub const AREA_ICONS: [&str; 60] = [
+    "home",
+    "kitchen",
+    "garden",
+    "kids",
+    "pets",
+    "cleaning",
+    "laundry",
+    "bed",
+    "repairs",
+    "plants",
+    "family",
+    "work",
+    "school",
+    "computer",
+    "meetings",
+    "mail",
+    "book",
+    "science",
+    "idea",
+    "code",
+    "health",
+    "sport",
+    "doctor",
+    "medication",
+    "food",
+    "running",
+    "cycling",
+    "relax",
+    "music",
+    "photo",
+    "movie",
+    "games",
+    "art",
+    "crafts",
+    "hiking",
+    "football",
+    "car",
+    "travel",
+    "bus",
+    "train",
+    "boat",
+    "beach",
+    "map",
+    "hotel",
+    "shopping",
+    "money",
+    "gift",
+    "phone",
+    "key",
+    "bank",
+    "receipt",
+    "document",
+    "star",
+    "brain",
+    "flag",
+    "event",
+    "party",
+    "coffee",
+    "bolt",
+    "sun",
 ];
 
 /// The id every Device plants the starter place `slug` of `ty` under.
@@ -87,6 +183,8 @@ pub struct Topic {
     pub name: String,
     /// The Starter Set slug, or `None` when the user made it.
     pub starter: Option<String>,
+    /// One of [`AREA_ICONS`], drawn in its Area's colour (obf-1156).
+    pub icon: Option<String>,
 }
 
 /// One Area or Topic of the Starter Set, by slug and canonical English
@@ -240,6 +338,23 @@ impl<'a> Places<'a> {
             return Err(Error::Invalid(format!("not an Area icon: {icon}")));
         }
         self.store.append(area_id, keys::ICON, icon, None).map(drop)
+    }
+
+    /// Sets or clears the icon of the Topic `topic_id`, one of
+    /// [`AREA_ICONS`] (obf-1156), stored as an Area's: an older app
+    /// keeps it, as it writes only the fields it changes.
+    pub fn set_topic_icon(&self, topic_id: &str, icon: Option<&str>) -> Result<()> {
+        if self.topic_by_id(topic_id)?.is_none() {
+            return Err(Error::Invalid(format!("not a Topic: {topic_id}")));
+        }
+        if let Some(icon) = icon
+            && !AREA_ICONS.contains(&icon)
+        {
+            return Err(Error::Invalid(format!("not an icon: {icon}")));
+        }
+        self.store
+            .append(topic_id, keys::ICON, icon, None)
+            .map(drop)
     }
 
     /// How many Notes sit in `id`; for an Area, its Topics' Notes count
@@ -474,6 +589,7 @@ impl<'a> Places<'a> {
             area_id: area_id.to_string(),
             name: fields.get(keys::NAME).unwrap_or_default().to_string(),
             starter: fields.get(keys::STARTER).map(str::to_string),
+            icon: fields.get(keys::ICON).map(str::to_string),
         }))
     }
 
@@ -512,6 +628,7 @@ impl<'a> Places<'a> {
                     area_id: area_id.to_string(),
                     name: held.get(keys::NAME).unwrap_or_default().to_string(),
                     starter: held.get(keys::STARTER).map(str::to_string),
+                    icon: held.get(keys::ICON).map(str::to_string),
                 });
             }
         }

@@ -743,6 +743,7 @@ extension SharedAreas on Store {
       if (topic.starter case final starter?) {
         append(topicId, PlaceKeys.starter, starter);
       }
+      if (topic.icon case final icon?) append(topicId, PlaceKeys.icon, icon);
       moved[topic.id] = topicId;
     }
     for (final note in entitiesOfType(NoteKeys.typeNote)..sort()) {

@@ -112,7 +112,12 @@ const AREA_FIELDS: [&str; 4] = [
     place_keys::COLOUR,
     place_keys::ICON,
 ];
-const TOPIC_FIELDS: [&str; 3] = [place_keys::TYPE, place_keys::AREA, place_keys::NAME];
+const TOPIC_FIELDS: [&str; 4] = [
+    place_keys::TYPE,
+    place_keys::AREA,
+    place_keys::NAME,
+    place_keys::ICON,
+];
 /// The type of the user's own Agenda choices for a Note, the entity
 /// `agenda:<note id>`
 /// ([`crate::checklists::keys::AGENDA_PREFIX`]).

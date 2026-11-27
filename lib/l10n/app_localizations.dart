@@ -296,6 +296,12 @@ abstract class AppLocalizations {
   /// **'Colour and icon'**
   String get areaLook;
 
+  /// In a Topic's menu (obf-1156): opens the page that picks its icon, shown in its Area's colour.
+  ///
+  /// In en, this message translates to:
+  /// **'Icon'**
+  String get topicLook;
+
   /// No description provided for @colourHeading.
   ///
   /// In en, this message translates to:

@@ -226,25 +226,72 @@ pub const SAVE_FILE: char = '\u{f05b}';
 pub const SHOW_LINES: char = '\u{e44c}';
 pub const SHOW_GRID: char = '\u{e2e9}';
 
-/// How the phone draws each of the core's Area icons.
+/// How the phone draws each of the core's Area and Topic icons: the
+/// codepoints of the Material icons named, as Flutter's `icons.dart`
+/// has them (obf-1156).
 pub fn area_icon(key: Option<&str>) -> Option<char> {
     Some(match key? {
-        "home" => '\u{e318}',
-        "work" => '\u{e6f2}',
-        "car" => '\u{e1d7}',
-        "health" => '\u{e25b}',
-        "school" => '\u{e559}',
-        "kids" => '\u{e160}',
-        "kitchen" => '\u{e35e}',
-        "garden" => '\u{e6fb}',
-        "shopping" => '\u{e59c}',
-        "money" => '\u{e553}',
-        "pets" => '\u{e4a1}',
-        "sport" => '\u{e28d}',
-        "travel" => '\u{e297}',
-        "star" => '\u{e5f9}',
+        "home" => '\u{e318}',       // home
+        "kitchen" => '\u{e35e}',    // kitchen
+        "garden" => '\u{e6fb}',     // yard
+        "kids" => '\u{e160}',       // child_care
+        "pets" => '\u{e4a1}',       // pets
+        "cleaning" => '\u{e167}',   // cleaning_services
+        "laundry" => '\u{e398}',    // local_laundry_service
+        "bed" => '\u{e0d7}',        // bed
+        "repairs" => '\u{e116}',    // build
+        "plants" => '\u{e393}',     // local_florist
+        "family" => '\u{e257}',     // family_restroom
+        "work" => '\u{e6f2}',       // work
+        "school" => '\u{e559}',     // school
+        "computer" => '\u{e185}',   // computer
+        "meetings" => '\u{e2ee}',   // groups
+        "mail" => '\u{e3c3}',       // mail
+        "book" => '\u{e3dd}',       // menu_book
+        "science" => '\u{e55a}',    // science
+        "idea" => '\u{e37b}',       // lightbulb
+        "code" => '\u{e176}',       // code
+        "health" => '\u{e25b}',     // favorite
+        "sport" => '\u{e28d}',      // fitness_center
+        "doctor" => '\u{e396}',     // local_hospital
+        "medication" => '\u{e3d9}', // medication
+        "food" => '\u{e532}',       // restaurant
+        "running" => '\u{e1dc}',    // directions_run
+        "cycling" => '\u{e1d2}',    // directions_bike
+        "relax" => '\u{e5d8}',      // spa
+        "music" => '\u{e415}',      // music_note
+        "photo" => '\u{e4b6}',      // photo_camera
+        "movie" => '\u{e40d}',      // movie
+        "games" => '\u{e5e8}',      // sports_esports
+        "art" => '\u{e46b}',        // palette
+        "crafts" => '\u{e113}',     // brush
+        "hiking" => '\u{e313}',     // hiking
+        "football" => '\u{e5f2}',   // sports_soccer
+        "car" => '\u{e1d7}',        // directions_car
+        "travel" => '\u{e297}',     // flight
+        "bus" => '\u{e1d5}',        // directions_bus
+        "train" => '\u{e675}',      // train
+        "boat" => '\u{e1d3}',       // directions_boat
+        "beach" => '\u{e0d6}',      // beach_access
+        "map" => '\u{e3c8}',        // map
+        "hotel" => '\u{e322}',      // hotel
+        "shopping" => '\u{e59c}',   // shopping_cart
+        "money" => '\u{e553}',      // savings
+        "gift" => '\u{e13e}',       // card_giftcard
+        "phone" => '\u{e5c6}',      // smartphone
+        "key" => '\u{e6c7}',        // vpn_key
+        "bank" => '\u{e040}',       // account_balance
+        "receipt" => '\u{e50c}',    // receipt
+        "document" => '\u{e1bf}',   // description
+        "star" => '\u{e5f9}',       // star
         // `psychology`, the phone's brain for the help Notes' Area (#180).
-        "brain" => '\u{e4ef}',
+        "brain" => '\u{e4ef}',  // psychology
+        "flag" => '\u{e28e}',   // flag
+        "event" => '\u{e23e}',  // event
+        "party" => '\u{e149}',  // celebration
+        "coffee" => '\u{e38d}', // local_cafe
+        "bolt" => '\u{e0ee}',   // bolt
+        "sun" => '\u{e6d9}',    // wb_sunny
         _ => return None,
     })
 }

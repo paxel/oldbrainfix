@@ -465,6 +465,28 @@ final _scenarios = <Scenario>[
     },
   ),
   (
+    name: 'topic-icons',
+    about:
+        'Topics with an icon (obf-1156): one given an icon and renamed, '
+        'which keeps it; one whose icon was cleared again; one without; '
+        'their Area with its own colour and icon, and a Note in the Topic '
+        'with the icon.',
+    build: (store) {
+      final places = Places(store);
+      final home = places.addArea('Home');
+      places.setColour(home.id, 'F06292');
+      places.setIcon(home.id, 'family');
+      final post = places.addTopic(home.id, 'Post');
+      places.setTopicIcon(post.id, 'mail');
+      places.rename(post.id, 'Letters');
+      final bills = places.addTopic(home.id, 'Bills');
+      places.setTopicIcon(bills.id, 'receipt');
+      places.setTopicIcon(bills.id, null);
+      places.addTopic(home.id, 'Attic');
+      Notes(store).capture('Pay the rent', place: post.id);
+    },
+  ),
+  (
     name: 'trash',
     about:
         'A Note in the trash; one trashed and restored; one trashed long '
@@ -4423,6 +4445,9 @@ Map<String, Object?> _expected(Store store) {
                 'areaId': topic.areaId,
                 'name': topic.name,
                 'starter': topic.starter,
+                // Only where one is set (obf-1156), so the scenarios
+                // before it read as they did.
+                'icon': ?topic.icon,
               },
           ],
         },
@@ -13115,6 +13140,8 @@ Future<void> main(List<String> args) async {
     '- `schema.sql`: the tables and indexes of the store, and its version.\n'
     '- `signing.json`: entries signed by the writer key, with the bytes '
     'the signatures cover.\n'
+    '- `area_icons.json`: the icon keys an Area or a Topic can carry, in '
+    'the groups the look page shows (obf-1156).\n'
     '- `question_marks.json`: the background\'s shapes and their scatter '
     'over a region.\n'
     '- `schedules.json`: RRULEs read, written back or refused, schedules '
@@ -13658,6 +13685,10 @@ Future<void> main(List<String> args) async {
   _write(
     File('${root.path}/question_marks.json'),
     '${_json.convert(_questionMarks())}\n',
+  );
+  _write(
+    File('${root.path}/area_icons.json'),
+    '${_json.convert({'groups': areaIconGroups})}\n',
   );
   _write(
     File('${root.path}/schedules.json'),

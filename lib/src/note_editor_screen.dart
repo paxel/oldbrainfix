@@ -4155,7 +4155,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final editable = changes && note.textEditable;
     final when = DateFormat.yMd(Localizations.localeOf(context).toString())
         .add_Hm();
-    final colour = areaColour(area?.colour);
+    final colour = areaColour(area?.colour, Theme.of(context).brightness);
     final place = area == null
         ? (note.spawned ? t.notFiled : t.unsorted)
         : [

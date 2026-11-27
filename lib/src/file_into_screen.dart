@@ -147,7 +147,9 @@ class _FileIntoScreenState extends State<FileIntoScreen> {
         id == widget.current ? Icon(Icons.check, color: scheme.primary) : null;
     Widget areaMark(Area area) => Icon(
       areaIconData(area.icon) ?? Icons.folder,
-      color: areaColour(area.colour) ?? scheme.outline,
+      color:
+          areaColour(area.colour, Theme.of(context).brightness) ??
+          scheme.outline,
     );
     // The rows' ink shows on the card, not under it.
     Widget card(List<Widget> rows) => Padding(
@@ -196,7 +198,12 @@ class _FileIntoScreenState extends State<FileIntoScreen> {
                         key: ValueKey(
                           'file-into-recent-${topic?.id ?? area.id}',
                         ),
-                        leading: areaMark(area),
+                        // A Topic's own icon where it has one (obf-1156).
+                        leading:
+                            (topic == null
+                                ? null
+                                : topicMark(context, area, topic)) ??
+                            areaMark(area),
                         title: Text(
                           topic == null
                               ? areaName(t, area)
@@ -228,7 +235,10 @@ class _FileIntoScreenState extends State<FileIntoScreen> {
                           left: 72,
                           right: 16,
                         ),
-                        title: Text(topicName(t, topic)),
+                        title: _TopicTitle(
+                          mark: topicMark(context, area, topic, size: 20),
+                          name: topicName(t, topic),
+                        ),
                         trailing: marked(topic.id),
                         onTap: () => _pick(topic.id),
                       ),
@@ -264,4 +274,21 @@ class _FileIntoScreenState extends State<FileIntoScreen> {
       ),
     );
   }
+}
+
+/// A Topic's name in File into, after its icon where it has one
+/// (obf-1156).
+class _TopicTitle extends StatelessWidget {
+  final Widget? mark;
+  final String name;
+
+  const _TopicTitle({required this.mark, required this.name});
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      if (mark case final mark?) ...[mark, const SizedBox(width: 8)],
+      Flexible(child: Text(name)),
+    ],
+  );
 }

@@ -113,6 +113,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get areaLook => 'Colour and icon';
 
   @override
+  String get topicLook => 'Icon';
+
+  @override
   String get colourHeading => 'Colour';
 
   @override

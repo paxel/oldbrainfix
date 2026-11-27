@@ -85,7 +85,12 @@ class _ShoppingPickScreenState extends State<ShoppingPickScreen> {
                   child: ListTile(
                     leading: Icon(
                       Icons.shopping_cart_outlined,
-                      color: areaColour(areaOf(note)?.colour) ?? scheme.outline,
+                      color:
+                          areaColour(
+                            areaOf(note)?.colour,
+                            Theme.of(context).brightness,
+                          ) ??
+                          scheme.outline,
                     ),
                     title: Text(
                       shoppingTitle(t, note),

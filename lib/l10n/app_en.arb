@@ -47,6 +47,8 @@
   "rename": "Rename",
   "delete": "Delete",
   "areaLook": "Colour and icon",
+  "topicLook": "Icon",
+  "@topicLook": {"description": "In a Topic's menu (obf-1156): opens the page that picks its icon, shown in its Area's colour."},
   "colourHeading": "Colour",
   "iconHeading": "Icon",
   "noColour": "No colour",

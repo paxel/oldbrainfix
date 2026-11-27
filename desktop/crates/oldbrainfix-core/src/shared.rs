@@ -998,6 +998,9 @@ impl Store {
             if let Some(starter) = &topic.starter {
                 self.append(&topic_id, place_keys::STARTER, Some(starter), None)?;
             }
+            if let Some(icon) = &topic.icon {
+                self.append(&topic_id, place_keys::ICON, Some(icon), None)?;
+            }
             moved.insert(topic.id, topic_id);
         }
         let mut notes = self.entities_of_type(note_keys::TYPE_NOTE)?;

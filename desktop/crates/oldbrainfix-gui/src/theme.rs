@@ -55,10 +55,64 @@ pub fn tones(visuals: &Visuals) -> Tones {
 }
 
 /// The colours offered for an Area, as stored (`RRGGBB`): the phone's
-/// `areaPalette`.
-pub const AREA_PALETTE: [&str; 9] = [
+/// `areaPalette`, today's nine, then lighter and darker shades
+/// (obf-1156). A colour once offered stays, so every stored look still
+/// reads.
+pub const AREA_PALETTE: [&str; 18] = [
     "C62828", "EF6C00", "F9A825", "2E7D32", "00838F", "1565C0", "6A1B9A", "8D6E63", "546E7A",
+    "F06292", "FF8A65", "AED581", "4FC3F7", "BA68C8", "AD1457", "9E9D24", "1B5E20", "283593",
 ];
+
+/// How far an Area's colour stands out from the ground, the question
+/// marks and the cards it is drawn on, at least (WCAG, as for a graphic
+/// or an icon): the phone's `areaContrast`.
+pub const AREA_CONTRAST: f64 = 3.0;
+
+/// An Area's colour as it is drawn in the dark or the light look
+/// (obf-1156), as the phone's `areaColour`: darkened on the light look
+/// and brightened on the dark one, in twentieths toward black or white,
+/// just as far as it takes to stand out [`AREA_CONTRAST`] from every
+/// surface of that look.
+pub fn area_shade(colour: Color32, dark: bool) -> Color32 {
+    let tones = if dark { DARK } else { LIGHT };
+    let surfaces = [tones.background, tones.mark, tones.card];
+    let toward = if dark { 255.0 } else { 0.0 };
+    for step in 0..=20u8 {
+        let t = f64::from(step) / 20.0;
+        let mix = |c: u8| {
+            let c = f64::from(c);
+            // Within 0..=255, as both ends are.
+            (c + (toward - c) * t).round().clamp(0.0, 255.0) as u8
+        };
+        let mixed = Color32::from_rgb(mix(colour.r()), mix(colour.g()), mix(colour.b()));
+        if surfaces
+            .iter()
+            .all(|&s| contrast(mixed, s) >= AREA_CONTRAST)
+        {
+            return mixed;
+        }
+    }
+    if dark { Color32::WHITE } else { Color32::BLACK }
+}
+
+/// The WCAG contrast of two opaque colours.
+pub fn contrast(a: Color32, b: Color32) -> f64 {
+    let (x, y) = (luminance(a), luminance(b));
+    (x.max(y) + 0.05) / (x.min(y) + 0.05)
+}
+
+/// The WCAG relative luminance of an opaque colour.
+fn luminance(colour: Color32) -> f64 {
+    let linear = |c: u8| {
+        let v = f64::from(c) / 255.0;
+        if v <= 0.04045 {
+            v / 12.92
+        } else {
+            ((v + 0.055) / 1.055).powf(2.4)
+        }
+    };
+    0.2126 * linear(colour.r()) + 0.7152 * linear(colour.g()) + 0.0722 * linear(colour.b())
+}
 
 /// How round a card is.
 pub const CARD_RADIUS: u8 = 16;

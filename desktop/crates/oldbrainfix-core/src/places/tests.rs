@@ -29,6 +29,52 @@ fn place_writes_check_what_they_write_to() -> Result<()> {
 }
 
 #[test]
+fn a_topic_carries_an_icon_and_no_colour() -> Result<()> {
+    let store = crate::store::tests::store();
+    let places = Places::new(&store);
+    let area = places.add_area("Home")?;
+    let topic = places.add_topic(&area.id, "Post")?;
+    assert_eq!(topic.icon, None);
+    assert!(places.set_topic_icon(&topic.id, Some("rocket")).is_err());
+    assert!(places.set_topic_icon(&area.id, Some("mail")).is_err());
+    assert!(places.set_icon(&topic.id, Some("mail")).is_err());
+    places.set_topic_icon(&topic.id, Some("mail"))?;
+    let read = places.topic_by_id(&topic.id)?.and_then(|t| t.icon);
+    assert_eq!(read.as_deref(), Some("mail"));
+    let listed: Vec<_> = places
+        .topics(&area.id)?
+        .into_iter()
+        .map(|t| t.icon)
+        .collect();
+    assert_eq!(listed, [Some("mail".to_string())]);
+    // A rename writes the name alone: the icon stays.
+    places.rename(&topic.id, "Letters")?;
+    let read = places.topic_by_id(&topic.id)?.and_then(|t| t.icon);
+    assert_eq!(read.as_deref(), Some("mail"));
+    places.set_topic_icon(&topic.id, None)?;
+    assert_eq!(places.topic_by_id(&topic.id)?.and_then(|t| t.icon), None);
+    Ok(())
+}
+
+#[test]
+fn the_icons_are_their_groups_with_the_first_fifteen_kept() {
+    let flat: Vec<&str> = AREA_ICON_GROUPS
+        .iter()
+        .flat_map(|g| g.iter().copied())
+        .collect();
+    assert_eq!(flat, AREA_ICONS);
+    let unique: HashSet<&str> = flat.iter().copied().collect();
+    assert_eq!(unique.len(), flat.len());
+    // The keys offered before obf-1156, which stored looks hold.
+    for key in [
+        "home", "work", "car", "health", "school", "kids", "kitchen", "garden", "shopping",
+        "money", "pets", "sport", "travel", "star", "brain",
+    ] {
+        assert!(AREA_ICONS.contains(&key), "{key}");
+    }
+}
+
+#[test]
 fn starter_names_are_found_by_slug() {
     assert_eq!(starter_name("to-sort-out"), Some("To sort out"));
     assert_eq!(starter_name("health"), Some("Health"));

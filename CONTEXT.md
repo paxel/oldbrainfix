@@ -138,7 +138,7 @@ The top level the user files Notes under, e.g. Household, Work, Kids, Doctor. Ha
 _Avoid_: domain, category, folder
 
 **Topic**:
-The second and last level, inside an Area, e.g. Household/Kitchen, Kids/School. German: Thema.
+The second and last level, inside an Area, e.g. Household/Kitchen, Kids/School. Has an optional icon from the same set as an Area's, shown in its Area's colour; it has no colour of its own (obf-1156). German: Thema.
 _Avoid_: category, subcategory, tag (a Tag is a #word of the text)
 
 **Browser**:

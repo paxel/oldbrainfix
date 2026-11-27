@@ -454,3 +454,18 @@ fn what_a_members_batch_judges_again_is_what_the_whole_log_judges() -> TestResul
     assert_eq!(ben.judged_builds.load(SeqCst) - before, 1);
     Ok(())
 }
+
+#[test]
+fn a_topic_keeps_its_icon_when_its_area_moves_to_fresh_ids() -> TestResult {
+    let ann = device(1)?;
+    let places = Places::new(&ann);
+    places.plant_starter_set(&["household", "kitchen"])?;
+    let starter = crate::places::starter_id(place_keys::TYPE_AREA, "household");
+    let kitchen = crate::places::starter_id(place_keys::TYPE_TOPIC, "kitchen");
+    places.set_topic_icon(&kitchen, Some("food"))?;
+    let area = ann.share(&starter)?;
+    assert_ne!(area, starter);
+    let icons: Vec<_> = places.topics(&area)?.into_iter().map(|t| t.icon).collect();
+    assert_eq!(icons, [Some("food".to_string())]);
+    Ok(())
+}
