@@ -23133,53 +23133,58 @@ fn area_look_form(
     // The colours and the icons scroll, as high as the window allows,
     // the title, the name and the buttons around them (obf-1156).
     let high = (ui.ctx().content_rect().height() - 240.0).max(160.0);
-    egui::ScrollArea::vertical()
-        .max_height(high)
-        .show(ui, |ui| {
-            let (icon, painted) = match look {
-                PlaceLook::Area(look) => {
-                    area_colours(ui, t, &mut look.colour);
-                    (&mut look.icon, text)
-                }
-                // A Topic shows in its Area's colour: it has none of its own.
-                PlaceLook::Topic { icon, colour } => {
-                    let shown = area_colour(colour.as_deref(), dark).unwrap_or(text);
-                    (icon, shown)
-                }
-            };
-            ui.label(RichText::new(t.icon_heading()).strong());
-            // Each group of the core's on its own lines (obf-1156).
-            for (i, group) in AREA_ICON_GROUPS.iter().enumerate() {
-                if i > 0 {
-                    ui.add_space(6.0);
-                }
-                ui.horizontal_wrapped(|ui| {
-                    if i == 0
-                        && ui
-                            .add(egui::Button::selectable(
-                                icon.is_none(),
-                                RichText::new(t.no_icon()).color(text),
-                            ))
-                            .clicked()
-                    {
-                        *icon = None;
-                    }
-                    for &key in *group {
-                        let Some(glyph) = icons::area_icon(Some(key)) else {
-                            continue;
-                        };
-                        let on = icon.as_deref() == Some(key);
-                        if swatch(ui, key, on, |painter, rect| {
-                            icons::paint(painter, rect.shrink(5.0), glyph, painted);
-                        })
-                        .clicked()
-                        {
-                            *icon = Some(key.to_string());
-                        }
-                    }
-                });
+    let choices = |ui: &mut Ui| {
+        let (icon, painted) = match look {
+            PlaceLook::Area(look) => {
+                area_colours(ui, t, &mut look.colour);
+                (&mut look.icon, text)
             }
-        });
+            // A Topic shows in its Area's colour: it has none of its own.
+            PlaceLook::Topic { icon, colour } => {
+                let shown = area_colour(colour.as_deref(), dark).unwrap_or(text);
+                (icon, shown)
+            }
+        };
+        ui.label(RichText::new(t.icon_heading()).strong());
+        // Each group of the core's on its own lines (obf-1156).
+        for (i, group) in AREA_ICON_GROUPS.iter().enumerate() {
+            if i > 0 {
+                ui.add_space(6.0);
+            }
+            ui.horizontal_wrapped(|ui| {
+                if i == 0
+                    && ui
+                        .add(egui::Button::selectable(
+                            icon.is_none(),
+                            RichText::new(t.no_icon()).color(text),
+                        ))
+                        .clicked()
+                {
+                    *icon = None;
+                }
+                for &key in *group {
+                    let Some(glyph) = icons::area_icon(Some(key)) else {
+                        continue;
+                    };
+                    let on = icon.as_deref() == Some(key);
+                    if swatch(ui, key, on, |painter, rect| {
+                        icons::paint(painter, rect.shrink(5.0), glyph, painted);
+                    })
+                    .clicked()
+                    {
+                        *icon = Some(key.to_string());
+                    }
+                }
+            });
+        }
+    };
+    // As high as its choices up to `high` at once, not grown frame by
+    // frame from the size the dialog had before.
+    egui::ScrollArea::vertical()
+        .id_salt("place look")
+        .min_scrolled_height(high)
+        .max_height(high)
+        .show(ui, choices);
     ui.add_space(8.0);
     ui.horizontal(|ui| {
         cancel(ui, t, actions);
