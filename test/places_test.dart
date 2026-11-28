@@ -347,6 +347,9 @@ void main() {
 
       await rowMenu(tester, 'Car', 'Colour and icon');
       await tester.tap(find.byType(CircleAvatar).first);
+      // 18 colours and 60 icons: the car may lie below the fold (obf-1156).
+      await tester.ensureVisible(find.byIcon(Icons.directions_car));
+      await tester.pumpAndSettle();
       await tester.tap(find.byIcon(Icons.directions_car));
       await tester.pumpAndSettle();
 
