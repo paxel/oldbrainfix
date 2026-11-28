@@ -1,3 +1,11 @@
 Old Brain Fix now speaks AXT, an open format small apps use to hand records to each other. "Export as AXT file…", beside Export as Pack…, gives a Note, a selection, a Topic or an Area to another app; a Note with a Reminder or Routine goes as a task. An AXT file opened or shared to Old Brain Fix shows its records, all ticked, and "Take it" files them into the place picked, Unsorted at first; an appointment becomes a Reminder with its Heads-ups. A later file from the same app updates or removes what it brought, unless you changed it in the meantime.
 
 On the iPad, Old Brain Fix is now an iPad app, and on a screen from 700 points wide it shows a sidebar with the Agenda, Unsorted, All Notes, Frogs and your Areas beside the list, and a Note opens as a dialog over it.
+
+A Topic now has an icon of its own, shown in its Area's colour, and Areas and Topics pick from about 60 icons in groups and 18 colours, each readable in the light and the dark theme.
+
+While a recording plays, a slim bar at the top of every screen names its Note and stops it; a tap on the name opens the Note. A recording from a locked Area shows as "Private recording".
+
+In a Note's text, Return on a line that starts with a box puts an open box on the next line; Return on a line with only its box ends the boxes.
+
+A Tally now sets a number of sets instead of switching on Counts in sets: a new entry starts with that many, ×3 shows by its targets, and an entry with fewer reads "2/3 sets". A Session's picks show only the Tally's name and its targets, without its tags and description.

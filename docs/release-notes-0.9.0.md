@@ -4,7 +4,7 @@ Paste source for the Google Play Console and App Store Connect: the release's Wh
 
 ## Summary
 
-Version 0.9.0. Live: 0.8.0 on Google Play, 0.7.2 on the App Store (0.8.0 not submitted there yet), read with `live.py` on 2026-11-25. Every text here describes the `## [0.9.0]` section of the changelog against 0.8.0: AXT files to and from other apps (export, open and take, later updates and deletions), the desktop's layout on tablets and iPads from 700 dp wide, and the iPad as a device of its own. The Play and App Store texts name all three; the desktop's own AXT dialog and menus stay out of the phone texts. Listing: the App Store description's first line names the iPad (decided in the grilling, Q3), and one line per description names AXT files, accepted on 2026-11-26. Frames: Play's 10" tablet frames and the App Store's iPad 13" frames are new (1 to 8 each); the iPhone's frame 4 now shows Export as AXT file… in the Share group; the phone frames are unchanged.
+Version 0.9.0. Live: 0.8.0 on Google Play and on the App Store, read with `live.py` on 2026-11-28. Every text here describes the `## [0.9.0]` section of the changelog against 0.8.0: AXT files to and from other apps (export, open and take, later updates and deletions), the desktop's layout on tablets and iPads from 700 dp wide, and the iPad as a device of its own. The Play and App Store texts name all three; the desktop's own AXT dialog and menus stay out of the phone texts. Listing: the App Store description's first line names the iPad (decided in the grilling, Q3), and one line per description names AXT files, accepted on 2026-11-26. The later changes of 0.9.0 (boxes carried on by Return, Topic icons with 60 icons and 18 colours, the bar that stops a playing recording, a Tally's number of sets, a Session's picks by name) bring no listing edit, answered on 2026-11-28: the line "each with a colour and an icon" is now true for Topics too. Frames: Play's 10" tablet frames and the App Store's iPad 13" frames are new (1 to 8 each); the iPhone's frame 4 now shows Export as AXT file… in the Share group; frame 8 (the dark Agenda) of the phone and the iPhone is regenerated, as the Areas' colours are drawn lighter on the dark theme; the other phone frames are unchanged.
 
 - [Play Kit](https://claude.ai/artifact/Ds5iewxVwTLoPwAWFbpWiJ)
 - [App Store Kit](https://claude.ai/artifact/PvZUte3cRrwyoHg2feLj1T)
@@ -19,6 +19,12 @@ Added
 • AXT files: Notes and reminders to and from other apps.
 • Tablets and iPads show a sidebar beside the list.
 • The iPad is a device of its own.
+• Return on a line with a box starts the next line with a box.
+• Topics get an icon; more icons and colours.
+• A bar on top stops a playing recording from any screen.
+Changed
+• A Tally sets its number of sets, shown by its targets.
+• A Session's picks show only the Tally's name.
 ```
 
 <!-- block id=play_notes_de limit=500 lang=de title="Versionshinweise, de-DE" where="Internal testing release" -->
@@ -27,6 +33,12 @@ Neu
 • AXT-Dateien: Notizen und Erinnerungen von und zu anderen Apps.
 • Tablets und iPads zeigen eine Seitenleiste neben der Liste.
 • Das iPad ist ein eigenes Gerät.
+• Eingabe nach einem Kästchen setzt eins in die nächste Zeile.
+• Jedes Thema bekommt ein Symbol; mehr Symbole und Farben.
+• Eine Leiste oben hält eine laufende Aufnahme überall an.
+Geändert
+• Eine Strichliste legt ihre Sätze fest, gezeigt bei ihren Zielen.
+• Die Auswahl einer Einheit zeigt nur den Namen der Strichliste.
 ```
 
 ## App Store: What's New
@@ -36,6 +48,14 @@ Neu
 Old Brain Fix now speaks AXT, an open format small apps use to hand records to each other. "Export as AXT file…", beside Export as Pack…, gives a Note, a selection, a Topic or an Area to another app; a Note with a Reminder or Routine goes as a task. An AXT file opened or shared to Old Brain Fix shows its records, all ticked, and "Take it" files them into the place picked, Unsorted at first; an appointment becomes a Reminder with its Heads-ups. A later file from the same app updates or removes what it brought, unless you changed it in the meantime.
 
 On the iPad, Old Brain Fix is now an iPad app, and on a screen from 700 points wide it shows a sidebar with the Agenda, Unsorted, All Notes, Frogs and your Areas beside the list, and a Note opens as a dialog over it.
+
+A Topic now has an icon of its own, shown in its Area's colour, and Areas and Topics pick from about 60 icons in groups and 18 colours, each readable in the light and the dark theme.
+
+While a recording plays, a slim bar at the top of every screen names its Note and stops it; a tap on the name opens the Note. A recording from a locked Area shows as "Private recording".
+
+In a Note's text, Return on a line that starts with a box puts an open box on the next line; Return on a line with only its box ends the boxes.
+
+A Tally now sets a number of sets instead of switching on Counts in sets: a new entry starts with that many, ×3 shows by its targets, and an entry with fewer reads "2/3 sets". A Session's picks show only the Tally's name and its targets, without its tags and description.
 ```
 
 <!-- block id=appstore_whatsnew_de limit=4000 lang=de title="Neue Funktionen, Deutsch" where="Version information" -->
@@ -43,6 +63,14 @@ On the iPad, Old Brain Fix is now an iPad app, and on a screen from 700 points w
 Old Brain Fix spricht jetzt AXT, ein offenes Format, mit dem kleine Apps einander Einträge geben. „Als AXT-Datei exportieren…“, neben „Als Paket exportieren…“, gibt eine Notiz, eine Auswahl, ein Thema oder einen Bereich an eine andere App; eine Notiz mit Erinnerung oder Routine geht als Aufgabe. Eine geöffnete oder geteilte AXT-Datei zeigt ihre Einträge, alle angehakt, und „Übernehmen“ legt sie am gewählten Ort ab, zuerst in Unsortiert; ein Termin wird eine Erinnerung mit ihren Vorwarnungen. Eine spätere Datei derselben App ändert oder entfernt, was sie gebracht hat, außer du hast es seither geändert.
 
 Auf dem iPad ist Old Brain Fix jetzt eine iPad-App, und ab 700 Punkten Breite zeigt es neben der Liste eine Seitenleiste mit Agenda, Unsortiert, Alle Notizen, Frösche und deinen Bereichen; eine Notiz öffnet sich als Dialog darüber.
+
+Ein Thema hat jetzt ein eigenes Symbol in der Farbe seines Bereichs, und Bereiche und Themen wählen aus etwa 60 Symbolen in Gruppen und 18 Farben, jede im hellen und im dunklen Aussehen gut lesbar.
+
+Während eine Aufnahme läuft, nennt eine schmale Leiste oben auf jedem Bildschirm ihre Notiz und hält sie an; ein Tippen auf den Namen öffnet die Notiz. Eine Aufnahme aus einem gesperrten Bereich heißt dort „Private Aufnahme“.
+
+Im Text einer Notiz setzt die Eingabetaste auf einer Zeile, die mit einem Kästchen beginnt, ein offenes Kästchen in die nächste Zeile; auf einer Zeile mit nur ihrem Kästchen beendet sie die Kästchen.
+
+Eine Strichliste legt jetzt eine Zahl an Sätzen fest, statt „Zählt in Sätzen“ einzuschalten: ein neuer Eintrag beginnt mit so vielen, ×3 steht bei ihren Zielen, und ein Eintrag mit weniger zeigt „2/3 Sätze“. Die Auswahl einer Einheit zeigt nur den Namen der Strichliste und ihre Ziele, ohne #Wörter und Beschreibung.
 ```
 
 ## Tester notes
@@ -55,6 +83,11 @@ What to test
 • Export an Area and a selection of cards as AXT files.
 • On an Android tablet or an iPad: the sidebar beside the list from 700 dp wide, a Note as a dialog over it; turn the device and the place shown stays.
 • On an iPad: install from TestFlight; it runs as an iPad app, not at iPhone size.
+• In a Note's text, type "☐ milk", press Return: the next line starts with ☐. Return again on that empty box line removes it.
+• Give a Topic an icon (its ⋮ ▸ Icon in the Areas list); it shows in its Area's colour. Pick one of the new colours for an Area and check it in the dark theme.
+• Play a voice Note, leave it: the bar at the top names it; tap the name, then Stop. Lock its Area and the bar says "Private recording".
+• Set a Tally's Sets to 3 in its setup: a new entry starts with 3 sets, the card shows ×3; save 2 sets and the entry reads "2/3 sets".
+• Put that Tally with a #tag and a second line into a Session: the pick shows only its name, its target and ×3.
 Known
 • Each Device is its own AXT sender: a file from your phone cannot update a Note your desktop's file brought.
 ```
@@ -371,7 +404,7 @@ Changelog 0.9.0, Added: "Export as AXT file… hands Notes, a selection, a Topic
 
 ## Screenshots: Play
 
-Phone 1080 × 1920 per locale, unchanged since 0.8.0. 10-inch tablet 1440 × 2560 per locale, new: the big-screen layout. Feature graphic 1024 × 500, unchanged.
+Phone 1080 × 1920 per locale; frame 8 is regenerated (the Areas' colours lighter on the dark theme), the rest are unchanged since 0.8.0. 10-inch tablet 1440 × 2560 per locale, new: the big-screen layout. Feature graphic 1024 × 500, unchanged.
 
 | # | Files | Size | What is on it |
 |---|---|---|---|
@@ -397,7 +430,7 @@ Phone 1080 × 1920 per locale, unchanged since 0.8.0. 10-inch tablet 1440 × 256
 
 ## Screenshots: App Store
 
-iPhone 6.9″ 1320 × 2868 per locale; frame 4 is regenerated (Export as AXT file… in the Share group), the rest are unchanged since 0.8.0. iPad 13″ 2064 × 2752 per locale, new: the big-screen layout.
+iPhone 6.9″ 1320 × 2868 per locale; frame 4 is regenerated (Export as AXT file… in the Share group) and frame 8 (the Areas' colours lighter on the dark theme), the rest are unchanged since 0.8.0. iPad 13″ 2064 × 2752 per locale, new: the big-screen layout.
 
 | # | Files | Size | What is on it |
 |---|---|---|---|
@@ -423,7 +456,7 @@ iPhone 6.9″ 1320 × 2868 per locale; frame 4 is regenerated (Export as AXT fil
 
 ## Play Console, in order
 
-1. Store listing: replace phone screenshots none; the phone frames stay.
+1. Store listing: replace phone screenshots 8 with the phone frame above; the other phone frames stay.
 2. Store listing: replace tablet screenshots 1, 2, 3, 4, 5, 6, 7 and 8 with the 10-inch frames above (Phone and tablet screenshots, 10-inch tablet).
 3. Store listing: apply the accepted listing edits to the full description, en-US and de-DE.
 4. Testing, Internal testing: the tag pipeline uploads the AAB; open the new release.
@@ -434,7 +467,7 @@ iPhone 6.9″ 1320 × 2868 per locale; frame 4 is regenerated (Export as AXT fil
 
 1. The tag pipeline uploads the build to TestFlight; try it on an iPhone and an iPad, and the tester notes above go into Test Information.
 2. The What's New above is in `fastlane/metadata/ios/en-US/release_notes.txt` and `fastlane/metadata/ios/de-DE/release_notes.txt` (written by `tool/store_release.py appstore`), and the accepted listing edits are in the description files.
-3. Replace frames 4 by hand in App Store Connect (iPhone 6.9″); the other iPhone frames stay.
+3. Replace frames 4 and 8 by hand in App Store Connect (iPhone 6.9″); the other iPhone frames stay.
 4. Replace iPad frames 1, 2, 3, 4, 5, 6, 7 and 8 by hand in App Store Connect (iPad 13″).
 5. Submit with Actions, Release, Run workflow: the tag, publish on, submit_app_store on. `fastlane deliver` uploads the listing and What's New from `fastlane/metadata/ios/`, and submits the build that run uploads.
 6. After approval, release the version by hand.
