@@ -13,10 +13,23 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Eine spätere AXT-Datei derselben App ändert oder entfernt die Notizen, die sie gebracht hat, außer du hast sie seither geändert. ([obf-1147](https://github.com/paxel/oldbrainfix/issues/463))
 - Fedora und openSUSE bekommen ein .rpm der Desktop-App, neben dem .deb, dem AppImage und dem Tar-Archiv. ([obf-1152](https://github.com/paxel/oldbrainfix/issues/470))
 - Debian und Ubuntu können die Desktop-App aus einem apt-Repository installieren und bekommen jede neue Version mit ihren Updates. ([obf-1153](https://github.com/paxel/oldbrainfix/issues/471))
+- Die Eingabetaste in einer Zeile mit einem Statuskästchen (☐, ✅ oder ❌) vorn setzt ein offenes ☐ in die nächste; zweimal beendet die Kästchen. ([obf-1154](https://github.com/paxel/oldbrainfix/issues/474))
+- Themen bekommen ein Symbol in der Farbe ihres Bereichs, aus rund 60 Symbolen; Bereiche wählen aus 18 Farben, jede hell und dunkel gut lesbar. ([obf-1156](https://github.com/paxel/oldbrainfix/issues/476))
+- Während eine Aufnahme spielt, nennt eine Leiste oben auf jeder Seite ihre Notiz, öffnet sie per Tippen und hält sie an. ([obf-1155](https://github.com/paxel/oldbrainfix/issues/475))
+
+### Geändert
+
+- In der Seitenleiste der Desktop-App ist der Name eines Bereichs fett, und seine Themen stehen eingerückt in kleinerer Schrift darunter. ([obf-1157](https://github.com/paxel/oldbrainfix/issues/477))
+- Eine Strichliste hat eine Zahl der Sätze statt „Zählt in Sätzen“; neue Einträge beginnen mit so vielen, und ×3 steht bei ihren Zielen. ([obf-1159](https://github.com/paxel/oldbrainfix/issues/479))
+- Eine Auswahl einer Einheit zeigt nur den Namen ihrer Strichliste, ohne #Wörter und Beschreibung, dann ihre Ziele. ([obf-1158](https://github.com/paxel/oldbrainfix/issues/478))
 
 ### Entfernt
 
 - Das Flatpak wird nicht mehr angeboten; unter Linux gibt es das Tar-Archiv, das .deb, das AppImage oder Homebrew. ([obf-1151](https://github.com/paxel/oldbrainfix/issues/469))
+
+### Behoben
+
+- Auf der Agenda am Desktop brechen die Auswahlen einer Einheit in weitere Zeilen um, statt abgeschnitten zu werden. ([obf-1160](https://github.com/paxel/oldbrainfix/issues/480))
 
 ## [0.8.0] - 2026-11-25
 

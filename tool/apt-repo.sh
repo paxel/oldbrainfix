@@ -5,8 +5,7 @@
 #   tool/apt-repo.sh <deb dir> <out dir>
 #
 # The key is $APT_SIGNING_KEY (the ASCII-armoured secret key) and its
-# passphrase $APT_SIGNING_PASSPHRASE, as docs/agents/apt-repository.md
-# makes them. Writes <out dir>/pool/main/o/oldbrainfix/*.deb,
+# passphrase $APT_SIGNING_PASSPHRASE. Writes <out dir>/pool/main/o/oldbrainfix/*.deb,
 # dists/stable/main/binary-{amd64,arm64}/Packages(.gz), dists/stable/
 # Release, InRelease and Release.gpg, and the public key oldbrainfix.asc
 # that users add. Needs apt-ftparchive (apt-utils), dpkg-deb and gpg.

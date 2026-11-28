@@ -1,5 +1,5 @@
 {
-  "now": "2026-01-02T10:04:21.000Z",
+  "now": "2026-01-02T10:05:09.000Z",
   "device": "65b60673d6ed884bf01c2c222d82ada0",
   "areas": [],
   "notes": [
@@ -125,7 +125,7 @@
     },
     {
       "id": "note:00000000000000000000000000000027",
-      "text": "Steps",
+      "text": "Rows",
       "textFormat": "plain",
       "textVersion": 1,
       "textEditable": true,
@@ -140,7 +140,7 @@
       },
       "place": null,
       "importance": "normal",
-      "trashed": "2026-01-01T10:04:16.000Z",
+      "trashed": null,
       "mergedInto": null,
       "spawned": true,
       "photos": [],
@@ -155,11 +155,101 @@
     },
     {
       "id": "note:0000000000000000000000000000002a",
+      "text": "Dips",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:04:20.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:0000000000000000000000000000002d",
+      "text": "Chins",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:04:38.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:0000000000000000000000000000002f",
+      "text": "Steps",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:04:50.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": "2026-01-01T10:05:04.000Z",
+      "mergedInto": null,
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000032",
       "text": "Unsorted thought",
       "textFormat": "plain",
       "textVersion": 1,
       "textEditable": true,
-      "captured": "2026-01-01T10:04:18.000Z",
+      "captured": "2026-01-01T10:05:06.000Z",
       "context": {
         "location": null,
         "namedPlace": null,
@@ -185,20 +275,26 @@
     }
   ],
   "all": [
+    "note:00000000000000000000000000000032",
+    "note:0000000000000000000000000000002d",
     "note:0000000000000000000000000000002a",
+    "note:00000000000000000000000000000027",
     "note:0000000000000000000000000000001f",
     "note:00000000000000000000000000000011",
     "note:00000000000000000000000000000001"
   ],
   "unsorted": [
-    "note:0000000000000000000000000000002a"
+    "note:00000000000000000000000000000032"
   ],
   "trashed": [
-    "note:00000000000000000000000000000027"
+    "note:0000000000000000000000000000002f"
   ],
   "inside": {},
   "sections": {
+    "note:00000000000000000000000000000032": [],
+    "note:0000000000000000000000000000002d": [],
     "note:0000000000000000000000000000002a": [],
+    "note:00000000000000000000000000000027": [],
     "note:0000000000000000000000000000001f": [],
     "note:00000000000000000000000000000011": [
       {
@@ -230,17 +326,35 @@
       }
     ],
     "note:00000000000000000000000000000001": [],
-    "note:00000000000000000000000000000027": []
+    "note:0000000000000000000000000000002f": []
   },
   "untranscribed": [],
   "unreadPhotos": [],
   "removable": {},
   "shares": {
-    "note:0000000000000000000000000000002a": {
+    "note:00000000000000000000000000000032": {
       "html": null,
       "photos": [],
       "recordings": [],
       "text": "Unsorted thought"
+    },
+    "note:0000000000000000000000000000002d": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Chins"
+    },
+    "note:0000000000000000000000000000002a": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Dips"
+    },
+    "note:00000000000000000000000000000027": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Rows"
     },
     "note:0000000000000000000000000000001f": {
       "html": null,
@@ -260,7 +374,7 @@
       "recordings": [],
       "text": "Gym"
     },
-    "note:00000000000000000000000000000027": {
+    "note:0000000000000000000000000000002f": {
       "html": null,
       "photos": [],
       "recordings": [],
@@ -269,7 +383,10 @@
   },
   "search": {
     "": [
+      "note:00000000000000000000000000000032",
+      "note:0000000000000000000000000000002d",
       "note:0000000000000000000000000000002a",
+      "note:00000000000000000000000000000027",
       "note:0000000000000000000000000000001f",
       "note:00000000000000000000000000000011",
       "note:00000000000000000000000000000001"
@@ -284,7 +401,7 @@
     "called": [],
     "loop": [],
     " e ": [
-      "note:0000000000000000000000000000002a",
+      "note:00000000000000000000000000000032",
       "note:0000000000000000000000000000001f",
       "note:00000000000000000000000000000011",
       "note:00000000000000000000000000000001"

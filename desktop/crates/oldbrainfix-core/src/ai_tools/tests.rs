@@ -557,6 +557,42 @@ fn the_areas_list_in_the_persons_own_order_and_a_drafted_one_last() -> TestResul
 }
 
 #[test]
+fn a_topics_icon_is_set_up_and_listed_as_drafted() -> TestResult {
+    let store = store();
+    let places = Places::new(&store);
+    let home = places.add_area("Home")?.id;
+    let post = places.add_topic(&home, "Post")?.id;
+    let task = store.open_ai_task()?;
+    let set = call(
+        &store,
+        &task,
+        "set_topic_icon",
+        &json!({"id": post, "icon": "mail"}),
+    )?;
+    assert!(!set.is_error, "{set:?}");
+    let odd = call(
+        &store,
+        &task,
+        "set_topic_icon",
+        &json!({"id": post, "icon": "rocket"}),
+    )?;
+    assert!(odd.is_error, "{odd:?}");
+    let area = call(
+        &store,
+        &task,
+        "set_topic_icon",
+        &json!({"id": home, "icon": "mail"}),
+    )?;
+    assert!(area.is_error, "{area:?}");
+    let listed = json_of(&call(&store, &task, "list_places", &json!({}))?)?;
+    assert_eq!(
+        listed.pointer("/0/topics/0"),
+        Some(&json!({"icon": "mail", "id": post, "name": "Post"}))
+    );
+    Ok(())
+}
+
+#[test]
 fn the_tags_list_by_their_levels_and_a_drafted_one_shows() -> TestResult {
     let store = store();
     let notes = Notes::new(&store);
@@ -715,10 +751,10 @@ fn every_tally_set_up_waits_for_the_review() -> TestResult {
     )?;
     lands_as_pending(
         "set_tally",
-        |s| Ok(json!({"bar": "week", "id": tally(s, "Squats")?.0, "sets": true})),
+        |s| Ok(json!({"bar": "week", "id": tally(s, "Squats")?.0, "sets": 3})),
         |s, a| {
             let tally = Tallies::new(s).by_note(&arg(a, "id")?)?.ok_or("a Tally")?;
-            Ok(tally.bar == TallyPeriod::Week && tally.counts_in_sets)
+            Ok(tally.bar == TallyPeriod::Week && tally.sets == 3)
         },
     )?;
     lands_as_pending(
@@ -1116,6 +1152,7 @@ fn no_tool_writes_the_users_own_data() {
         "rename_place",
         "set_area_colour",
         "set_area_icon",
+        "set_topic_icon",
         "delete_place",
         "add_routine",
         "reschedule_routine",
@@ -1481,12 +1518,46 @@ fn notes_name_their_kind_and_parts() -> TestResult {
 }
 
 #[test]
+fn set_tally_takes_a_number_of_sets_and_still_the_old_switch() -> TestResult {
+    let store = store();
+    let (note, _) = tally(&store, "Bench")?;
+    let task = store.open_ai_task()?;
+    let sets = |given: Value| -> Made<usize> {
+        let out = call(
+            &store,
+            &task,
+            "set_tally",
+            &json!({"id": note, "sets": given}),
+        )?;
+        assert!(!out.is_error, "{given}: {out:?}");
+        Ok(Tallies::new(&store).by_note(&note)?.ok_or("a Tally")?.sets)
+    };
+    // As a model called it before obf-1159: on is 2, unless it counts
+    // in sets already, off is 1.
+    assert_eq!(sets(json!(true))?, 2);
+    assert_eq!(sets(json!(4))?, 4);
+    assert_eq!(sets(json!(true))?, 4);
+    assert_eq!(sets(json!(false))?, 1);
+    assert_eq!(sets(json!(1))?, 1);
+    for odd in [json!(0), json!(100), json!(2.5), json!("3"), json!(-1)] {
+        let out = call(
+            &store,
+            &task,
+            "set_tally",
+            &json!({"id": note, "sets": odd}),
+        )?;
+        assert!(out.is_error, "{odd}");
+    }
+    Ok(())
+}
+
+#[test]
 fn an_entry_reads_with_its_sets_and_what_each_field_counts() -> TestResult {
     let store = store();
     let (note, reps) = tally(&store, "Push-ups")?;
     let tallies = Tallies::new(&store);
     let done = tallies.add_check(&note, "Stretched", None)?;
-    tallies.set_counts_in_sets(&note, true)?;
+    tallies.set_sets(&note, 2)?;
     tallies.add_with(
         &note,
         &BTreeMap::from([(reps.clone(), 10.0), (done.clone(), 1.0)]),
@@ -1506,7 +1577,7 @@ fn an_entry_reads_with_its_sets_and_what_each_field_counts() -> TestResult {
         Some(&json!([{reps.as_str(): 10.0}, {reps.as_str(): 8.0}]))
     );
     let shown = read("read_note", json!({"id": note}))?;
-    assert_eq!(shown.pointer("/tally/sets"), Some(&json!(true)));
+    assert_eq!(shown.pointer("/tally/sets"), Some(&json!(2)));
     assert_eq!(shown.pointer("/tally/bar"), Some(&json!("day")));
     assert_eq!(shown.pointer("/tally/fields/1/check"), Some(&json!(true)));
     Ok(())

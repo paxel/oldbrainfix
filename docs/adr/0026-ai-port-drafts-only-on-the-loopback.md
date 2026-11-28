@@ -17,7 +17,7 @@ A tool that changes something runs through the same calls the screens use, insid
 ## Trust rules
 
 - An AI Task writes drafts only. It writes no entry, photo, recording, local setting or blob, and takes in nothing from elsewhere. Any of these inside `drafting` is an error.
-- Each draft must be a field an AI Task may write: on a Note its type, capture time, text, place, Importance, trash, Merge, spawned mark and Nudge; on a Section its type, Note, capture time and text; on a Routine its type, Note, schedule, Re-nag, Escalation and trash; on an Area its type, name, colour and icon; on a Topic its type, Area and name. That rules out roles, blocks, Overrides, a Sent Item's link, Profiles, check-offs, photos and recordings. A type, capture time or link is written only when the entity is made, and a type only as what the entity's id says it is (an Area or Topic may be deleted).
+- Each draft must be a field an AI Task may write: on a Note its type, capture time, text, place, Importance, trash, Merge, spawned mark and Nudge; on a Section its type, Note, capture time and text; on a Routine its type, Note, schedule, Re-nag, Escalation and trash; on an Area its type, name, colour and icon; on a Topic its type, Area, name and icon (obf-1156). That rules out roles, blocks, Overrides, a Sent Item's link, Profiles, check-offs, photos and recordings. A type, capture time or link is written only when the entity is made, and a type only as what the entity's id says it is (an Area or Topic may be deleted).
 - A draft must be allowed by this Device's role in the Shared Area, as the log has it (`judged`, ADR 0013 and 0022): changing a Note or Section needs `may_change`; filing, merging into or amending in a Shared Area needs a role there; changing a Routine, Area or Topic needs `may_manage`. These are the checks the screens make before they write. Other Devices would ignore what the role does not allow, but the model gets a refusal at once and the review never lists a change no one would keep.
 - Sync goes on while the port is open and while the review waits (#389). The drafts are no entries, so nothing that syncs, relays or backs up carries them: the LAN host, joining a host, the shared folder, bundles and offering an Area send the log alone. A Note sent goes as the log has it (`Store::log_only` around the Sent Item), and one only the task made is not sent before Accept. The Changes Nudge counts the log alone. What comes in meanwhile goes into the log as ever, and the review marks where it touches a draft (below).
 - Alarms fire from the log alone (`Store::log_only` around the alarm plan). A Routine the task added does not fire before Accept, and one it rescheduled fires as the log has it. The Agenda shows the pending changes as stored, as every read does.
@@ -119,6 +119,14 @@ Amended by ADR 0051: the desktop's Ask panel calls the port's tools in-process, 
 ## Answers only from the Notes read (#294)
 
 Amended by #294 (Q692): the `instructions` the port sends on `initialize` carry the Ask panel's rule (ADR 0051) for the user's own MCP client: answer questions about the Notes only from the Notes read through the port with `read_note`, never from general knowledge or a guess, link the Note of every statement as `[title](oldbrainfix://note/<id>)` (ADR 0046), and say when the Notes read hold nothing about it. The port sees no answer of an outside client, so none is checked. No trust rule changed.
+
+## A Topic's icon (obf-1156)
+
+Amended by obf-1156: a Topic has an icon, one of the Area icons, shown in its Area's colour and without a colour of its own. `set_topic_icon` sets it up as `set_area_icon` sets an Area's, and `list_places` gives each Topic's `icon` beside its id and name. It is a field of the place like its name, so an AI Task may write it on a Topic; no trust rule changed.
+
+## A number of sets per Tally (obf-1159)
+
+Amended by obf-1159 (ADR 0028): `read_note` reports a Tally's `sets` as its number of sets, 1 for none, and `make_tally` and `set_tally` take `sets` as a whole number from 1 to 99. A boolean, as the tools took it before, still counts so an older call does not break: `true` as 2 unless the Tally counts in sets already, `false` as 1. An AI Task may write `tally:setCount` beside `tally:sets`; no trust rule changed.
 
 ## Sync goes on while the port is open (#389)
 

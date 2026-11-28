@@ -200,6 +200,15 @@ void main() {
       expect(Places(ann).areas().map((a) => a.id), [id]);
     });
 
+    test('a Topic keeps its icon when its Area moves to fresh ids', () {
+      Places(ann).plantStarterSet({'household', 'kitchen'});
+      final starter = Places.starterId(PlaceKeys.typeArea, 'household');
+      final kitchen = Places.starterId(PlaceKeys.typeTopic, 'kitchen');
+      Places(ann).setTopicIcon(kitchen, 'food');
+      final id = ann.share(starter);
+      expect(Places(ann).topics(id).single.icon, 'food');
+    });
+
     test('an Area Lock follows the Area to its fresh id', () {
       ann.setPin('1234', iterations: 1);
       Places(ann).plantStarterSet({'health'});

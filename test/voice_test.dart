@@ -685,8 +685,12 @@ void main() {
       await tap(tester, play);
 
       expect(voice.played, [first]);
-      expect(find.byIcon(Icons.stop), findsOneWidget);
-      await tap(tester, find.byIcon(Icons.stop));
+      final stopOnCard = find.descendant(
+        of: find.byType(NoteCard),
+        matching: find.byIcon(Icons.stop),
+      );
+      expect(stopOnCard, findsOneWidget);
+      await tap(tester, stopOnCard);
       expect(voice.stoppedPlaying, 1);
       expect(find.byIcon(Icons.play_arrow), findsOneWidget);
 
@@ -752,6 +756,97 @@ void main() {
       await reveal(tester, own);
       await tap(tester, play(own));
       expect(voice.played, [second, first]);
+    });
+  });
+
+  group('the playing bar', () {
+    final bar = find.byKey(const ValueKey('playingBar'));
+    Finder inBar(Finder finder) => find.descendant(of: bar, matching: finder);
+
+    /// Plays [note]'s recording in its editor, then leaves the editor.
+    Future<void> playAndLeave(WidgetTester tester, Note note) async {
+      await edit(tester, note);
+      final play = find.descendant(
+        of: find.byType(NoteEditorScreen),
+        matching: find.byIcon(Icons.play_arrow),
+      );
+      await reveal(tester, play);
+      await tap(tester, play);
+      expect(voice.played, [first]);
+      // On the Note's own page its own stop button is there.
+      expect(bar, findsNothing);
+      Navigator.of(tester.element(find.byType(NoteEditorScreen))).pop();
+      await tester.pumpAndSettle();
+      expect(find.byType(NoteEditorScreen), findsNothing);
+    }
+
+    testWidgets('names the Note playing once it is left, and Stop stops it', (
+      tester,
+    ) async {
+      final note = notes.capture('sauce\nwith basil', recordings: [first]);
+      await start(tester);
+      await playAndLeave(tester, note);
+
+      expect(bar, findsOneWidget);
+      expect(inBar(find.text('sauce')), findsOneWidget);
+      expect(voice.stoppedPlaying, 0, reason: 'it plays on');
+      // At the top, under the status bar, nothing at the bottom.
+      expect(tester.getTopLeft(bar).dy, 0);
+      await tap(tester, inBar(find.byKey(const ValueKey('playingBarStop'))));
+      expect(voice.stoppedPlaying, 1);
+      expect(bar, findsNothing);
+    });
+
+    testWidgets('a tap on the name opens the Note, where it goes', (
+      tester,
+    ) async {
+      final note = notes.capture('sauce', recordings: [first]);
+      await start(tester);
+      await playAndLeave(tester, note);
+
+      await tap(tester, inBar(find.byKey(const ValueKey('playingBarName'))));
+      expect(find.byType(NoteEditorScreen), findsOneWidget);
+      expect(bar, findsNothing);
+      expect(voice.stoppedPlaying, 0);
+    });
+
+    testWidgets('goes once the recording played to its end', (tester) async {
+      final note = notes.capture('sauce', recordings: [first]);
+      await start(tester);
+      await playAndLeave(tester, note);
+      expect(bar, findsOneWidget);
+
+      voice.finishPlaying();
+      await tester.pumpAndSettle();
+      expect(bar, findsNothing);
+    });
+
+    testWidgets('says "Private recording" for a closed locked Area, and a '
+        'tap asks for the PIN before it opens the Note', (tester) async {
+      store.setPin('2468', iterations: 10);
+      final places = Places(store);
+      final doctor = places.addArea('Doctor');
+      final note = notes.capture('Dentist on Friday', recordings: [first]);
+      notes.file(note.id, doctor.id);
+      store.setAreaLocked(doctor.id, true);
+      await start(tester);
+      await playAndLeave(tester, notes.byId(note.id)!);
+
+      expect(inBar(find.text('Private recording')), findsOneWidget);
+      expect(find.text('Dentist on Friday'), findsNothing);
+      await tap(tester, inBar(find.byKey(const ValueKey('playingBarName'))));
+      expect(find.byKey(const ValueKey('pinField')), findsOneWidget);
+      expect(find.byType(NoteEditorScreen), findsNothing);
+      await tester.enterText(
+        find.descendant(
+          of: find.byKey(const ValueKey('pinField')),
+          matching: find.byType(EditableText),
+        ),
+        '2468',
+      );
+      await tap(tester, find.widgetWithText(TextButton, 'Unlock'));
+      expect(find.byType(NoteEditorScreen), findsOneWidget);
+      expect(voice.stoppedPlaying, 0, reason: 'it played on');
     });
   });
 

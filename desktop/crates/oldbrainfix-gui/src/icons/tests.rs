@@ -2,8 +2,13 @@ use super::*;
 
 #[test]
 fn every_area_icon_of_the_core_has_a_glyph() {
+    // In the bundled icon font itself, not only a codepoint (obf-1156).
+    let face = ttf_parser::Face::parse(MATERIAL_ICONS, 0).expect("the icon font");
     for key in oldbrainfix_core::AREA_ICONS {
-        assert!(area_icon(Some(key)).is_some(), "{key}");
+        let icon = area_icon(Some(key));
+        assert!(icon.is_some(), "{key}");
+        let glyph = icon.and_then(|c| face.glyph_index(c));
+        assert!(glyph.is_some_and(|g| g.0 != 0), "{key}");
     }
     assert_eq!(area_icon(Some("rocket")), None);
     assert_eq!(area_icon(None), None);

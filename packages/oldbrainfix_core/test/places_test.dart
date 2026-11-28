@@ -75,6 +75,54 @@ void main() {
       final car = places.addArea('Car');
       expect(() => places.setIcon(car.id, 'rocket-ship'), throwsArgumentError);
     });
+
+    test('a Topic carries an optional icon and no colour (obf-1156)', () {
+      final home = places.addArea('Home');
+      final post = places.addTopic(home.id, 'Post');
+      expect(post.icon, isNull);
+      expect(() => places.setTopicIcon(post.id, 'rocket'), throwsArgumentError);
+      expect(() => places.setTopicIcon(home.id, 'mail'), throwsArgumentError);
+      expect(() => places.setIcon(post.id, 'mail'), throwsArgumentError);
+      expect(() => places.setColour(post.id, 'C62828'), throwsArgumentError);
+      tick();
+      places.setTopicIcon(post.id, 'mail');
+      expect(places.topicById(post.id)?.icon, 'mail');
+      expect(places.topics(home.id).single.icon, 'mail');
+      // A rename writes the name alone: the icon stays.
+      tick();
+      places.rename(post.id, 'Letters');
+      expect(places.topicById(post.id)?.icon, 'mail');
+      tick();
+      places.setTopicIcon(post.id, null);
+      expect(places.topicById(post.id)?.icon, isNull);
+    });
+
+    test('the icons are their groups, the first fifteen kept', () {
+      expect(areaIcons, [for (final group in areaIconGroups) ...group]);
+      expect(areaIcons.toSet(), hasLength(areaIcons.length));
+      expect(areaIcons, hasLength(60));
+      // The keys offered before obf-1156, which stored looks hold.
+      expect(
+        areaIcons,
+        containsAll([
+          'home',
+          'work',
+          'car',
+          'health',
+          'school',
+          'kids',
+          'kitchen',
+          'garden',
+          'shopping',
+          'money',
+          'pets',
+          'sport',
+          'travel',
+          'star',
+          'brain',
+        ]),
+      );
+    });
   });
 
   group('filing and Unsorted', () {

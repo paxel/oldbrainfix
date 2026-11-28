@@ -4,11 +4,16 @@ use chrono::TimeZone;
 #[test]
 fn area_colours_read_as_the_phone_reads_them() {
     assert_eq!(
-        area_colour(Some("6A1B9A")),
+        area_colour(Some("6A1B9A"), false),
         Some(Color32::from_rgb(0x6A, 0x1B, 0x9A))
     );
-    assert_eq!(area_colour(Some("nope")), None);
-    assert_eq!(area_colour(None), None);
+    // Brightened on the dark look (obf-1156), as the phone draws it.
+    assert_eq!(
+        area_colour(Some("6A1B9A"), true),
+        Some(Color32::from_rgb(0xAD, 0x82, 0xC7))
+    );
+    assert_eq!(area_colour(Some("nope"), false), None);
+    assert_eq!(area_colour(None, true), None);
 }
 
 #[test]

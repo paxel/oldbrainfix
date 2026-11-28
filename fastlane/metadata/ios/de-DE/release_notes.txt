@@ -1,3 +1,11 @@
 Old Brain Fix spricht jetzt AXT, ein offenes Format, mit dem kleine Apps einander Einträge geben. „Als AXT-Datei exportieren…“, neben „Als Paket exportieren…“, gibt eine Notiz, eine Auswahl, ein Thema oder einen Bereich an eine andere App; eine Notiz mit Erinnerung oder Routine geht als Aufgabe. Eine geöffnete oder geteilte AXT-Datei zeigt ihre Einträge, alle angehakt, und „Übernehmen“ legt sie am gewählten Ort ab, zuerst in Unsortiert; ein Termin wird eine Erinnerung mit ihren Vorwarnungen. Eine spätere Datei derselben App ändert oder entfernt, was sie gebracht hat, außer du hast es seither geändert.
 
 Auf dem iPad ist Old Brain Fix jetzt eine iPad-App, und ab 700 Punkten Breite zeigt es neben der Liste eine Seitenleiste mit Agenda, Unsortiert, Alle Notizen, Frösche und deinen Bereichen; eine Notiz öffnet sich als Dialog darüber.
+
+Ein Thema hat jetzt ein eigenes Symbol in der Farbe seines Bereichs, und Bereiche und Themen wählen aus etwa 60 Symbolen in Gruppen und 18 Farben, jede im hellen und im dunklen Aussehen gut lesbar.
+
+Während eine Aufnahme läuft, nennt eine schmale Leiste oben auf jedem Bildschirm ihre Notiz und hält sie an; ein Tippen auf den Namen öffnet die Notiz. Eine Aufnahme aus einem gesperrten Bereich heißt dort „Private Aufnahme“.
+
+Im Text einer Notiz setzt die Eingabetaste auf einer Zeile, die mit einem Kästchen beginnt, ein offenes Kästchen in die nächste Zeile; auf einer Zeile mit nur ihrem Kästchen beendet sie die Kästchen.
+
+Eine Strichliste legt jetzt eine Zahl an Sätzen fest, statt „Zählt in Sätzen“ einzuschalten: ein neuer Eintrag beginnt mit so vielen, ×3 steht bei ihren Zielen, und ein Eintrag mit weniger zeigt „2/3 Sätze“. Die Auswahl einer Einheit zeigt nur den Namen der Strichliste und ihre Ziele, ohne #Wörter und Beschreibung.

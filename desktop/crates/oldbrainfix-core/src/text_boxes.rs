@@ -374,6 +374,81 @@ pub fn convert(
     Ok(out)
 }
 
+/// What Return does to a line that starts with a box (obf-1154): `text`
+/// in `format` right after a line break was typed at `cursor - 1`, the
+/// cursor at `cursor` after it, as the editor holds it then; `None` when
+/// the break stays as it is. A line starts with a box when after its
+/// indent of spaces and tabs, and an optional `-` and blanks, comes a ☐,
+/// ✅ or ❌ ([`find`]'s glyph, its selector and id with it). The break
+/// after the box, the line's words or some of them still after it, gives
+/// the new line the same indent and `-` and a bare ☐ and a space before
+/// the words carried over, their blanks in front dropped; the cursor goes
+/// before them. The break on a line that holds its box alone is taken
+/// back with the indent, the `-` and the box, so the line is empty, the
+/// cursor on it. A break before the box, a box later in the line, a Code
+/// text (#213) and in a formatted text a box in a code block or in inline
+/// code carry nothing. The same in both cores (`text_boxes.dart`); the
+/// offsets in bytes. The text and the cursor after it.
+pub fn carried_on(text: &str, cursor: usize, format: &str) -> Option<(String, usize)> {
+    if format == text_format::CODE || cursor < 1 {
+        return None;
+    }
+    let broke = cursor - 1;
+    let before = text.get(..broke)?;
+    if text.get(broke..cursor)? != "\n" {
+        return None;
+    }
+    let blank = |c: char| c == ' ' || c == '\t';
+    let line_start = before.rfind('\n').map_or(0, |at| at + 1);
+    let line = &before[line_start..];
+    let mut rest = line.trim_start_matches(blank);
+    if let Some(after) = rest.strip_prefix('-') {
+        let words = after.trim_start_matches(blank);
+        if words.len() < after.len() {
+            rest = words;
+        }
+    }
+    let glyph_start = broke - rest.len();
+    let glyph = rest.chars().next()?;
+    BoxState::of_glyph(glyph)?;
+    let mut box_end = glyph_start + glyph.len_utf8();
+    if let Some(next @ (TEXT_STYLE | EMOJI_STYLE)) = text[box_end..].chars().next() {
+        box_end += next.len_utf8();
+    }
+    if text[box_end..].starts_with(JOINER) {
+        return None;
+    }
+    if id_at(text, box_end).is_some() {
+        box_end += TAG_BYTES * (ID_LENGTH + 1);
+    }
+    if box_end > broke {
+        return None;
+    }
+    if format == text_format::MARKDOWN
+        && markdown::literal_ranges(text)
+            .iter()
+            .any(|&(s, e)| glyph_start >= s && glyph_start < e)
+    {
+        return None;
+    }
+    let line_end = text[cursor..]
+        .find('\n')
+        .map_or(text.len(), |at| cursor + at);
+    let after = &text[cursor..line_end];
+    if text[box_end..broke].chars().all(blank) && after.chars().all(blank) {
+        let out = format!("{}{}", &text[..line_start], &text[line_end..]);
+        return Some((out, line_start));
+    }
+    let words = cursor + (after.len() - after.trim_start_matches(blank).len());
+    let carried = format!(
+        "{}{} ",
+        &text[line_start..glyph_start],
+        BoxState::Open.glyph()
+    );
+    let out = format!("{}{}{}", &text[..cursor], carried, &text[words..]);
+    Some((out, cursor + carried.len()))
+}
+
 /// A new id from `new_id`: the first bytes of the SHA-256 of a fresh
 /// entity id, each taken modulo the alphabet.
 fn drawn(new_id: &mut impl FnMut() -> Result<String>) -> Result<String> {

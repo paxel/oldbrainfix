@@ -240,7 +240,7 @@ Die Seite des Telefons für seine Kalender: „Aus deinem Kalender lesen“, das
 ## Strichlisten
 
 **Strichliste** [Tally]:
-Eine Notiz, die festhält, wie viel von etwas getan wurde, etwa Liegestütze, gelesene Seiten oder Minuten Video: ihr Text ist ihr Name und ihre Beschreibung, und ihr Inhalt ihre Felder, jedes eine Zahl mit Maßeinheit, einem freiwilligen Ziel je Balken und einer Regel für mehrere Sätze oder Einträge in einem Balken (ihre Summe oder der größte), oder ein Abhakfeld, und ihre Einträge, untereinander aufgelistet, der neueste zuerst, und als ein Diagramm je Feld gezeigt, ein Balken je ihrer Balkenlänge, Tag, Woche, Monat oder Jahr, mit der Strichliste eingerichtet. Mit „Zählt in Sätzen“ hält jeder Eintrag Sätze. Eine Strichliste, deren Feld früher ein anderes multiplizierte (#200), zählt in Sätzen.
+Eine Notiz, die festhält, wie viel von etwas getan wurde, etwa Liegestütze, gelesene Seiten oder Minuten Video: ihr Text ist ihr Name und ihre Beschreibung, und ihr Inhalt ihre Felder, jedes eine Zahl mit Maßeinheit, einem freiwilligen Ziel je Balken und einer Regel für mehrere Sätze oder Einträge in einem Balken (ihre Summe oder der größte), oder ein Abhakfeld, und ihre Einträge, untereinander aufgelistet, der neueste zuerst, und als ein Diagramm je Feld gezeigt, ein Balken je ihrer Balkenlänge, Tag, Woche, Monat oder Jahr, mit der Strichliste eingerichtet, und ihre Zahl der Sätze, anfangs 1: über 1 zählt sie in Sätzen, jeder neue Eintrag beginnt mit so vielen, und sie ist ein Ziel, als „×3“ hinter ihren Zielen gezeigt. Eine Strichliste, die vor der Zahl in Sätzen zählte (obf-1159) oder deren Feld ein anderes multiplizierte (#200), beginnt mit so vielen, wie ihr neuester Eintrag hat, mindestens 2.
 _Avoid_: Tracker, Protokoll, Training, Übung, Gewohnheit
 
 **Eintrag** [Entry]:
@@ -248,7 +248,7 @@ Ein Datensatz einer Strichliste: ein Haken für einige ihrer Abhakfelder, ein We
 _Avoid_: Abschnitt (ein Abschnitt ist ein datierter Teil des Textes einer Notiz), Datensatz
 
 **Satz** [Set]:
-Eine Reihe eines Eintrags über die Zahlenfelder seiner Strichliste, etwa 60 kg × 10 und dann 65 kg × 8, in einer Strichliste, die in Sätzen zählt; „Satz hinzufügen“ beginnt einen mit den Werten des Satzes davor, und jedes Feld fasst die Sätze eines Eintrags nach seiner Regel zusammen, Wiederholungen als Summe, ein Gewicht als das größte. Ein Eintrag, der festgehalten wurde, als ein Feld ein anderes multiplizierte, etwa 3 Runden × 20 Liegestütze, liest sich als so viele Sätze.
+Eine Reihe eines Eintrags über die Zahlenfelder seiner Strichliste, etwa 60 kg × 10 und dann 65 kg × 8, in einer Strichliste, die in Sätzen zählt: Ein Satz wiederholt alle ihre Felder, und verschiedene Übungen sind verschiedene Strichlisten. Ein neuer Eintrag beginnt mit der Zahl der Sätze der Strichliste, jeder mit den Werten des Satzes davor, der erste mit ihren Zielen; „Satz hinzufügen“ beginnt einen weiteren mit den Werten des Satzes davor, und ein Eintrag mit weniger macht die Auswahl einer Einheit trotzdem erledigt und zeigt „2/3 Sätze“; jedes Feld fasst die Sätze eines Eintrags nach seiner Regel zusammen, Wiederholungen als Summe, ein Gewicht als das größte. Ein Eintrag, der festgehalten wurde, als ein Feld ein anderes multiplizierte, etwa 3 Runden × 20 Liegestütze, liest sich als so viele Sätze.
 _Avoid_: Runde, Wiederholung, Multiplikator
 
 **Abhakfeld** [Check field]:

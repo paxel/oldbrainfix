@@ -57,6 +57,7 @@ import 'place_names.dart';
 import 'photo_platform.dart';
 import 'profile.dart';
 import 'print_platform.dart';
+import 'playing_bar.dart';
 import 'profile_platform.dart';
 import 'question_mark_background.dart';
 import 'restore_screen.dart';
@@ -512,6 +513,31 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     ),
   );
 
+  /// The page on top of the navigator, the big screen's Note dialog
+  /// counted as one, other dialogs, popups and menus left out; for the
+  /// playing bar (obf-1155).
+  Route<dynamic>? _topPage() {
+    for (final route in _routes.routes.reversed) {
+      if (route is! PopupRoute || route is NoteDialogRoute) return route;
+    }
+    return null;
+  }
+
+  /// Opens the Note [noteId] of the recording playing, from the playing
+  /// bar (obf-1155): behind the App Lock after the PIN or biometrics,
+  /// in a closed locked Area after its unlock, as an app link does.
+  Future<void> _openPlaying(String noteId) async {
+    final context = _routes.navigator?.overlay?.context;
+    if (context == null) return;
+    if (_lock.locked) {
+      final title = context.t.unlockApp;
+      if (!await confirmOwner(context, _lock, title: title)) return;
+      _lock.unlock();
+    }
+    if (!context.mounted) return;
+    await _links.open(context, AppLink(AppLinkKind.note, noteId));
+  }
+
   /// [child] with the green "!" of the button taps over it while they
   /// are on (obf-1143).
   Widget _marked(Widget child) =>
@@ -552,84 +578,96 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
             on: _fatFingers,
             child: QuestionMarkBackground(
               scroll: _scroll,
-              child: AnnouncementStrip(
-                announcements: _announcements,
-                child: AnnouncementsScope(
+              // Above any announcement (UI laws, "The playing bar").
+              child: PlayingBar(
+                playback: _playback,
+                lock: _lock,
+                notes: _notes,
+                page: _topPage,
+                onOpen: (noteId) => unawaited(_openPlaying(noteId)),
+                child: AnnouncementStrip(
                   announcements: _announcements,
-                  child: LocationScope(
-                    location: widget.location,
-                    child: ContextScope(
-                      source: widget.context,
-                      child: PhotoScope(
-                        photos: widget.photos,
-                        bytes: _notes.photoBytes,
-                        child: VoiceScope(
-                          voice: widget.voice,
-                          playback: _playback,
-                          child: SpeechScope(
-                            model: _speechModel,
-                            transcriber: _transcriber,
-                            child: PhotoReaderScope(
-                              reader: _photoReader,
-                              child: FileScope(
-                                files: widget.files,
-                                child: PrintScope(
-                                  printing: widget.printing,
-                                  child: AttachmentReaderScope(
-                                    reader: _attachmentReader,
-                                    child: AttachmentScope(
-                                      notes: _notes,
-                                      child: CalendarScope(
-                                        calendar: widget.calendar,
-                                        child: CalendarMirrorScope(
-                                          mirror: _mirror,
-                                          child: AppointmentScope(
-                                            source: widget.appointments,
-                                            child: DraftsScope(
-                                              drafts: _drafts,
-                                              child: LockScope(
-                                                lock: _lock,
-                                                child: PairingScope(
-                                                  pairing: widget.pairing,
-                                                  child: AutoSyncScope(
-                                                    sync: _autoSync,
-                                                    child: FolderScope(
-                                                      folders: widget.folders,
-                                                      child: BundleScope(
-                                                        bundles: widget.bundles,
-                                                        child: PersonScope(
-                                                          store: widget.store,
-                                                          platform:
-                                                              widget.profile,
-                                                          onChangesSent:
-                                                              _alarms.replan,
-                                                          child: TagSearchScope(
-                                                            onSearch:
-                                                                _searchTag,
-                                                            child: AppLinkScope(
-                                                              onOpen:
-                                                                  _links.open,
-                                                              onPick: _pickLink,
-                                                              child: AlarmSyncScope(
-                                                                alarms: _alarms,
-                                                                child: HomeShortcutsScope(
-                                                                  shortcuts: widget
-                                                                      .shortcuts,
-                                                                  child: ImportJobsScope(
-                                                                    jobs:
-                                                                        _imports,
-                                                                    child: AreaDeletionsScope(
-                                                                      deletions:
-                                                                          _deletions,
-                                                                      child: TrashEmptyingScope(
-                                                                        emptying:
-                                                                            _emptying,
-                                                                        child: RunningScope(
-                                                                          running:
-                                                                              _running,
-                                                                          child: _spotlit(
-                                                                            _big(
-                                                                              child ?? const SizedBox.shrink(),
+                  child: AnnouncementsScope(
+                    announcements: _announcements,
+                    child: LocationScope(
+                      location: widget.location,
+                      child: ContextScope(
+                        source: widget.context,
+                        child: PhotoScope(
+                          photos: widget.photos,
+                          bytes: _notes.photoBytes,
+                          child: VoiceScope(
+                            voice: widget.voice,
+                            playback: _playback,
+                            child: SpeechScope(
+                              model: _speechModel,
+                              transcriber: _transcriber,
+                              child: PhotoReaderScope(
+                                reader: _photoReader,
+                                child: FileScope(
+                                  files: widget.files,
+                                  child: PrintScope(
+                                    printing: widget.printing,
+                                    child: AttachmentReaderScope(
+                                      reader: _attachmentReader,
+                                      child: AttachmentScope(
+                                        notes: _notes,
+                                        child: CalendarScope(
+                                          calendar: widget.calendar,
+                                          child: CalendarMirrorScope(
+                                            mirror: _mirror,
+                                            child: AppointmentScope(
+                                              source: widget.appointments,
+                                              child: DraftsScope(
+                                                drafts: _drafts,
+                                                child: LockScope(
+                                                  lock: _lock,
+                                                  child: PairingScope(
+                                                    pairing: widget.pairing,
+                                                    child: AutoSyncScope(
+                                                      sync: _autoSync,
+                                                      child: FolderScope(
+                                                        folders: widget.folders,
+                                                        child: BundleScope(
+                                                          bundles:
+                                                              widget.bundles,
+                                                          child: PersonScope(
+                                                            store: widget.store,
+                                                            platform:
+                                                                widget.profile,
+                                                            onChangesSent:
+                                                                _alarms.replan,
+                                                            child: TagSearchScope(
+                                                              onSearch:
+                                                                  _searchTag,
+                                                              child: AppLinkScope(
+                                                                onOpen:
+                                                                    _links.open,
+                                                                onPick:
+                                                                    _pickLink,
+                                                                child: AlarmSyncScope(
+                                                                  alarms:
+                                                                      _alarms,
+                                                                  child: HomeShortcutsScope(
+                                                                    shortcuts:
+                                                                        widget
+                                                                            .shortcuts,
+                                                                    child: ImportJobsScope(
+                                                                      jobs:
+                                                                          _imports,
+                                                                      child: AreaDeletionsScope(
+                                                                        deletions:
+                                                                            _deletions,
+                                                                        child: TrashEmptyingScope(
+                                                                          emptying:
+                                                                              _emptying,
+                                                                          child: RunningScope(
+                                                                            running:
+                                                                                _running,
+                                                                            child: _spotlit(
+                                                                              _big(
+                                                                                child ?? const SizedBox.shrink(),
+                                                                              ),
                                                                             ),
                                                                           ),
                                                                         ),

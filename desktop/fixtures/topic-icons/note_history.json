@@ -1,0 +1,29 @@
+{
+  "notes": [
+    {
+      "id": "note:00000000000000000000000000000005",
+      "history": [
+        {
+          "at": "2026-01-01T10:00:18.000Z",
+          "entity": "note:00000000000000000000000000000005",
+          "kind": "filed",
+          "before": null,
+          "after": "topic:00000000000000000000000000000002",
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:00:18.000Z",
+          "entity": "note:00000000000000000000000000000005",
+          "kind": "captured",
+          "before": null,
+          "after": "Pay the rent",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    }
+  ]
+}

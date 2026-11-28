@@ -401,13 +401,15 @@ fn a_card_shows_its_areas_colour_and_icon_and_an_unsorted_one_neither() -> TestR
     places.set_icon(&household.id, Some("home"))?;
     let course = routine(&store, "Course")?;
     Notes::new(&store).file(&course.note_id, &household.id)?;
-    let colour = area_colour(Some("2E7D6B")).ok_or("a colour")?;
     let icon = icons::area_icon(Some("home")).ok_or("an icon")?;
     let mut app = App::new(store, "en");
     app.select(Selection::AllRoutines);
     let mut harness = window(app);
     // A frame more, with the icon font bound by the first.
     harness.run();
+    // As the theme shown draws it (obf-1156).
+    let dark = harness.ctx.global_style().visuals.dark_mode;
+    let colour = area_colour(Some("2E7D6B"), dark).ok_or("a colour")?;
 
     let shapes = painted(&harness);
     let filed = cards(&harness, "Course").next().ok_or("its card")?.rect();

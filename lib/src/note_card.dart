@@ -565,7 +565,7 @@ class NoteCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final area = this.area;
     final topic = this.topic;
-    final colour = areaColour(area?.colour);
+    final colour = areaColour(area?.colour, Theme.of(context).brightness);
     // A Note that spawned a Routine is not Unsorted, though not filed.
     final place = !showPlace
         ? null
@@ -1913,7 +1913,11 @@ class _CompactNoteState extends State<_CompactNote> {
               spacing: 8,
               children: [
                 for (final hash in note.recordings)
-                  RecordingButton(key: ValueKey(hash), hash: hash),
+                  RecordingButton(
+                    key: ValueKey(hash),
+                    hash: hash,
+                    noteId: note.id,
+                  ),
               ],
             ),
             for (final hash in note.recordings)
@@ -2050,6 +2054,7 @@ class _FullNoteState extends State<_FullNote> {
       children: [
         _Whole(
           id: note.id,
+          noteId: note.id,
           text: note.shownText,
           source: note.text,
           boxes: note.boxes,
@@ -2085,6 +2090,7 @@ class _FullNoteState extends State<_FullNote> {
               const TearLine(),
               _Whole(
                 id: section.id,
+                noteId: note.id,
                 text: section.shownText,
                 source: section.text,
                 boxes: section.boxes,
@@ -2125,6 +2131,9 @@ class _FullNoteState extends State<_FullNote> {
 /// photos and recordings removed while their texts stay.
 class _Whole extends StatelessWidget {
   final String id;
+
+  /// The Note it is of, for the playing bar (obf-1155).
+  final String noteId;
 
   /// The text as it shows, its [boxes] in it, and as it is stored.
   final String text;
@@ -2168,6 +2177,7 @@ class _Whole extends StatelessWidget {
 
   const _Whole({
     required this.id,
+    required this.noteId,
     required this.text,
     required this.source,
     required this.boxes,
@@ -2266,7 +2276,7 @@ class _Whole extends StatelessWidget {
           key: ValueKey(hash),
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            RecordingButton(hash: hash),
+            RecordingButton(hash: hash, noteId: noteId),
             TranscriptText(
               noteId: id,
               hash: hash,

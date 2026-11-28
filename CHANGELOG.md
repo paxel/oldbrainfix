@@ -14,10 +14,23 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - A later AXT file from the same app updates or removes the Notes it made, unless you changed them since. ([obf-1147](https://github.com/paxel/oldbrainfix/issues/463))
 - Fedora and openSUSE get an .rpm of the desktop app, beside the .deb, the AppImage and the tarball. ([obf-1152](https://github.com/paxel/oldbrainfix/issues/470))
 - Debian and Ubuntu can install the desktop app from an apt repository and get each new version with their updates. ([obf-1153](https://github.com/paxel/oldbrainfix/issues/471))
+- Return on a line starting with a box (☐, ✅ or ❌) puts an open ☐ on the next line; twice ends the boxes. ([obf-1154](https://github.com/paxel/oldbrainfix/issues/474))
+- Topics get an icon in their Area's colour, picked from about 60 icons; Areas pick from 18 colours, each readable in light and dark. ([obf-1156](https://github.com/paxel/oldbrainfix/issues/476))
+- While a recording plays, a bar at the top of every screen names its Note, opens it with a tap, and stops it. ([obf-1155](https://github.com/paxel/oldbrainfix/issues/475))
+
+### Changed
+
+- In the desktop sidebar an Area's name is bold, and its Topics stand indented under it in smaller text. ([obf-1157](https://github.com/paxel/oldbrainfix/issues/477))
+- A Tally sets a number of sets instead of Counts in sets; new entries start with that many, and ×3 shows by its targets. ([obf-1159](https://github.com/paxel/oldbrainfix/issues/479))
+- A Session's pick shows only its Tally's name, without its tags and description, then its targets. ([obf-1158](https://github.com/paxel/oldbrainfix/issues/478))
 
 ### Removed
 
 - The Flatpak is no longer offered; Linux users take the tarball, the .deb, the AppImage or Homebrew. ([obf-1151](https://github.com/paxel/oldbrainfix/issues/469))
+
+### Fixed
+
+- On the desktop Agenda, a Session's picks wrap onto more lines instead of being cut off. ([obf-1160](https://github.com/paxel/oldbrainfix/issues/480))
 
 ---
 

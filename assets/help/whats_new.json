@@ -36,7 +36,7 @@
     "en": "Added\n• Find in a Note.\n• Search shows the places.\n• Undo and Redo in the editor.\n• Tables: sort, select, move.\n• A custom Heads-up length.\n• Recordings end after a pause.\n• A Running page.\n• Empty the trash now.\n• A green \"!\" on button taps.\nChanged\n• Search ignores accents.\n• Quick notes keep Transcripts.\n• Note buttons in four groups.\n• Backups keep settings.\n• Reminders open the Agenda.\n• Areas open the editor.\nFixed\n• Search bars cut off nothing.\n• Packs with a picture open."
   },
   "0.9.0": {
-    "de": "Neu\n• AXT-Dateien: Notizen und Erinnerungen von und zu anderen Apps.\n• Tablets und iPads zeigen eine Seitenleiste neben der Liste.\n• Das iPad ist ein eigenes Gerät.",
-    "en": "Added\n• AXT files: Notes and reminders to and from other apps.\n• Tablets and iPads show a sidebar beside the list.\n• The iPad is a device of its own."
+    "de": "Neu\n• AXT-Dateien: Notizen und Erinnerungen von und zu anderen Apps.\n• Tablets und iPads zeigen eine Seitenleiste neben der Liste.\n• Das iPad ist ein eigenes Gerät.\n• Eingabe nach einem Kästchen setzt eins in die nächste Zeile.\n• Jedes Thema bekommt ein Symbol; mehr Symbole und Farben.\n• Eine Leiste oben hält eine laufende Aufnahme überall an.\nGeändert\n• Eine Strichliste legt ihre Sätze fest, gezeigt bei ihren Zielen.\n• Die Auswahl einer Einheit zeigt nur den Namen der Strichliste.",
+    "en": "Added\n• AXT files: Notes and reminders to and from other apps.\n• Tablets and iPads show a sidebar beside the list.\n• The iPad is a device of its own.\n• Return on a line with a box starts the next line with a box.\n• Topics get an icon; more icons and colours.\n• A bar on top stops a playing recording from any screen.\nChanged\n• A Tally sets its number of sets, shown by its targets.\n• A Session's picks show only the Tally's name."
   }
 }

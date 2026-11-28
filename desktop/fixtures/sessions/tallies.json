@@ -116,31 +116,38 @@
   "settings": {
     "note:00000000000000000000000000000001": {
       "bar": "day",
-      "countsInSets": false
+      "countsInSets": false,
+      "sets": 1
     },
     "note:00000000000000000000000000000003": {
       "bar": "day",
-      "countsInSets": false
+      "countsInSets": false,
+      "sets": 1
     },
     "note:00000000000000000000000000000005": {
       "bar": "day",
-      "countsInSets": false
+      "countsInSets": false,
+      "sets": 1
     },
     "note:00000000000000000000000000000007": {
       "bar": "day",
-      "countsInSets": false
+      "countsInSets": false,
+      "sets": 1
     },
     "note:00000000000000000000000000000009": {
       "bar": "day",
-      "countsInSets": false
+      "countsInSets": false,
+      "sets": 1
     },
     "note:0000000000000000000000000000000b": {
       "bar": "day",
-      "countsInSets": false
+      "countsInSets": false,
+      "sets": 1
     },
     "note:0000000000000000000000000000000d": {
       "bar": "day",
-      "countsInSets": false
+      "countsInSets": false,
+      "sets": 1
     }
   },
   "all": [

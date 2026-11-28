@@ -855,7 +855,7 @@ fn a_pick_by_keyboard_or_screen_reader_closes_the_menus_of_areas_and_topics() ->
         .get_by_role_and_label(Role::Button, "Garden")
         .click_secondary();
     harness.run();
-    harness.get_by_label("Rename").click_accesskit();
+    harness.get_by_label("Name and icon…").click_accesskit();
     harness.run();
     assert!(!shows(&harness, "Delete"));
     Ok(())

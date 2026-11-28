@@ -102,7 +102,7 @@
 #   APT_SIGNING_KEY / APT_SIGNING_PASSPHRASE — the apt repository's key
 #                 (ASCII-armoured secret key) and its passphrase, read by
 #                 pages.yml, which the apt job starts; without them the
-#                 site has no /apt/ (steps: docs/agents/apt-repository.md)
+#                 site has no /apt/
 #
 # No Flatpak (obf-1151): Flathub's generative AI policy forbids
 # AI-written manifests and AI-opened pull requests, and this project is
@@ -221,7 +221,7 @@ jobs:
       # stops the release; an unmaintained notice is listed only.
       - name: osv-scanner
         continue-on-error: true
-        uses: google/osv-scanner-action/osv-scanner-action@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
+        uses: google/osv-scanner-action/osv-scanner-action@32d3cd482bdadfb38b186c0ad1b031902d55d932 # v2.7.1
         with:
           scan-args: |-
             --format=json
@@ -532,7 +532,7 @@ jobs:
           submodules: recursive
       # The keystore must be readable by this Java: one made with Java 25's
       # keytool (PBMAC1) reads as "keystore password was incorrect" here.
-      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '21'

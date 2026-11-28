@@ -439,6 +439,11 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
   String _before = '';
   late String _now = widget.controller.text;
 
+  /// The selection before the text's last change, and now: what Return
+  /// typed in its place.
+  TextSelection _selectedBefore = const TextSelection.collapsed(offset: -1);
+  late TextSelection _selected = widget.controller.selection;
+
   /// Whether the text was formatted when last drawn.
   bool _markdown = false;
 
@@ -497,6 +502,7 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
       _formatters = _formattersOf(widget.controller);
       _before = '';
       _now = widget.controller.text;
+      _selected = widget.controller.selection;
     }
     _markdown = _formatting?.markdown ?? false;
     _drawGrids(widget.controller);
@@ -556,9 +562,12 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
   /// Typing ends selecting: the typed text replaced the selection.
   void _changed() {
     final text = widget.controller.text;
+    final selected = _selected;
+    _selected = widget.controller.selection;
     if (text != _now) {
       _before = _now;
       _now = text;
+      _selectedBefore = selected;
     }
     if (_selecting && text != _selectingText) {
       setState(() => _selecting = false);
@@ -614,8 +623,11 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
   /// pasted text that looks like code goes to [TwoRowTextField.onCodePasted]
   /// instead (#213). In a formatted text, a task list item on the lines
   /// it touched becomes an item with a box (#263), so `- [ ] ` typed
-  /// turns into `- ☐ ` at its space.
+  /// turns into `- ☐ ` at its space. Return on a line that starts with a
+  /// box carries a ☐ on to the next line, or ends the boxes on a line
+  /// with its box alone ([TextBoxes.carriedOn], obf-1154).
   void _userChanged(String text) {
+    if (_carriedOn(text)) return;
     final onCode = widget.onCodePasted;
     final controller = _formatting;
     if (onCode == null && controller == null) return;
@@ -658,6 +670,50 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
         );
       }
     }
+  }
+
+  /// Carries a box on to the line [text] just got with Return, a field
+  /// with boxes and lines of its own only, not a table's cell; whether
+  /// it did.
+  bool _carriedOn(String text) {
+    if (!_inserts || !widget.lineFormats) return false;
+    final selection = widget.controller.selection;
+    if (!selection.isValid || !selection.isCollapsed) return false;
+    final cursor = selection.extentOffset;
+    // Return typed: a line break just before the cursor, in place of what
+    // was selected, if anything.
+    if (cursor < 1 ||
+        cursor > text.length ||
+        text.codeUnitAt(cursor - 1) != 0x0A) {
+      return false;
+    }
+    final head = text.substring(0, cursor - 1);
+    final tail = text.substring(cursor);
+    final replaced = _before.length - tail.length;
+    final was = _selectedBefore;
+    final typed =
+        replaced == head.length ||
+        was.isValid &&
+            !was.isCollapsed &&
+            was.start == head.length &&
+            was.end == replaced;
+    if (!typed ||
+        replaced < head.length ||
+        !_before.startsWith(head) ||
+        !_before.endsWith(tail)) {
+      return false;
+    }
+    final format = switch (widget.controller) {
+      final TagTextController c when c.markdown => TextFormats.markdown,
+      _ => TextFormats.plain,
+    };
+    final change = TextBoxes.carriedOn(text, cursor, format: format);
+    if (change == null) return false;
+    widget.controller.value = TextEditingValue(
+      text: change.text,
+      selection: TextSelection.collapsed(offset: change.cursor),
+    );
+    return true;
   }
 
   void _becomeFormatted(TagTextController controller) {

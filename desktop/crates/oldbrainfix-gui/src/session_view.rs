@@ -8,8 +8,8 @@
 
 use egui::{Id, RichText, Sense, Ui, WidgetInfo, WidgetType};
 use oldbrainfix_core::{
-    Day, Notes, Occurrence, Routines, Session, SessionOccurrence, SessionPick, SessionRule,
-    SessionSetup, Sessions, Store, UnitSystem, WallClock,
+    Day, Note, Notes, Occurrence, Routines, Session, SessionOccurrence, SessionPick, SessionRule,
+    SessionSetup, Sessions, Store, UnitSystem, WallClock, note_kinds, tag_tree, text_format,
 };
 
 use crate::app::row_title;
@@ -26,7 +26,8 @@ pub const CARD_WEEKS: i64 = 4;
 pub const CARD_RUNS: usize = 5;
 
 /// One past run of a Session as it shows (#264): its day and time, and
-/// each picked Tally's name with whether it was done.
+/// each picked Tally's name ([`pick_name`], obf-1158) with whether it
+/// was done.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RunShown {
     pub when: String,
@@ -47,7 +48,7 @@ pub fn runs(
     for run in Sessions::new(store).runs(note_id, wall)? {
         let mut picks = Vec::new();
         for (note, done) in &run.picks {
-            picks.push((row_title(t, notes.by_id(note)?.as_ref()), *done));
+            picks.push((pick_name(t, notes.by_id(note)?.as_ref()), *done));
         }
         out.push(RunShown {
             when: format!(
@@ -305,11 +306,12 @@ pub enum SessionAction {
     },
 }
 
-/// A picked Tally as its line shows: its Note's text and the targets of
-/// its fields, each with the field's name when it has more than one
-/// ("Push-ups 20 times").
+/// A picked Tally as its line shows: its Name without its tags
+/// ([`pick_name`], obf-1158) and the targets of its fields, each with the
+/// field's name when it has more than one ("Push-ups 20 times"), and
+/// ` ×N` for its N sets while above 1 (obf-1159).
 pub fn pick_text(t: &L10n, pick: &SessionPick, system: UnitSystem) -> String {
-    let name = row_title(t, pick.note.as_ref());
+    let name = pick_name(t, pick.note.as_ref());
     let decimal = decimal_sign(t);
     let aimed: Vec<_> = pick
         .tally
@@ -330,10 +332,41 @@ pub fn pick_text(t: &L10n, pick: &SessionPick, system: UnitSystem) -> String {
             })
         })
         .collect();
+    let times = pick
+        .tally
+        .as_ref()
+        .map(|tally| crate::tally_view::sets_times(t, tally))
+        .unwrap_or_default();
     if targets.is_empty() {
-        name
+        format!("{name}{times}")
     } else {
-        format!("{name} {}", targets.join(" · "))
+        format!("{name} {}{times}", targets.join(" · "))
+    }
+}
+
+/// The name a pick goes by (obf-1158): its Note's first line, the
+/// Tally's Name, as it reads without its tags and their marks; what its
+/// row shows ([`row_title`]) when no words are left of it, as the
+/// phone's `pickName`.
+fn pick_name(t: &L10n, note: Option<&Note>) -> String {
+    let words = note.map(|note| {
+        let shown = note.shown_text();
+        let name = note_kinds::name(&shown);
+        let mut kept = String::new();
+        let mut at = 0;
+        for tag in tag_tree::tags_in(&note.text_format, name) {
+            kept.push_str(name.get(at..tag.start).unwrap_or_default());
+            at = tag.end;
+        }
+        kept.push_str(name.get(at..).unwrap_or_default());
+        text_format::visible(&note.text_format, &kept)
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+    });
+    match words {
+        Some(words) if !words.is_empty() => words,
+        _ => row_title(t, note),
     }
 }
 

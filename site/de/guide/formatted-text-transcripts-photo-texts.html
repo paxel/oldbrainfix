@@ -354,6 +354,7 @@
   <li>Statuskästchen werden auf der Karte der Notiz, in ihren Abschnitten, im Notiz-Editor und in einer Tabelle im Vollbild abgehakt. Ein Statuskästchen, das gerade getippt wird, lässt sich abhaken, sobald der Text gespeichert ist.</li>
   <li>☐ in der Formatleiste setzt ☐ am Cursor ein, auch mitten in einem Wort.</li>
   <li>In einem formatierten Text wird ein Listenpunkt, der als Markdown-Aufgabe geschrieben ist, etwa <code>- [ ] Milch</code> oder <code>1. [x] Brot</code>, zu einem Statuskästchen: <code>[ ]</code> wird ☐, <code>[x]</code> oder <code>[X]</code> wird ✅. Das geschieht, sobald das Leerzeichen nach <code>]</code> getippt ist, wenn eine solche Liste eingefügt wird und wenn eine Markdown-Datei importiert wird. In Code, einem Codeblock, einem Code-Text oder einem unformatierten Text bleibt es, wie es geschrieben ist.</li>
+  <li>Die Eingabetaste in einer Zeile, die nach Leerzeichen oder <code>- </code> mit einem Statuskästchen beginnt, setzt an den Anfang der nächsten Zeile ein offenes ☐ mit denselben Leerzeichen und <code>- </code>; Wörter nach dem Cursor kommen mit. In einer Zeile, die nur ihr Statuskästchen hält, leert die Eingabetaste die Zeile, zweimal beendet sie also die Statuskästchen. Nicht in einem Codeblock oder einem Code-Text; am Desktop im Notiz-Dialog.</li>
   <li>Jedes Statuskästchen trägt eine Kennung, die nie zu sehen ist. Der Cursor springt über ein Statuskästchen wie über ein Zeichen; wird sein Zeichen gelöscht, ist das Statuskästchen gelöscht.</li>
   <li><strong>Ticks zeigen</strong>, unter Diese Notiz im ⋮ der Karte der Notiz und als Plakette im Notiz-Editor, solange die Notiz oder ein Abschnitt ein Statuskästchen enthält, zeigt nach jedem abgehakten Statuskästchen klein und grau, wer es zuletzt wann geändert hat, etwa „Ann, Di. 14:02“, oder „Du“ bei deinen eigenen; eine ältere Änderung zeigt ihr Datum. Das gilt für diese Notiz auf diesem Gerät.</li>
   <li>Sobald ein Statuskästchen geändert wurde, hat sein Menü auch <strong>Verlauf</strong>: jede Änderung, die älteste zuerst, mit Zustand, Person und Zeitpunkt.</li>
@@ -506,6 +507,15 @@
 <p>
   Auf dem Desktop ist das Sprachmodell eine Karte im Dialog Einstellungen, nach „Schnellnotiz“, mit
   denselben Möglichkeiten; Transkripte funktionieren ebenso, solange die App läuft.
+</p>
+<p>
+  Eine Aufnahme spielt weiter, wenn du ihre Notiz verlässt. Solange sie spielt, zeigt oben auf jeder
+  Seite eine schmale Leiste, unter der Statusleiste und auf dem Desktop unter der Menüleiste, den
+  Namen der Notiz und <strong>Anhalten</strong>; ein Tippen oder Klicken auf den Namen öffnet die
+  Notiz. Die Leiste geht, wenn die Aufnahme endet oder angehalten wird, und zeigt sich nicht auf der
+  Seite der Notiz selbst, wo deren eigener Knopf zum Anhalten ist. Auf dem Handy zeigt sich eine
+  Aufnahme aus einem gesperrten Bereich, oder jede, solange die App-Sperre gesperrt ist, als „Private
+  Aufnahme“, und das Tippen fragt zuerst nach deiner PIN.
 </p>
 <p>
   Auf dem iPhone wird eine Sprachnachricht, die auf einem Android-Handy als Ogg-Datei in die App

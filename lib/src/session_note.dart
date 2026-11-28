@@ -366,15 +366,9 @@ class _SessionRunsState extends State<SessionRuns> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          switch (widget.notes.byId(pick.noteId)) {
-                            final note? when pick.done => t.sessionRunDone(
-                              noteText(t, note),
-                            ),
-                            final note? => t.sessionRunNotDone(
-                              noteText(t, note),
-                            ),
-                            null when pick.done => t.sessionRunDone(t.noteGone),
-                            null => t.sessionRunNotDone(t.noteGone),
+                          switch (pickName(t, widget.notes.byId(pick.noteId))) {
+                            final name when pick.done => t.sessionRunDone(name),
+                            final name => t.sessionRunNotDone(name),
                           },
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,

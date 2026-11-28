@@ -138,7 +138,7 @@
                     "kind": "note",
                     "note": 8,
                     "index": null,
-                    "size": 169,
+                    "size": 194,
                     "children": []
                   }
                 ]
@@ -148,7 +148,7 @@
                 "kind": "note",
                 "note": 5,
                 "index": null,
-                "size": 200,
+                "size": 213,
                 "children": []
               },
               {
@@ -188,7 +188,7 @@
       "n7",
       "n8"
     ],
-    "startSize": 1242,
+    "startSize": 1280,
     "all": [
       "n0",
       "n1",
@@ -209,7 +209,7 @@
       "n7",
       "n8"
     ],
-    "allSize": 1386,
+    "allSize": 1424,
     "untickedPool": [
       "n0",
       "n1",
@@ -243,7 +243,7 @@
             "kind": "note",
             "note": 0,
             "index": null,
-            "size": 169,
+            "size": 194,
             "children": []
           }
         ]
@@ -383,7 +383,7 @@
                 "kind": "note",
                 "note": 6,
                 "index": null,
-                "size": 200,
+                "size": 213,
                 "children": []
               },
               {
@@ -423,7 +423,7 @@
       "n7",
       "n8"
     ],
-    "startSize": 1242,
+    "startSize": 1280,
     "all": [
       "n0",
       "n1",
@@ -444,7 +444,7 @@
       "n7",
       "n8"
     ],
-    "allSize": 1386,
+    "allSize": 1424,
     "untickedPool": [
       "n1",
       "n2",
@@ -616,7 +616,7 @@
                 "kind": "note",
                 "note": 5,
                 "index": null,
-                "size": 200,
+                "size": 213,
                 "children": []
               },
               {
@@ -655,7 +655,7 @@
       "n6",
       "n7"
     ],
-    "startSize": 1071,
+    "startSize": 1084,
     "all": [
       "n0",
       "n1",
@@ -675,7 +675,7 @@
       "n6",
       "n7"
     ],
-    "allSize": 1215,
+    "allSize": 1228,
     "untickedPool": [
       "n0",
       "n1",
@@ -824,7 +824,7 @@
                     "kind": "note",
                     "note": 8,
                     "index": null,
-                    "size": 169,
+                    "size": 194,
                     "children": []
                   }
                 ]
@@ -834,7 +834,7 @@
                 "kind": "note",
                 "note": 5,
                 "index": null,
-                "size": 200,
+                "size": 213,
                 "children": []
               },
               {
@@ -874,7 +874,7 @@
       "n7",
       "n8"
     ],
-    "startSize": 1242,
+    "startSize": 1280,
     "all": [
       "n0",
       "n1",
@@ -893,7 +893,7 @@
       "n7",
       "n8"
     ],
-    "allSize": 1310,
+    "allSize": 1348,
     "untickedPool": [
       "n0",
       "n1",
@@ -1046,7 +1046,7 @@
                     "kind": "note",
                     "note": 8,
                     "index": null,
-                    "size": 169,
+                    "size": 194,
                     "children": []
                   }
                 ]
@@ -1056,7 +1056,7 @@
                 "kind": "note",
                 "note": 5,
                 "index": null,
-                "size": 200,
+                "size": 213,
                 "children": []
               },
               {
@@ -1096,7 +1096,7 @@
       "n7",
       "n8"
     ],
-    "startSize": 1242,
+    "startSize": 1280,
     "all": [
       "n0",
       "n1",
@@ -1117,7 +1117,7 @@
       "n7",
       "n8"
     ],
-    "allSize": 1386,
+    "allSize": 1424,
     "untickedPool": [
       "n0",
       "n1",

@@ -899,53 +899,57 @@ class _CaptureScreenState extends State<CaptureScreen> {
               ],
             ),
           );
-    // Leaving by Back saves as well (UI laws, "Capture").
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) unawaited(_save());
-      },
-      child: Scaffold(
-        // No Save and no Back on top (#352): Android's Back saves, the
-        // iPhone keeps a back arrow that saves; the bar carries the sync
-        // line under it.
-        appBar: defaultTargetPlatform == TargetPlatform.iOS
-            ? AppBar(
-                leading: BackButton(onPressed: () => unawaited(_save())),
-                flexibleSpace: const SyncLine(),
-              )
-            : AppBar(
-                automaticallyImplyLeading: false,
-                toolbarHeight: 0,
-                flexibleSpace: const SyncLine(),
-              ),
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                text,
-                const SizedBox(height: 8),
-                if (_sorted || !_nudgeButtons)
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      key: const ValueKey('captureSave'),
-                      onPressed: _save,
-                      child: Text(t.save),
+    // Leaving by Back saves as well (UI laws, "Capture"). Its own stop
+    // button shows here, the playing bar not (obf-1155).
+    return NotePageMark(
+      noteId: _captured?.noteId,
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) unawaited(_save());
+        },
+        child: Scaffold(
+          // No Save and no Back on top (#352): Android's Back saves, the
+          // iPhone keeps a back arrow that saves; the bar carries the sync
+          // line under it.
+          appBar: defaultTargetPlatform == TargetPlatform.iOS
+              ? AppBar(
+                  leading: BackButton(onPressed: () => unawaited(_save())),
+                  flexibleSpace: const SyncLine(),
+                )
+              : AppBar(
+                  automaticallyImplyLeading: false,
+                  toolbarHeight: 0,
+                  flexibleSpace: const SyncLine(),
+                ),
+          body: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  text,
+                  const SizedBox(height: 8),
+                  if (_sorted || !_nudgeButtons)
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        key: const ValueKey('captureSave'),
+                        onPressed: _save,
+                        child: Text(t.save),
+                      ),
+                    )
+                  // No tip over the stop button while a recording runs.
+                  else if (_voiceMode)
+                    NudgeButtons(onPicked: _save)
+                  else
+                    Spotlight(
+                      id: 'capture-nudge',
+                      child: NudgeButtons(onPicked: _save),
                     ),
-                  )
-                // No tip over the stop button while a recording runs.
-                else if (_voiceMode)
-                  NudgeButtons(onPicked: _save)
-                else
-                  Spotlight(
-                    id: 'capture-nudge',
-                    child: NudgeButtons(onPicked: _save),
-                  ),
-                // While recording, the big stop button comes first.
-                if (!recording) ?_moreButton(context),
-              ],
+                  // While recording, the big stop button comes first.
+                  if (!recording) ?_moreButton(context),
+                ],
+              ),
             ),
           ),
         ),
@@ -1011,7 +1015,11 @@ class _CaptureScreenState extends State<CaptureScreen> {
       for (final hash in _recordings) ...[
         Align(
           alignment: Alignment.centerLeft,
-          child: RecordingButton(key: ValueKey(hash), hash: hash),
+          child: RecordingButton(
+            key: ValueKey(hash),
+            hash: hash,
+            noteId: _captured?.noteId,
+          ),
         ),
         ?_transcriptOf(context, hash),
         const SizedBox(height: 8),

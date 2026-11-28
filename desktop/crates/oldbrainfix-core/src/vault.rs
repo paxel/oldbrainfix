@@ -1192,7 +1192,9 @@ fn kind_properties(
             if tally.bar != TallyPeriod::Day {
                 t.insert("bar".into(), json!(tally.bar.name()));
             }
-            t.insert("sets".into(), json!(tally.counts_in_sets));
+            t.insert("sets".into(), json!(tally.counts_in_sets()));
+            // The number beside the switch an older app reads (obf-1159).
+            t.insert("setCount".into(), json!(tally.sets));
             t.insert("fields".into(), Value::Array(fields));
             t.insert("entries".into(), Value::Array(list));
             props.push(("tally", Value::Object(t)));
@@ -2297,6 +2299,12 @@ fn write_kind(
                 Some(if sets { "true" } else { "false" }),
                 date,
             )?;
+            // Absent in a vault an older app wrote (obf-1159).
+            let count = tally.get("setCount").and_then(Value::as_u64);
+            if let Some(count) = count.filter(|n| (1..=tally_keys::MAX_SETS as u64).contains(n)) {
+                let count = count.to_string();
+                store.append(note, tally_keys::SET_COUNT, Some(&count), date)?;
+            }
             for e in list(tally.get("entries")) {
                 let Some(id) = e
                     .get("id")

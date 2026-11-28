@@ -3848,7 +3848,12 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       ],
       for (final hash in section.recordings) ...[
         const SizedBox(height: 8),
-        RecordingButton(key: ValueKey(hash), hash: hash, compact: false),
+        RecordingButton(
+          key: ValueKey(hash),
+          hash: hash,
+          noteId: widget.noteId,
+          compact: false,
+        ),
         TranscriptText(
           key: ValueKey('transcript:$hash'),
           noteId: section.id,
@@ -4155,99 +4160,103 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final editable = changes && note.textEditable;
     final when = DateFormat.yMd(Localizations.localeOf(context).toString())
         .add_Hm();
-    final colour = areaColour(area?.colour);
+    final colour = areaColour(area?.colour, Theme.of(context).brightness);
     final place = area == null
         ? (note.spawned ? t.notFiled : t.unsorted)
         : [
             areaName(t, area),
             if (topic != null) topicName(t, topic),
           ].join(' / ');
-    return PopScope(
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) return;
-        // Leaving drops the Lines left empty (#141).
-        _lines.leave();
-        _saveText();
-      },
-      child: EditHistoryScope(
-        history: _history,
-        child: Scaffold(
-          appBar: pageBar(
-            context,
-            title: t.noteTitle,
-            actions: [
-              // First, so they stay on the bar of the narrowest phone
-              // (obf-1051).
-              BarAction(
-                key: const ValueKey('editor-undo'),
-                label: t.editorUndo,
-                onPressed: _history.canUndo ? _undo : null,
-                icon: Icons.undo,
-              ),
-              BarAction(
-                key: const ValueKey('editor-redo'),
-                label: t.editorRedo,
-                onPressed: _history.canRedo ? _redo : null,
-                icon: Icons.redo,
-              ),
-              // Finds words in the Note, with or without a search (obf-1047).
-              BarAction(
-                key: const ValueKey('find-in-note'),
-                label: t.findInNote,
-                onPressed: _openFind,
-                icon: Icons.search,
-              ),
-              CalendarButton(choices: _calendarChoices),
-              BarAction(
-                key: const ValueKey('note-history'),
-                label: t.historyTitle,
-                onPressed: _openHistory,
-                icon: Icons.history,
-              ),
-              BarAction(
-                key: const ValueKey('editor-revert'),
-                label: t.revertAllChanges,
-                onPressed: _history.canUndo
-                    ? () => unawaited(_revertAll())
-                    : null,
-                icon: Icons.settings_backup_restore,
-              ),
-            ],
-          ),
-          body: Column(
-            children: [
-              if (_finding)
-                FindBar(
-                  controller: _findWords,
-                  focusNode: _findFocus,
-                  at: _hitAt,
-                  count: _hits.length,
-                  onChanged: _findChanged,
-                  onPrevious: () => _stepHit(-1),
-                  onNext: () => _stepHit(1),
-                  onClose: _closeFind,
-                  onSearchAll: TagSearchScope.of(context) == null
-                      ? null
-                      : _searchAll,
+    // Its own stop button shows here, the playing bar not (obf-1155).
+    return NotePageMark(
+      noteId: widget.noteId,
+      child: PopScope(
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) return;
+          // Leaving drops the Lines left empty (#141).
+          _lines.leave();
+          _saveText();
+        },
+        child: EditHistoryScope(
+          history: _history,
+          child: Scaffold(
+            appBar: pageBar(
+              context,
+              title: t.noteTitle,
+              actions: [
+                // First, so they stay on the bar of the narrowest phone
+                // (obf-1051).
+                BarAction(
+                  key: const ValueKey('editor-undo'),
+                  label: t.editorUndo,
+                  onPressed: _history.canUndo ? _undo : null,
+                  icon: Icons.undo,
                 ),
-              Expanded(
-                child: FindScope(
-                  marks: _findMarks,
-                  child: SelectionSearchScope(
-                    onSearch: _openFind,
-                    child: _body(
-                      t,
-                      placed,
-                      note,
-                      editable,
-                      when,
-                      place,
-                      colour,
+                BarAction(
+                  key: const ValueKey('editor-redo'),
+                  label: t.editorRedo,
+                  onPressed: _history.canRedo ? _redo : null,
+                  icon: Icons.redo,
+                ),
+                // Finds words in the Note, with or without a search (obf-1047).
+                BarAction(
+                  key: const ValueKey('find-in-note'),
+                  label: t.findInNote,
+                  onPressed: _openFind,
+                  icon: Icons.search,
+                ),
+                CalendarButton(choices: _calendarChoices),
+                BarAction(
+                  key: const ValueKey('note-history'),
+                  label: t.historyTitle,
+                  onPressed: _openHistory,
+                  icon: Icons.history,
+                ),
+                BarAction(
+                  key: const ValueKey('editor-revert'),
+                  label: t.revertAllChanges,
+                  onPressed: _history.canUndo
+                      ? () => unawaited(_revertAll())
+                      : null,
+                  icon: Icons.settings_backup_restore,
+                ),
+              ],
+            ),
+            body: Column(
+              children: [
+                if (_finding)
+                  FindBar(
+                    controller: _findWords,
+                    focusNode: _findFocus,
+                    at: _hitAt,
+                    count: _hits.length,
+                    onChanged: _findChanged,
+                    onPrevious: () => _stepHit(-1),
+                    onNext: () => _stepHit(1),
+                    onClose: _closeFind,
+                    onSearchAll: TagSearchScope.of(context) == null
+                        ? null
+                        : _searchAll,
+                  ),
+                Expanded(
+                  child: FindScope(
+                    marks: _findMarks,
+                    child: SelectionSearchScope(
+                      onSearch: _openFind,
+                      child: _body(
+                        t,
+                        placed,
+                        note,
+                        editable,
+                        when,
+                        place,
+                        colour,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -4446,6 +4455,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             child: RecordingButton(
               key: ValueKey(hash),
               hash: hash,
+              noteId: note.id,
               compact: false,
             ),
           ),

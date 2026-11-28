@@ -411,8 +411,8 @@ void main() {
   });
 
   group('sets and Check fields (#264)', () {
-    testWidgets('the setup\'s badges set the bar length and whether it '
-        'counts in sets, on the Note', (tester) async {
+    testWidgets('the setup\'s badges set the bar length and the number of '
+        'sets, on the Note', (tester) async {
       final note = notes.capture('Push-ups');
       tallies.addField(note.id, name: 'Reps');
       await startAtNotes(tester);
@@ -432,10 +432,66 @@ void main() {
         ),
         findsOneWidget,
       );
+      // A number of sets, 1 at first, each step written at once
+      // (obf-1159).
+      expect(
+        find.descendant(of: key('tally-setup-sets'), matching: find.text('1')),
+        findsOneWidget,
+      );
       await tap(tester, key('tally-setup-sets'));
-      await tap(tester, key('badge-switch'));
+      final more = find.descendant(
+        of: key('tally-sets'),
+        matching: find.byTooltip('More'),
+      );
+      await tap(tester, more);
+      await tap(tester, more);
+      expect(tallies.byNote(note.id)!.sets, 3);
+      expect(notes.store.current(note.id, TallyKeys.sets), 'true');
       await tap(tester, key('badge-close'));
-      expect(tallies.byNote(note.id)!.countsInSets, isTrue);
+      expect(
+        find.descendant(of: key('tally-setup-sets'), matching: find.text('3')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('a Tally of sets starts each entry with them and shows them '
+        'by its targets', (tester) async {
+      final note = notes.capture('Rows');
+      final reps = tallies.addField(note.id, name: 'Reps', target: 10);
+      tallies.setSets(note.id, 3);
+      await startAtNotes(tester);
+      await tap(tester, key('tally-add-entry'));
+      // As many sets as its number, each from the targets (obf-1159).
+      for (final set in ['Set 1', 'Set 2', 'Set 3']) {
+        expect(find.text(set), findsOneWidget);
+      }
+      expect(find.text('Set 4'), findsNothing);
+      String text(String value) =>
+          tester.widget<TextField>(key(value)).controller?.text ?? '';
+      expect(text('tally-value-$reps'), '10');
+      expect(text('tally-value-2-$reps'), '10');
+      await tap(tester, key('tally-add-set'));
+      expect(find.text('Set 4'), findsOneWidget);
+      await tap(tester, key('tally-set-remove-3'));
+      await tap(tester, key('tally-set-remove-2'));
+      await tap(tester, key('tally-entry-save'));
+      expect(tallies.entries(note.id).single.more, [
+        {reps: 10.0},
+      ]);
+      await reveal(tester, key('tally-entries'));
+      expect(find.textContaining('2/3 sets'), findsOneWidget);
+      // The entries scrolled the card's name out of view.
+      await tester.ensureVisible(find.text('Rows'));
+      await tester.pumpAndSettle();
+      await tester.longPress(find.text('Rows'));
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: key('tally-setup-target-$reps'),
+          matching: find.text('10 ×3'),
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('"Add set" adds a set that starts with the set before; each '
@@ -451,12 +507,15 @@ void main() {
       // The fields show in the order they were added.
       now = now.add(const Duration(seconds: 1));
       final reps = tallies.addField(note.id, name: 'Reps');
-      tallies.setCountsInSets(note.id, true);
+      tallies.setSets(note.id, 2);
       await startAtNotes(tester);
       // No period to pick on the card: the bar length is the Tally's.
       expect(key('tally-period'), findsNothing);
       await tap(tester, key('tally-add-entry'));
       expect(find.text('Set 1'), findsOneWidget);
+      // It starts with as many sets as the Tally's number (obf-1159).
+      await tap(tester, key('tally-set-remove-1'));
+      expect(find.text('Set 2'), findsNothing);
       await enter(tester, key('tally-value-$weight'), '60');
       await enter(tester, key('tally-value-$reps'), '10');
       await tap(tester, key('tally-add-set'));

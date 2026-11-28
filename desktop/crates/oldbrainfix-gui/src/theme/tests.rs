@@ -259,3 +259,49 @@ fn a_tear_line_is_a_row_of_short_dashes_across() {
         assert!((points[1].x - points[0].x - TEAR_DASH).abs() < 0.01);
     }
 }
+
+/// An Area's colour as stored, as a colour.
+fn stored(hex: &str) -> Color32 {
+    let value = u32::from_str_radix(hex, 16).unwrap_or_default();
+    let [_, r, g, b] = value.to_be_bytes();
+    Color32::from_rgb(r, g, b)
+}
+
+#[test]
+fn every_area_colour_stands_out_from_every_surface_of_both_looks() {
+    // Today's nine first, none twice (obf-1156).
+    assert_eq!(
+        AREA_PALETTE.iter().take(9).copied().collect::<Vec<_>>(),
+        [
+            "C62828", "EF6C00", "F9A825", "2E7D32", "00838F", "1565C0", "6A1B9A", "8D6E63",
+            "546E7A"
+        ]
+    );
+    let unique: std::collections::HashSet<_> = AREA_PALETTE.iter().collect();
+    assert_eq!(unique.len(), 18);
+    for (dark, tones) in [(false, LIGHT), (true, DARK)] {
+        let mut drawn = std::collections::HashSet::new();
+        for hex in AREA_PALETTE {
+            let shade = area_shade(stored(hex), dark);
+            for surface in [tones.background, tones.mark, tones.card] {
+                let ratio = contrast(shade, surface);
+                assert!(ratio >= 3.0, "{hex} as {shade:?} on {surface:?}: {ratio}");
+            }
+            drawn.insert(shade);
+        }
+        // Still eighteen colours to tell apart.
+        assert_eq!(drawn.len(), 18, "dark: {dark}");
+    }
+}
+
+#[test]
+fn an_area_colour_is_shaded_as_the_phone_shades_it() {
+    // Readable already: as stored.
+    assert_eq!(area_shade(stored("C62828"), false), stored("C62828"));
+    assert_eq!(area_shade(stored("F9A825"), true), stored("F9A825"));
+    // The same values as the phone's `area_look_test.dart`.
+    assert_eq!(area_shade(stored("F9A825"), false), stored("A26D18"));
+    assert_eq!(area_shade(stored("EF6C00"), false), stored("BF5600"));
+    assert_eq!(area_shade(stored("6A1B9A"), true), stored("AD82C7"));
+    assert_eq!(area_shade(stored("283593"), true), stored("8990C4"));
+}

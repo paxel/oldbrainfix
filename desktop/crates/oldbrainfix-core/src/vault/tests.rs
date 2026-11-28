@@ -138,6 +138,8 @@ fn full(clock: &Arc<parking_lot::Mutex<DateTime<Utc>>>) -> Made<Store> {
     let kg = tallies.add_field(&weight.id, "Weight", "kg", Some(70.0), None)?;
     let kg_again = kg.clone();
     let done = tallies.add_check(&weight.id, "Walked", None)?;
+    // Its number of sets comes back beside the switch (obf-1159).
+    tallies.set_sets(&weight.id, 3)?;
     tallies.add(
         &weight.id,
         &BTreeMap::from([(kg.clone(), 71.25), (done.clone(), 1.0)]),
@@ -320,6 +322,7 @@ fn digest(store: &Store) -> Made<Vec<String>> {
                     f.check
                 ));
             }
+            out.push(format!("  sets {} {}", t.counts_in_sets(), t.sets));
             let mut entries = tallies.entries(&n.id, &PersonFilter::default())?;
             entries.extend(tallies.removed_entries(&n.id)?);
             entries.sort_by_key(|e| e.at);

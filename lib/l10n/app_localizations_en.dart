@@ -113,6 +113,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get areaLook => 'Colour and icon';
 
   @override
+  String get topicLook => 'Icon';
+
+  @override
   String get colourHeading => 'Colour';
 
   @override
@@ -1450,6 +1453,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get stopPlaying => 'Stop';
+
+  @override
+  String get privateRecording => 'Private recording';
 
   @override
   String get microphoneExplainTitle => 'Use the microphone?';
@@ -4257,8 +4263,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tallyCountsInSets => 'Counts in sets';
 
   @override
-  String get tallyCountsInSetsDetail =>
-      'Each entry holds several sets, such as 60 kg × 10 and then 65 kg × 8. Each field totals the sets of an entry by its rule: reps by their sum, a weight by the largest.';
+  String get tallySets => 'Sets';
+
+  @override
+  String get tallySetsDetail =>
+      'How many sets a new entry starts with, 1 for none. Each set repeats the fields, such as 60 kg × 10 three times, and Add set adds more. Each field totals the sets of an entry by its rule: reps by their sum, a weight by the largest.';
+
+  @override
+  String tallySetsTimes(int count) {
+    return '×$count';
+  }
+
+  @override
+  String tallyEntrySets(int held, int target) {
+    return '$held/$target sets';
+  }
 
   @override
   String get tallyAddSet => 'Add set';

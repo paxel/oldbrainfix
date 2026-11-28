@@ -398,6 +398,11 @@ fn change_line(
                 .to_string()
             }));
         }
+        (note_keys::TYPE_NOTE, tally_keys::SET_COUNT) => {
+            return Ok(words(t.tally_sets().to_string(), &|v| {
+                v.unwrap_or("1").to_string()
+            }));
+        }
         (routine_keys::TYPE_ROUTINE | note_keys::TYPE_NOTE, session_keys::COUNT) => {
             return Ok(words(t.session_count().to_string(), &|v| {
                 v.unwrap_or("1").to_string()
@@ -446,7 +451,7 @@ fn change_line(
         (place_keys::TYPE_AREA, place_keys::NAME) => t.conflict_area_name(),
         (place_keys::TYPE_TOPIC, place_keys::NAME) => t.conflict_topic_name(),
         (place_keys::TYPE_AREA, place_keys::COLOUR) => t.colour_heading(),
-        (place_keys::TYPE_AREA, place_keys::ICON) => t.icon_heading(),
+        (place_keys::TYPE_AREA | place_keys::TYPE_TOPIC, place_keys::ICON) => t.icon_heading(),
         (place_keys::TYPE_TOPIC, place_keys::AREA) => t.ai_field_area(),
         _ => t.conflict_other(),
     };

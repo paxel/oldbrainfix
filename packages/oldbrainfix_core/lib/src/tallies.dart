@@ -37,6 +37,22 @@ abstract final class TallyKeys {
   /// (#264).
   static const sets = 'tally:sets';
 
+  /// How many sets an entry of the Tally starts with, its target
+  /// (obf-1159): `1` to `99`, written without a leading zero, on the
+  /// Tally's Note beside [sets], which says whether it is above 1 for an
+  /// older app. It counts only while [sets] is absent or agrees with it;
+  /// otherwise, or while absent or anything else, the Tally reads as
+  /// [sets] says: one that counts in sets as many as its newest entry
+  /// holds, at least 2.
+  static const setCount = 'tally:setCount';
+
+  /// [value] as a number of sets, `1` to `99` without a leading zero, or
+  /// null.
+  static int? setCountOf(String? value) =>
+      value != null && _setCount.hasMatch(value) ? int.parse(value) : null;
+
+  static final _setCount = RegExp(r'^[1-9][0-9]?$');
+
   /// How many sets an entry holds at most.
   static const maxSets = 99;
 
@@ -186,15 +202,19 @@ class Tally {
   /// How long a bar of its charts is; its targets count per bar (#264).
   final TallyPeriod bar;
 
-  /// Whether its entry form has "+ Set" (#264).
-  final bool countsInSets;
+  /// How many sets an entry starts with, its target (obf-1159): 1 for a
+  /// Tally without sets.
+  final int sets;
 
   const Tally(
     this.noteId,
     this.fields, {
     this.bar = TallyPeriod.day,
-    this.countsInSets = false,
+    this.sets = 1,
   });
+
+  /// Whether it counts in sets: its entry form has "Add set" (#264).
+  bool get countsInSets => sets > 1;
 
   /// The fields that show: those not hidden.
   List<TallyField> get shown => [
@@ -398,8 +418,8 @@ class Tallies {
   static const maxBuckets = 1000;
 
   /// The Tally of the Note [noteId], with the fields of the Notes merged
-  /// into it, or null while it has no field. Its bar length and whether
-  /// it counts in sets lie on its own Note.
+  /// into it, or null while it has no field. Its bar length and its
+  /// number of sets lie on its own Note ([TallyKeys.setCount]).
   Tally? byNote(String noteId) {
     final shape = _shapes()[noteId];
     if (shape == null) return null;
@@ -410,16 +430,29 @@ class Tallies {
           field._counting(counted.contains(field.id)),
       ]),
     );
-    return Tally(
+    final read = Tally(
       noteId,
       fields,
       bar: TallyPeriod.values.asNameMap()[shape.bar] ?? TallyPeriod.day,
-      countsInSets: switch (shape.sets) {
-        'true' => true,
-        'false' => false,
-        _ => fields.any((f) => f.multiplies != null),
-      },
     );
+    final count = TallyKeys.setCountOf(shape.setCount);
+    final on = switch (shape.sets) {
+      'true' => true,
+      'false' => false,
+      _ => null,
+    };
+    final int sets;
+    if (count != null && (on == null || on == count > 1)) {
+      sets = count;
+    } else if (on ?? fields.any((f) => f.multiplies != null)) {
+      sets = switch (_newest()[noteId]) {
+        final entry? => read.setsOf(entry).length.clamp(2, TallyKeys.maxSets),
+        null => 2,
+      };
+    } else {
+      sets = 1;
+    }
+    return Tally(noteId, fields, bar: read.bar, sets: sets);
   }
 
   /// The fields of [tally] with the multipliers its settings make (#200):
@@ -547,14 +580,33 @@ class Tallies {
   void setBar(String noteId, TallyPeriod bar) =>
       _setOnTally(noteId, TallyKeys.bar, bar.name);
 
-  /// Switches whether the Tally of [noteId] counts in sets (#264): its
-  /// entry form has "+ Set" then. The entries keep their sets either way.
-  void setCountsInSets(String noteId, bool on) =>
-      _setOnTally(noteId, TallyKeys.sets, on ? 'true' : 'false');
+  /// Sets how many sets an entry of the Tally of [noteId] starts with
+  /// (obf-1159), 1 to [TallyKeys.maxSets]: above 1 its entry form has
+  /// "Add set". Writes the number unless it holds that already, and
+  /// whether it is above 1, for an older app, with a new number always,
+  /// so the two keep together where Devices merge them, else unless it
+  /// holds that already. The entries keep their sets either way.
+  void setSets(String noteId, int sets) {
+    if (sets < 1 || sets > TallyKeys.maxSets) {
+      throw ArgumentError.value(sets, 'sets', 'not 1 to ${TallyKeys.maxSets}');
+    }
+    final count = '$sets';
+    store.batch(() {
+      final changed = store.current(noteId, TallyKeys.setCount) != count;
+      _setOnTally(noteId, TallyKeys.setCount, count);
+      final on = sets > 1 ? 'true' : 'false';
+      _setOnTally(noteId, TallyKeys.sets, on, always: changed);
+    });
+  }
 
   /// Writes [value] under [key] on the Note of the Tally [noteId], unless
-  /// it holds that already.
-  void _setOnTally(String noteId, String key, String value) {
+  /// it holds that already and not [always].
+  void _setOnTally(
+    String noteId,
+    String key,
+    String value, {
+    bool always = false,
+  }) {
     final note = Notes(store).byId(noteId);
     if (byNote(noteId) == null ||
         note == null ||
@@ -565,7 +617,7 @@ class Tallies {
     if (!store.mayChange(noteId)) {
       throw StateError('may not change $noteId');
     }
-    if (store.current(noteId, key) == value) return;
+    if (!always && store.current(noteId, key) == value) return;
     store.append(noteId, key, value);
   }
 
@@ -966,24 +1018,24 @@ class Tallies {
   /// added, each as if it had no entries: read from the Notes alone, not
   /// from the entries, and kept until the log changes (#216). Shared by
   /// every caller, so nobody changes it.
-  Map<String, ({List<TallyField> fields, String? bar, String? sets})>
-  _shapes() => store.workedOut((Tallies, #shapes), () {
+  Map<String, _Shape> _shapes() => store.workedOut((Tallies, #shapes), () {
     final holders = <String, List<String>>{};
     for (final MapEntry(key: holder, value: note) in _shownUnder().entries) {
       (holders[note] ??= []).add(holder);
     }
-    final shapes =
-        <String, ({List<TallyField> fields, String? bar, String? sets})>{};
+    final shapes = <String, _Shape>{};
     for (final MapEntry(key: note, value: on) in holders.entries) {
       final fields = <TallyField>[];
       String? bar;
       String? sets;
+      String? setCount;
       for (final holder in on..sort()) {
         final current = store.currentFields(holder);
         fields.addAll(_fieldsOn(holder, current));
         if (holder == note) {
           bar = current[TallyKeys.bar];
           sets = current[TallyKeys.sets];
+          setCount = current[TallyKeys.setCount];
         }
       }
       if (fields.isEmpty) continue;
@@ -991,7 +1043,7 @@ class Tallies {
         final byAdded = a.added.compareTo(b.added);
         return byAdded != 0 ? byAdded : a.id.compareTo(b.id);
       });
-      shapes[note] = (fields: fields, bar: bar, sets: sets);
+      shapes[note] = (fields: fields, bar: bar, sets: sets, setCount: setCount);
     }
     return shapes;
   });
@@ -1078,6 +1130,26 @@ class Tallies {
         return counted;
       });
 
+  /// The newest entry not removed of each Tally, by the Note it shows
+  /// under, as [entries] orders them (obf-1159): every entry read in one
+  /// query, kept until the log changes. Shared by every caller, so nobody
+  /// changes it.
+  Map<String, TallyEntry> _newest() => store.workedOut((Tallies, #newest), () {
+    final shownUnder = _shownUnder();
+    final newest = <String, TallyEntry>{};
+    for (final MapEntry(key: id, value: fields)
+        in store.currentFieldsOfType(TallyKeys.typeEntry).entries) {
+      final entry = _entryFrom(id, fields);
+      if (entry == null || entry.isTrashed) continue;
+      final under = shownUnder[entry.noteId] ?? entry.noteId;
+      final held = newest[under];
+      if (held == null || _newestFirst(entry, held) < 0) {
+        newest[under] = entry;
+      }
+    }
+    return newest;
+  });
+
   /// Every Note with a field of a Tally on it, by the Note it shows
   /// under: itself, or the one it was merged into. Kept until the log
   /// changes (#216) and shared by every caller, so nobody changes it.
@@ -1114,3 +1186,13 @@ class Tallies {
     return trimmed;
   }
 }
+
+/// A Tally as its Notes hold it, read without its entries: its fields,
+/// and its bar length, sets switch and number of sets as stored on its
+/// own Note.
+typedef _Shape = ({
+  List<TallyField> fields,
+  String? bar,
+  String? sets,
+  String? setCount,
+});

@@ -52,7 +52,7 @@ use std::collections::BTreeMap;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 35] = [
+const SCENARIOS: [&str; 36] = [
     "added-grammars",
     "area-order",
     "area-order-shown",
@@ -87,6 +87,7 @@ const SCENARIOS: [&str; 35] = [
     "sessions",
     "shopping-lists",
     "tallies",
+    "topic-icons",
     "trash",
 ];
 
@@ -397,12 +398,19 @@ fn read(store: &Store) -> Result<Value, Box<dyn std::error::Error>> {
             "starter": area.starter,
             "colour": area.colour,
             "icon": area.icon,
-            "topics": topics.iter().map(|t| json!({
-                "id": t.id,
-                "areaId": t.area_id,
-                "name": t.name,
-                "starter": t.starter,
-            })).collect::<Vec<_>>(),
+            "topics": topics.iter().map(|t| {
+                let mut topic = json!({
+                    "id": t.id,
+                    "areaId": t.area_id,
+                    "name": t.name,
+                    "starter": t.starter,
+                });
+                // Only where one is set (obf-1156), as the generator.
+                if let (Some(icon), Some(fields)) = (&t.icon, topic.as_object_mut()) {
+                    fields.insert("icon".into(), json!(icon));
+                }
+                topic
+            }).collect::<Vec<_>>(),
         }));
     }
     let mut every = Vec::new();
@@ -841,6 +849,18 @@ fn the_store_has_the_dart_core_tables() -> TestResult {
     let theirs = std::fs::read_to_string(fixtures().join("schema.sql"))?;
     let squash = |s: &str| s.split_whitespace().collect::<Vec<_>>().join(" ");
     assert_eq!(squash(&ours), squash(&theirs));
+    Ok(())
+}
+
+#[test]
+fn the_icon_keys_are_the_dart_cores_in_its_groups() -> TestResult {
+    let fixture = read_json(&fixtures().join("area_icons.json"))?;
+    let theirs: Vec<Vec<String>> = serde_json::from_value(fixture["groups"].clone())?;
+    let ours: Vec<Vec<String>> = oldbrainfix_core::AREA_ICON_GROUPS
+        .iter()
+        .map(|g| g.iter().map(|k| k.to_string()).collect())
+        .collect();
+    assert_eq!(ours, theirs);
     Ok(())
 }
 
@@ -1809,6 +1829,23 @@ fn write_places(store: &Store) -> Built {
     places.add_topic(&gone.id, "Gone too")?;
     places.delete_area(&gone.id, NotesGo::Unsorted)?;
     notes.set_importance(&lost.id, Importance::Important)?;
+    Ok(())
+}
+
+/// The generator's `topic-icons` scenario (obf-1156).
+fn write_topic_icons(store: &Store) -> Built {
+    let places = Places::new(store);
+    let home = places.add_area("Home")?;
+    places.set_colour(&home.id, Some("F06292"))?;
+    places.set_icon(&home.id, Some("family"))?;
+    let post = places.add_topic(&home.id, "Post")?;
+    places.set_topic_icon(&post.id, Some("mail"))?;
+    places.rename(&post.id, "Letters")?;
+    let bills = places.add_topic(&home.id, "Bills")?;
+    places.set_topic_icon(&bills.id, Some("receipt"))?;
+    places.set_topic_icon(&bills.id, None)?;
+    places.add_topic(&home.id, "Attic")?;
+    Notes::new(store).capture("Pay the rent", Some(&post.id), None)?;
     Ok(())
 }
 
@@ -2984,7 +3021,7 @@ fn photos_and_recordings_are_kept_as_the_dart_core_keeps_them() -> TestResult {
 
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 35] = [
+    let writers: [(&str, Writer); 36] = [
         ("added-grammars", write_added_grammars),
         ("area-order", write_area_order),
         ("area-order-shown", write_area_order_shown),
@@ -3019,6 +3056,7 @@ fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResu
         ("sessions", write_sessions),
         ("shopping-lists", write_shopping_lists),
         ("tallies", write_tallies),
+        ("topic-icons", write_topic_icons),
         ("trash", write_trash),
     ];
     assert_eq!(writers.map(|(s, _)| s), SCENARIOS);
@@ -5651,14 +5689,18 @@ fn write_tallies(store: &Store) -> Built {
         None,
     )?;
     let tally_keys = oldbrainfix_core::tallies::keys::BAR;
-    tallies.set_counts_in_sets(&gym, false)?;
+    // As an older app switches it (#264).
+    let sets_key = oldbrainfix_core::tallies::keys::SETS;
+    store.append(&gym, sets_key, Some("false"), None)?;
     store.append(&evenings, tally_keys, Some("fortnight"), None)?;
     store.append(&reading, tally_keys, Some("year"), None)?;
     let press = notes.capture("Bench", None, None)?.id;
     let weight = tallies.add_field(&press, "Weight", "kg", None, Some(TallyRule::Max))?;
     let times = tallies.add_field(&press, "Reps", "", Some(30.0), None)?;
     let warm = tallies.add_check(&press, "Warmed up", Some(2.0))?;
-    tallies.set_counts_in_sets(&press, true)?;
+    // As an older app switches it: as many sets as the newest entry holds
+    // (obf-1159).
+    store.append(&press, sets_key, Some("true"), None)?;
     tallies.set_bar(&press, TallyPeriod::Week)?;
     let heavy = tallies.add_with(
         &press,
@@ -5698,6 +5740,36 @@ fn write_tallies(store: &Store) -> Built {
     store.append(&light.id, &format!("v5:{times}"), Some("4"), None)?;
     let set_value = oldbrainfix_core::tallies::keys::set_value;
     store.append(&light.id, &set_value(2, &warm), Some("1"), None)?;
+    let rows = notes.capture("Rows", None, None)?.id;
+    let pulls = tallies.add_field(&rows, "Pulls", "", Some(12.0), None)?;
+    tallies.set_sets(&rows, 3)?;
+    tallies.add_with(
+        &rows,
+        &by_field(&[(&pulls, 12.0)]),
+        &[by_field(&[(&pulls, 10.0)])],
+        "",
+        Some(utc(2026, 1, 3, 18)?),
+        |_| Ok(()),
+    )?;
+    let dips = notes.capture("Dips", None, None)?.id;
+    let dipped = tallies.add_field(&dips, "Dips", "", None, None)?;
+    store.append(&dips, sets_key, Some("true"), None)?;
+    // As a modified app would: no number, read as the newest entry.
+    let set_count = oldbrainfix_core::tallies::keys::SET_COUNT;
+    store.append(&dips, set_count, Some("03"), None)?;
+    tallies.add_with(
+        &dips,
+        &by_field(&[(&dipped, 10.0)]),
+        &[by_field(&[(&dipped, 8.0)]), by_field(&[(&dipped, 6.0)])],
+        "",
+        None,
+        |_| Ok(()),
+    )?;
+    let chins = notes.capture("Chins", None, None)?.id;
+    tallies.add_field(&chins, "Chins", "", None, None)?;
+    tallies.set_sets(&chins, 4)?;
+    // An older app switches it off: the number no longer counts.
+    store.append(&chins, sets_key, Some("false"), None)?;
     let steps = notes.capture("Steps", None, None)?.id;
     let count = tallies.add_field(&steps, "Steps", "steps", None, None)?;
     tallies.add(&steps, &by_field(&[(&count, 8000.0)]), "", None)?;
@@ -5881,7 +5953,11 @@ fn tallies_come_to_what_the_dart_core_says(scenario: &str) -> TestResult {
         every.insert(id.clone(), json!(fields));
         settings.insert(
             id.clone(),
-            json!({"bar": tally.bar.name(), "countsInSets": tally.counts_in_sets}),
+            json!({
+                "bar": tally.bar.name(),
+                "countsInSets": tally.counts_in_sets(),
+                "sets": tally.sets,
+            }),
         );
         let mut listed = Vec::new();
         for e in tallies.entries(id, &PersonFilter::default())? {

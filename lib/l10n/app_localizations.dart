@@ -296,6 +296,12 @@ abstract class AppLocalizations {
   /// **'Colour and icon'**
   String get areaLook;
 
+  /// In a Topic's menu (obf-1156): opens the page that picks its icon, shown in its Area's colour.
+  ///
+  /// In en, this message translates to:
+  /// **'Icon'**
+  String get topicLook;
+
   /// No description provided for @colourHeading.
   ///
   /// In en, this message translates to:
@@ -2251,6 +2257,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Stop'**
   String get stopPlaying;
+
+  /// The playing bar at the top in place of the Note's name while the recording playing is of a locked Area or the App Lock is locked (obf-1155).
+  ///
+  /// In en, this message translates to:
+  /// **'Private recording'**
+  String get privateRecording;
 
   /// No description provided for @microphoneExplainTitle.
   ///
@@ -6686,17 +6698,35 @@ abstract class AppLocalizations {
   /// **'No target'**
   String get tallyNoTarget;
 
-  /// A Tally's setting (#264), a badge in its setup: with it each entry holds several sets, each a row across the Tally's number fields (CONTEXT.md: Set).
+  /// Whether a Tally counts in sets (#264), as the setting an older app switches, named in the AI review and on a field that counted sets as a multiplier did (CONTEXT.md: Set).
   ///
   /// In en, this message translates to:
   /// **'Counts in sets'**
   String get tallyCountsInSets;
 
-  /// No description provided for @tallyCountsInSetsDetail.
+  /// A Tally's setting (obf-1159), a badge in its setup: how many sets a new entry starts with, 1 for none, each a row across the Tally's number fields (CONTEXT.md: Set).
   ///
   /// In en, this message translates to:
-  /// **'Each entry holds several sets, such as 60 kg × 10 and then 65 kg × 8. Each field totals the sets of an entry by its rule: reps by their sum, a weight by the largest.'**
-  String get tallyCountsInSetsDetail;
+  /// **'Sets'**
+  String get tallySets;
+
+  /// No description provided for @tallySetsDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'How many sets a new entry starts with, 1 for none. Each set repeats the fields, such as 60 kg × 10 three times, and Add set adds more. Each field totals the sets of an entry by its rule: reps by their sum, a weight by the largest.'**
+  String get tallySetsDetail;
+
+  /// After a Tally's targets (obf-1159), its number of sets while above 1, such as Bench 10 ×3.
+  ///
+  /// In en, this message translates to:
+  /// **'×{count}'**
+  String tallySetsTimes(int count);
+
+  /// Under an entry with fewer sets than its Tally's number of sets (obf-1159), such as 2/3 sets.
+  ///
+  /// In en, this message translates to:
+  /// **'{held}/{target} sets'**
+  String tallyEntrySets(int held, int target);
 
   /// The button under the sets of a Tally entry (#264): adds a set that starts with the values of the set before.
   ///

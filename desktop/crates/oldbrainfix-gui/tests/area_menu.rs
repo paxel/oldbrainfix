@@ -14,8 +14,9 @@
 
 use std::sync::Arc;
 
-use egui::Key;
 use egui::accesskit::Toggled;
+use egui::epaint::ClippedShape;
+use egui::{Key, Pos2, Rect, Shape};
 use egui_kittest::kittest::{NodeT, Queryable};
 use egui_kittest::{Harness, Node};
 use oldbrainfix_core::{Notes, Places, SigningKey, Store};
@@ -115,9 +116,10 @@ const ENTRIES: [&str; 6] = [
     "Delete",
 ];
 
-/// The entries of a Topic's band ⋮, Rename with its key.
+/// The entries of a Topic's band ⋮, Name and icon… (obf-1156) with its
+/// key.
 const TOPIC_ENTRIES: [&str; 4] = [
-    "Rename F2",
+    "Name and icon… F2",
     "Export as Pack…",
     "Export as AXT file…",
     "Delete",
@@ -231,10 +233,11 @@ fn f2_renames_the_place_shown_but_not_in_a_text_field() -> TestResult {
     let mut harness = window(app);
     harness.key_press(Key::F2);
     harness.run();
-    assert!(shows(&harness, "Rename"), "the Rename dialog");
+    // A Topic's name with its icon (obf-1156).
+    assert!(shows(&harness, "Name and icon"), "the Topic's dialog");
     harness.key_press(Key::Escape);
     harness.run();
-    assert!(!shows(&harness, "Rename"));
+    assert!(!shows(&harness, "Name and icon"));
 
     // In the search field F2 is the field's.
     harness.key_press_modifiers(egui::Modifiers::COMMAND, Key::F);
@@ -242,7 +245,7 @@ fn f2_renames_the_place_shown_but_not_in_a_text_field() -> TestResult {
     assert!(harness.ctx.text_edit_focused());
     harness.key_press(Key::F2);
     harness.run();
-    assert!(!shows(&harness, "Rename"));
+    assert!(!shows(&harness, "Name and icon"));
     Ok(())
 }
 
@@ -346,5 +349,102 @@ fn an_area_folds_its_topics_and_this_device_keeps_the_fold() -> TestResult {
     drop(harness);
     let harness = window(App::new(store, "en"));
     assert!(shows(&harness, "Repairs"));
+    Ok(())
+}
+
+#[test]
+fn a_topics_dialog_picks_its_icon_and_no_colour() -> TestResult {
+    let (store, household, repairs) = store()?;
+    Places::new(&store).set_colour(&household, Some("1565C0"))?;
+    let mut app = App::new(store.clone(), "en");
+    app.select(Selection::Place(repairs.clone()));
+    let mut harness = window(app);
+    harness.key_press(Key::F2);
+    harness.run();
+    // Its name and icon (obf-1156): a Topic has no colour of its own.
+    assert!(shows(&harness, "Name and icon"));
+    assert!(!shows(&harness, "No colour"));
+    assert!(shows(&harness, "No icon"));
+    last(&harness, "mail").click_accesskit();
+    harness.run();
+    last(&harness, "Save").click_accesskit();
+    harness.run();
+    assert!(!shows(&harness, "Name and icon"));
+    let places = Places::new(&store);
+    let icon = places.topic_by_id(&repairs)?.and_then(|t| t.icon);
+    assert_eq!(icon.as_deref(), Some("mail"));
+    // The Area keeps its own.
+    let area = places.area_by_id(&household)?.ok_or("the Area")?;
+    assert_eq!(area.icon, None);
+    assert_eq!(area.colour.as_deref(), Some("1565C0"));
+    Ok(())
+}
+
+/// Where the left pane draws the name `label` in its row, in points, and
+/// the size of its text: once for each time it is drawn.
+fn drawn_names(harness: &Harness<'_, App>, label: &str) -> Vec<(Pos2, f32)> {
+    fn flat(shape: &Shape, into: &mut Vec<Shape>) {
+        match shape {
+            Shape::Vec(shapes) => shapes.iter().for_each(|s| flat(s, into)),
+            other => into.push(other.clone()),
+        }
+    }
+    let scale = harness.ctx.pixels_per_point();
+    let rows: Vec<Rect> = harness
+        .query_all_by_label(label)
+        .map(|n| {
+            let r = n.rect();
+            Rect::from_min_max(
+                (r.min.to_vec2() / scale).to_pos2(),
+                (r.max.to_vec2() / scale).to_pos2(),
+            )
+        })
+        .collect();
+    let mut shapes = Vec::new();
+    for ClippedShape { shape, .. } in &harness.output().shapes {
+        flat(shape, &mut shapes);
+    }
+    shapes
+        .iter()
+        .filter_map(|shape| match shape {
+            Shape::Text(text) if text.galley.text() == label => {
+                let size = text.galley.job.sections[0].format.font_id.size;
+                rows.iter()
+                    .any(|r| r.contains(text.pos))
+                    .then_some((text.pos, size))
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn a_topic_stands_under_its_area_in_smaller_text() -> TestResult {
+    let (store, household, _repairs) = store()?;
+    let places = Places::new(&store);
+    places.set_icon(&household, Some("home"))?;
+    let bills = places.add_topic(&household, "Bills")?;
+    places.set_topic_icon(&bills.id, Some("mail"))?;
+    let harness = window(App::new(store, "en"));
+    // The Area's name bold (obf-1157): drawn twice, a little apart.
+    let area = drawn_names(&harness, "Household");
+    assert_eq!(area.len(), 2, "{area:?}");
+    let (area_at, area_size) = area[0];
+    // A Topic one text size smaller, its name further right than the
+    // Area's, with its icon or without.
+    let [(repairs_at, repairs_size)] = drawn_names(&harness, "Repairs")[..] else {
+        panic!("Repairs drawn once");
+    };
+    let [(bills_at, bills_size)] = drawn_names(&harness, "Bills")[..] else {
+        panic!("Bills drawn once");
+    };
+    assert!(repairs_size < area_size, "{repairs_size} < {area_size}");
+    assert_eq!(bills_size, repairs_size);
+    assert!(repairs_at.x > area_at.x + 1.0, "{repairs_at:?} {area_at:?}");
+    // A Topic without an icon keeps its room: the names in one column.
+    assert!(
+        (repairs_at.x - bills_at.x).abs() < 0.5,
+        "{repairs_at:?} {bills_at:?}"
+    );
     Ok(())
 }

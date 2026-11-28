@@ -526,6 +526,8 @@
   "deskMenuGoTo": "Gehe zu",
   "deskAreaLook": "Name, Farbe und Symbol …",
   "deskAreaLookTitle": "Name, Farbe und Symbol",
+  "deskTopicLook": "Name und Symbol …",
+  "deskTopicLookTitle": "Name und Symbol",
   "deskAreaMove": "Verschieben",
   "runningTitle": "Im Hintergrund",
   "runningNone": "Im Hintergrund läuft nichts.",

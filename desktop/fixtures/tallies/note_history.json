@@ -74,21 +74,11 @@
       "id": "note:00000000000000000000000000000027",
       "history": [
         {
-          "at": "2026-01-01T10:04:17.000Z",
-          "entity": "note:00000000000000000000000000000027",
-          "kind": "trashed",
-          "before": null,
-          "after": null,
-          "format": null,
-          "by": null,
-          "mayUse": false
-        },
-        {
           "at": "2026-01-01T10:04:02.000Z",
           "entity": "note:00000000000000000000000000000027",
           "kind": "captured",
           "before": null,
-          "after": "Steps",
+          "after": "Rows",
           "format": "plain",
           "by": null,
           "mayUse": false
@@ -99,8 +89,63 @@
       "id": "note:0000000000000000000000000000002a",
       "history": [
         {
-          "at": "2026-01-01T10:04:18.000Z",
+          "at": "2026-01-01T10:04:20.000Z",
           "entity": "note:0000000000000000000000000000002a",
+          "kind": "captured",
+          "before": null,
+          "after": "Dips",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:0000000000000000000000000000002d",
+      "history": [
+        {
+          "at": "2026-01-01T10:04:38.000Z",
+          "entity": "note:0000000000000000000000000000002d",
+          "kind": "captured",
+          "before": null,
+          "after": "Chins",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:0000000000000000000000000000002f",
+      "history": [
+        {
+          "at": "2026-01-01T10:05:05.000Z",
+          "entity": "note:0000000000000000000000000000002f",
+          "kind": "trashed",
+          "before": null,
+          "after": null,
+          "format": null,
+          "by": null,
+          "mayUse": false
+        },
+        {
+          "at": "2026-01-01T10:04:50.000Z",
+          "entity": "note:0000000000000000000000000000002f",
+          "kind": "captured",
+          "before": null,
+          "after": "Steps",
+          "format": "plain",
+          "by": null,
+          "mayUse": false
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000032",
+      "history": [
+        {
+          "at": "2026-01-01T10:05:06.000Z",
+          "entity": "note:00000000000000000000000000000032",
           "kind": "captured",
           "before": null,
           "after": "Unsorted thought",

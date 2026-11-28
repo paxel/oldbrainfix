@@ -96,14 +96,15 @@ use oldbrainfix_core::settings::RECORDING_PAUSE_CHOICES;
 use oldbrainfix_core::share::{self, NoteShare};
 use oldbrainfix_core::sync::SETTINGS_SOURCE;
 use oldbrainfix_core::{
-    AREA_ICONS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, Attachment, Blob, BoxState, Boxes,
-    CaptureContext, CapturedDetail, CardTaken, Checklist, ChecklistAgendaRow, Checklists,
+    AREA_ICON_GROUPS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, Attachment, Blob, BoxState,
+    Boxes, CaptureContext, CapturedDetail, CardTaken, Checklist, ChecklistAgendaRow, Checklists,
     ClockTime, Coordinates, Day, DeviceSettings, Frog, Frogs, FrogsToday, Importance, Invite, Line,
     ListOnAgenda, MissedSummary, Note, NoteHistory, Notes, NotesGo, Occurrence, OpenOccurrence,
     OwnProfile, Person, PersonFilter, PersonSettings, Places, Profile, QuietHours, Routine,
     RoutineOccurrence, Routines, Search, Section, SessionSetup, Sessions, ShoppingLine,
     ShoppingList, ShoppingLists, ShoppingOnAgenda, ShownBox, SpeechModelChoice, SpeechModelSource,
-    Store, Tallies, TextSize, ThemeChoice, Topic, UnitSystem, bundle, markdown, text_format,
+    Store, Tallies, TextSize, ThemeChoice, Topic, UnitSystem, bundle, markdown, text_boxes,
+    text_format,
 };
 
 use crate::about_view;
@@ -1171,13 +1172,14 @@ enum Dialog {
         area: Option<String>,
         name: String,
     },
-    /// Renaming the Area or Topic `id`, shown as `shown`; an Area's with
-    /// its colour and icon as picked, `look`, one dialog (obf-1014).
+    /// Renaming the Area or Topic `id`, shown as `shown`, with its look
+    /// as picked, `look`, one dialog: an Area's colour and icon
+    /// (obf-1014), a Topic's icon (obf-1156).
     Rename {
         id: String,
         name: String,
         shown: String,
-        look: Option<AreaLook>,
+        look: Option<PlaceLook>,
     },
     Delete(Deleting),
     /// Picking the Note to merge `notes` into, by id and text: the
@@ -2489,6 +2491,9 @@ pub struct App {
     player: Option<Box<dyn Player>>,
     /// The recording playing, by its hash.
     playing: Option<String>,
+    /// The Note whose recording plays, for the playing bar (obf-1155);
+    /// set with [`App::playing`] as it starts.
+    playing_note: Option<String>,
     /// How fast recordings play, 1 being normal speed; a Device setting.
     speed: f64,
     /// The recordings that ended, held on the capture field until its
@@ -3183,6 +3188,7 @@ impl App {
             recorder: None,
             player: None,
             playing: None,
+            playing_note: None,
             speed,
             recorded: Vec::new(),
             recording_into: None,
@@ -9242,6 +9248,9 @@ impl App {
                     && player.play(bytes)
                 {
                     self.playing = Some(hash);
+                    // Played in the Note dialog or a Note's window, of the
+                    // Note it shows.
+                    self.playing_note = self.view.detail.as_ref().map(|(p, _)| p.note.id.clone());
                 }
             }
             Action::Speed(speed) => {
@@ -9692,10 +9701,20 @@ impl App {
             }
             Action::Rename(id) => {
                 let shown = self.shown_name(&id);
-                let look = self.view.area(&id).map(|area| AreaLook {
-                    colour: area.colour.clone(),
-                    icon: area.icon.clone(),
+                let area = self.view.area(&id).map(|area| {
+                    PlaceLook::Area(AreaLook {
+                        colour: area.colour.clone(),
+                        icon: area.icon.clone(),
+                    })
                 });
+                let topic = self.view.topic(&id).map(|topic| PlaceLook::Topic {
+                    icon: topic.icon.clone(),
+                    colour: self
+                        .view
+                        .area(&topic.area_id)
+                        .and_then(|a| a.colour.clone()),
+                });
+                let look = area.or(topic);
                 self.dialog = Some(Dialog::Rename {
                     id,
                     name: shown.clone(),
@@ -9765,13 +9784,19 @@ impl App {
                     }
                     // Only what was changed: a sync meanwhile keeps the
                     // rest.
-                    if let (Some(look), Some(area)) = (look, self.view.area(id)) {
+                    if let (Some(PlaceLook::Area(look)), Some(area)) = (look, self.view.area(id)) {
                         if look.colour != area.colour {
                             places.set_colour(id, look.colour.as_deref())?;
                         }
                         if look.icon != area.icon {
                             places.set_icon(id, look.icon.as_deref())?;
                         }
+                    }
+                    if let (Some(PlaceLook::Topic { icon, .. }), Some(topic)) =
+                        (look, self.view.topic(id))
+                        && *icon != topic.icon
+                    {
+                        places.set_topic_icon(id, icon.as_deref())?;
                     }
                     self.dialog = None;
                 }
@@ -11502,7 +11527,7 @@ impl App {
                 });
             }
             TallyAction::Bar(bar) => tallies.set_bar(&note, bar)?,
-            TallyAction::Sets(on) => tallies.set_counts_in_sets(&note, on)?,
+            TallyAction::Sets(sets) => tallies.set_sets(&note, sets)?,
             TallyAction::AllShown(shown) => {
                 let setting = tally_view::entries_shown_setting(&note);
                 if shown {
@@ -11882,6 +11907,7 @@ impl App {
         swap(&mut self.recorder, &mut to.recorder);
         swap(&mut self.player, &mut to.player);
         swap(&mut self.playing, &mut to.playing);
+        swap(&mut self.playing_note, &mut to.playing_note);
         swap(&mut self.clipboard, &mut to.clipboard);
         swap(&mut self.transcriber, &mut to.transcriber);
         swap(&mut self.reader, &mut to.reader);
@@ -12579,7 +12605,7 @@ impl App {
             tally: view
                 .tally
                 .as_ref()
-                .map(|shown| (shown.tally.bar, shown.tally.counts_in_sets)),
+                .map(|shown| (shown.tally.bar, shown.tally.sets)),
             session: view.session_setup.clone(),
         };
         Some(State { typed, kept })
@@ -14862,7 +14888,8 @@ impl App {
                 ];
                 for (selection, icon, label) in rows {
                     let on = self.selection == selection;
-                    if row(ui, tones, on, 0.0, Some((icon, text)), label, false).clicked() {
+                    let shown = (0.0, RowName::Plain);
+                    if row(ui, tones, on, shown, Some((icon, text)), label, false).clicked() {
                         actions.push(Action::Select(selection));
                     }
                 }
@@ -14878,7 +14905,8 @@ impl App {
                 ui.add_space(4.0);
                 let mut blocks = Vec::new();
                 for (area, topics) in &self.view.areas {
-                    let colour = area_colour(area.colour.as_deref()).unwrap_or(text);
+                    let colour =
+                        area_colour(area.colour.as_deref(), ui.visuals().dark_mode).unwrap_or(text);
                     let icon = icons::area_icon(area.icon.as_deref()).map(|i| (i, colour));
                     let on = self.selection == Selection::Place(area.id.clone());
                     let name = area_name(&t, area);
@@ -14887,7 +14915,7 @@ impl App {
                     // was, nothing to click, drag, drop on or open a menu
                     // of; its Topics go with it.
                     if let Some(moved) = self.deletions.of(&area.id) {
-                        let resp = row(ui, tones, on, 0.0, icon, &name, false);
+                        let resp = row(ui, tones, on, (0.0, RowName::Area), icon, &name, false);
                         let spinner = egui::Rect::from_center_size(
                             egui::pos2(resp.rect.right() - 18.0, resp.rect.center().y),
                             egui::vec2(16.0, 16.0),
@@ -14911,7 +14939,7 @@ impl App {
                     }
                     // Dragged by its row into the person's own order
                     // (#280); a card dropped on it files.
-                    let resp = row(ui, tones, on, 0.0, icon, &name, true)
+                    let resp = row(ui, tones, on, (0.0, RowName::Area), icon, &name, true)
                         .interact(Sense::click_and_drag());
                     // A shield before its chevron while it is Hidden from
                     // AI (#267).
@@ -15026,6 +15054,9 @@ impl App {
                         }
                     });
                     let row_rect = resp.rect;
+                    // Its Topics stand under its name, their icons where
+                    // its name starts (obf-1157).
+                    let under = if icon.is_some() { ROW_ICON_ROOM } else { 0.0 };
                     for topic in topics {
                         let on = self.selection == Selection::Place(topic.id.clone());
                         // A folded Area still shows the Topic shown, which
@@ -15033,14 +15064,19 @@ impl App {
                         if folded && !on {
                             continue;
                         }
-                        let resp = row(ui, tones, on, 24.0, None, &topic_name(&t, topic), true);
+                        // Its icon in the Area's colour, where it has one
+                        // (obf-1156).
+                        let icon = icons::area_icon(topic.icon.as_deref()).map(|i| (i, colour));
+                        let shown = (under, RowName::Topic);
+                        let resp = row(ui, tones, on, shown, icon, &topic_name(&t, topic), true);
                         place_row(&resp, &topic.id, actions);
                         // Export as Pack… for anyone who may read it
                         // (#165), the rest for who manages the Area.
                         resp.context_menu(|ui| {
                             let mut items = Vec::new();
                             if manages {
-                                items.push((t.rename(), Action::Rename(topic.id.clone())));
+                                let look = t.desk_topic_look();
+                                items.push((look, Action::Rename(topic.id.clone())));
                             }
                             items.push((t.export_as_pack(), Action::ExportPack(topic.id.clone())));
                             // Its Notes for another app (obf-1145).
@@ -15069,8 +15105,80 @@ impl App {
                 ui.add_space(12.0);
                 let on = self.selection == Selection::Trash;
                 let trash = Some((icons::OPEN_TRASH, text));
-                if row(ui, tones, on, 0.0, trash, t.trash_title(), false).clicked() {
+                if row(
+                    ui,
+                    tones,
+                    on,
+                    (0.0, RowName::Plain),
+                    trash,
+                    t.trash_title(),
+                    false,
+                )
+                .clicked()
+                {
                     actions.push(Action::Select(Selection::Trash));
+                }
+            });
+    }
+
+    /// While a recording plays, the slim bar at the top, above the
+    /// announcement, wherever announcements show (obf-1155, UI laws "The
+    /// playing bar"): its Note's name, a click on it opening the Note, and
+    /// Stop. Not over the Note it is of, whose own stop button shows.
+    fn playing_bar(&self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
+        let Some(hash) = self.playing.clone() else {
+            return;
+        };
+        let note = self.playing_note.as_deref();
+        let shown = self.view.detail.as_ref().map(|(p, _)| p.note.id.as_str());
+        if note.is_some() && note == shown {
+            return;
+        }
+        let t = self.t;
+        let found = note.and_then(|id| Notes::new(&self.store).by_id(id).ok().flatten());
+        let name = match &found {
+            Some(note) => match note.shown_name() {
+                name if name.is_empty() => {
+                    l10n::wordless(&t, note.wordless(), &note.wordless_name())
+                }
+                name => name.lines().next().unwrap_or_default().to_string(),
+            },
+            None => t.voice_recording().to_string(),
+        };
+        egui::Panel::top("playing bar")
+            .frame(
+                Frame::NONE
+                    .inner_margin(Margin::symmetric(12, 6))
+                    .fill(tones.card),
+            )
+            .show(ui, |ui| {
+                let colour = ui.visuals().text_color();
+                // Stop first, so a long name leaves it room.
+                let (said, stop) = egui::containers::Sides::new()
+                    .shrink_left()
+                    .truncate()
+                    .show(
+                        ui,
+                        |ui| {
+                            let label = egui::Label::new(RichText::new(name).color(colour))
+                                .sense(egui::Sense::click());
+                            ui.add(label)
+                                .on_hover_cursor(egui::CursorIcon::PointingHand)
+                        },
+                        |ui| design::text_button(ui, icons::STOP, t.stop_playing()),
+                    );
+                if stop.clicked() {
+                    actions.push(Action::Play(hash));
+                }
+                if let Some(id) = note
+                    && said.clicked()
+                {
+                    // Over a page, the Note dialog shows only once it is
+                    // closed.
+                    if !self.pages.is_empty() {
+                        actions.push(Action::ClosePage);
+                    }
+                    actions.push(Action::FollowLink(AppLink::Note(id.to_string())));
                 }
             });
     }
@@ -15079,6 +15187,7 @@ impl App {
     /// most pressing first: of the window, or of the dialog shown over it
     /// (#145).
     fn announcements(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
+        self.playing_bar(ui, tones, actions);
         if self.made_hidden_shows(ui) {
             // A Note made that the filter hides, back in its list
             // (obf-1070), before what waits; the click shows it.
@@ -16817,16 +16926,20 @@ impl App {
                 }
                 None => true,
             },
+            // Each step written at once, as on the phone (obf-1159).
             NoteBadge::TallySets => match &self.view.tally {
                 Some(shown) => {
-                    let setting = t.tally_counts_in_sets();
-                    let mut on = shown.tally.counts_in_sets;
+                    let setting = t.tally_sets();
+                    let mut sets = shown.tally.sets as i64;
                     badge_dialog(ctx, (&t, tones), (icons::TALLY_SETS, None), setting, |ui| {
                         let weak = ui.visuals().weak_text_color();
-                        let detail = t.tally_counts_in_sets_detail();
+                        let detail = t.tally_sets_detail();
                         ui.label(RichText::new(detail).small().color(weak));
-                        if badge_switch(ui, &t, setting, &mut on) {
-                            actions.push(Action::Tally(TallyAction::Sets(on)));
+                        let most = oldbrainfix_core::tallies::keys::MAX_SETS as i64;
+                        if crate::routine_editor::stepper(ui, &t, &mut sets, (1, Some(most)), None)
+                        {
+                            let sets = usize::try_from(sets).unwrap_or(1);
+                            actions.push(Action::Tally(TallyAction::Sets(sets)));
                         }
                     })
                 }
@@ -17799,7 +17912,7 @@ impl App {
             )];
             if !place.area {
                 let rename = [(
-                    t.rename(),
+                    t.desk_topic_look(),
                     keys(Modifiers::NONE, Key::F2),
                     manages,
                     Action::Rename(id.clone()),
@@ -21352,6 +21465,18 @@ struct AreaLook {
     icon: Option<String>,
 }
 
+/// What the dialog of a place picks besides its name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum PlaceLook {
+    Area(AreaLook),
+    /// A Topic's icon (obf-1156), shown in `colour`, its Area's as
+    /// stored: it has none of its own.
+    Topic {
+        icon: Option<String>,
+        colour: Option<String>,
+    },
+}
+
 /// What may be done to the Note shown (#145), by its id.
 struct NoteMenu {
     id: String,
@@ -23072,79 +23197,119 @@ fn people_form(
     }
 }
 
-/// An Area's name, colour and icon in one dialog (obf-1014): its name
-/// over the colours and icons, each marked as it is picked and kept with
-/// Save, or Enter in the name; Cancel keeps none of them.
+/// An Area's name, colour and icon in one dialog (obf-1014), or a
+/// Topic's name and icon (obf-1156): its name over the colours and the
+/// icons, a Topic's in its Area's colour, each marked as it is picked
+/// and kept with Save, or Enter in the name; Cancel keeps none of them.
 fn area_look_form(
     ui: &mut Ui,
     t: &L10n,
     (name, focus): (&mut String, bool),
-    look: &mut AreaLook,
+    look: &mut PlaceLook,
     actions: &mut Vec<Action>,
 ) {
     let text = ui.visuals().text_color();
-    title(ui, t.desk_area_look_title());
+    let dark = ui.visuals().dark_mode;
+    match look {
+        PlaceLook::Area(_) => title(ui, t.desk_area_look_title()),
+        PlaceLook::Topic { .. } => title(ui, t.desk_topic_look_title()),
+    }
     let field = focused_field(ui, t, (&mut *name, focus), "name", t.name_hint());
     let ready = !name.trim().is_empty();
     if ready && field.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
         actions.push(Action::SaveName);
     }
     ui.add_space(8.0);
-    ui.label(RichText::new(t.colour_heading()).strong());
-    ui.horizontal_wrapped(|ui| {
-        let none = look.colour.is_none();
-        if ui
-            .add(egui::Button::selectable(
-                none,
-                RichText::new(t.no_colour()).color(text),
-            ))
-            .clicked()
-        {
-            look.colour = None;
-        }
-        for hex in AREA_PALETTE {
-            let on = look.colour.as_deref() == Some(hex);
-            let colour = area_colour(Some(hex)).unwrap_or(text);
-            if swatch(ui, hex, on, |painter, rect| {
-                painter.circle_filled(rect.center(), rect.width() / 2.0 - 3.0, colour);
-            })
-            .clicked()
-            {
-                look.colour = Some(hex.to_string());
+    // The colours and the icons scroll, as high as the window allows,
+    // the title, the name and the buttons around them (obf-1156).
+    let high = (ui.ctx().content_rect().height() - 240.0).max(160.0);
+    let choices = |ui: &mut Ui| {
+        let (icon, painted) = match look {
+            PlaceLook::Area(look) => {
+                area_colours(ui, t, &mut look.colour);
+                (&mut look.icon, text)
             }
-        }
-    });
-    ui.label(RichText::new(t.icon_heading()).strong());
-    ui.horizontal_wrapped(|ui| {
-        let none = look.icon.is_none();
-        if ui
-            .add(egui::Button::selectable(
-                none,
-                RichText::new(t.no_icon()).color(text),
-            ))
-            .clicked()
-        {
-            look.icon = None;
-        }
-        for key in AREA_ICONS {
-            let Some(glyph) = icons::area_icon(Some(key)) else {
-                continue;
-            };
-            let on = look.icon.as_deref() == Some(key);
-            if swatch(ui, key, on, |painter, rect| {
-                icons::paint(painter, rect.shrink(5.0), glyph, text);
-            })
-            .clicked()
-            {
-                look.icon = Some(key.to_string());
+            // A Topic shows in its Area's colour: it has none of its own.
+            PlaceLook::Topic { icon, colour } => {
+                let shown = area_colour(colour.as_deref(), dark).unwrap_or(text);
+                (icon, shown)
             }
+        };
+        ui.label(RichText::new(t.icon_heading()).strong());
+        // Each group of the core's on its own lines (obf-1156).
+        for (i, group) in AREA_ICON_GROUPS.iter().enumerate() {
+            if i > 0 {
+                ui.add_space(6.0);
+            }
+            ui.horizontal_wrapped(|ui| {
+                if i == 0
+                    && ui
+                        .add(egui::Button::selectable(
+                            icon.is_none(),
+                            RichText::new(t.no_icon()).color(text),
+                        ))
+                        .clicked()
+                {
+                    *icon = None;
+                }
+                for &key in *group {
+                    let Some(glyph) = icons::area_icon(Some(key)) else {
+                        continue;
+                    };
+                    let on = icon.as_deref() == Some(key);
+                    if swatch(ui, key, on, |painter, rect| {
+                        icons::paint(painter, rect.shrink(5.0), glyph, painted);
+                    })
+                    .clicked()
+                    {
+                        *icon = Some(key.to_string());
+                    }
+                }
+            });
         }
-    });
+    };
+    // As high as its choices up to `high` at once, not grown frame by
+    // frame from the size the dialog had before.
+    egui::ScrollArea::vertical()
+        .id_salt("place look")
+        .min_scrolled_height(high)
+        .max_height(high)
+        .show(ui, choices);
     ui.add_space(8.0);
     ui.horizontal(|ui| {
         cancel(ui, t, actions);
         if theme::main_action(ui, ready, t.save()) {
             actions.push(Action::SaveName);
+        }
+    });
+}
+
+/// An Area's colours to pick from (obf-1014), each as this look draws
+/// it, and none.
+fn area_colours(ui: &mut Ui, t: &L10n, colour: &mut Option<String>) {
+    let text = ui.visuals().text_color();
+    let dark = ui.visuals().dark_mode;
+    ui.label(RichText::new(t.colour_heading()).strong());
+    ui.horizontal_wrapped(|ui| {
+        if ui
+            .add(egui::Button::selectable(
+                colour.is_none(),
+                RichText::new(t.no_colour()).color(text),
+            ))
+            .clicked()
+        {
+            *colour = None;
+        }
+        for hex in AREA_PALETTE {
+            let on = colour.as_deref() == Some(hex);
+            let shown = area_colour(Some(hex), dark).unwrap_or(text);
+            if swatch(ui, hex, on, |painter, rect| {
+                painter.circle_filled(rect.center(), rect.width() / 2.0 - 3.0, shown);
+            })
+            .clicked()
+            {
+                *colour = Some(hex.to_string());
+            }
         }
     });
 }
@@ -24023,11 +24188,37 @@ struct EntryClicks {
 /// words, struck through and dimmed when `struck`, indented under the
 /// heading, `depth` steps further for a Line under another. The box
 /// clicks while `boxes`, the words while `opens`, as a button named by
-/// them; `id` keeps their click apart from every other's.
+/// them; `id` keeps their click apart from every other's. The words stay
+/// on one line, cut off at the card's edge.
 fn agenda_entry(
     ui: &mut Ui,
     tones: Tones,
-    (id, words, depth): (Id, &str, usize),
+    shown: (Id, &str, usize),
+    states: (bool, bool),
+    clicks: (bool, bool),
+) -> EntryClicks {
+    entry_row(ui, tones, (shown, false), states, clicks)
+}
+
+/// A Session's pick under its heading, as [`agenda_entry`], its words
+/// wrapping onto more lines, so its name and targets show whole
+/// (obf-1160).
+fn agenda_pick(
+    ui: &mut Ui,
+    tones: Tones,
+    shown: (Id, &str, usize),
+    states: (bool, bool),
+    clicks: (bool, bool),
+) -> EntryClicks {
+    entry_row(ui, tones, (shown, true), states, clicks)
+}
+
+/// The entry [`agenda_entry`] and [`agenda_pick`] draw, its words
+/// wrapping where `wraps`.
+fn entry_row(
+    ui: &mut Ui,
+    tones: Tones,
+    ((id, words, depth), wraps): ((Id, &str, usize), bool),
     (checked, struck): (bool, bool),
     (boxes, opens): (bool, bool),
 ) -> EntryClicks {
@@ -24048,7 +24239,11 @@ fn agenda_entry(
         if struck {
             shown = shown.strikethrough().color(weak);
         }
-        let label = ui.add(egui::Label::new(shown).truncate());
+        let label = if wraps {
+            ui.add(egui::Label::new(shown).wrap())
+        } else {
+            ui.add(egui::Label::new(shown).truncate())
+        };
         let sense = if opens {
             Sense::click()
         } else {
@@ -24118,7 +24313,7 @@ fn agenda_row(
     let colour = row
         .area
         .as_ref()
-        .and_then(|a| area_colour(a.colour.as_deref()));
+        .and_then(|a| area_colour(a.colour.as_deref(), ui.visuals().dark_mode));
     let title = row_title(t, row.row.note.as_ref());
     let time = occurrence_time(t, &occurrence);
     let card = agenda_card(ui, tones, colour, |ui| {
@@ -24278,7 +24473,7 @@ fn session_picks(
         let words = shown.texts.get(i).map(String::as_str).unwrap_or_default();
         let opens = shown.opens.get(i).copied().unwrap_or(false);
         let id = Id::new(("session pick", session, occurrence.key(), &pick.note_id));
-        let clicks = agenda_entry(
+        let clicks = agenda_pick(
             ui,
             tones,
             (id, words, 0),
@@ -24358,7 +24553,7 @@ fn shopping_row(ui: &mut Ui, tones: Tones, row: &ShoppingRow, actions: &mut Vec<
     let colour = row
         .area
         .as_ref()
-        .and_then(|a| area_colour(a.colour.as_deref()));
+        .and_then(|a| area_colour(a.colour.as_deref(), ui.visuals().dark_mode));
     agenda_card(ui, tones, colour, |ui| {
         let icon = (icons::SHOPPING_CART, row.area.as_ref(), colour);
         list_heading(ui, icon, (&row.note_id, &row.text, "shopping row"), actions);
@@ -24393,7 +24588,7 @@ fn checklist_row(ui: &mut Ui, tones: Tones, row: &ChecklistRow, actions: &mut Ve
     let colour = row
         .area
         .as_ref()
-        .and_then(|a| area_colour(a.colour.as_deref()));
+        .and_then(|a| area_colour(a.colour.as_deref(), ui.visuals().dark_mode));
     agenda_card(ui, tones, colour, |ui| {
         let icon = (icons::CHECKLIST, row.area.as_ref(), colour);
         list_heading(
@@ -24583,10 +24778,10 @@ fn missed_card(
 
 /// An Area's stored colour (`RRGGBB`), or `None` when it has none or it
 /// cannot be read.
-pub fn area_colour(hex: Option<&str>) -> Option<Color32> {
+pub fn area_colour(hex: Option<&str>, dark: bool) -> Option<Color32> {
     let value = u32::from_str_radix(hex?, 16).ok()?;
     let [_, r, g, b] = value.to_be_bytes();
-    Some(Color32::from_rgb(r, g, b))
+    Some(theme::area_shade(Color32::from_rgb(r, g, b), dark))
 }
 
 /// When something was captured, in the app's language and local time:
@@ -24780,19 +24975,40 @@ fn place_line(t: &L10n, placed: &Placed) -> Option<String> {
     })
 }
 
+/// How a row of the left pane sets its name (obf-1157).
+#[derive(Clone, Copy, PartialEq)]
+enum RowName {
+    /// In the body's text, as Agenda, All Notes or Trash.
+    Plain,
+    /// Bold, so its Topics stand apart from it.
+    Area,
+    /// One text size smaller, after its icon or the room of one, so the
+    /// names of an Area's Topics stand in one column.
+    Topic,
+}
+
+/// The room a row of the left pane gives its icon, the gap included.
+const ROW_ICON_ROOM: f32 = 26.0;
+
 /// A row of the left pane: self-painted so its text reads in every
 /// state, with the accent while selected. A `droppable` row is outlined
-/// while a card is held over it.
+/// while a card is held over it. `indent` moves its icon and name right,
+/// `name` sets how its name looks.
 fn row(
     ui: &mut Ui,
     tones: Tones,
     on: bool,
-    indent: f32,
+    (indent, name): (f32, RowName),
     icon: Option<(char, Color32)>,
     label: &str,
     droppable: bool,
 ) -> egui::Response {
-    let font = egui::TextStyle::Body.resolve(ui.style());
+    // Grown by this Device's text size, as egui's text styles are.
+    let style = match name {
+        RowName::Topic => egui::TextStyle::Small,
+        RowName::Plain | RowName::Area => egui::TextStyle::Body,
+    };
+    let font = style.resolve(ui.style());
     let height = 30.0;
     let width = ui.available_width();
     let (rect, resp) = ui.allocate_exact_size(egui::vec2(width, height), Sense::click());
@@ -24824,7 +25040,9 @@ fn row(
                 egui::vec2(18.0, 18.0),
             );
             icons::paint(ui.painter(), icon_rect, glyph, colour);
-            x += 26.0;
+            x += ROW_ICON_ROOM;
+        } else if name == RowName::Topic {
+            x += ROW_ICON_ROOM;
         }
         let text = ui.painter().layout(
             label.to_string(),
@@ -24833,6 +25051,12 @@ fn row(
             (rect.right() - x - 8.0).max(0.0),
         );
         let y = rect.center().y - text.size().y / 2.0;
+        // egui's fonts have no bold: drawn again a little to the right,
+        // as a Note's bold text is.
+        if name == RowName::Area {
+            let again = egui::pos2(x + 0.6, y);
+            ui.painter().galley(again, text.clone(), fg);
+        }
         ui.painter().galley(egui::pos2(x, y), text, fg);
     }
     resp
@@ -25234,7 +25458,7 @@ fn note_badges(
         // Area and Topic in one: File into… picks both at once.
         // The folder for every place, in the Area's colour.
         let area = placed.area.as_ref();
-        let colour = area.and_then(|a| area_colour(a.colour.as_deref()));
+        let colour = area.and_then(|a| area_colour(a.colour.as_deref(), ui.visuals().dark_mode));
         let place = place_line(t, placed).unwrap_or_else(|| t.unsorted().to_string());
         let place = badge(
             ui,
@@ -26580,6 +26804,25 @@ fn edited_text(
                 ui.ctx().request_repaint();
             }
         }
+        // Return on a line that starts with a box carries a ☐ on to the
+        // next line, or ends the boxes on a line with its box alone
+        // (obf-1154).
+        let returned = ui.input(|i| {
+            i.events.iter().any(|e| {
+                matches!(e, egui::Event::Key { key: Key::Enter, pressed: true, modifiers, .. }
+                    if modifiers.matches_logically(Modifiers::NONE))
+            })
+        });
+        if output.response.response.changed() && returned && !as_code {
+            let (start, cursor) = format_bar::selection(ui, id, edited);
+            if start == cursor
+                && let Some((text, at)) = text_boxes::carried_on(edited, cursor, typed_format)
+            {
+                *edited = text;
+                format_bar::select(ui, id, edited, (at, at));
+                ui.ctx().request_repaint();
+            }
+        }
         let marked = Id::new(("field", of));
         if let Some(asked) = text_marks_view::box_clicks(ui, &t, marked, &spots, edit.ticks) {
             actions.push(box_action(of.to_string(), asked));
@@ -27554,7 +27797,7 @@ fn note_card(
     let colour = placed
         .area
         .as_ref()
-        .and_then(|a| area_colour(a.colour.as_deref()));
+        .and_then(|a| area_colour(a.colour.as_deref(), ui.visuals().dark_mode));
     let mut author_rect = None;
     let mut edit_rect = egui::Rect::NOTHING;
     let mut more_rect = None;

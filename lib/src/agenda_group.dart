@@ -168,7 +168,7 @@ class AgendaGroup extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.t;
     final text = Theme.of(context).textTheme;
-    final colour = areaColour(area?.colour);
+    final colour = areaColour(area?.colour, Theme.of(context).brightness);
     final time = this.time;
     final onMenu = this.onMenu;
     final sizes = AgendaSizes.of(context);

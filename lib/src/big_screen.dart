@@ -505,7 +505,7 @@ class _SidebarState extends State<Sidebar> with ReloadsOnLogChange {
             icon: Icon(
               areaIconData(area.icon) ?? Icons.folder,
               color:
-                  areaColour(area.colour) ??
+                  areaColour(area.colour, Theme.of(context).brightness) ??
                   Theme.of(context).colorScheme.outline,
             ),
             label: areaName(t, area),
@@ -522,7 +522,8 @@ class _SidebarState extends State<Sidebar> with ReloadsOnLogChange {
               ShownPlace.topic(topic.id),
               shown,
               indent: 48,
-              icon: const SizedBox.shrink(),
+              // Its icon in the Area's colour, where it has one (obf-1156).
+              icon: topicMark(context, area, topic) ?? const SizedBox.shrink(),
               label: topicName(t, topic),
             ),
         ],

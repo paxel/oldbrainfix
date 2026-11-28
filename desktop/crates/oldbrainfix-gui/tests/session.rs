@@ -276,6 +276,27 @@ fn a_click_on_a_pick_records_an_entry_prefilled_with_its_targets() -> TestResult
 }
 
 #[test]
+fn a_pick_of_a_tally_in_sets_shows_how_many_and_any_entry_makes_it_done() -> TestResult {
+    let device = device()?;
+    let id = spawn(&device)?;
+    Tallies::new(&device.store).set_sets(&device.tallies[0], 3)?;
+    let mut harness = window(&device.store, None);
+    let t = L10n::new("en");
+    // The number of sets after its targets (obf-1159).
+    assert!(shows(&harness, "Push-ups 20 times ×3"));
+    assert!(shows(&harness, "Wall sit 30 times"));
+    click_button(&mut harness, "Push-ups 20 times ×3");
+    assert!(shows(&harness, &t.tally_set(3)));
+    // One set fewer still makes the pick done.
+    click_button(&mut harness, &t.tally_remove_set(3));
+    click_button(&mut harness, t.save());
+    let today = Sessions::new(&device.store).on(&id, &occurrence())?;
+    assert!(today.picks[0].done());
+    assert_eq!(today.picks[0].entries.len(), 1);
+    Ok(())
+}
+
+#[test]
 fn a_picks_field_without_a_target_starts_with_the_latest_own_value() -> TestResult {
     let device = device()?;
     let push_ups = &device.tallies[0];
@@ -1259,4 +1280,102 @@ fn framed(harness: &Harness<'_, App>, label: &str) -> bool {
         .shapes
         .iter()
         .any(|clipped| flat(&clipped.shape, at, look))
+}
+
+#[test]
+fn a_long_pick_on_the_agenda_wraps_instead_of_being_cut_off() -> TestResult {
+    // obf-1160: the whole name and the target show, over several lines.
+    let device = device()?;
+    let store = &device.store;
+    let name = "Push-ups with the hands on a chair, slowly down and quickly up again, \
+                the elbows close to the body and the back straight from head to heels";
+    let note = Notes::new(store).capture(name, None, None)?;
+    Tallies::new(store).add_field(&note.id, "Push-ups", "times", Some(20.0), None)?;
+    let pool = vec![note.id];
+    Sessions::new(store).spawn(&device.sport, &daily()?, &pool, 1, SessionRule::Rolling)?;
+    let harness = window(store, None);
+    let label = format!("{name} 20 times");
+    let rect = harness.get_by_role_and_label(Role::Button, &label).rect();
+    // Taller than one line of words at the Agenda's text size.
+    assert!(rect.height() > 30.0, "{rect:?}");
+    Ok(())
+}
+
+#[test]
+fn a_pick_shows_only_its_name_without_tags_and_its_targets() -> TestResult {
+    // obf-1158: neither the tags of its first line nor its Description.
+    let device = device()?;
+    let store = &device.store;
+    let note = Notes::new(store).capture("Push-ups #sport\nSlowly down, quickly up", None, None)?;
+    Tallies::new(store).add_field(&note.id, "Push-ups", "times", Some(20.0), None)?;
+    let pool = vec![note.id];
+    Sessions::new(store).spawn(&device.sport, &daily()?, &pool, 1, SessionRule::Rolling)?;
+    let harness = window(store, None);
+    assert!(
+        harness
+            .query_all_by_role_and_label(Role::Button, "Push-ups 20 times")
+            .next()
+            .is_some()
+    );
+    assert!(
+        harness
+            .query_all_by_label_contains("#sport")
+            .next()
+            .is_none()
+    );
+    assert!(
+        harness
+            .query_all_by_label_contains("Slowly")
+            .next()
+            .is_none()
+    );
+    Ok(())
+}
+
+#[test]
+fn a_pick_named_only_by_tags_shows_them() -> TestResult {
+    // obf-1158: without words left, it shows what its row shows.
+    let device = device()?;
+    let store = &device.store;
+    let note = Notes::new(store).capture("#sport", None, None)?;
+    Tallies::new(store).add_field(&note.id, "Push-ups", "times", Some(20.0), None)?;
+    let pool = vec![note.id];
+    Sessions::new(store).spawn(&device.sport, &daily()?, &pool, 1, SessionRule::Rolling)?;
+    let harness = window(store, None);
+    assert!(
+        harness
+            .query_all_by_role_and_label(Role::Button, "#sport 20 times")
+            .next()
+            .is_some()
+    );
+    Ok(())
+}
+
+#[test]
+fn a_past_run_names_each_pick_without_tags_or_description() -> TestResult {
+    // obf-1158: as the pick showed, without its targets.
+    use oldbrainfix_core::sessions::keys;
+    let device = device()?;
+    let store = &device.store;
+    let note = Notes::new(store).capture("Push-ups #sport\nSlowly down, quickly up", None, None)?;
+    Tallies::new(store).add_field(&note.id, "Push-ups", "times", Some(20.0), None)?;
+    let rule = Recurrence::parse("FREQ=DAILY").map_err(|e| e.source)?;
+    let from = today().add_days(-1);
+    let schedule = Schedule::new(from, &[], Some(rule)).ok_or("a schedule")?;
+    let pool = vec![note.id.clone()];
+    let made =
+        Sessions::new(store).spawn(&device.sport, &schedule, &pool, 1, SessionRule::Rolling)?;
+    let yesterday = Occurrence::new(from, None);
+    store.append(
+        &made.routine.id,
+        &keys::pick(&yesterday),
+        Some(&note.id),
+        None,
+    )?;
+    let t = L10n::new("en");
+    let harness = window(store, Some(&device.sport));
+    // On its card, and on its page in the Note dialog.
+    let not_done = t.session_run_not_done("Push-ups");
+    assert_eq!(harness.query_all_by_label(&not_done).count(), 2);
+    Ok(())
 }

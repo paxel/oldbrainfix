@@ -748,7 +748,7 @@ fn the_note_dialog_holds_only_the_setup_and_a_badge_opens_the_field() -> TestRes
 }
 
 #[test]
-fn the_setups_badges_set_the_bar_length_and_whether_it_counts_in_sets() -> TestResult {
+fn the_setups_badges_set_the_bar_length_and_the_number_of_sets() -> TestResult {
     let (store, note) = with_note()?;
     let tallies = Tallies::new(&store);
     tallies.add_field(&note, "Reps", "", None, None)?;
@@ -759,12 +759,62 @@ fn the_setups_badges_set_the_bar_length_and_whether_it_counts_in_sets() -> TestR
     let tally = tallies.by_note(&note)?.ok_or("a Tally")?;
     assert_eq!(tally.bar, TallyPeriod::Week);
     assert!(shows(&harness, "One bar per: Week"));
-    click_button(&mut harness, "Counts in sets: Off");
-    harness
-        .get_by_role_and_label(Role::CheckBox, "Counts in sets")
-        .click_accesskit();
+    // A number of sets, 1 at first, each step written at once (obf-1159).
+    assert!(!shows(&harness, "Fewer"));
+    click_button(&mut harness, "Sets: 1");
+    click(&mut harness, "More")?;
+    click(&mut harness, "More")?;
+    assert_eq!(tallies.by_note(&note)?.ok_or("a Tally")?.sets, 3);
+    assert_eq!(
+        store.current(&note, oldbrainfix_core::tallies::keys::SETS)?,
+        Some("true".into())
+    );
+    click(&mut harness, "Fewer")?;
+    assert_eq!(tallies.by_note(&note)?.ok_or("a Tally")?.sets, 2);
+    harness.key_press(egui::Key::Escape);
     harness.run();
-    assert!(tallies.by_note(&note)?.ok_or("a Tally")?.counts_in_sets);
+    assert!(shows(&harness, "Sets: 2"));
+    Ok(())
+}
+
+#[test]
+fn a_tally_of_sets_starts_each_entry_with_them_and_shows_them_by_its_targets() -> TestResult {
+    let (store, note) = with_note()?;
+    let tallies = Tallies::new(&store);
+    let reps = tallies.add_field(&note, "Reps", "", Some(10.0), None)?;
+    tallies.set_sets(&note, 3)?;
+    store.set_local_setting("compactNotes:allNotes", "true")?;
+    // Its compact card and its setup name the sets after the target.
+    let dialog = window(&store, Some(&note));
+    assert!(shows(&dialog, "Reps 0 / 10 ×3"));
+    assert!(shows(&dialog, "Target: 10 ×3"));
+    store.remove_local_setting("compactNotes:allNotes")?;
+    let mut harness = window(&store, None);
+    click_button(&mut harness, "Add entry");
+    // As many sets as its number, each from the targets, and Add set.
+    for set in 1..=3 {
+        assert!(shows(&harness, &format!("Set {set}")), "{set}");
+    }
+    assert!(!shows(&harness, "Set 4"));
+    assert_eq!(
+        harness
+            .query_all_by_role_and_label(Role::TextInput, "Reps")
+            .filter_map(|n| n.accesskit_node().value())
+            .collect::<Vec<_>>(),
+        ["10", "10", "10"]
+    );
+    click_button(&mut harness, "Add set");
+    assert!(shows(&harness, "Set 4"));
+    click_button(&mut harness, "Remove set 4");
+    click_button(&mut harness, "Remove set 3");
+    click_button(&mut harness, "Save");
+    let entry = tallies
+        .entries(&note, &Default::default())?
+        .pop()
+        .ok_or("an entry")?;
+    assert_eq!(entry.more, vec![BTreeMap::from([(reps, 10.0)])]);
+    // Fewer sets than its number say so.
+    assert!(shows_part(&harness, "2/3 sets"));
     Ok(())
 }
 
@@ -774,10 +824,13 @@ fn add_set_starts_with_the_set_before_and_each_field_totals_its_sets_by_its_rule
     let tallies = Tallies::new(&store);
     let weight = tallies.add_field(&note, "Weight", "kg", None, Some(TallyRule::Max))?;
     let reps = tallies.add_field(&note, "Reps", "", None, None)?;
-    tallies.set_counts_in_sets(&note, true)?;
+    tallies.set_sets(&note, 2)?;
     let mut harness = window(&store, None);
     click_button(&mut harness, "Add entry");
     assert!(shows(&harness, "Set 1"));
+    // It starts with as many sets as the Tally's number (obf-1159).
+    click_button(&mut harness, "Remove set 2");
+    assert!(!shows(&harness, "Set 2"));
     type_into(&mut harness, "Weight", "60");
     type_into(&mut harness, "Reps", "10");
     assert!(in_accent(&harness, "Add set"));
@@ -863,7 +916,8 @@ fn a_tally_a_multiplier_made_shows_its_entries_as_sets() -> TestResult {
     assert!(!shows_part(&harness, "Chart of Rounds"));
     store.set_local_setting("compactNotes:allNotes", "true")?;
     let compact = window(&store, None);
-    assert!(shows(&compact, "Reps 60 / 50 reps"));
+    // It counts in sets, as many as its newest entry holds (obf-1159).
+    assert!(shows(&compact, "Reps 60 / 50 reps ×3"));
     Ok(())
 }
 

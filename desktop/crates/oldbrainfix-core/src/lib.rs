@@ -142,7 +142,8 @@ pub use pending::{
 pub use people::{NoteAccess, PersonFilter, PersonTaken};
 pub use person_settings::PersonSettings;
 pub use places::{
-    AREA_ICONS, Area, MoveProgress, NotesGo, Places, STARTER_SET, StarterPlace, Stopping, Topic,
+    AREA_ICON_GROUPS, AREA_ICONS, Area, MoveProgress, NotesGo, Places, STARTER_SET, StarterPlace,
+    Stopping, Topic,
 };
 pub use profile::{OwnProfile, Profile, ProfileChoice, SentProfile};
 pub use routines::{Agenda, AgendaRow, HeadsUpUnit, NewerRoutine, Routine, Routines};
