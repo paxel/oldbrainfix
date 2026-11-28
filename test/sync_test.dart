@@ -479,7 +479,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Routine schedule'), findsOneWidget);
     expect(find.text('Pills'), findsOneWidget);
-    expect(find.textContaining('09:00'), findsOneWidget);
+    // The schedule in words; a conflict's own time is the wall clock's,
+    // which may read 09:00 too.
+    expect(find.text('Every day · 09:00'), findsOneWidget);
     expect(find.text('Named Place radius'), findsOneWidget);
     expect(find.text('250 m'), findsOneWidget);
     expect(find.text('50 m'), findsOneWidget);
